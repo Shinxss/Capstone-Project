@@ -1,0 +1,28 @@
+{
+  "name": "lifeline",
+  "private": true,
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "turbo dev"
+  },
+  
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.28.1",
+  "devDependencies": {
+    "turbo": "^2.7.6"
+  },
+  
+  "pnpm": {
+    "overrides": {
+      "vite": "7.3.1",
+      "@types/node": "24.1.0",
+      "rollup": "4.56.0"
+    }
+  }
+}

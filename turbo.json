@@ -1,0 +1,8 @@
+{
+  "tasks": {
+    "dev": { "cache": false, "persistent": true },
+    "build": { "dependsOn": ["^build"], "outputs": ["dist/**", ".expo/**"] },
+    "lint": {},
+    "typecheck": {}
+  }
+}

@@ -1,0 +1,97 @@
+# =========================
+# OS / Editors
+# =========================
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# =========================
+# Logs
+# =========================
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# =========================
+# Env / Secrets
+# =========================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+
+# =========================
+# Node / Package managers
+# =========================
+node_modules/
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/releases
+!.yarn/plugins
+!.yarn/sdks
+!.yarn/versions
+
+# pnpm
+.pnpm-store/
+
+# =========================
+# Build outputs
+# =========================
+dist/
+build/
+out/
+coverage/
+*.tsbuildinfo
+
+# =========================
+# Vite
+# =========================
+apps/web/dist/
+apps/web/.vite/
+
+# =========================
+# Next.js (if you ever add it)
+# =========================
+.next/
+
+# =========================
+# Turborepo
+# =========================
+.turbo/
+
+# =========================
+# Expo / React Native
+# =========================
+apps/mobile/.expo/
+apps/mobile/.expo-shared/
+apps/mobile/web-build/
+apps/mobile/android/
+apps/mobile/ios/
+apps/mobile/*.jks
+apps/mobile/*.keystore
+
+# Metro / RN caches
+apps/mobile/.metro-cache/
+apps/mobile/npm-cache/
+apps/mobile/yarn-cache/
+
+# =========================
+# TypeScript caches
+# =========================
+*.tsbuildinfo
+
+# =========================
+# Mongo / Local DB (if any)
+# =========================
+data/
+dump/
