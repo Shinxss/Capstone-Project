@@ -18,9 +18,12 @@
   },
   "pnpm": {
     "overrides": {
+      "lightningcss": "1.30.1",
       "vite": "7.3.1",
       "@types/node": "24.1.0",
-      "rollup": "4.56.0"
+      "rollup": "4.56.0",
+      "react": "19.1.0",
+      "react-dom": "19.1.0"
     }
   }
 }

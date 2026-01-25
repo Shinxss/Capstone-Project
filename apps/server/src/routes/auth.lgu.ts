@@ -1,6 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { User } from "../models/Users";
+import { User } from "../models/User";
 import { signAccessToken } from "../utils/jwt";
 
 export const lguAuthRouter = Router();

@@ -1,10 +1,17 @@
 import { Schema, model, models } from "mongoose";
 
 export type UserRole = "ADMIN" | "LGU" | "VOLUNTEER" | "COMMUNITY";
+export type VolunteerStatus = "NONE" | "PENDING" | "APPROVED";
 
 const UserSchema = new Schema(
   {
-    username: { type: String, required: true, unique: true, trim: true },
+    // LGU uses username, Community uses email
+    username: { type: String, unique: true, sparse: true, trim: true },
+    email: { type: String, unique: true, sparse: true, lowercase: true, trim: true },
+
+    firstName: { type: String, default: "" },
+    lastName: { type: String, default: "" },
+
     passwordHash: { type: String, required: true },
 
     role: {
@@ -14,10 +21,18 @@ const UserSchema = new Schema(
       index: true,
     },
 
-    // Optional LGU fields (edit as needed)
+    // Optional LGU fields
     lguName: { type: String, default: "" },
     barangay: { type: String, default: "" },
     municipality: { type: String, default: "" },
+
+    // ✅ Community can apply to be volunteer later
+    volunteerStatus: {
+      type: String,
+      enum: ["NONE", "PENDING", "APPROVED"],
+      default: "NONE",
+      index: true,
+    },
 
     isActive: { type: Boolean, default: true },
   },
