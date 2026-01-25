@@ -84,7 +84,7 @@ function MapboxEmergencyMap() {
 
     const map = new mapboxgl.Map({
       container: mapElRef.current,
-      style: "mapbox://styles/mapbox/dark-v11",
+      style: "mapbox://styles/mapbox/streets-v12",
       center: [120.19, 16.08],
       zoom: 11.5,
     });
@@ -143,7 +143,7 @@ function MapboxEmergencyMap() {
       </div>
 
       <div className="relative">
-        <div ref={mapElRef} className="h-[340px] w-full" />
+        <div ref={mapElRef} className="h-[500px] w-full" />
 
         <div className="absolute bottom-3 right-3 bg-black/55 text-white text-xs rounded-md px-3 py-2 backdrop-blur">
           <div className="font-semibold mb-1">Volunteer Status</div>
