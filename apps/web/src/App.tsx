@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import LguLogin from "./pages/lgu/LguLogin";
 import LguDashboard from "./pages/lgu/LguDashboard";
 import PlaceholderPage from "./pages/lgu/PlaceholderPage";
+import LguEmergencies from "./pages/lgu/LguEmergencies";
 
 export default function App() {
   return (
@@ -12,7 +13,7 @@ export default function App() {
       <Route path="/lgu/dashboard" element={<LguDashboard />} />
 
       {/* ✅ Placeholder pages for sidebar routes (for now) */}
-      <Route path="/lgu/emergencies" element={<PlaceholderPage title="Emergencies" />} />
+      <Route path="/lgu/emergencies" element={<LguEmergencies />} />
       <Route path="/lgu/volunteers" element={<PlaceholderPage title="Volunteers" />} />
       <Route path="/lgu/tasks" element={<PlaceholderPage title="Tasks" />} />
       <Route path="/lgu/live-map" element={<PlaceholderPage title="Live Map" />} />

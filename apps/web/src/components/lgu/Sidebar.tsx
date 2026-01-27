@@ -22,10 +22,22 @@ const navItems = [
   { label: "Profile", to: "/lgu/profile", icon: User },
 ];
 
-function LifelineLogo() {
+function LifelineLogo({ collapsed }: { collapsed: boolean }) {
   return (
-    <div className="flex items-center gap-3 px-6 pt-6 pb-5">
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <div
+      className={
+        collapsed
+          ? "flex justify-center pt-6 pb-5"
+          : "flex items-center gap-3 px-6 pt-6 pb-5"
+      }
+    >
+      <svg
+        width="28"
+        height="28"
+        viewBox="0 0 24 24"
+        fill="none"
+        aria-hidden="true"
+      >
         <path
           d="M12 2l8 4v6c0 5-3.4 9.4-8 10-4.6-.6-8-5-8-10V6l8-4z"
           stroke="#E11D2E"
@@ -33,40 +45,44 @@ function LifelineLogo() {
           fill="white"
         />
       </svg>
-      <div className="text-2xl font-bold leading-none">
-        <span className="text-[#E11D2E]">Life</span>
-        <span className="text-gray-700">line</span>
-      </div>
+
+      {!collapsed && (
+        <div className="text-2xl font-bold leading-none">
+          <span className="text-[#E11D2E]">Life</span>
+          <span className="text-gray-700">line</span>
+        </div>
+      )}
     </div>
   );
 }
 
-export default function Sidebar() {
+export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
+  const w = collapsed ? "w-[86px]" : "w-[270px]";
+
   return (
     <aside
-      className="
-        w-[270px]
-        bg-white
-        border-r border-gray-300
-        min-h-screen
-        flex flex-col
-      "
+      className={[
+        w,
+        "bg-white border-r border-gray-300 h-screen shrink-0 flex flex-col",
+        "transition-[width] duration-200 ease-in-out",
+      ].join(" ")}
     >
-      <LifelineLogo />
+      <LifelineLogo collapsed={collapsed} />
 
-      {/* ✅ Fixed menu area (no scrolling) */}
       <nav className="px-4 pt-4 flex-1">
         <div className="space-y-2">
           {navItems.map((item) => {
             const Icon = item.icon;
+
             return (
               <NavLink
                 key={item.to}
                 to={item.to}
+                title={collapsed ? item.label : undefined}
                 className={({ isActive }) =>
                   [
-                    "flex items-center gap-4 rounded-lg px-4 py-3 text-base font-semibold",
-                    "transition-colors",
+                    "flex items-center rounded-lg py-3 text-base font-semibold transition-colors",
+                    collapsed ? "justify-center px-3" : "gap-4 px-4",
                     isActive
                       ? "bg-gray-200 text-gray-900"
                       : "text-gray-800 hover:bg-gray-100",
@@ -74,21 +90,21 @@ export default function Sidebar() {
                 }
               >
                 <Icon size={20} className="text-gray-900" />
-                {item.label}
+                {!collapsed && <span>{item.label}</span>}
               </NavLink>
             );
           })}
         </div>
       </nav>
 
-      {/* ✅ Settings pinned bottom */}
       <div className="px-4 pb-6">
         <NavLink
           to="/lgu/settings"
+          title={collapsed ? "Settings" : undefined}
           className={({ isActive }) =>
             [
-              "flex items-center gap-4 rounded-lg px-4 py-3 text-base font-semibold",
-              "transition-colors",
+              "flex items-center rounded-lg py-3 text-base font-semibold transition-colors",
+              collapsed ? "justify-center px-3" : "gap-4 px-4",
               isActive
                 ? "bg-gray-200 text-gray-900"
                 : "text-gray-800 hover:bg-gray-100",
@@ -96,7 +112,7 @@ export default function Sidebar() {
           }
         >
           <Settings size={20} className="text-gray-900" />
-          Settings
+          {!collapsed && <span>Settings</span>}
         </NavLink>
       </div>
     </aside>

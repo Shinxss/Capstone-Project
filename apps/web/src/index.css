@@ -1,1 +1,31 @@
 @import "tailwindcss";
+
+
+/* Heartbeat blinking effect (red <-> white) */
+@keyframes heartbeatBlink {
+  0%   { background-color: rgba(220, 38, 38, 1); }
+  50%  { background-color: rgb(242, 105, 105); }
+  100% { background-color: rgba(220, 38, 38, 1); }
+}
+
+/* Soft “pulsing” aura for SOS sections */
+@keyframes heartbeatGlow {
+  0%   { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.35); }
+  70%  { box-shadow: 0 0 0 10px rgba(220, 38, 38, 0.0); }
+  100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.0); }
+}
+
+/* Top SOS emergency strip */
+.heartbeat-strip {
+  animation: heartbeatBlink 2s infinite ease-in-out;
+}
+
+/* SOS alert banner pulse */
+.heartbeat-alert {
+  animation: heartbeatGlow 2s infinite ease-in-out;
+}
+
+/* Optional: subtle outer glow on SOS card container */
+.heartbeat-wrap {
+  animation: heartbeatGlow 1.8s infinite ease-in-out;
+}

@@ -8,6 +8,8 @@ import {
   ChevronDown,
   User,
   LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 
 type HeaderProps = {
@@ -15,6 +17,9 @@ type HeaderProps = {
   subtitle?: string;
   userName?: string;
   userRole?: string;
+
+  sidebarCollapsed?: boolean;
+  onToggleSidebar?: () => void;
 };
 
 export default function Header({
@@ -22,6 +27,8 @@ export default function Header({
   subtitle = "Welcome Back, John Doe",
   userName = "John Doe",
   userRole = "Administrator",
+  sidebarCollapsed = false,
+  onToggleSidebar,
 }: HeaderProps) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -52,18 +59,28 @@ export default function Header({
   }
 
   return (
-    <header className="bg-white border-b border-gray-300">
+    <header className="sticky top-0 z-40 bg-white border-b border-gray-300">
       <div className="h-16 px-6 flex items-center justify-between">
-        {/* Left: Title + subtitle */}
+        {/* Left: sidebar toggle + title */}
         <div className="min-w-[260px]">
           <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-md bg-gray-100 border border-gray-200 flex items-center justify-center">
-              <span className="h-4 w-4 border-2 border-gray-700 rounded-sm" />
-            </div>
+            <button
+              type="button"
+              onClick={onToggleSidebar}
+              disabled={!onToggleSidebar}
+              className="h-10 w-10 rounded-md bg-gray-100 border border-gray-200 hover:bg-gray-200 flex items-center justify-center disabled:opacity-50"
+              aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              {sidebarCollapsed ? (
+                <PanelLeftOpen size={18} />
+              ) : (
+                <PanelLeftClose size={18} />
+              )}
+            </button>
 
             <div className="leading-tight">
               <div className="text-xl font-bold text-gray-900">{title}</div>
-              <div className="text-sm text-blue-300">{subtitle}</div>
+              <div className="text-sm text-gray-500">{subtitle}</div>
             </div>
           </div>
         </div>
@@ -76,7 +93,7 @@ export default function Header({
               className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
             />
             <input
-              className="w-full h-11 rounded-full border border-gray-300 bg-white pl-12 pr-4 text-base outline-none focus:border-gray-400"
+              className="w-full h-11 rounded-lg border border-gray-300 bg-white pl-12 pr-4 text-base outline-none focus:border-gray-400"
               placeholder="Search"
             />
           </div>
@@ -96,7 +113,7 @@ export default function Header({
 
           <div className="h-8 w-px bg-gray-300 mx-1" />
 
-          {/* User box + dropdown */}
+          {/* User dropdown */}
           <div ref={menuRef} className="relative">
             <button
               type="button"
@@ -190,9 +207,7 @@ function MenuItem({
       onClick={onClick}
       className={[
         "w-full px-4 py-3 flex items-center gap-3 text-sm font-semibold text-left",
-        danger
-          ? "text-red-600 hover:bg-red-50"
-          : "text-gray-800 hover:bg-gray-50",
+        danger ? "text-red-600 hover:bg-red-50" : "text-gray-800 hover:bg-gray-50",
       ].join(" ")}
     >
       <span className="text-gray-700">{icon}</span>
