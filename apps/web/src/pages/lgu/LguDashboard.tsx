@@ -1,13 +1,30 @@
+// apps/web/src/pages/lgu/LguDashboard.tsx
 import { useEffect, useMemo, useRef } from "react";
 import mapboxgl from "mapbox-gl";
-import { AlertTriangle, Users, ClipboardList, Activity } from "lucide-react";
+import { createRoot, type Root } from "react-dom/client";
+import {
+  AlertTriangle,
+  Users,
+  ClipboardList,
+  Activity,
+  Droplet,
+  Flame,
+  Wind,
+  Zap,
+  Building2,
+  Siren,
+} from "lucide-react";
+
 import LguShell from "../../components/lgu/LguShell";
 
-type MarkerItem = {
+type EmergencyType = "SOS" | "Flood" | "Fire" | "Typhoon" | "Earthquake" | "Collapse";
+
+type EmergencyReport = {
   id: string;
+  type: EmergencyType;
+  title: string;
   lng: number;
   lat: number;
-  type: "critical" | "high" | "medium" | "low";
 };
 
 function StatCard({
@@ -55,22 +72,147 @@ function ProgressRing({ percent }: { percent: number }) {
   );
 }
 
-function MapboxEmergencyMap() {
+function hexToRgba(hex: string, alpha: number) {
+  const h = hex.replace("#", "");
+  const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const num = parseInt(full, 16);
+  const r = (num >> 16) & 255;
+  const g = (num >> 8) & 255;
+  const b = num & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function iconForEmergency(type: EmergencyType) {
+  switch (type) {
+    case "Flood":
+      return Droplet;
+    case "Fire":
+      return Flame;
+    case "Typhoon":
+      return Wind;
+    case "Earthquake":
+      return Zap;
+    case "Collapse":
+      return Building2;
+    case "SOS":
+      return Siren;
+    default:
+      return AlertTriangle;
+  }
+}
+
+function colorForEmergency(type: EmergencyType) {
+  switch (type) {
+    case "Flood":
+      return "#2563EB"; // blue
+    case "Fire":
+      return "#DC2626"; // red
+    case "Typhoon":
+      return "#B91C1C"; // deep red
+    case "Earthquake":
+      return "#F59E0B"; // amber
+    case "Collapse":
+      return "#CA8A04"; // yellow-ish
+    case "SOS":
+      return "#EF4444"; // bright red
+    default:
+      return "#64748B"; // slate
+  }
+}
+
+/**
+ * ✅ Marker UI:
+ * - Large pulse zone
+ * - Icon centered (smaller icon)
+ */
+function EmergencyMarker({ type }: { type: EmergencyType }) {
+  const Icon = iconForEmergency(type);
+  const color = colorForEmergency(type);
+
+  return (
+    <div className="relative h-[76px] w-[76px] pointer-events-none">
+      {/* BIG pulse zone */}
+      <span
+        className="absolute left-1/2 top-1/2 rounded-full"
+        style={{
+          width: 76,
+          height: 76,
+          transform: "translate(-50%, -50%)",
+          background: hexToRgba(color, 0.18),
+          border: `2px solid ${hexToRgba(color, 0.35)}`,
+          animation: "llPulse 1.7s ease-out infinite",
+        }}
+      />
+      <span
+        className="absolute left-1/2 top-1/2 rounded-full"
+        style={{
+          width: 76,
+          height: 76,
+          transform: "translate(-50%, -50%)",
+          background: hexToRgba(color, 0.1),
+          border: `2px solid ${hexToRgba(color, 0.22)}`,
+          animation: "llPulse 1.7s ease-out infinite",
+          animationDelay: "0.85s",
+        }}
+      />
+
+      {/* CENTER PIN */}
+      <div
+        className="absolute left-1/2 top-1/2 rounded-full shadow-xl"
+        style={{
+          width: 38,
+          height: 38,
+          transform: "translate(-50%, -50%)",
+          border: `3px solid ${hexToRgba(color, 0.95)}`,
+          background: "rgba(255,255,255,0.98)",
+          zIndex: 10,
+        }}
+      >
+        {/* subtle wave inside */}
+        <div
+          className="absolute inset-[5px] rounded-full"
+          style={{
+            background: `radial-gradient(circle, ${hexToRgba(color, 0.25)} 0%, rgba(255,255,255,0) 65%)`,
+            animation: "llInnerWave 1.4s ease-in-out infinite",
+          }}
+        />
+        {/* SMALLER icon in the middle */}
+        <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 20 }}>
+          <Icon size={14} style={{ color }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ensureMarkerStylesOnce() {
+  const id = "ll-dashboard-marker-styles";
+  if (document.getElementById(id)) return;
+
+  const style = document.createElement("style");
+  style.id = id;
+  style.innerHTML = `
+    @keyframes llPulse {
+      0%   { transform: translate(-50%, -50%) scale(0.45); opacity: 0.75; }
+      70%  { opacity: 0.18; }
+      100% { transform: translate(-50%, -50%) scale(1.15); opacity: 0; }
+    }
+    @keyframes llInnerWave {
+      0%   { transform: scale(0.92); opacity: 0.65; }
+      50%  { transform: scale(1.05); opacity: 0.35; }
+      100% { transform: scale(0.92); opacity: 0.65; }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+function MapboxEmergencyMap({ reports }: { reports: EmergencyReport[] }) {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const mapElRef = useRef<HTMLDivElement | null>(null);
 
-  const markers: MarkerItem[] = useMemo(
-    () => [
-      { id: "m1", lng: 120.19, lat: 16.07, type: "critical" },
-      { id: "m2", lng: 120.195, lat: 16.085, type: "low" },
-      { id: "m3", lng: 120.205, lat: 16.08, type: "medium" },
-      { id: "m4", lng: 120.185, lat: 16.095, type: "high" },
-      { id: "m5", lng: 120.175, lat: 16.065, type: "high" },
-    ],
-    []
-  );
-
   useEffect(() => {
+    ensureMarkerStylesOnce();
+
     const token = import.meta.env.VITE_MAPBOX_TOKEN as string | undefined;
     if (!token) {
       console.warn("Missing VITE_MAPBOX_TOKEN in apps/web/.env");
@@ -80,11 +222,14 @@ function MapboxEmergencyMap() {
 
     if (!mapElRef.current) return;
 
+    // ✅ Dagupan center
+    const DAGUPAN_CENTER: [number, number] = [120.3333, 16.0432];
+
     const map = new mapboxgl.Map({
       container: mapElRef.current,
       style: "mapbox://styles/mapbox/streets-v12",
-      center: [120.19, 16.08],
-      zoom: 11.5,
+      center: DAGUPAN_CENTER,
+      zoom: 13,
       attributionControl: false,
     });
 
@@ -93,22 +238,28 @@ function MapboxEmergencyMap() {
 
     mapRef.current = map;
 
-    const colorByType: Record<MarkerItem["type"], string> = {
-      critical: "#ef4444",
-      high: "#f97316",
-      medium: "#a855f7",
-      low: "#22c55e",
-    };
+    const markerObjs: mapboxgl.Marker[] = [];
+    const roots: Root[] = [];
 
-    markers.forEach((m) => {
-      const el = document.createElement("div");
-      el.style.width = "12px";
-      el.style.height = "12px";
-      el.style.borderRadius = "999px";
-      el.style.background = colorByType[m.type];
-      el.style.border = "2px solid rgba(255,255,255,0.9)";
-      el.style.boxShadow = "0 6px 16px rgba(0,0,0,0.35)";
-      new mapboxgl.Marker({ element: el }).setLngLat([m.lng, m.lat]).addTo(map);
+    map.on("load", () => {
+      reports.forEach((r) => {
+        const el = document.createElement("div");
+        const root = createRoot(el);
+        root.render(<EmergencyMarker type={r.type} />);
+        roots.push(root);
+
+        const marker = new mapboxgl.Marker({ element: el, anchor: "center" })
+          .setLngLat([r.lng, r.lat])
+          .addTo(map);
+
+        markerObjs.push(marker);
+      });
+
+      if (reports.length > 0) {
+        const bounds = new mapboxgl.LngLatBounds();
+        reports.forEach((r) => bounds.extend([r.lng, r.lat]));
+        map.fitBounds(bounds, { padding: 140, maxZoom: 14, duration: 650 });
+      }
     });
 
     const ro = new ResizeObserver(() => map.resize());
@@ -116,50 +267,46 @@ function MapboxEmergencyMap() {
 
     return () => {
       ro.disconnect();
+      markerObjs.forEach((m) => m.remove());
+      roots.forEach((rt) => rt.unmount());
       map.remove();
       mapRef.current = null;
     };
-  }, [markers]);
+  }, [reports]);
+
+  const counts = useMemo(() => {
+    const c = { SOS: 0, Fire: 0, Other: 0 };
+    reports.forEach((r) => {
+      if (r.type === "SOS") c.SOS += 1;
+      else if (r.type === "Fire") c.Fire += 1;
+      else c.Other += 1;
+    });
+    return c;
+  }, [reports]);
 
   return (
     <div className="relative bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
       <div ref={mapElRef} className="h-[500px] w-full" />
 
-      {/* Overlay header */}
+      {/* overlay header */}
       <div className="absolute inset-x-0 top-0 p-4 flex items-start justify-between pointer-events-none">
         <div className="pointer-events-auto">
           <div className="flex items-center gap-2 text-white font-semibold">
             <span className="h-2 w-2 rounded-full bg-blue-500" />
-            <div className="px-3 py-2 rounded-lg bg-black/40 backdrop-blur-md">
-              Emergency Map
-            </div>
+            <div className="px-3 py-2 rounded-lg bg-black/40 backdrop-blur-md">Emergency Map</div>
           </div>
         </div>
 
         <div className="pointer-events-auto flex items-center gap-2 mr-14">
           <span className="px-3 py-1 rounded-full bg-red-500/20 text-red-200 border border-red-400/30 text-xs font-semibold backdrop-blur-md">
-            2 Critical
+            {counts.SOS} SOS
           </span>
           <span className="px-3 py-1 rounded-full bg-orange-500/20 text-orange-200 border border-orange-400/30 text-xs font-semibold backdrop-blur-md">
-            12 High
+            {counts.Fire} Fire
           </span>
           <span className="px-3 py-1 rounded-full bg-white/10 text-white border border-white/20 text-xs font-semibold backdrop-blur-md">
-            3 Volunteers
+            {counts.Other} Other
           </span>
-        </div>
-      </div>
-
-      {/* Legend */}
-      <div className="absolute bottom-3 right-3 bg-black/55 text-white text-xs rounded-md px-3 py-2 backdrop-blur pointer-events-none">
-        <div className="font-semibold mb-1">Volunteer Status</div>
-        <div className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-green-500" /> Available
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-orange-500" /> Busy
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-red-500" /> Offline
         </div>
       </div>
 
@@ -171,43 +318,78 @@ function MapboxEmergencyMap() {
 }
 
 export default function LguDashboard() {
+  // ✅ Dagupan-only static pinpoints (adjust anytime)
+  const reports: EmergencyReport[] = useMemo(
+    () => [
+      {
+        id: "sos-1",
+        type: "SOS",
+        title: "SOS: Flash Flood Emergency (Calmay)",
+        lng: 120.3365,
+        lat: 16.0458,
+      },
+      {
+        id: "fire-1",
+        type: "Fire",
+        title: "Residential Fire (Poblacion Oeste)",
+        lng: 120.3348,
+        lat: 16.0428,
+      },
+      {
+        id: "collapse-1",
+        type: "Collapse",
+        title: "Building Collapse (Tapuac)",
+        lng: 120.3456,
+        lat: 16.0294,
+      },
+      {
+        id: "typhoon-1",
+        type: "Typhoon",
+        title: "Typhoon Evacuation Support (Bonuan Binloc)",
+        lng: 120.3092,
+        lat: 16.0732,
+      },
+    ],
+    []
+  );
+
   const emergencies = [
     {
       title: "Flood",
       status: "critical",
-      location: "Barangay San Jose, Quezon City",
+      location: "Barangay Calmay, Dagupan City",
       time: "15 min ago",
       percent: 75,
     },
     {
       title: "Fire",
       status: "high",
-      location: "Barangay Poblacion, Malasi",
+      location: "Poblacion Oeste, Dagupan City",
       time: "32 min ago",
       percent: 80,
     },
     {
       title: "Typhoon Evacuation",
       status: "critical",
-      location: "Barangay Binmaley, Pasay City",
+      location: "Bonuan Binloc, Dagupan City",
       time: "45 min ago",
       percent: 70,
     },
     {
       title: "Building Collapse",
       status: "moderate",
-      location: "Barangay Binga, Caloocan",
+      location: "Tapuac, Dagupan City",
       time: "2 hours ago",
       percent: 100,
     },
   ];
 
   const activity = [
-    { text: "Maj. Santos completed verification task", time: "Just now" },
-    { text: "Juan Dela Cruz assigned to Flood Response", time: "5 min ago" },
-    { text: "New emergency reported in Quezon City", time: "15 min ago" },
-    { text: "Supply delivery delayed — rerouting", time: "30 min ago" },
-    { text: "Team Alpha deployed to evacuation center", time: "1 hour ago" },
+    { text: "Dagupan DRRMO verified new SOS report", time: "Just now" },
+    { text: "Responder team assigned to Calmay Flood Response", time: "5 min ago" },
+    { text: "New emergency reported in Poblacion Oeste", time: "15 min ago" },
+    { text: "Supply delivery delayed — rerouting to Bonuan", time: "30 min ago" },
+    { text: "Team Alpha deployed to evacuation center (Bonuan)", time: "1 hour ago" },
   ];
 
   return (
@@ -215,9 +397,7 @@ export default function LguDashboard() {
       <div className="p-6">
         <div className="mb-7">
           <div className="text-4xl font-bold text-gray-900">Command Center</div>
-          <div className="text-base text-gray-400">
-            Real-time emergency coordination dashboard
-          </div>
+          <div className="text-base text-gray-400">Real-time emergency coordination dashboard</div>
         </div>
 
         {/* Stats */}
@@ -250,7 +430,7 @@ export default function LguDashboard() {
 
         {/* Map */}
         <div className="mb-4">
-          <MapboxEmergencyMap />
+          <MapboxEmergencyMap reports={reports} />
         </div>
 
         {/* Bottom panels */}
@@ -259,9 +439,7 @@ export default function LguDashboard() {
             <div className="px-4 py-3 flex items-center justify-between border-b border-gray-200">
               <div>
                 <div className="text-sm font-bold text-gray-900">Active Emergencies</div>
-                <div className="text-xs text-gray-500">
-                  Current incidents requiring response
-                </div>
+                <div className="text-xs text-gray-500">Current incidents requiring response</div>
               </div>
               <button className="text-xs font-semibold text-gray-700 hover:text-gray-900">
                 View All →
@@ -302,9 +480,7 @@ export default function LguDashboard() {
                 <div className="text-sm font-bold text-gray-900">Activity Feed</div>
                 <div className="text-xs text-gray-500">Real-time updates</div>
               </div>
-              <button className="text-xs font-semibold text-gray-700 hover:text-gray-900">
-                ↗
-              </button>
+              <button className="text-xs font-semibold text-gray-700 hover:text-gray-900">↗</button>
             </div>
 
             <div className="p-4 space-y-4">

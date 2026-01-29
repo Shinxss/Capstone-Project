@@ -1,7 +1,8 @@
 import React from "react";
-import { View, Dimensions } from "react-native";
+import { View, Dimensions, StyleSheet} from "react-native";
 import Svg, { Defs, RadialGradient, Stop, Circle } from "react-native-svg";
 import LoginBg from "../assets/login_lightbg.svg"; // adjust path
+import { BlurView } from "expo-blur";
 
 const { width, height } = Dimensions.get("window");
 
@@ -24,8 +25,8 @@ function SirenGlow({
       <Svg width={size} height={size}>
         <Defs>
           <RadialGradient id={id} cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor={main} stopOpacity={0.30} />
-            <Stop offset="55%" stopColor={main} stopOpacity={0.12} />
+            <Stop offset="0%" stopColor={main} stopOpacity={2} />
+            <Stop offset="55%" stopColor={main} stopOpacity={0.60} />
             <Stop offset="100%" stopColor={main} stopOpacity={0} />
           </RadialGradient>
         </Defs>
@@ -37,25 +38,32 @@ function SirenGlow({
 
 export default function AuthBackground({ children }: { children: React.ReactNode }) {
   return (
-    <View style={{ flex: 1, backgroundColor: "white" }}>
-      {/* ✅ Background behind */}
-      <View
-        pointerEvents="none"
-        style={{ position: "absolute", inset: 0, zIndex: 0 }}
-      >
+    <View style={{ flex: 1, backgroundColor: "white", position: "relative" }}>
+      {/* Background */}
+      <View pointerEvents="none" style={{ position: "absolute", inset: 0, zIndex: 0 }}>
         <LoginBg width={width} height={height} preserveAspectRatio="xMidYMid slice" />
       </View>
 
-      {/* ✅ Siren glow behind */}
-      <View
-        pointerEvents="none"
-        style={{ position: "absolute", inset: 0, zIndex: 1 }}
-      >
-        <SirenGlow color="blue" size={240} x={-90} y={40} />
+      {/* Siren glows */}
+      <View pointerEvents="none" style={{ position: "absolute", inset: 0, zIndex: 1 }}>
+        <SirenGlow color="blue" size={240} x={-40} y={150} />
         <SirenGlow color="red" size={240} x={width - 180} y={30} />
       </View>
 
-      {/* ✅ Content on top */}
+      {/* ✅ White blur overlay */}
+      <BlurView
+        pointerEvents="none"
+        intensity={90}
+        tint="light"
+        style={[StyleSheet.absoluteFill, { zIndex: 2 }]}
+      />
+      {/* ✅ Extra white wash (optional, makes it brighter) */}
+      <View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(255,255,255,0.25)", zIndex: 3 }]}
+      />
+
+      {/* Content */}
       <View style={{ flex: 1, zIndex: 5 }}>{children}</View>
     </View>
   );

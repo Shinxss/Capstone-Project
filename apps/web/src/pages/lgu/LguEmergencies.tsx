@@ -1,3 +1,4 @@
+// apps/web/src/pages/lgu/LguEmergencies.tsx
 import { useMemo, useState } from "react";
 import LguShell from "../../components/lgu/LguShell";
 import {
@@ -53,17 +54,9 @@ const typeChips: { key: "ALL" | "SOS" | EmergencyType; label: string; icon: Luci
   { key: "Collapse", label: "Collapse", icon: Building2 },
 ];
 
-function Pill({
-  children,
-  className = "",
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
+function Pill({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${className}`}
-    >
+    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${className}`}>
       {children}
     </span>
   );
@@ -170,7 +163,7 @@ function EmergencyCard({ item }: { item: EmergencyItem }) {
 
   return (
     <div className={`bg-white rounded-2xl text-white shadow-sm ${cardBorder} overflow-hidden`}>
-      {/* SOS Strip (heartbeat) */}
+      {/* SOS Strip */}
       {isSOS && (
         <div className="heartbeat-strip px-4 py-2 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-bold tracking-wide">
@@ -187,11 +180,7 @@ function EmergencyCard({ item }: { item: EmergencyItem }) {
       <div className="p-6 grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6">
         {/* left */}
         <div className="flex gap-4">
-          <div
-            className={`h-14 w-14 rounded-2xl ${bgForType(
-              item.type
-            )} flex items-center justify-center`}
-          >
+          <div className={`h-14 w-14 rounded-2xl ${bgForType(item.type)} flex items-center justify-center`}>
             <Icon size={22} className="text-red-600" />
           </div>
 
@@ -201,9 +190,7 @@ function EmergencyCard({ item }: { item: EmergencyItem }) {
 
               {item.isSOS && <Pill className="bg-red-100 text-red-700">SOS</Pill>}
               <Pill className={priorityPill(item.priority)}>{item.priority}</Pill>
-              <Pill className={statusPill(item.status)}>
-                {item.status.replace("_", " ")}
-              </Pill>
+              <Pill className={statusPill(item.status)}>{item.status.replace("_", " ")}</Pill>
             </div>
 
             <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-gray-600">
@@ -299,13 +286,14 @@ export default function LguEmergencies() {
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<"ALL" | "SOS" | EmergencyType>("ALL");
 
+  // ✅ Dagupan-only data
   const data: EmergencyItem[] = useMemo(
     () => [
       {
         id: "sos-1",
         type: "Flood",
-        title: "Flash Flood Emergency",
-        location: "Barangay San Jose, Quezon City",
+        title: "Flash Flood Emergency (SOS)",
+        location: "Barangay Calmay, Dagupan City",
         timeAgo: "15 min ago",
         priority: "critical",
         status: "active",
@@ -313,8 +301,7 @@ export default function LguEmergencies() {
         reporterLabel: "SOS Reported by",
         reporterName: "Maria Santos",
         phone: "+63 917 XXX 1234",
-        description:
-          "Severe flooding affecting 500+ households. Immediate evacuation assistance needed.",
+        description: "Severe flooding near the river. Immediate evacuation assistance needed.",
         needs: ["Boats", "Life vests", "Food packs", "Medical supplies"],
         volunteersAssigned: 18,
         volunteersNeeded: 25,
@@ -324,15 +311,14 @@ export default function LguEmergencies() {
         id: "fire-1",
         type: "Fire",
         title: "Residential Fire",
-        location: "Barangay Poblacion, Makati",
+        location: "Poblacion Oeste, Dagupan City",
         timeAgo: "32 min ago",
         priority: "high",
         status: "active",
         reporterLabel: "Reported by Authority",
-        reporterName: "Fire Station 5",
+        reporterName: "Dagupan Fire Station",
         reporterVerified: true,
-        description:
-          "Multi-story residential building on fire. Evacuation and first aid required.",
+        description: "House fire spreading to nearby structures. Evacuation and first aid required.",
         needs: ["First aid kits", "Blankets", "Water"],
         volunteersAssigned: 12,
         volunteersNeeded: 15,
@@ -342,35 +328,34 @@ export default function LguEmergencies() {
         id: "collapse-1",
         type: "Collapse",
         title: "Building Collapse",
-        location: "Barangay Bagong Silang, Caloocan",
+        location: "Barangay Tapuac, Dagupan City",
         timeAgo: "2 hours ago",
         priority: "medium",
-        status: "resolved",
+        status: "in_progress",
         reporterLabel: "Reported by User",
         reporterName: "Juan Dela Cruz",
-        description: "Partial building collapse. Search and rescue operations ongoing.",
+        description: "Partial structure collapse. Rescue and perimeter control ongoing.",
         needs: ["Heavy equipment", "Medical team", "Search dogs"],
-        volunteersAssigned: 20,
+        volunteersAssigned: 14,
         volunteersNeeded: 20,
-        progressPercent: 100,
+        progressPercent: 60,
       },
       {
         id: "typhoon-1",
         type: "Typhoon",
         title: "Typhoon Evacuation Support",
-        location: "Multiple Barangays, Pasig City",
+        location: "Bonuan Binloc, Dagupan City",
         timeAgo: "1 hour ago",
         priority: "critical",
         status: "active",
         reporterLabel: "Reported by Authority",
-        reporterName: "PDRRMO Pasig",
+        reporterName: "Dagupan CDRRMO",
         reporterVerified: true,
-        description:
-          "Evacuation centers filling up. Need transport and relief distribution.",
+        description: "Coastal area evacuation underway. Need transport and relief distribution.",
         needs: ["Transport", "Relief goods", "Medical team"],
-        volunteersAssigned: 35,
-        volunteersNeeded: 50,
-        progressPercent: 70,
+        volunteersAssigned: 22,
+        volunteersNeeded: 40,
+        progressPercent: 55,
       },
     ],
     []
@@ -385,20 +370,16 @@ export default function LguEmergencies() {
       d.reporterName.toLowerCase().includes(query.toLowerCase());
 
     const matchesType =
-      typeFilter === "ALL"
-        ? true
-        : typeFilter === "SOS"
-        ? !!d.isSOS
-        : d.type === typeFilter;
+      typeFilter === "ALL" ? true : typeFilter === "SOS" ? !!d.isSOS : d.type === typeFilter;
 
     return matchesQuery && matchesType;
   });
 
   const stats = {
     activeSOS: String(sosCount),
-    critical: "3",
-    high: "5",
-    inProgress: "4",
+    critical: String(data.filter((d) => d.priority === "critical").length),
+    high: String(data.filter((d) => d.priority === "high").length),
+    inProgress: String(data.filter((d) => d.status === "in_progress").length),
     deployed: "85",
   };
 
@@ -408,9 +389,7 @@ export default function LguEmergencies() {
         {/* top row */}
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <div className="text-4xl font-bold text-gray-900 leading-tight">
-              Emergencies
-            </div>
+            <div className="text-4xl font-bold text-gray-900 leading-tight">Emergencies</div>
             <div className="text-base text-gray-400 mt-1">
               Monitor and manage active emergency situations
             </div>
@@ -422,7 +401,7 @@ export default function LguEmergencies() {
           </button>
         </div>
 
-        {/* SOS alert banner (heartbeat red↔white) */}
+        {/* SOS alert banner */}
         {sosCount > 0 && (
           <div className="heartbeat-alert border border-red-300 rounded-2xl px-6 py-5 flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -430,9 +409,7 @@ export default function LguEmergencies() {
                 <Siren className="text-red-700" />
               </div>
               <div>
-                <div className="text-lg font-bold text-red-700">
-                  {sosCount} Active SOS Alerts
-                </div>
+                <div className="text-lg font-bold text-red-700">{sosCount} Active SOS Alerts</div>
                 <div className="text-sm text-gray-600">
                   Urgent life-threatening situations requiring immediate response
                 </div>
@@ -448,10 +425,7 @@ export default function LguEmergencies() {
         {/* Search + chips */}
         <div className="flex flex-col lg:flex-row gap-3 lg:items-center">
           <div className="relative flex-1 max-w-[600px]">
-            <Search
-              size={18}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
-            />
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -485,36 +459,11 @@ export default function LguEmergencies() {
 
         {/* Stats row */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
-          <StatCard
-            value={stats.activeSOS}
-            label="Active SOS"
-            tone="pink"
-            icon={<Siren className="text-red-600" />}
-          />
-          <StatCard
-            value={stats.critical}
-            label="Critical"
-            tone="pink"
-            icon={<AlertTriangle className="text-red-600" />}
-          />
-          <StatCard
-            value={stats.high}
-            label="High Priority"
-            tone="blue"
-            icon={<Droplet className="text-blue-600" />}
-          />
-          <StatCard
-            value={stats.inProgress}
-            label="In Progress"
-            tone="yellow"
-            icon={<Clock className="text-yellow-700" />}
-          />
-          <StatCard
-            value={stats.deployed}
-            label="Deployed"
-            tone="green"
-            icon={<Users className="text-green-700" />}
-          />
+          <StatCard value={stats.activeSOS} label="Active SOS" tone="pink" icon={<Siren className="text-red-600" />} />
+          <StatCard value={stats.critical} label="Critical" tone="pink" icon={<AlertTriangle className="text-red-600" />} />
+          <StatCard value={stats.high} label="High Priority" tone="blue" icon={<Droplet className="text-blue-600" />} />
+          <StatCard value={stats.inProgress} label="In Progress" tone="yellow" icon={<Clock className="text-yellow-700" />} />
+          <StatCard value={stats.deployed} label="Deployed" tone="green" icon={<Users className="text-green-700" />} />
         </div>
 
         {/* List */}

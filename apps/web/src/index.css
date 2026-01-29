@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 
+
 /* Heartbeat blinking effect (red <-> white) */
 @keyframes heartbeatBlink {
   0%   { background-color: rgba(220, 38, 38, 1); }
@@ -28,4 +29,54 @@
 /* Optional: subtle outer glow on SOS card container */
 .heartbeat-wrap {
   animation: heartbeatGlow 1.8s infinite ease-in-out;
+}
+
+
+
+
+
+
+/* --- Lifeline Map Pins (circle + wave inside) --- */
+/* --- Large pulse zone OUTSIDE the pin --- */
+.ll-pin-wrap {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  /* uses your per-marker CSS vars */
+  --ll-pin-rgb: 37, 99, 235;
+  --ll-pin-br: #2563eb;
+}
+
+.ll-pin-wrap::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 120px;           /* big zone like your screenshot */
+  height: 120px;
+  border-radius: 9999px;
+  transform: translate(-50%, -50%) scale(0.2);
+  opacity: 0;
+  pointer-events: none;
+
+  border: 2px solid rgba(var(--ll-pin-rgb), 0.35);
+  background: radial-gradient(
+    circle,
+    rgba(var(--ll-pin-rgb), 0.22) 0%,
+    rgba(var(--ll-pin-rgb), 0.00) 62%
+  );
+
+  animation: ll-zone-pulse 1.8s ease-out infinite;
+}
+
+@keyframes ll-zone-pulse {
+  0%   { transform: translate(-50%, -50%) scale(0.20); opacity: 0.0; }
+  15%  { opacity: 0.85; }
+  100% { transform: translate(-50%, -50%) scale(1.00); opacity: 0.0; }
+}
+
+/* (optional) make emoji/icon centered nicely if needed */
+.ll-pin__icon {
+  font-size: 16px;
+  line-height: 1;
 }

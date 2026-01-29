@@ -38,7 +38,7 @@ export default function LoginScreen() {
 
   return (
     <AuthBackground>
-      <View className="flex-1 px-7 pt-20">
+      <View className="flex-1 px-5 pt-60">
         <View className="mb-10">
           <LifelineLogo />
         </View>
@@ -47,7 +47,7 @@ export default function LoginScreen() {
           <TextInput
             placeholder="Email"
             placeholderTextColor="#9CA3AF"
-            className="h-12 rounded border border-gray-200 bg-white px-4 text-[14px]"
+            className="h-15 rounded border border-gray-200 bg-white px-6 pl-3 text-[15px] font-semibold"
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
@@ -58,7 +58,7 @@ export default function LoginScreen() {
             <TextInput
               placeholder="Password"
               placeholderTextColor="#9CA3AF"
-              className="h-12 rounded border border-gray-200 bg-white px-4 pr-12 text-[14px]"
+              className="h-15 rounded border border-gray-200 bg-white px-4 pr-12 pl-3 text-[15px] font-semibold"
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!show}
@@ -66,51 +66,63 @@ export default function LoginScreen() {
             />
             <Pressable
               onPress={() => setShow((s) => !s)}
-              className="absolute right-3 top-0 h-12 items-center justify-center"
+              className="absolute right-3 top-0 h-15 items-center justify-center"
             >
-              <Ionicons name={show ? "eye-off-outline" : "eye-outline"} size={18} color="#9CA3AF" />
+              <Ionicons name={show ? "eye-off-outline" : "eye-outline"} size={23} color="#9CA3AF" />
             </Pressable>
           </View>
 
           <Pressable onPress={() => Alert.alert("Forgot Password", "Add your reset flow here.")}>
-            <Text className="text-[12px] text-gray-700">Forgot Password?</Text>
+            <Text className="text-[15px] text-gray-700">Forgot Password?</Text>
           </Pressable>
 
-          {error ? <Text className="text-[12px] text-red-500">{error}</Text> : null}
+          {error ? <Text className="text-[15px] text-red-500">{error}</Text> : null}
 
           <Pressable
             onPress={onLogin}
             disabled={loading}
-            className="mt-2 h-12 items-center justify-center rounded bg-red-500"
-            style={{ opacity: loading ? 0.7 : 1 }}
+            style={({ pressed }) => ({
+              marginTop: 14,
+              height: 48,
+              width: "100%",
+              borderRadius: 10,
+              backgroundColor: "#EF4444",
+              alignItems: "center",
+              justifyContent: "center",
+              opacity: pressed || loading ? 0.75 : 1,
+            })}
           >
-            <Text className="text-[14px] font-semibold text-white">
+            <Text style={{ color: "#fff", fontSize: 15, fontWeight: "700" }}>
               {loading ? "Logging in..." : "Login"}
             </Text>
           </Pressable>
 
           {/* OR divider */}
           <View className="my-3 flex-row items-center">
-            <View className="h-[1px] flex-1 bg-gray-200" />
-            <Text className="mx-3 text-[12px] text-gray-400">OR</Text>
-            <View className="h-[1px] flex-1 bg-gray-200" />
+            <View className="h-[1px flex-1 bg-gray-200" />
+            <Text className="mx-3 text-[12px] text-gray-500 font-semibold">OR</Text>
+            <View className="h-1px flex-1 bg-gray-200" />
           </View>
 
           {/* Google button */}
           <Pressable
             onPress={() => Alert.alert("Google Sign-In", "We can wire this after the basic auth is done.")}
-            className="h-12 flex-row items-center justify-center gap-2 rounded border border-gray-200 bg-white"
+            className="h-14 flex-row items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white"
           >
             <GoogleIcon />
-            <Text className="text-[13px] text-gray-800">Continue with Google</Text>
+            <Text className="text-[15px] text-gray-800">Continue with Google</Text>
           </Pressable>
 
-          <View className="mt-10 flex-row justify-center">
-            <Text className="text-[12px] text-gray-700">Don't have an account? </Text>
-            <Link href="/(auth)/signup" className="text-[12px] text-blue-500">
-              Sign up
+          <View className="mt-25 flex-row justify-center">
+            <Text className="text-[15px] text-gray-700">Don't have an account? </Text>
+
+            <Link href="/signup" asChild>
+              <Text style={{ color: "#3B82F6", fontSize: 15, fontWeight: "500",  }}>
+                Sign up
+              </Text>
             </Link>
           </View>
+
         </View>
       </View>
     </AuthBackground>

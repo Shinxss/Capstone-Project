@@ -3,6 +3,7 @@ import LguLogin from "./pages/lgu/LguLogin";
 import LguDashboard from "./pages/lgu/LguDashboard";
 import PlaceholderPage from "./pages/lgu/PlaceholderPage";
 import LguEmergencies from "./pages/lgu/LguEmergencies";
+import LguLiveMap from "./pages/lgu/LguLiveMap";
 
 export default function App() {
   return (
@@ -16,7 +17,7 @@ export default function App() {
       <Route path="/lgu/emergencies" element={<LguEmergencies />} />
       <Route path="/lgu/volunteers" element={<PlaceholderPage title="Volunteers" />} />
       <Route path="/lgu/tasks" element={<PlaceholderPage title="Tasks" />} />
-      <Route path="/lgu/live-map" element={<PlaceholderPage title="Live Map" />} />
+      <Route path="/lgu/live-map" element={<LguLiveMap />} />
       <Route path="/lgu/blockchain-logs" element={<PlaceholderPage title="Blockchain Logs" />} />
       <Route path="/lgu/reports" element={<PlaceholderPage title="Reports" />} />
       <Route path="/lgu/profile" element={<PlaceholderPage title="Profile" />} />
