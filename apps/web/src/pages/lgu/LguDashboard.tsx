@@ -1,5 +1,4 @@
-// apps/web/src/pages/lgu/LguDashboard.tsx
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import mapboxgl from "mapbox-gl";
 import { createRoot, type Root } from "react-dom/client";
 import {
@@ -33,13 +32,13 @@ function StatCard({
   value,
   badge,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
   value: string;
   badge: string;
 }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm flex items-center justify-between">
+    <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm flex items-center justify-between h-24">
       <div className="flex items-start gap-3">
         <div className="h-8 w-8 rounded-md bg-gray-100 flex items-center justify-center">
           {icon}
@@ -123,20 +122,26 @@ function colorForEmergency(type: EmergencyType) {
 /**
  * ✅ Marker UI:
  * - Large pulse zone
- * - Icon centered (smaller icon)
+ * - Small icon centered in the middle
+ * - Circular border + subtle inner wave
  */
 function EmergencyMarker({ type }: { type: EmergencyType }) {
   const Icon = iconForEmergency(type);
   const color = colorForEmergency(type);
 
+  // ✅ size tuning (smaller center icon + slightly smaller center circle)
+  const PULSE_SIZE = 76;
+  const CENTER_SIZE = 34; // was 38
+  const ICON_SIZE = 14; // was 18
+
   return (
-    <div className="relative h-[76px] w-[76px] pointer-events-none">
+    <div className="relative" style={{ width: PULSE_SIZE, height: PULSE_SIZE }} aria-hidden>
       {/* BIG pulse zone */}
       <span
         className="absolute left-1/2 top-1/2 rounded-full"
         style={{
-          width: 76,
-          height: 76,
+          width: PULSE_SIZE,
+          height: PULSE_SIZE,
           transform: "translate(-50%, -50%)",
           background: hexToRgba(color, 0.18),
           border: `2px solid ${hexToRgba(color, 0.35)}`,
@@ -146,8 +151,8 @@ function EmergencyMarker({ type }: { type: EmergencyType }) {
       <span
         className="absolute left-1/2 top-1/2 rounded-full"
         style={{
-          width: 76,
-          height: 76,
+          width: PULSE_SIZE,
+          height: PULSE_SIZE,
           transform: "translate(-50%, -50%)",
           background: hexToRgba(color, 0.1),
           border: `2px solid ${hexToRgba(color, 0.22)}`,
@@ -156,19 +161,19 @@ function EmergencyMarker({ type }: { type: EmergencyType }) {
         }}
       />
 
-      {/* CENTER PIN */}
+      {/* CENTER PIN (always above pulses) */}
       <div
         className="absolute left-1/2 top-1/2 rounded-full shadow-xl"
         style={{
-          width: 38,
-          height: 38,
+          width: CENTER_SIZE,
+          height: CENTER_SIZE,
           transform: "translate(-50%, -50%)",
           border: `3px solid ${hexToRgba(color, 0.95)}`,
           background: "rgba(255,255,255,0.98)",
           zIndex: 10,
         }}
       >
-        {/* subtle wave inside */}
+        {/* inner wave */}
         <div
           className="absolute inset-[5px] rounded-full"
           style={{
@@ -176,9 +181,10 @@ function EmergencyMarker({ type }: { type: EmergencyType }) {
             animation: "llInnerWave 1.4s ease-in-out infinite",
           }}
         />
-        {/* SMALLER icon in the middle */}
+
+        {/* icon */}
         <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 20 }}>
-          <Icon size={14} style={{ color }} />
+          <Icon size={ICON_SIZE} style={{ color }} />
         </div>
       </div>
     </div>
@@ -222,8 +228,8 @@ function MapboxEmergencyMap({ reports }: { reports: EmergencyReport[] }) {
 
     if (!mapElRef.current) return;
 
-    // ✅ Dagupan center
-    const DAGUPAN_CENTER: [number, number] = [120.3333, 16.0432];
+    // ✅ Dagupan City center
+    const DAGUPAN_CENTER: [number, number] = [120.3333, 16.0431];
 
     const map = new mapboxgl.Map({
       container: mapElRef.current,
@@ -248,6 +254,7 @@ function MapboxEmergencyMap({ reports }: { reports: EmergencyReport[] }) {
         root.render(<EmergencyMarker type={r.type} />);
         roots.push(root);
 
+        // ✅ anchor center so icon sits in the middle of pulse
         const marker = new mapboxgl.Marker({ element: el, anchor: "center" })
           .setLngLat([r.lng, r.lat])
           .addTo(map);
@@ -258,7 +265,7 @@ function MapboxEmergencyMap({ reports }: { reports: EmergencyReport[] }) {
       if (reports.length > 0) {
         const bounds = new mapboxgl.LngLatBounds();
         reports.forEach((r) => bounds.extend([r.lng, r.lat]));
-        map.fitBounds(bounds, { padding: 140, maxZoom: 14, duration: 650 });
+        map.fitBounds(bounds, { padding: 140, maxZoom: 14.5, duration: 650 });
       }
     });
 
@@ -293,7 +300,9 @@ function MapboxEmergencyMap({ reports }: { reports: EmergencyReport[] }) {
         <div className="pointer-events-auto">
           <div className="flex items-center gap-2 text-white font-semibold">
             <span className="h-2 w-2 rounded-full bg-blue-500" />
-            <div className="px-3 py-2 rounded-lg bg-black/40 backdrop-blur-md">Emergency Map</div>
+            <div className="px-3 py-2 rounded-lg bg-black/40 backdrop-blur-md">
+              Emergency Map (Dagupan)
+            </div>
           </div>
         </div>
 
@@ -318,36 +327,37 @@ function MapboxEmergencyMap({ reports }: { reports: EmergencyReport[] }) {
 }
 
 export default function LguDashboard() {
-  // ✅ Dagupan-only static pinpoints (adjust anytime)
+  // ✅ Dagupan-only static pinpoints
   const reports: EmergencyReport[] = useMemo(
     () => [
+      // Dagupan City (approx. coordinates)
       {
         id: "sos-1",
         type: "SOS",
-        title: "SOS: Flash Flood Emergency (Calmay)",
-        lng: 120.3365,
-        lat: 16.0458,
+        title: "SOS: Flood Rescue Needed",
+        lng: 120.3298, // Calmay area
+        lat: 16.0562,
       },
       {
         id: "fire-1",
         type: "Fire",
-        title: "Residential Fire (Poblacion Oeste)",
-        lng: 120.3348,
-        lat: 16.0428,
+        title: "Residential Fire",
+        lng: 120.3339, // Poblacion area
+        lat: 16.0446,
       },
       {
         id: "collapse-1",
         type: "Collapse",
-        title: "Building Collapse (Tapuac)",
-        lng: 120.3456,
-        lat: 16.0294,
+        title: "Structure Collapse",
+        lng: 120.3475, // Pantal area
+        lat: 16.0470,
       },
       {
         id: "typhoon-1",
         type: "Typhoon",
-        title: "Typhoon Evacuation Support (Bonuan Binloc)",
-        lng: 120.3092,
-        lat: 16.0732,
+        title: "Typhoon Evacuation Support",
+        lng: 120.3040, // Bonuan Gueset area
+        lat: 16.0328,
       },
     ],
     []
@@ -355,41 +365,41 @@ export default function LguDashboard() {
 
   const emergencies = [
     {
-      title: "Flood",
+      title: "Flood Rescue",
       status: "critical",
       location: "Barangay Calmay, Dagupan City",
       time: "15 min ago",
       percent: 75,
     },
     {
-      title: "Fire",
+      title: "Fire Incident",
       status: "high",
-      location: "Poblacion Oeste, Dagupan City",
+      location: "Poblacion, Dagupan City",
       time: "32 min ago",
       percent: 80,
     },
     {
-      title: "Typhoon Evacuation",
+      title: "Evacuation Support",
       status: "critical",
-      location: "Bonuan Binloc, Dagupan City",
+      location: "Bonuan Gueset, Dagupan City",
       time: "45 min ago",
       percent: 70,
     },
     {
-      title: "Building Collapse",
+      title: "Structure Collapse",
       status: "moderate",
-      location: "Tapuac, Dagupan City",
+      location: "Pantal, Dagupan City",
       time: "2 hours ago",
       percent: 100,
     },
   ];
 
   const activity = [
-    { text: "Dagupan DRRMO verified new SOS report", time: "Just now" },
-    { text: "Responder team assigned to Calmay Flood Response", time: "5 min ago" },
-    { text: "New emergency reported in Poblacion Oeste", time: "15 min ago" },
-    { text: "Supply delivery delayed — rerouting to Bonuan", time: "30 min ago" },
-    { text: "Team Alpha deployed to evacuation center (Bonuan)", time: "1 hour ago" },
+    { text: "Responder Team notified — Calmay flood", time: "Just now" },
+    { text: "Unit Bravo assigned to Fire Response (Poblacion)", time: "5 min ago" },
+    { text: "New report logged near Pantal bridge", time: "15 min ago" },
+    { text: "Relief route updated — Bonuan Gueset", time: "30 min ago" },
+    { text: "Volunteer team en route to evacuation point", time: "1 hour ago" },
   ];
 
   return (
@@ -397,7 +407,9 @@ export default function LguDashboard() {
       <div className="p-6">
         <div className="mb-7">
           <div className="text-4xl font-bold text-gray-900">Command Center</div>
-          <div className="text-base text-gray-400">Real-time emergency coordination dashboard</div>
+          <div className="text-base text-gray-400">
+            Real-time emergency coordination dashboard
+          </div>
         </div>
 
         {/* Stats */}
@@ -439,7 +451,9 @@ export default function LguDashboard() {
             <div className="px-4 py-3 flex items-center justify-between border-b border-gray-200">
               <div>
                 <div className="text-sm font-bold text-gray-900">Active Emergencies</div>
-                <div className="text-xs text-gray-500">Current incidents requiring response</div>
+                <div className="text-xs text-gray-500">
+                  Current incidents requiring response
+                </div>
               </div>
               <button className="text-xs font-semibold text-gray-700 hover:text-gray-900">
                 View All →
@@ -480,7 +494,9 @@ export default function LguDashboard() {
                 <div className="text-sm font-bold text-gray-900">Activity Feed</div>
                 <div className="text-xs text-gray-500">Real-time updates</div>
               </div>
-              <button className="text-xs font-semibold text-gray-700 hover:text-gray-900">↗</button>
+              <button className="text-xs font-semibold text-gray-700 hover:text-gray-900">
+                ↗
+              </button>
             </div>
 
             <div className="p-4 space-y-4">

@@ -6,6 +6,8 @@ import AuthBackground from "../../components/AuthBackground";
 import LifelineLogo from "../../components/LifelineLogo";
 import GoogleIcon from "../../components/GoogleIcon";
 import { api } from "../../lib/api";
+import { StatusBar } from "expo-status-bar";
+
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -37,8 +39,20 @@ export default function LoginScreen() {
   }
 
   return (
+
+    
     <AuthBackground>
-      <View className="flex-1 px-5 pt-60">
+
+      <View className="w-full items-end pt-20 px-7">
+        <Pressable onPress={() => router.replace("/(tabs)")}>
+          <Text style={{ color: "#EF4444", fontSize: 15, fontWeight: "600" }}>
+            Skip &gt;
+          </Text>
+        </Pressable>
+      </View>
+
+      
+      <View className="flex-1 px-5 pt-45">
         <View className="mb-10">
           <LifelineLogo />
         </View>

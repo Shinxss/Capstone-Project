@@ -8,8 +8,7 @@ import {
   ChevronDown,
   User,
   LogOut,
-  PanelLeftClose,
-  PanelLeftOpen,
+  Sidebar, // ✅ use this
 } from "lucide-react";
 
 type HeaderProps = {
@@ -60,7 +59,7 @@ export default function Header({
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-gray-300">
-      <div className="h-16 px-6 flex items-center justify-between">
+      <div className="h-16 px-3 flex items-center justify-between">
         {/* Left: sidebar toggle + title */}
         <div className="min-w-[260px]">
           <div className="flex items-center gap-3">
@@ -68,14 +67,12 @@ export default function Header({
               type="button"
               onClick={onToggleSidebar}
               disabled={!onToggleSidebar}
-              className="h-10 w-10 rounded-md bg-gray-100 border border-gray-200 hover:bg-gray-200 flex items-center justify-center disabled:opacity-50"
+              className="h-10 w-10 rounded-md bg-white hover:bg-gray-200 flex items-center justify-center disabled:opacity-50"
               aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-pressed={!sidebarCollapsed}
             >
-              {sidebarCollapsed ? (
-                <PanelLeftOpen size={18} />
-              ) : (
-                <PanelLeftClose size={18} />
-              )}
+              {/* ✅ single icon for both states */}
+              <Sidebar size={18} className={sidebarCollapsed ? "opacity-70" : "opacity-100"} />
             </button>
 
             <div className="leading-tight">

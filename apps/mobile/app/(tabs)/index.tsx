@@ -52,12 +52,12 @@ export default function HomeScreen() {
           </View>
 
           <Pressable style={styles.bellBtn}>
-            <Ionicons name="notifications-outline" size={20} color="#111827" />
+            <Ionicons name="notifications-outline" size={25} color="#111827" />
           </Pressable>
         </View>
 
         {/* Heading */}
-        <View style={styles.headerBlock}>
+        <View style={styles.headerBlock} className="">
           <Text style={styles.h1}>Emergency help{"\n"}needed?</Text>
           <Text style={styles.h2}>
             Press the button below and help{"\n"}reach you shortly.
@@ -82,17 +82,17 @@ export default function HomeScreen() {
           </View>
 
           <Text style={styles.locationNote}>
-            Your location will be shared with emergency{"\n"}responders
+            Your location will be shared with emergency responders
           </Text>
         </View>
 
         {/* Alert card */}
-        <View style={[styles.card, { marginTop: 18 }]}>
+        <View style={[styles.card, { marginTop: 60 }]}>
           <View style={styles.cardIcon} />
           <View style={{ flex: 1 }}>
             <Text style={styles.cardTitle}>Alert</Text>
             <Text style={styles.cardSub}>
-              Tropical Depression approaching. Expected{"\n"}rainfall: Heavy
+              Tropical Depression approaching. Expected rainfall: Heavy
             </Text>
           </View>
         </View>
@@ -119,7 +119,7 @@ export default function HomeScreen() {
 
           <View style={styles.volRow}>
             <View style={styles.volBadge}>
-              <Ionicons name="shield-outline" size={18} color="#fff" />
+              <Ionicons name="shield-outline" size={30} color="#fff" />
             </View>
             <Text style={styles.volTitle}>Become a Volunteer</Text>
           </View>
@@ -143,7 +143,7 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#F3F4F6" },
-  container: { paddingHorizontal: 16, paddingTop: 10 },
+  container: { paddingHorizontal: 16, paddingTop: 50 },
 
   topRow: {
     flexDirection: "row",
@@ -152,57 +152,58 @@ const styles = StyleSheet.create({
   },
   profile: { flexDirection: "row", alignItems: "center", gap: 10 },
   avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 50,
+    height: 50,
+    borderRadius: 100,
     backgroundColor: "#fff",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: "#EF4444",
   },
-  hello: { fontSize: 12, color: "#111827", fontWeight: "700" },
-  sub: { fontSize: 11, color: "#6B7280", marginTop: 1 },
+  hello: { fontSize: 18, color: "#111827", fontWeight: "700" },
+  sub: { fontSize: 13, color: "#6B7280", marginTop: 1 },
   bellBtn: {
-    width: 34,
-    height: 34,
+    width: 40,
+    height: 40,
     borderRadius: 10,
     backgroundColor: "#fff",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
+    marginRight: 6,
     borderColor: "#E5E7EB",
   },
 
-  headerBlock: { marginTop: 22, alignItems: "center" },
+  headerBlock: { marginTop: 50, alignItems: "center" },
   h1: {
-    fontSize: 30,
+    fontSize: 35,
     fontWeight: "900",
     color: "#6B7280",
     textAlign: "center",
-    lineHeight: 36,
+    lineHeight: 38,
   },
   h2: {
     fontSize: 12,
     color: "#9CA3AF",
     textAlign: "center",
-    marginTop: 8,
+    marginTop: 40,
     lineHeight: 16,
   },
 
   sosBlock: { marginTop: 22, alignItems: "center" },
   sosOuter: {
-    width: 180,
-    height: 180,
-    borderRadius: 90,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
     backgroundColor: "#FEE2E2",
     alignItems: "center",
     justifyContent: "center",
   },
   sosInner: {
-    width: 130,
-    height: 130,
-    borderRadius: 65,
+    width: 190,
+    height: 190,
+    borderRadius: 95,
     backgroundColor: "#EF4444",
     alignItems: "center",
     justifyContent: "center",
@@ -222,14 +223,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 6,
   },
-  sosText: { fontSize: 26, fontWeight: "900", color: "#fff" },
-  sosHint: { fontSize: 11, color: "rgba(255,255,255,0.92)", marginTop: 2 },
+  sosText: { fontSize: 46, fontWeight: "600", color: "#fff" },
+  sosHint: { fontSize: 13, color: "rgba(255,255,255,0.92)", marginTop: 2 },
   locationNote: {
-    marginTop: 10,
-    fontSize: 11,
+    marginTop: 30,
+    fontSize: 14,
     color: "#9CA3AF",
     textAlign: "center",
-    lineHeight: 15,
+    lineHeight: 20,
   },
 
   card: {
@@ -241,23 +242,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E5E7EB",
   },
-  cardIcon: { width: 38, height: 38, borderRadius: 10, backgroundColor: "#D1D5DB" },
-  cardTitle: { fontSize: 13, fontWeight: "800", color: "#111827" },
-  cardSub: { fontSize: 11, color: "#6B7280", marginTop: 2, lineHeight: 15 },
+  cardIcon: { width: 58, height: 58, borderRadius: 10, backgroundColor: "#D1D5DB" },
+  cardTitle: { fontSize: 18, fontWeight: "700", color: "#111827" },
+  cardSub: { fontSize: 12, color: "#6B7280", marginTop: 2, lineHeight: 15 },
 
   sectionRow: {
-    marginTop: 18,
-    marginBottom: 10,
+    marginTop: 25,
+    marginBottom: 15,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  sectionTitle: { fontSize: 12, fontWeight: "800", color: "#6B7280" },
+  sectionTitle: { fontSize: 20, fontWeight: "800", color: "#6B7280" },
   viewAllRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  viewAll: { fontSize: 11, color: "#2563EB", fontWeight: "700" },
+  viewAll: { fontSize: 15, color: "#2563EB", fontWeight: "600" },
 
   listCard: {
-    height: 70,
+    height: 130,
     backgroundColor: "#fff",
     borderRadius: 14,
     borderWidth: 1,
@@ -266,7 +267,7 @@ const styles = StyleSheet.create({
   },
 
   volunteer: {
-    marginTop: 14,
+    marginTop: 25,
     backgroundColor: "#B91C1C",
     borderRadius: 16,
     padding: 16,
@@ -292,15 +293,15 @@ const styles = StyleSheet.create({
   },
   volRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   volBadge: {
-    width: 34,
-    height: 34,
+    width: 50,
+    height: 50,
     borderRadius: 10,
     backgroundColor: "rgba(255,255,255,0.15)",
     alignItems: "center",
     justifyContent: "center",
   },
-  volTitle: { color: "#fff", fontSize: 14, fontWeight: "900" },
-  volSub: { color: "rgba(255,255,255,0.85)", fontSize: 11, marginTop: 8, lineHeight: 15 },
+  volTitle: { color: "#fff", fontSize: 20, fontWeight: "900" },
+  volSub: { color: "rgba(255,255,255,0.85)", fontSize: 14, marginTop: 10, lineHeight: 15 },
 
   applyBtn: {
     marginTop: 12,
