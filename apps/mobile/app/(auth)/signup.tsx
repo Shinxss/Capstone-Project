@@ -4,6 +4,7 @@ import { Link, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import AuthBackground from "../../components/AuthBackground";
 import GoogleIcon from "../../components/GoogleIcon";
+import axios from "axios";
 import { api } from "../../lib/api";
 
 export default function SignupScreen() {
@@ -19,28 +20,70 @@ export default function SignupScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function onSignup() {
-    setError(null);
-    if (!agree) return setError("Please agree to Terms and Privacy Policy.");
-    if (password !== confirm) return setError("Passwords do not match.");
+  const REGISTER_PATH = "/api/auth/community/register";
 
-    setLoading(true);
-    try {
-      await api.post("/api/auth/community/register", {
-        firstName,
-        lastName,
-        email,
-        password,
-      });
+async function onSignup() {
+  if (loading) return;
 
-      Alert.alert("Success", "Account created. Please log in.");
-      router.replace("/(auth)/login");
-    } catch (e: any) {
-      setError(e?.response?.data?.error || e?.message || "Signup failed");
-    } finally {
-      setLoading(false);
-    }
+  setError(null);
+
+  // ✅ Basic validations first (prevents useless requests)
+  if (!firstName.trim() || !lastName.trim() || !email.trim() || !password) {
+    setError("Please fill in all fields.");
+    return;
   }
+
+  if (password !== confirm) {
+    setError("Passwords do not match.");
+    return;
+  }
+
+  if (!agree) {
+    setError("Please accept the Terms & Privacy Policy.");
+    return;
+  }
+
+  setLoading(true);
+
+  // ✅ Log URL BEFORE request (so it shows even when request fails)
+  console.log("BASE_URL:", api.defaults.baseURL);
+  console.log("REGISTER_URI:", api.getUri({ url: REGISTER_PATH }));
+
+  try {
+    const res = await api.post(REGISTER_PATH, {
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      email: email.trim(),
+      password,
+    });
+
+    console.log("REGISTER_OK:", res.status, res.data);
+
+    Alert.alert("Success", res.data?.message ?? "Account created.");
+    router.replace("/login"); // or "/(auth)/login" if you want explicit
+  } catch (err: unknown) {
+    // ✅ Proper axios error logging
+    if (axios.isAxiosError(err)) {
+      console.log("SIGNUP_ERR_MESSAGE:", err.message);
+      console.log("SIGNUP_ERR_CODE:", err.code);
+      console.log("SIGNUP_ERR_URL:", err.config?.baseURL, err.config?.url);
+      console.log("SIGNUP_ERR_STATUS:", err.response?.status);
+      console.log("SIGNUP_ERR_DATA:", err.response?.data);
+
+      setError(
+        err.response?.data?.error ||
+          err.response?.data?.message ||
+          err.message ||
+          "Signup failed"
+      );
+    } else {
+      console.log("SIGNUP_ERR_UNKNOWN:", err);
+      setError("Signup failed");
+    }
+  } finally {
+    setLoading(false);
+  }
+}
 
   return (
     <AuthBackground>
