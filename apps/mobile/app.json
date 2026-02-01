@@ -49,7 +49,7 @@
       [
         "@rnmapbox/maps",
         {
-          "RNMapboxMapsVersion": "11.13.4"
+          "RNMapboxMapsVersion": "11.14.2"
         }
       ],
       [

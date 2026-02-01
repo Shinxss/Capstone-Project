@@ -175,7 +175,7 @@ function EmergencyMarker({ type }: { type: EmergencyType }) {
       >
         {/* inner wave */}
         <div
-          className="absolute inset-[5px] rounded-full"
+          className="absolute inset-1.25 rounded-full"
           style={{
             background: `radial-gradient(circle, ${hexToRgba(color, 0.25)} 0%, rgba(255,255,255,0) 65%)`,
             animation: "llInnerWave 1.4s ease-in-out infinite",
@@ -293,7 +293,7 @@ function MapboxEmergencyMap({ reports }: { reports: EmergencyReport[] }) {
 
   return (
     <div className="relative bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
-      <div ref={mapElRef} className="h-[500px] w-full" />
+      <div ref={mapElRef} className="h-125 w-full" />
 
       {/* overlay header */}
       <div className="absolute inset-x-0 top-0 p-4 flex items-start justify-between pointer-events-none">
