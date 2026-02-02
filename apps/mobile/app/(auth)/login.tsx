@@ -24,7 +24,7 @@ export default function LoginScreen() {
         onChangeEmail={vm.setEmail}
         onChangePassword={vm.setPassword}
         onToggleShowPassword={vm.toggleShowPassword}
-        onForgotPassword={() => Alert.alert("Forgot Password", "Add your reset flow here.")}
+        onForgotPassword={() => Alert.alert("Forgot Password?", "Add your reset flow here.")}
         onLogin={vm.onLogin}
         onGoogle={() => Alert.alert("Google Sign-In", "We can wire this after the basic auth is done.")}
         onGoSignup={vm.goSignup}
