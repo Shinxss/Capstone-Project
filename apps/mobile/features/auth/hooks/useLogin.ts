@@ -4,9 +4,11 @@ import { loginCommunity } from "../services/authApi";
 import { authStorage } from "../services/authStorage";
 import { validateLogin } from "../utils/authValidators";
 import { getErrorMessage } from "../utils/authErrors";
+import { useSession } from "./useSession";
 
 export function useLogin() {
   const router = useRouter();
+  const { loginAsGuest, loginAsUser } = useSession();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,16 +30,41 @@ export function useLogin() {
 
     setLoading(true);
     try {
-      const token = await loginCommunity({ email: email.trim(), password });
-      await authStorage.setToken(token);
+      const cleanEmail = email.trim().toLowerCase();
 
-      router.replace("/(tabs)");
+      const { accessToken, user } = await loginCommunity({ email: email.trim(), password });
+
+        await authStorage.setToken(accessToken);
+
+        // ✅ set session so Home header shows firstName
+        await loginAsUser({
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          role: user.role,
+        });
+
+        router.replace("/(tabs)");
+
     } catch (err) {
       setError(getErrorMessage(err, "Login failed"));
     } finally {
       setLoading(false);
     }
-  }, [email, password, loading, router]);
+  }, [email, password, loading, router, loginAsUser]);
+
+  const skip = useCallback(async () => {
+    if (loading) return;
+    setError(null);
+
+    try {
+      await loginAsGuest();
+      router.replace("/(tabs)");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to enter guest mode"));
+    }
+  }, [loading, loginAsGuest, router]);
 
   return {
     email,
@@ -49,7 +76,7 @@ export function useLogin() {
     setPassword,
     toggleShowPassword: () => setShowPassword((s) => !s),
     onLogin,
-    goSignup: () => router.push("/signup"),
-    skip: () => router.replace("/(tabs)"),
+    goSignup: () => router.push("/(auth)/signup"),
+    skip,
   };
 }

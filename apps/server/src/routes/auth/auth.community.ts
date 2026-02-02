@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { User } from "../models/User";
-import { signAccessToken } from "../utils/jwt";
+import { User } from "../../models/User";
+import { signAccessToken } from "../../utils/jwt";
 
 export const communityAuthRouter = Router();
 
@@ -84,10 +84,7 @@ communityAuthRouter.post("/login", async (req, res) => {
     const secret = process.env.JWT_ACCESS_SECRET || "";
     if (!secret) return res.status(500).json({ success: false, error: "Missing JWT_ACCESS_SECRET" });
 
-    const token = signAccessToken(
-      { sub: user._id.toString(), role: user.role, email: user.email },
-      secret
-    );
+    const token = signAccessToken({ sub: user._id.toString(), role: user.role });
 
     return res.json({
       success: true,

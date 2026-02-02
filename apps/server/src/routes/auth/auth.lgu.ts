@@ -1,14 +1,10 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { User } from "../models/User";
-import { signAccessToken } from "../utils/jwt";
+import { User } from "../../models/User";
+import { signAccessToken } from "../../utils/jwt";
 
 export const lguAuthRouter = Router();
 
-/**
- * POST /api/auth/lgu/login
- * body: { username, password }
- */
 lguAuthRouter.post("/login", async (req, res) => {
   try {
     const { username, password } = req.body as { username?: string; password?: string };
@@ -18,25 +14,14 @@ lguAuthRouter.post("/login", async (req, res) => {
     }
 
     const user = await User.findOne({ username, role: "LGU" }).lean();
-    if (!user) {
-      return res.status(401).json({ success: false, error: "Invalid credentials" });
-    }
-
-    if (!user.isActive) {
-      return res.status(403).json({ success: false, error: "Account is disabled" });
-    }
+    if (!user) return res.status(401).json({ success: false, error: "Invalid credentials" });
+    if (!user.isActive) return res.status(403).json({ success: false, error: "Account is disabled" });
 
     const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) {
-      return res.status(401).json({ success: false, error: "Invalid credentials" });
-    }
+    if (!ok) return res.status(401).json({ success: false, error: "Invalid credentials" });
 
-    const secret = process.env.JWT_ACCESS_SECRET || "";
-    if (!secret) {
-      return res.status(500).json({ success: false, error: "Missing JWT_ACCESS_SECRET" });
-    }
-
-    const token = signAccessToken({ sub: user._id.toString(), role: user.role }, secret);
+    // ✅ FIX: only 1 arg
+    const token = signAccessToken({ sub: user._id.toString(), role: user.role });
 
     return res.json({
       success: true,
