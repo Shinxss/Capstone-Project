@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { authenticateUser } from "./auth.service";
 import { signAccessToken } from "../../utils/jwt";
 import { User } from "../../models/User";
+import { verifyMfaChallenge } from "../../utils/mfa";
 
 export async function login(req: Request, res: Response) {
   try {
@@ -30,6 +31,41 @@ export async function login(req: Request, res: Response) {
     });
   } catch (e) {
     return res.status(500).json({ message: "Login failed." });
+  }
+}
+
+// ✅ NEW: Verify admin OTP and issue JWT
+export async function adminMfaVerify(req: Request, res: Response) {
+  try {
+    const { challengeId, code } = req.body as { challengeId?: string; code?: string };
+
+    if (!challengeId || !code) {
+      return res.status(400).json({ success: false, error: "challengeId and code are required" });
+    }
+
+    const userId = await verifyMfaChallenge(challengeId, String(code).trim());
+    const user = await User.findById(userId);
+
+    if (!user) return res.status(404).json({ success: false, error: "User not found" });
+    if (!user.isActive) return res.status(403).json({ success: false, error: "Account is disabled" });
+    if (user.role !== "ADMIN") return res.status(403).json({ success: false, error: "Not allowed" });
+
+    const token = signAccessToken({ sub: user._id.toString(), role: user.role });
+
+    return res.json({
+      success: true,
+      data: {
+        accessToken: token,
+        role: "ADMIN",
+        user: {
+          id: user._id.toString(),
+          username: user.username,
+          role: user.role,
+        },
+      },
+    });
+  } catch (err: any) {
+    return res.status(401).json({ success: false, error: err?.message || "OTP verification failed" });
   }
 }
 
