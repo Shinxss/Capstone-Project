@@ -1,55 +1,28 @@
 import { useState } from "react";
-import { api } from "../../lib/api";
-import bgWhite from "../../assets/bg_white.jpg";
-
-// ✅ add this
+import bgWhite from "../../../assets/bg_white.jpg";
 import { Eye, EyeOff } from "lucide-react";
+import { ShieldLogo } from "../../../components/ShieldLogo";
 
-function ShieldLogo() {
-  return (
-    <div className="flex items-center justify-center gap-2">
-      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path
-          d="M12 2l8 4v6c0 5-3.4 9.4-8 10-4.6-.6-8-5-8-10V6l8-4z"
-          stroke="#E11D2E"
-          strokeWidth="2"
-          fill="white"
-        />
-      </svg>
-      <div className="text-4xl font-bold leading-none">
-        <span className="text-[#E11D2E]">Life</span>
-        <span className="text-gray-500">line</span>
-      </div>
-    </div>
-  );
-}
+type Props = {
+  username: string;
+  password: string;
+  setUsername: (v: string) => void;
+  setPassword: (v: string) => void;
+  loading: boolean;
+  error: string | null;
+  onSubmit: (e: React.FormEvent) => void;
+};
 
-export default function LguLogin() {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // ✅ add this
+export default function LguLoginView({
+  username,
+  password,
+  setUsername,
+  setPassword,
+  loading,
+  error,
+  onSubmit,
+}: Props) {
   const [showPassword, setShowPassword] = useState(false);
-
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
-    try {
-      const res = await api.post("/api/auth/lgu/login", { username, password });
-      const token = res.data?.data?.accessToken;
-      if (!token) throw new Error("No token returned");
-      localStorage.setItem("lifeline_lgu_token", token);
-      window.location.href = "/lgu/dashboard";
-    } catch (err: any) {
-      const msg = err?.response?.data?.error || err?.message || "Login failed";
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   return (
     <div
@@ -63,12 +36,12 @@ export default function LguLogin() {
     >
       <div className="absolute inset-0 bg-white/70 backdrop-blur-xs" />
 
-      <div className="relative z-10 w-full max-w-[470px]">
+      <div className="relative z-10 w-full max-w-117.5">
         <div className="mb-4">
           <ShieldLogo />
         </div>
 
-        <div className="bg-white border-2 rounded-xl border-b-3 border-gray-200 p-8 shadow-sm h-[450px]">
+        <div className="bg-white border-2 rounded-xl border-b-3 border-gray-200 p-8 shadow-sm h-112.5">
           <h1 className="text-center text-[30px] font-bold text-[#111827]">
             Welcome Back
           </h1>
@@ -95,7 +68,6 @@ export default function LguLogin() {
                 Password
               </label>
 
-              {/* ✅ Password + Eye Icon */}
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
@@ -127,7 +99,7 @@ export default function LguLogin() {
               {loading ? "Logging in..." : "Login"}
             </button>
 
-            <p className="pt-2 text-center text-xs text-gray-500">
+            <p className="pt-2 text-center text-md text-gray-500">
               Contact your administrator if you need access
             </p>
           </form>

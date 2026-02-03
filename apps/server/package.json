@@ -8,6 +8,7 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
     "seed:lgu": "tsx src/scripts/seedLgu.ts",
+    "seed:system-admin": "tsx src/scripts/seedSystemAdmin.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "keywords": [],

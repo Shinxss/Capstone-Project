@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from "react-router-dom";
-import LguLogin from "./pages/lgu/LguLogin";
+import LguLogin from "./pages/Login";
 import LguDashboard from "./pages/lgu/LguDashboard";
 import PlaceholderPage from "./pages/lgu/PlaceholderPage";
 import LguEmergencies from "./pages/lgu/LguEmergencies";

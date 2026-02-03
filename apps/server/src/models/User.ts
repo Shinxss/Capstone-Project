@@ -7,6 +7,7 @@ export type UserDoc = {
   username?: string; // LGU / Admin can use this
   email?: string; // Community uses this
 
+  // ✅ Used by all roles (including LGU)
   firstName: string;
   lastName: string;
 
@@ -14,7 +15,9 @@ export type UserDoc = {
 
   role: UserRole;
 
+  // ✅ LGU-only fields
   lguName?: string;
+  lguPosition?: string; // ✅ NEW (e.g., "MDRRMO Officer", "Barangay Captain")
   barangay?: string;
   municipality?: string;
 
@@ -29,12 +32,12 @@ export type UserDoc = {
 const UserSchema = new Schema<UserDoc>(
   {
     // LGU uses username, Community uses email
-    // NOTE: do NOT use `unique: true` here. We'll define robust indexes below.
     username: { type: String, trim: true },
     email: { type: String, lowercase: true, trim: true },
 
-    firstName: { type: String, default: "" },
-    lastName: { type: String, default: "" },
+    // ✅ Names (LGU included)
+    firstName: { type: String, default: "", trim: true },
+    lastName: { type: String, default: "", trim: true },
 
     passwordHash: { type: String, required: true },
 
@@ -45,12 +48,12 @@ const UserSchema = new Schema<UserDoc>(
       index: true,
     },
 
-    // Optional LGU fields
-    lguName: { type: String, default: "" },
-    barangay: { type: String, default: "" },
-    municipality: { type: String, default: "" },
+    // ✅ Optional LGU fields
+    lguName: { type: String, default: "", trim: true },
+    lguPosition: { type: String, default: "", trim: true }, // ✅ NEW
+    barangay: { type: String, default: "", trim: true },
+    municipality: { type: String, default: "", trim: true },
 
-    // Community can apply to be volunteer later
     volunteerStatus: {
       type: String,
       enum: ["NONE", "PENDING", "APPROVED"],
@@ -62,7 +65,6 @@ const UserSchema = new Schema<UserDoc>(
   },
   { timestamps: true }
 );
-
 
 UserSchema.index(
   { username: 1 },
