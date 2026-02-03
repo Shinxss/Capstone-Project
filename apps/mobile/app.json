@@ -55,9 +55,10 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Allow Lifeline to access your location to show your position on the map."
+          "locationWhenInUsePermission": "Allow Lifeline to access your location to show your position on the map and send SOS."
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,

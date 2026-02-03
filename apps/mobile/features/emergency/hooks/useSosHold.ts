@@ -1,8 +1,8 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type UseSosHoldOptions = {
   holdMs?: number;
-  onTriggered: () => void;
+  onTriggered: () => void | Promise<void>;
 };
 
 export function useSosHold({ holdMs = 3000, onTriggered }: UseSosHoldOptions) {
@@ -13,7 +13,7 @@ export function useSosHold({ holdMs = 3000, onTriggered }: UseSosHoldOptions) {
     setHolding(true);
     holdTimer.current = setTimeout(() => {
       setHolding(false);
-      onTriggered();
+      void onTriggered(); // supports async without unhandled promise warnings
     }, holdMs);
   }, [holdMs, onTriggered]);
 
@@ -21,6 +21,12 @@ export function useSosHold({ holdMs = 3000, onTriggered }: UseSosHoldOptions) {
     setHolding(false);
     if (holdTimer.current) clearTimeout(holdTimer.current);
     holdTimer.current = null;
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (holdTimer.current) clearTimeout(holdTimer.current);
+    };
   }, []);
 
   return { holding, startHold, cancelHold };

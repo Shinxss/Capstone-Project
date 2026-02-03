@@ -1,17 +1,17 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 const TOKEN_KEY = "__lifeline_token";
 
 export const authStorage = {
   async setToken(token: string) {
-    // TODO (later): replace with expo-secure-store
-    // await SecureStore.setItemAsync("lifeline_token", token);
-    (globalThis as any)[TOKEN_KEY] = token;
+    await AsyncStorage.setItem(TOKEN_KEY, token);
   },
 
   async getToken(): Promise<string | null> {
-    return (globalThis as any)[TOKEN_KEY] ?? null;
+    return AsyncStorage.getItem(TOKEN_KEY);
   },
 
   async clearToken() {
-    (globalThis as any)[TOKEN_KEY] = null;
+    await AsyncStorage.removeItem(TOKEN_KEY);
   },
 };

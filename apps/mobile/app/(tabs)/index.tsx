@@ -3,14 +3,20 @@ import { Alert } from "react-native";
 import { HomeView } from "../../features/home/components/HomeView";
 import { useSession } from "../../features/auth/hooks/useSession";
 import { useSosHold } from "../../features/emergency/hooks/useSosHold";
+import { useSosReport } from "../../features/emergency/hooks/useSosReport";
 
 export default function HomeScreen() {
   const { displayName } = useSession();
+  const { sendSos } = useSosReport();
 
-  const onSosTriggered = useCallback(() => {
-    // later: call emergency service here (API + location)
-    Alert.alert("SOS sent", "Your alert was sent to responders.");
-  }, []);
+  const onSosTriggered = useCallback(async () => {
+    try {
+      await sendSos();
+      Alert.alert("SOS sent", "Your alert was sent to responders.");
+    } catch (e: any) {
+      Alert.alert("SOS failed", e?.message ?? "Please try again.");
+    }
+  }, [sendSos]);
 
   const { holding, startHold, cancelHold } = useSosHold({
     holdMs: 3000,

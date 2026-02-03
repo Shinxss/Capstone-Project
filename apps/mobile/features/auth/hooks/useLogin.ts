@@ -34,14 +34,13 @@ export function useLogin() {
 
       const { accessToken, user } = await loginCommunity({ email: email.trim(), password });
 
-        await authStorage.setToken(accessToken);
-
         // ✅ set session so Home header shows firstName
         await loginAsUser({
           id: user.id,
           firstName: user.firstName,
           lastName: user.lastName,
           email: user.email,
+          accessToken: accessToken,
           role: user.role,
         });
 

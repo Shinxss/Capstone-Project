@@ -1,11 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AuthUser, Session } from "../models/session";
-import {
-  clearSession,
-  getSession,
-  setGuestSession,
-  setUserSession,
-} from "../services/sessionStorage";
+import { clearSession, getSession, setGuestSession, setUserSession } from "../services/sessionStorage";
+import { setApiAuthToken } from "../../../lib/api"; // ✅ add this import
 
 export function useSession() {
   const [session, setSessionState] = useState<Session | null>(null);
@@ -22,13 +18,19 @@ export function useSession() {
     refresh();
   }, [refresh]);
 
+  // ✅ keep axios auth header synced with session
+  useEffect(() => {
+    const token = session?.mode === "user" ? session.user.accessToken : null;
+    setApiAuthToken(token);
+  }, [session]);
+
   const isGuest = session?.mode === "guest";
   const isUser = session?.mode === "user";
 
   const displayName = useMemo(() => {
     if (isUser) return session.user.firstName || session.user.email || "User";
     if (isGuest) return "Guest";
-    return "Guest"; // default fallback if no session saved yet
+    return "Guest";
   }, [isGuest, isUser, session]);
 
   const loginAsGuest = useCallback(async () => {
@@ -36,13 +38,10 @@ export function useSession() {
     await refresh();
   }, [refresh]);
 
-  const loginAsUser = useCallback(
-    async (user: AuthUser) => {
-      await setUserSession(user);
-      await refresh();
-    },
-    [refresh]
-  );
+  const loginAsUser = useCallback(async (user: AuthUser) => {
+    await setUserSession(user);
+    await refresh();
+  }, [refresh]);
 
   const logout = useCallback(async () => {
     await clearSession();

@@ -4,6 +4,7 @@ export type AuthUser = {
   lastName?: string;
   email?: string;
   role?: string;
+  accessToken: string;
 };
 
 export type Session =
