@@ -10,19 +10,27 @@ export default function App() {
     <Routes>
       <Route path="/lgu/login" element={<LguLogin />} />
 
-      {/* ✅ Dashboard (same UI as screenshot) */}
+      {/* ✅ Dashboard */}
       <Route path="/lgu/dashboard" element={<LguDashboard />} />
 
-      {/* ✅ Placeholder pages for sidebar routes (for now) */}
+      {/* ✅ Sidebar routes */}
+      <Route path="/lgu/notifications" element={<PlaceholderPage title="Notifications" />} />
+
       <Route path="/lgu/emergencies" element={<LguEmergencies />} />
       <Route path="/lgu/volunteers" element={<PlaceholderPage title="Volunteers" />} />
       <Route path="/lgu/tasks" element={<PlaceholderPage title="Tasks" />} />
+      <Route path="/lgu/approvals" element={<PlaceholderPage title="Approvals / Verification" />} />
+
+      {/* Risk Zones stays inside Live Map */}
       <Route path="/lgu/live-map" element={<LguLiveMap />} />
-      <Route path="/lgu/blockchain-logs" element={<PlaceholderPage title="Blockchain Logs" />} />
+
+      <Route path="/lgu/announcements" element={<PlaceholderPage title="Announcements" />} />
       <Route path="/lgu/reports" element={<PlaceholderPage title="Reports" />} />
+
       <Route path="/lgu/profile" element={<PlaceholderPage title="Profile" />} />
       <Route path="/lgu/settings" element={<PlaceholderPage title="Settings" />} />
 
+      {/* ✅ Default */}
       <Route path="*" element={<Navigate to="/lgu/login" replace />} />
     </Routes>
   );
