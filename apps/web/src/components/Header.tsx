@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useLguSession } from "../features/auth/hooks/useLguSession";
+import { clearLguSession } from "../features/auth/services/authStorage";
+
 import {
   Search,
   Moon,
@@ -8,7 +11,7 @@ import {
   ChevronDown,
   User,
   LogOut,
-  Sidebar, // ✅ use this
+  Sidebar,
 } from "lucide-react";
 
 type HeaderProps = {
@@ -33,6 +36,19 @@ export default function Header({
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
+  // ✅ read session user from localStorage via hook
+  const { user } = useLguSession();
+
+  // ✅ computed display values (fallback safe)
+  const displayName =
+    user?.firstName || user?.lastName
+      ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim()
+      : user?.username ?? userName;
+
+  const displayRole = user?.role ?? userRole;
+
+  const displaySubtitle = user ? `Welcome Back, ${displayName}` : subtitle;
+
   // close on outside click + ESC
   useEffect(() => {
     function onDown(e: MouseEvent) {
@@ -52,7 +68,7 @@ export default function Header({
   }, [open]);
 
   function handleLogout() {
-    localStorage.removeItem("lifeline_lgu_token");
+    clearLguSession(); // ✅ clears token + user
     setOpen(false);
     navigate("/lgu/login", { replace: true });
   }
@@ -71,13 +87,15 @@ export default function Header({
               aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
               aria-pressed={!sidebarCollapsed}
             >
-              {/* ✅ single icon for both states */}
-              <Sidebar size={18} className={sidebarCollapsed ? "opacity-70" : "opacity-100"} />
+              <Sidebar
+                size={18}
+                className={sidebarCollapsed ? "opacity-70" : "opacity-100"}
+              />
             </button>
 
             <div className="leading-tight">
               <div className="text-xl font-bold text-gray-900">{title}</div>
-              <div className="text-sm text-gray-500">{subtitle}</div>
+              <div className="text-sm text-gray-500">{displaySubtitle}</div>
             </div>
           </div>
         </div>
@@ -124,8 +142,10 @@ export default function Header({
               </div>
 
               <div className="leading-tight text-left">
-                <div className="text-sm font-semibold text-gray-900">{userName}</div>
-                <div className="text-xs text-gray-600">{userRole}</div>
+                <div className="text-sm font-semibold text-gray-900">
+                  {displayName}
+                </div>
+                <div className="text-xs text-gray-600">{displayRole}</div>
               </div>
 
               <span className="h-9 w-9 rounded-md hover:bg-gray-100 flex items-center justify-center">

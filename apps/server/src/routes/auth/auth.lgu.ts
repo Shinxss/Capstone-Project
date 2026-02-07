@@ -43,15 +43,21 @@ lguAuthRouter.post("/login", async (req, res) => {
       });
 
       return res.json({
-        success: true,
-        data: {
-          mfaRequired: true,
-          role: "ADMIN",
-          challengeId,
-          emailMasked: maskEmail(user.email),
-          user: { id: user._id.toString(), username: user.username, role: user.role },
+      success: true,
+      data: {
+        mfaRequired: true,
+        role: "ADMIN",
+        challengeId,
+        emailMasked: maskEmail(user.email),
+        user: {
+          id: user._id.toString(),
+          username: user.username,
+          role: user.role,
+          firstName: user.firstName,
+          lastName: user.lastName,
         },
-      });
+      },
+    });
     }
 
     // ✅ LGU => token immediately
@@ -66,10 +72,16 @@ lguAuthRouter.post("/login", async (req, res) => {
           id: user._id.toString(),
           username: user.username,
           role: user.role,
+          firstName: user.firstName,
+          lastName: user.lastName,
           lguName: user.lguName,
+          lguPosition: user.lguPosition,
+          barangay: user.barangay,
+          municipality: user.municipality,
         },
       },
     });
+
   } catch (err) {
     console.error(err);
     return res.status(500).json({ success: false, error: "Server error" });

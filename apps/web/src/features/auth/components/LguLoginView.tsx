@@ -1,7 +1,7 @@
 import { useState } from "react";
 import bgWhite from "../../../assets/bg_white.jpg";
 import { Eye, EyeOff } from "lucide-react";
-import { ShieldLogo } from "../../../components/ShieldLogo";
+import { LifelineLogo } from "../../../components/LifelineLogo";
 import MfaModal from "./MfaModal";
 
 type Props = {
@@ -47,7 +47,7 @@ export default function LguLoginView({
   return (
     <>
       <div
-        className="relative min-h-screen w-full flex items-center justify-center px-4 overflow-hidden"
+        className="relative min-h-screen w-full flex items-start justify-center px-4 overflow-hidden pt-45"
         style={{
           backgroundImage: `url(${bgWhite})`,
           backgroundSize: "cover",
@@ -58,11 +58,13 @@ export default function LguLoginView({
         <div className="absolute inset-0 bg-white/70 backdrop-blur-xs" />
 
         <div className="relative z-10 w-full max-w-117.5">
-          <div className="mb-4">
-            <ShieldLogo />
+          <div className="mb-6 flex justify-center">
+            <LifelineLogo variant="full" iconSize={44} textClassName="text-5xl" />
           </div>
 
-          <div className="bg-white border-2 rounded-xl border-b-3 border-gray-200 p-8 shadow-sm h-112.5">
+
+
+          <div className="bg-white border-2 rounded-xl border-b-3 border-gray-200 p-8 shadow-sm h-112.5" >
             <h1 className="text-center text-[30px] font-bold text-[#111827]">
               Welcome Back
             </h1>

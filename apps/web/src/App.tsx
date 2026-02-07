@@ -19,7 +19,6 @@ export default function App() {
       <Route path="/lgu/emergencies" element={<LguEmergencies />} />
       <Route path="/lgu/volunteers" element={<PlaceholderPage title="Volunteers" />} />
       <Route path="/lgu/tasks" element={<PlaceholderPage title="Tasks" />} />
-      <Route path="/lgu/approvals" element={<PlaceholderPage title="Approvals / Verification" />} />
 
       {/* Risk Zones stays inside Live Map */}
       <Route path="/lgu/live-map" element={<LguLiveMap />} />

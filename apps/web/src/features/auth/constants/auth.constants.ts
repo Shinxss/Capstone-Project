@@ -1,5 +1,6 @@
 export const AUTH_STORAGE_KEYS = {
   lguToken: "lifeline_lgu_token", // OK for both LGU + ADMIN for now
+  lguUser: "lifeline_lgu_user",
 } as const;
 
 export const AUTH_ROUTES = {

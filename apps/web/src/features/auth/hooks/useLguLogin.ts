@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { lguLogin, adminMfaVerify } from "../services/lguAuth.service";
-import { setLguToken } from "../services/authStorage";
+import { setLguSession } from "../services/authStorage";
 import { AUTH_ROUTES } from "../constants/auth.constants";
 import type { PortalLoginData } from "../models/auth.types";
 
@@ -65,7 +65,7 @@ export function useLguLogin() {
         throw new Error("No token returned");
       }
 
-      setLguToken(result.accessToken);
+      setLguSession(result.accessToken, result.user);
       navigate(AUTH_ROUTES.lguAfterLogin, { replace: true });
     } catch (err: any) {
       // your backend uses { success:false, error } for LGU/Admin login
@@ -82,9 +82,10 @@ export function useLguLogin() {
 
     try {
       const data = await adminMfaVerify({ challengeId, code: otp });
-      setLguToken(data.accessToken);
+      setLguSession(data.accessToken, data.user);
       setMfaOpen(false);
       navigate(AUTH_ROUTES.adminAfterLogin, { replace: true });
+
     } catch (err: any) {
       const msg = err?.response?.data?.error || err?.message || "OTP verification failed";
       setMfaError(msg);
