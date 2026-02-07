@@ -20,6 +20,10 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
+// ✅ NEW: hook + types
+import { useLguEmergencies } from "../../features/emergency/hooks/useLguEmergencies";
+import type { EmergencyReport } from "../../features/emergency/models/emergency.types";
+
 type EmergencyType = "SOS" | "Flood" | "Fire" | "Typhoon" | "Earthquake" | "Collapse";
 type Priority = "critical" | "high" | "medium";
 type Status = "active" | "in_progress" | "resolved" | "pending";
@@ -282,84 +286,95 @@ function EmergencyCard({ item }: { item: EmergencyItem }) {
   );
 }
 
+/* ---------------------------------------------
+   ✅ Mapping MongoDB EmergencyReport -> UI item
+---------------------------------------------- */
+
+function normalizeType(raw?: string): EmergencyType {
+  const up = String(raw || "").toUpperCase();
+  if (up === "SOS") return "SOS";
+  if (up === "FIRE") return "Fire";
+  if (up === "FLOOD") return "Flood";
+  if (up === "EARTHQUAKE") return "Earthquake";
+  // These may not exist in your backend yet, but keep UI safe:
+  if (up === "TYPHOON") return "Typhoon";
+  if (up === "COLLAPSE") return "Collapse";
+  return "SOS";
+}
+
+function normalizeStatus(raw?: string): Status {
+  const up = String(raw || "").toUpperCase();
+  if (up === "OPEN") return "active";
+  if (up === "ACKNOWLEDGED") return "in_progress";
+  if (up === "RESOLVED" || up === "CANCELLED") return "resolved";
+  return "active";
+}
+
+function formatTimeAgo(iso?: string) {
+  if (!iso) return "Just now";
+  const then = new Date(iso).getTime();
+  const diff = Math.max(0, Date.now() - then);
+  const mins = Math.floor(diff / 60000);
+
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins} min ago`;
+
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} hour${hrs > 1 ? "s" : ""} ago`;
+
+  const days = Math.floor(hrs / 24);
+  return `${days} day${days > 1 ? "s" : ""} ago`;
+}
+
+function reporterNameFrom(r: EmergencyReport) {
+  const rb: any = r.reportedBy;
+  if (!rb || typeof rb === "string") return "Unknown Reporter";
+
+  const full = `${rb.firstName || ""} ${rb.lastName || ""}`.trim();
+  return full || rb.username || rb.email || "Unknown Reporter";
+}
+
+function locationLabelFrom(r: EmergencyReport) {
+  const coords = r.location?.coordinates;
+  if (!coords || coords.length !== 2) return "Unknown location";
+  const [lng, lat] = coords;
+  return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+}
+
+function toItem(r: EmergencyReport): EmergencyItem {
+  const isSOS = String(r.emergencyType).toUpperCase() === "SOS" || String(r.source).toUpperCase() === "SOS_BUTTON";
+  const created = r.reportedAt || r.createdAt || r.updatedAt;
+
+  return {
+    id: r._id,
+    type: normalizeType(r.emergencyType),
+    title: isSOS ? "SOS Emergency" : `${normalizeType(r.emergencyType)} Emergency`,
+    location: locationLabelFrom(r),
+    timeAgo: formatTimeAgo(created),
+    priority: isSOS ? "critical" : "high",
+    status: normalizeStatus(r.status),
+    isSOS,
+    reporterLabel: isSOS ? "SOS Reported by" : "Reported by",
+    reporterName: reporterNameFrom(r),
+    reporterVerified: false,
+    phone: undefined,
+    description: r.notes || `Reported via ${r.source}`,
+    needs: [],
+    volunteersAssigned: 0,
+    volunteersNeeded: 0,
+    progressPercent: 0,
+  };
+}
+
 export default function LguEmergencies() {
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<"ALL" | "SOS" | EmergencyType>("ALL");
 
-  // ✅ Dagupan-only data
-  const data: EmergencyItem[] = useMemo(
-    () => [
-      {
-        id: "sos-1",
-        type: "Flood",
-        title: "Flash Flood Emergency (SOS)",
-        location: "Barangay Calmay, Dagupan City",
-        timeAgo: "15 min ago",
-        priority: "critical",
-        status: "active",
-        isSOS: true,
-        reporterLabel: "SOS Reported by",
-        reporterName: "Maria Santos",
-        phone: "+63 917 XXX 1234",
-        description: "Severe flooding near the river. Immediate evacuation assistance needed.",
-        needs: ["Boats", "Life vests", "Food packs", "Medical supplies"],
-        volunteersAssigned: 18,
-        volunteersNeeded: 25,
-        progressPercent: 72,
-      },
-      {
-        id: "fire-1",
-        type: "Fire",
-        title: "Residential Fire",
-        location: "Poblacion Oeste, Dagupan City",
-        timeAgo: "32 min ago",
-        priority: "high",
-        status: "active",
-        reporterLabel: "Reported by Authority",
-        reporterName: "Dagupan Fire Station",
-        reporterVerified: true,
-        description: "House fire spreading to nearby structures. Evacuation and first aid required.",
-        needs: ["First aid kits", "Blankets", "Water"],
-        volunteersAssigned: 12,
-        volunteersNeeded: 15,
-        progressPercent: 80,
-      },
-      {
-        id: "collapse-1",
-        type: "Collapse",
-        title: "Building Collapse",
-        location: "Barangay Tapuac, Dagupan City",
-        timeAgo: "2 hours ago",
-        priority: "medium",
-        status: "in_progress",
-        reporterLabel: "Reported by User",
-        reporterName: "Juan Dela Cruz",
-        description: "Partial structure collapse. Rescue and perimeter control ongoing.",
-        needs: ["Heavy equipment", "Medical team", "Search dogs"],
-        volunteersAssigned: 14,
-        volunteersNeeded: 20,
-        progressPercent: 60,
-      },
-      {
-        id: "typhoon-1",
-        type: "Typhoon",
-        title: "Typhoon Evacuation Support",
-        location: "Bonuan Binloc, Dagupan City",
-        timeAgo: "1 hour ago",
-        priority: "critical",
-        status: "active",
-        reporterLabel: "Reported by Authority",
-        reporterName: "Dagupan CDRRMO",
-        reporterVerified: true,
-        description: "Coastal area evacuation underway. Need transport and relief distribution.",
-        needs: ["Transport", "Relief goods", "Medical team"],
-        volunteersAssigned: 22,
-        volunteersNeeded: 40,
-        progressPercent: 55,
-      },
-    ],
-    []
-  );
+  // ✅ Fetch from MongoDB (via API)
+  const { reports, loading, error, refetch } = useLguEmergencies();
+
+  // ✅ Convert backend reports to UI list
+  const data: EmergencyItem[] = useMemo(() => reports.map(toItem), [reports]);
 
   const sosCount = data.filter((d) => d.isSOS).length;
 
@@ -380,7 +395,7 @@ export default function LguEmergencies() {
     critical: String(data.filter((d) => d.priority === "critical").length),
     high: String(data.filter((d) => d.priority === "high").length),
     inProgress: String(data.filter((d) => d.status === "in_progress").length),
-    deployed: "85",
+    deployed: "0",
   };
 
   return (
@@ -401,6 +416,18 @@ export default function LguEmergencies() {
           </button>
         </div>
 
+        {/* ✅ error + loading */}
+        {error && (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 flex items-center justify-between">
+            <span>{error}</span>
+            <button onClick={refetch} className="rounded-lg bg-red-600 px-3 py-2 text-white font-semibold">
+              Retry
+            </button>
+          </div>
+        )}
+
+        {loading && <div className="text-sm text-gray-500">Loading emergencies...</div>}
+
         {/* SOS alert banner */}
         {sosCount > 0 && (
           <div className="heartbeat-alert border border-red-300 rounded-2xl px-6 py-5 flex items-center justify-between">
@@ -416,7 +443,10 @@ export default function LguEmergencies() {
               </div>
             </div>
 
-            <button className="rounded-xl bg-red-300/70 hover:bg-red-300 px-5 py-3 text-sm font-bold text-white">
+            <button
+              onClick={() => setTypeFilter("SOS")}
+              className="rounded-xl bg-red-300/70 hover:bg-red-300 px-5 py-3 text-sm font-bold text-white"
+            >
               View SOS Reports
             </button>
           </div>
@@ -468,13 +498,19 @@ export default function LguEmergencies() {
 
         {/* List */}
         <div className="space-y-5">
-          {filtered.map((item) =>
-            item.isSOS ? (
-              <div key={item.id} className="heartbeat-wrap rounded-2xl">
-                <EmergencyCard item={item} />
-              </div>
-            ) : (
-              <EmergencyCard key={item.id} item={item} />
+          {!loading && filtered.length === 0 ? (
+            <div className="rounded-2xl border border-gray-200 bg-white p-8 text-sm text-gray-600">
+              No emergency reports found.
+            </div>
+          ) : (
+            filtered.map((item) =>
+              item.isSOS ? (
+                <div key={item.id} className="heartbeat-wrap rounded-2xl">
+                  <EmergencyCard item={item} />
+                </div>
+              ) : (
+                <EmergencyCard key={item.id} item={item} />
+              )
             )
           )}
         </div>

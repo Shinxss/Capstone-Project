@@ -9,8 +9,6 @@ type CreateSosInput = {
   notes?: string;
 };
 
-
-// Create a new SOS emergency report
 export async function createSosReport(input: CreateSosInput) {
   const doc = await EmergencyReport.create({
     emergencyType: "SOS",
@@ -27,6 +25,14 @@ export async function createSosReport(input: CreateSosInput) {
   });
 
   return doc;
-  
 }
 
+// ✅ LIST REPORTS (latest first)
+export async function listReports({ limit = 200 }: { limit?: number }) {
+  const docs = await EmergencyReport.find({})
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .populate("reportedBy", "firstName lastName role username email lguName municipality barangay");
+
+  return docs;
+}
