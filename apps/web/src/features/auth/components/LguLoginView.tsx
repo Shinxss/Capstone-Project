@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import bgWhite from "../../../assets/bg_white.jpg";
+import bgDark from "../../../assets/bg_dark.jpg";
 import { Eye, EyeOff } from "lucide-react";
 import { LifelineLogo } from "../../../components/LifelineLogo";
 import MfaModal from "./MfaModal";
+import { useThemeMode } from "../../theme/hooks/useThemeMode";
 
 type Props = {
   username: string;
@@ -43,42 +45,55 @@ export default function LguLoginView({
   closeMfa,
 }: Props) {
   const [showPassword, setShowPassword] = useState(false);
+  const { isDark } = useThemeMode();
+
+  const pageBg = useMemo(() => (isDark ? bgDark : bgWhite), [isDark]);
 
   return (
     <>
       <div
         className="relative min-h-screen w-full flex items-start justify-center px-4 overflow-hidden pt-45"
         style={{
-          backgroundImage: `url(${bgWhite})`,
+          backgroundImage: `url(${pageBg})`,
           backgroundSize: "cover",
           backgroundPosition: "center",
           backgroundRepeat: "no-repeat",
         }}
       >
-        <div className="absolute inset-0 bg-white/70 backdrop-blur-xs" />
+        {/* overlay */}
+        <div
+          className={
+            isDark
+              ? "absolute inset-0 bg-linear-to-b from-[#070D18]/70 via-[#070D18]/70 to-[#070D18]/70 backdrop-blur-sm"
+              : "absolute inset-0 bg-white/70 backdrop-blur-xs"
+          }
+        />
 
         <div className="relative z-10 w-full max-w-117.5">
           <div className="mb-6 flex justify-center">
-            <LifelineLogo variant="full" iconSize={44} textClassName="text-5xl" />
+            <LifelineLogo
+              variant="full"
+              iconSize={44}
+              textClassName="text-5xl"
+              logoColor={isDark ? "blue" : "red"}
+            />
           </div>
 
-
-
-          <div className="bg-white border-2 rounded-xl border-b-3 border-gray-200 p-8 shadow-sm h-112.5" >
-            <h1 className="text-center text-[30px] font-bold text-[#111827]">
+          <div className="bg-white border-2 rounded-xl border-b-3 border-gray-200 p-8 shadow-sm h-112.5 dark:bg-[#0B1220]/80 dark:border-slate-800 dark:shadow-black/30">
+            <h1 className="text-center text-[30px] font-bold text-[#111827] dark:text-slate-100">
               Welcome Back
             </h1>
-            <p className="mt-1 text-center text-base font-semibold text-gray-400">
+            <p className="mt-1 text-center text-base font-semibold text-gray-400 dark:text-slate-400">
               Login to access Dashboard
             </p>
 
             <form onSubmit={onSubmit} className="mt-6 space-y-4">
               <div>
-                <label className="block text-base font-bold text-gray-700 mb-1">
+                <label className="block text-base font-bold text-gray-700 mb-1 dark:text-slate-200">
                   Username
                 </label>
                 <input
-                  className="w-full rounded border border-gray-300 bg-gray-100 px-3 py-2 font-semibold text-sm outline-none focus:border-gray-400"
+                  className="w-full rounded border border-gray-300 bg-gray-100 px-3 py-2 font-semibold text-sm text-slate-900 outline-none focus:border-gray-400 placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-100 dark:placeholder:text-slate-400 dark:focus:border-slate-500"
                   placeholder="Enter your username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
@@ -87,14 +102,14 @@ export default function LguLoginView({
               </div>
 
               <div>
-                <label className="block text-base font-bold text-gray-700 mb-1">
+                <label className="block text-base font-bold text-gray-700 mb-1 dark:text-slate-200">
                   Password
                 </label>
 
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
-                    className="w-full rounded border border-gray-300 bg-gray-100 px-3 py-2 pr-11 font-semibold text-sm outline-none focus:border-gray-400"
+                    className="w-full rounded border border-gray-300 bg-gray-100 px-3 py-2 pr-11 font-semibold text-sm text-slate-900 outline-none focus:border-gray-400 placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-100 dark:placeholder:text-slate-400 dark:focus:border-slate-500"
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -104,7 +119,7 @@ export default function LguLoginView({
                   <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200"
                     aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -117,12 +132,12 @@ export default function LguLoginView({
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded bg-[#DC2626] mt-2 py-3 text-base font-semibold text-white hover:bg-[#c81e1e] disabled:opacity-60"
+                className="w-full rounded bg-[#DC2626] mt-2 py-3 text-base font-semibold text-white hover:bg-[#c81e1e] disabled:opacity-60 dark:bg-blue-600 dark:hover:bg-blue-500"
               >
                 {loading ? "Logging in..." : "Login"}
               </button>
 
-              <p className="pt-2 text-center text-md text-gray-500">
+              <p className="pt-2 text-center text-md text-gray-500 dark:text-slate-400">
                 Contact your administrator if you need access
               </p>
             </form>

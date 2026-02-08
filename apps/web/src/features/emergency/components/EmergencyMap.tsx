@@ -23,6 +23,21 @@ type Props = {
   legendVariant?: "legacy" | "byType";
 };
 
+// ✅ React 18 fix: avoid sync root.unmount() during an active render/commit
+const safeUnmount = (root: Root) => {
+  const run = () => {
+    try {
+      root.unmount();
+    } catch {
+      // ignore if already unmounted
+    }
+  };
+
+  // Prefer microtask, fallback to macrotask
+  if (typeof queueMicrotask === "function") queueMicrotask(run);
+  else setTimeout(run, 0);
+};
+
 export default function EmergencyMap({
   reports,
   heightClassName = "h-[420px]",
@@ -107,11 +122,13 @@ export default function EmergencyMap({
 
     return () => {
       ro.disconnect();
+
       markersRef.current.forEach(({ marker, root }) => {
         marker.remove();
-        root.unmount();
+        safeUnmount(root); // ✅ changed
       });
       markersRef.current = [];
+
       map.remove();
       mapRef.current = null;
     };
@@ -125,13 +142,14 @@ export default function EmergencyMap({
     // clear old markers
     markersRef.current.forEach(({ marker, root }) => {
       marker.remove();
-      root.unmount();
+      safeUnmount(root); // ✅ changed
     });
     markersRef.current = [];
 
     // add new markers
     for (const r of reports) {
       if (!Number.isFinite(r.lng) || !Number.isFinite(r.lat)) continue;
+
       const el = document.createElement("div");
       const root = createRoot(el);
       root.render(<EmergencyMarker type={r.type} />);

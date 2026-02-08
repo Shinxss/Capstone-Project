@@ -23,21 +23,25 @@ export default function MfaModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
-      <div className="relative w-full max-w-md rounded-xl bg-white p-6 shadow-lg">
-        <h2 className="text-xl font-bold text-gray-900">Admin Verification</h2>
-        <p className="mt-1 text-sm text-gray-600">
+      <div className="relative w-full max-w-md rounded-xl bg-white p-6 shadow-lg dark:bg-[#0B1220] dark:shadow-black/40">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100">
+          Admin Verification
+        </h2>
+        <p className="mt-1 text-sm text-gray-600 dark:text-slate-300">
           We sent a 6-digit code to <span className="font-semibold">{emailMasked}</span>
         </p>
 
         <div className="mt-4">
-          <label className="block text-sm font-semibold text-gray-700 mb-1">OTP Code</label>
+          <label className="block text-sm font-semibold text-gray-700 mb-1 dark:text-slate-200">
+            OTP Code
+          </label>
           <input
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
             inputMode="numeric"
-            className="w-full rounded border border-gray-300 bg-gray-50 px-3 py-2 font-semibold outline-none focus:border-gray-400"
+            className="w-full rounded border border-gray-300 bg-gray-50 px-3 py-2 font-semibold text-slate-900 outline-none focus:border-gray-400 placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-100 dark:placeholder:text-slate-400 dark:focus:border-slate-500"
             placeholder="Enter 6-digit code"
           />
         </div>
@@ -48,7 +52,7 @@ export default function MfaModal({
           <button
             type="button"
             onClick={onClose}
-            className="w-1/2 rounded border border-gray-300 py-2 font-semibold text-gray-700 hover:bg-gray-50"
+            className="w-1/2 rounded border border-gray-300 py-2 font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900/40"
             disabled={loading}
           >
             Cancel
@@ -56,7 +60,7 @@ export default function MfaModal({
           <button
             type="button"
             onClick={onVerify}
-            className="w-1/2 rounded bg-[#DC2626] py-2 font-semibold text-white hover:bg-[#c81e1e] disabled:opacity-60"
+            className="w-1/2 rounded bg-[#DC2626] py-2 font-semibold text-white hover:bg-[#c81e1e] disabled:opacity-60 dark:bg-blue-600 dark:hover:bg-blue-500"
             disabled={loading || code.length !== 6}
           >
             {loading ? "Verifying..." : "Verify"}
