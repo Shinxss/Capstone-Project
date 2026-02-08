@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 
 
@@ -79,4 +80,44 @@
 .ll-pin__icon {
   font-size: 16px;
   line-height: 1;
+}
+
+
+/* Native UI follows theme (helps some browsers) */
+:root { color-scheme: light; }
+.dark { color-scheme: dark; }
+
+/* Use CSS variables so light/dark is consistent everywhere */
+:root{
+  --sb-track: #e2e8f0;
+  --sb-thumb: #94a3b8;
+  --sb-thumb-hover: #64748b;
+}
+.dark{
+  --sb-track: #0b1220;      /* navy track */
+  --sb-thumb: #1e293b;      /* navy thumb */
+  --sb-thumb-hover: #334155;
+}
+
+/* Firefox */
+*{
+  scrollbar-width: thin;
+  scrollbar-color: var(--sb-thumb) var(--sb-track);
+}
+
+/* Chrome / Edge / Safari */
+*::-webkit-scrollbar{
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track{
+  background: var(--sb-track);
+}
+*::-webkit-scrollbar-thumb{
+  background: var(--sb-thumb);
+  border-radius: 9999px;
+  border: 2px solid var(--sb-track);
+}
+*::-webkit-scrollbar-thumb:hover{
+  background: var(--sb-thumb-hover);
 }

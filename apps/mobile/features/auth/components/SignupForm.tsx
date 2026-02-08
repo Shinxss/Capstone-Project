@@ -91,7 +91,7 @@ export default function SignupForm({
           <TextInput
             placeholder="Password"
             placeholderTextColor="#9CA3AF"
-            className="h-15 rounded border border-gray-200 bg-white px-4 pr-12 pl-3 text-[15px] font-semibold"
+            className="h-15 rounded border border-gray-200 bg-white px-4 pr-12 pl-3 text-[15px] font-semibold text-gray-900"
             value={password}
             onChangeText={onChangePassword}
             secureTextEntry={!showPassword}
@@ -113,7 +113,7 @@ export default function SignupForm({
           <TextInput
             placeholder="Confirm Password"
             placeholderTextColor="#9CA3AF"
-            className="h-15 rounded border border-gray-200 bg-white px-4 pr-12 pl-3 text-[15px] font-semibold"
+            className="h-15 rounded border border-gray-200 bg-white px-4 pr-12 pl-3 text-[15px] font-semibold text-gray-900"
             value={confirm}
             onChangeText={onChangeConfirm}
             secureTextEntry={!showConfirm}

@@ -1,7 +1,7 @@
 import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { connectDB } from "../config/db";
-import { User } from "../models/User";
+import { User } from "../features/users/user.model";
 
 async function seedLGU() {
   const MONGODB_URI = process.env.MONGODB_URI || "";

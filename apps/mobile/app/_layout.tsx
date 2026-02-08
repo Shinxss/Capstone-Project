@@ -10,6 +10,17 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
+
+        {/* ✅ Volunteer modal */}
+        <Stack.Screen
+          name="volunteer-apply-modal"
+          options={{ presentation: "transparentModal" }}
+        />
+
+        {/* ✅ Volunteer application form */}
+        <Stack.Screen name="volunteer-application" />
+
+        {/* keep your existing modal if you still use it */}
         <Stack.Screen name="modal" />
       </Stack>
     </GestureHandlerRootView>

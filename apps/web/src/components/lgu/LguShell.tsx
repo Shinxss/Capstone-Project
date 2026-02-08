@@ -30,7 +30,7 @@ export default function LguShell({ title, subtitle, children }: Props) {
   }, [collapsed]);
 
   return (
-    <div className="h-screen bg-[#F6F7F9] flex overflow-hidden">
+    <div className="h-screen bg-[#F6F7F9] text-slate-900 flex overflow-hidden dark:bg-[#060C18] dark:text-slate-100">
       <Sidebar collapsed={collapsed} />
 
       <div className="flex-1 min-w-0 flex flex-col">
@@ -42,7 +42,7 @@ export default function LguShell({ title, subtitle, children }: Props) {
         />
 
         {/* ✅ only page content scrolls */}
-        <div className="flex-1 overflow-y-auto">{children}</div>
+        <div className="flex-1 overflow-y-auto bg-transparent dark:bg-[#060C18]">{children}</div>
       </div>
     </div>
   );

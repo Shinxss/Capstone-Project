@@ -9,6 +9,8 @@
     "build": "tsc -p tsconfig.json",
     "seed:lgu": "tsx src/scripts/seedLgu.ts",
     "seed:system-admin": "tsx src/scripts/seedSystemAdmin.ts",
+    "seed:barangays": "tsx src/scripts/seedDagupanBarangays.ts",
+    "seed:barangays:sanfabian": "tsx src/scripts/seedSanFabianBarangays.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "keywords": [],
@@ -27,6 +29,7 @@
     "mongoose": "^9.1.5",
     "morgan": "^1.10.1",
     "nodemailer": "^7.0.13",
+    "socket.io": "^4.8.3",
     "zod": "^4.3.6"
   },
   "devDependencies": {

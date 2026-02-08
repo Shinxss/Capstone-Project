@@ -1,5 +1,6 @@
 import React, { useCallback } from "react";
 import { Alert } from "react-native";
+import { router } from "expo-router";
 import { HomeView } from "../../features/home/components/HomeView";
 import { useSession } from "../../features/auth/hooks/useSession";
 import { useSosHold } from "../../features/emergency/hooks/useSosHold";
@@ -31,7 +32,7 @@ export default function HomeScreen() {
       onCancelHold={cancelHold}
       onPressNotifications={() => {}}
       onPressViewAll={() => {}}
-      onPressApplyVolunteer={() => {}}
+      onPressApplyVolunteer={() => router.push("/volunteer-apply-modal")}
     />
   );
 }

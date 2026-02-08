@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { Types } from "mongoose";
-import { MfaChallenge } from "../models/MfaChallenge";
+import { MfaChallenge } from "../features/auth/MfaChallenge";
 
 const MAX_ATTEMPTS = 5;
 

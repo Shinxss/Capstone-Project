@@ -1,6 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { User } from "../../models/User";
+import { User } from "../users/user.model";
 import { signAccessToken } from "../../utils/jwt";
 
 export const communityAuthRouter = Router();

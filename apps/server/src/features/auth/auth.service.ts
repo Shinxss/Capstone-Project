@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { User } from "../../models/User";
+import { User } from "../users/user.model";
 
 export async function authenticateUser(email: string, password: string) {
   const user = await User.findOne({ email: email.toLowerCase().trim() }).select("+passwordHash");

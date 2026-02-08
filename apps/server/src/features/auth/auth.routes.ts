@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { communityAuthRouter } from "./auth.community";
-import { lguAuthRouter } from "./auth.lgu";
-import { adminAuthRouter } from "./auth.admin";
+import { communityAuthRouter } from "./auth.community.routes";
+import { lguAuthRouter } from "./auth.lgu.routes";
+import { adminAuthRouter } from "./auth.admin.routes";
 import { login, me } from "./auth.controller";
 import { requireAuth } from "../../middlewares/requireAuth";
 

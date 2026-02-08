@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { authenticateUser } from "./auth.service";
 import { signAccessToken } from "../../utils/jwt";
-import { User } from "../../models/User";
+import { User } from "../users/user.model";
 import { verifyMfaChallenge } from "../../utils/mfa";
 
 export async function login(req: Request, res: Response) {

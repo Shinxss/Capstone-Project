@@ -24,4 +24,10 @@ export type EmergencyReport = {
   reportedAt?: string;
   createdAt?: string;
   updatedAt?: string;
+
+  // ✅ add these
+  barangayName?: string | null;
+  barangayCity?: string | null;
+  barangayProvince?: string | null;
 };
+

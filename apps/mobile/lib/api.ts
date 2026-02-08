@@ -15,14 +15,20 @@ export function setApiAuthToken(token: string | null) {
   }
 }
 
-// Optional: keep interceptor as backup (works even if defaults not set yet)
 api.interceptors.request.use(async (config) => {
   try {
     const raw = await AsyncStorage.getItem(STORAGE_KEYS.SESSION);
     if (!raw) return config;
 
     const session = JSON.parse(raw);
-    const token = session?.user?.accessToken ?? null;
+
+    // ✅ support multiple possible shapes
+    const token =
+      session?.token ??
+      session?.accessToken ??
+      session?.user?.accessToken ??
+      session?.user?.token ??
+      null;
 
     if (token) {
       config.headers = config.headers ?? {};

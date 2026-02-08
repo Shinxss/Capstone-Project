@@ -8,7 +8,7 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSafeAreaInsets,} from "react-native-safe-area-context";
 
 type Props = {
   displayName: string;
@@ -97,22 +97,6 @@ export function HomeView({
             </Text>
           </View>
         </View>
-
-        {/* Recent Emergencies */}
-        <View style={styles.sectionRow}>
-          <Text style={styles.sectionTitle}>Recent Emergencies</Text>
-          <Pressable onPress={onPressViewAll}>
-            <View style={styles.viewAllRow}>
-              <Text style={styles.viewAll}>View all</Text>
-              <Ionicons name="chevron-forward" size={14} color="#2563EB" />
-            </View>
-          </Pressable>
-        </View>
-
-        <View style={styles.listCard} />
-        <View style={styles.listCard} />
-        <View style={styles.listCard} />
-
         {/* Volunteer CTA */}
         <View style={styles.volunteer}>
           <View style={styles.volCircle1} />
@@ -131,10 +115,6 @@ export function HomeView({
 
           <Pressable style={styles.applyBtn} onPress={onPressApplyVolunteer}>
             <Text style={styles.applyText}>Apply Now</Text>
-          </Pressable>
-
-          <Pressable style={styles.chatFab}>
-            <Ionicons name="chatbubble-ellipses" size={18} color="#EF4444" />
           </Pressable>
         </View>
       </ScrollView>
@@ -247,25 +227,6 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 18, fontWeight: "700", color: "#111827" },
   cardSub: { fontSize: 12, color: "#6B7280", marginTop: 2, lineHeight: 15 },
 
-  sectionRow: {
-    marginTop: 25,
-    marginBottom: 15,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  sectionTitle: { fontSize: 20, fontWeight: "800", color: "#6B7280" },
-  viewAllRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  viewAll: { fontSize: 15, color: "#2563EB", fontWeight: "600" },
-
-  listCard: {
-    height: 130,
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    marginBottom: 10,
-  },
 
   volunteer: {
     marginTop: 25,
@@ -273,6 +234,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     overflow: "hidden",
+    height: 230,
   },
   volCircle1: {
     position: "absolute",
@@ -292,37 +254,25 @@ const styles = StyleSheet.create({
     borderRadius: 60,
     backgroundColor: "rgba(0,0,0,0.18)",
   },
-  volRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  volRow: { flexDirection: "column", alignItems: "flex-start", gap: 1 },
   volBadge: {
     width: 50,
-    height: 50,
+    height: 55,
     borderRadius: 10,
     backgroundColor: "rgba(255,255,255,0.15)",
     alignItems: "center",
     justifyContent: "center",
   },
-  volTitle: { color: "#fff", fontSize: 20, fontWeight: "900" },
-  volSub: { color: "rgba(255,255,255,0.85)", fontSize: 14, marginTop: 10, lineHeight: 15 },
+  volTitle: { color: "#fff", fontSize: 25, fontWeight: "900" },
+  volSub: { color: "rgba(255,255,255,0.85)", fontSize: 15, marginTop: 10, lineHeight: 15 },
 
   applyBtn: {
-    marginTop: 12,
+    marginTop: 20,
     alignSelf: "flex-start",
     backgroundColor: "#fff",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 30,
+    paddingVertical: 12,
     borderRadius: 10,
   },
-  applyText: { color: "#B91C1C", fontWeight: "900", fontSize: 11 },
-
-  chatFab: {
-    position: "absolute",
-    right: 12,
-    bottom: 12,
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  applyText: { color: "#B91C1C", fontWeight: "700", fontSize: 15 },
 });

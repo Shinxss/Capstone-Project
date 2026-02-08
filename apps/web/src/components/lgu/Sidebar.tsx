@@ -1,4 +1,5 @@
 import React from "react";
+import { useThemeMode } from "../../features/theme/hooks/useThemeMode";
 import { NavLink, useLocation } from "react-router-dom";
 import { createPortal } from "react-dom";
 
@@ -89,14 +90,16 @@ function SidebarItem({ item, collapsed }: { item: NavItem; collapsed: boolean })
           "relative flex items-center rounded-md transition-colors",
           "py-2 text-sm font-medium",
           collapsed ? "justify-center px-2.5" : "gap-3 px-3",
-          isActive ? "bg-gray-200 text-gray-900" : "text-gray-800 hover:bg-gray-100",
           isActive
-            ? "before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:rounded-r before:bg-blue-600"
+            ? "bg-gray-200 text-gray-900 dark:bg-[#0F1A2E] dark:text-slate-100"
+            : "text-gray-800 hover:bg-gray-100 dark:text-slate-200 dark:hover:bg-[#0E1A30] dark:text-slate-200 dark:hover:bg-[#0E1A30]",
+          isActive
+            ? "before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:rounded-r before:bg-blue-600 dark:before:bg-blue-500"
             : "",
         ].join(" ")
       }
     >
-      <Icon size={18} className="text-gray-900" />
+      <Icon size={18} className="text-gray-900 dark:text-slate-200" />
       {!collapsed && <span className="truncate">{item.label}</span>}
     </NavLink>
   );
@@ -198,13 +201,15 @@ function SidebarSubmenu({
           className={[
             "relative w-full flex items-center justify-center rounded-md transition-colors",
             "py-2 text-sm font-medium",
-            active ? "bg-gray-200 text-gray-900" : "text-gray-800 hover:bg-gray-100",
             active
-              ? "before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:rounded-r before:bg-blue-600"
+            ? "bg-gray-200 text-gray-900 dark:bg-[#0F1A2E] dark:text-slate-100"
+            : "text-gray-800 hover:bg-gray-100 dark:text-slate-200 dark:hover:bg-[#0E1A30] dark:text-slate-200 dark:hover:bg-[#0E1A30]",
+            active
+              ? "before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:rounded-r before:bg-blue-600 dark:before:bg-blue-500"
               : "",
           ].join(" ")}
         >
-          <Icon size={18} className="text-gray-900" />
+          <Icon size={18} className="text-gray-900 dark:text-slate-200" />
         </button>
 
         {flyoutOpen && pos
@@ -215,12 +220,12 @@ function SidebarSubmenu({
                 onMouseLeave={closeFlyout}
                 className={[
                   "fixed z-[9999]",
-                  "w-60 rounded-lg border border-gray-200 bg-white shadow-lg",
+                  "w-60 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-[#162544] dark:bg-[#0E1626]",
                   "p-2",
                 ].join(" ")}
                 style={{ left: pos.left, top: pos.top }}
               >
-                <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 uppercase dark:text-slate-400 dark:text-slate-400 tracking-wide">
                   {label}
                 </div>
 
@@ -237,15 +242,15 @@ function SidebarSubmenu({
                             "relative flex items-center gap-2 rounded-md",
                             "px-2 py-2 text-sm transition-colors",
                             isActive
-                              ? "bg-gray-200 text-gray-900"
-                              : "text-gray-800 hover:bg-gray-100",
+                              ? "bg-gray-200 text-gray-900 dark:bg-[#0F1A2E] dark:text-slate-100"
+                              : "text-gray-800 hover:bg-gray-100 dark:text-slate-200 dark:hover:bg-[#0E1A30] dark:text-slate-200 dark:hover:bg-[#0E1A30]",
                             isActive
-                              ? "before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:rounded-r before:bg-blue-600"
+                              ? "before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:rounded-r before:bg-blue-600 dark:before:bg-blue-500"
                               : "",
                           ].join(" ")
                         }
                       >
-                        {SubIcon ? <SubIcon size={16} className="text-gray-900" /> : null}
+                        {SubIcon ? <SubIcon size={16} className="text-gray-900 dark:text-slate-200" /> : null}
                         <span className="truncate">{s.label}</span>
                       </NavLink>
                     );
@@ -269,15 +274,15 @@ function SidebarSubmenu({
         onClick={() => setOpen((v) => !v)}
         className={[
           "relative w-full flex items-center rounded-md transition-colors",
-          "py-2 text-sm font-medium text-gray-800 hover:bg-gray-100",
+          "py-2 text-sm font-medium text-gray-800 hover:bg-gray-100 dark:text-slate-200 dark:hover:bg-[#0E1A30]",
           "gap-3 px-3",
           active ? "bg-gray-200 text-gray-900" : "",
           active
-            ? "before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:rounded-r before:bg-blue-600"
+            ? "before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:rounded-r before:bg-blue-600 dark:before:bg-blue-500"
             : "",
         ].join(" ")}
       >
-        <Icon size={18} className="text-gray-900" />
+        <Icon size={18} className="text-gray-900 dark:text-slate-200" />
         <span className="truncate">{label}</span>
         <span className="ml-auto">
           <ChevronDown
@@ -290,7 +295,7 @@ function SidebarSubmenu({
       {open && (
         <div className="mt-1">
           <div className="relative px-3">
-            <div className="absolute left-[21px] top-1 bottom-1 w-px bg-gray-200" />
+            <div className="absolute left-[21px] top-1 bottom-1 w-px bg-gray-200 dark:bg-[#162544]" />
 
             <div className="space-y-1">
               {items.map((s) => {
@@ -306,13 +311,13 @@ function SidebarSubmenu({
                         "py-1.5 text-sm transition-colors px-3",
                         isActive
                           ? "bg-gray-200 text-gray-900"
-                          : "text-gray-700 hover:bg-gray-100",
+                          : "text-gray-700 hover:bg-gray-100 dark:text-slate-300 dark:hover:bg-[#0E1A30]",
                       ].join(" ")
                     }
                   >
-                    <span className="absolute left-[21px] top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gray-300" />
+                    <span className="absolute left-[21px] top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gray-300 dark:bg-slate-500" />
                     <span className="w-6 shrink-0" />
-                    {SubIcon ? <SubIcon size={16} className="text-gray-800" /> : null}
+                    {SubIcon ? <SubIcon size={16} className="text-gray-800 dark:text-slate-300" /> : null}
                     <span className="truncate">{s.label}</span>
                   </NavLink>
                 );
@@ -328,12 +333,13 @@ function SidebarSubmenu({
 
 export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
   const w = collapsed ? "w-[78px]" : "w-[255px]";
+  const { isDark } = useThemeMode();
 
   return (
     <aside
       className={[
         w,
-        "bg-white border-r border-gray-300 h-screen shrink-0 flex flex-col",
+        "bg-white border-r border-gray-300 h-screen shrink-0 flex flex-col dark:bg-[#0B1220] dark:border-[#162544]",
         "transition-[width] duration-200 ease-in-out",
       ].join(" ")}
     >
@@ -342,6 +348,7 @@ export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) 
         collapsed={collapsed}
         iconSize={35}
         textClassName="text-3xl"
+        logoColor={isDark ? "blue" : "red"}
       />
 
       {/* IMPORTANT: overflow-x-visible so flyout won't get clipped */}
@@ -350,12 +357,12 @@ export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) 
           <div key={section.title} className={idx === 0 ? "" : "mt-3"}>
             {idx !== 0 && (
               <div className={collapsed ? "my-2.5" : "my-3"}>
-                <div className="h-px bg-gray-200" />
+                <div className="h-px bg-gray-200 dark:bg-[#162544]" />
               </div>
             )}
 
             {!collapsed && (
-              <div className="px-3 pb-1.5 text-[10px] font-semibold tracking-wider text-gray-500 uppercase">
+              <div className="px-3 pb-1.5 text-[10px] font-semibold tracking-wider text-gray-500 uppercase dark:text-slate-400 dark:text-slate-400">
                 {section.title}
               </div>
             )}
@@ -403,7 +410,7 @@ export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) 
 
       <div className="px-3 pb-5">
         <div className={collapsed ? "my-2.5" : "my-3"}>
-          <div className="h-px bg-gray-200" />
+          <div className="h-px bg-gray-200 dark:bg-[#162544]" />
         </div>
 
         <NavLink
@@ -414,14 +421,16 @@ export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) 
               "relative flex items-center rounded-md transition-colors",
               "py-2 text-sm font-medium",
               collapsed ? "justify-center px-2.5" : "gap-3 px-3",
-              isActive ? "bg-gray-200 text-gray-900" : "text-gray-800 hover:bg-gray-100",
               isActive
-                ? "before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:rounded-r before:bg-blue-600"
+            ? "bg-gray-200 text-gray-900 dark:bg-[#0F1A2E] dark:text-slate-100"
+            : "text-gray-800 hover:bg-gray-100 dark:text-slate-200 dark:hover:bg-[#0E1A30] dark:text-slate-200 dark:hover:bg-[#0E1A30]",
+              isActive
+                ? "before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:rounded-r before:bg-blue-600 dark:before:bg-blue-500"
                 : "",
             ].join(" ")
           }
         >
-          <Settings size={18} className="text-gray-900" />
+          <Settings size={18} className="text-gray-900 dark:text-slate-200" />
           {!collapsed && <span>Settings</span>}
         </NavLink>
       </div>

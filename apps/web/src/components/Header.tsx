@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useThemeMode } from "../features/theme/hooks/useThemeMode";
 import { useNavigate } from "react-router-dom";
 import { useLguSession } from "../features/auth/hooks/useLguSession";
 import { clearLguSession } from "../features/auth/services/authStorage";
@@ -6,6 +7,7 @@ import { clearLguSession } from "../features/auth/services/authStorage";
 import {
   Search,
   Moon,
+  Sun,
   Bell,
   Settings,
   ChevronDown,
@@ -38,6 +40,9 @@ export default function Header({
 
   // ✅ read session user from localStorage via hook
   const { user } = useLguSession();
+
+  // Theme
+  const { isDark, toggle } = useThemeMode();
 
   // ✅ computed display values (fallback safe)
   const displayName =
@@ -74,16 +79,16 @@ export default function Header({
   }
 
   return (
-    <header className="sticky top-0 z-40 bg-white border-b border-gray-300">
+    <header className="sticky top-0 z-40 bg-white border-b border-gray-300 dark:bg-[#0B1220] dark:border-[#162544]">
       <div className="h-16 px-3 flex items-center justify-between">
         {/* Left: sidebar toggle + title */}
-        <div className="min-w-[260px]">
+        <div className="min-w-65">
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={onToggleSidebar}
               disabled={!onToggleSidebar}
-              className="h-10 w-10 rounded-md bg-white hover:bg-gray-200 flex items-center justify-center disabled:opacity-50"
+              className="h-10 w-10 rounded-md bg-white hover:bg-gray-200 flex items-center justify-center disabled:opacity-50 dark:bg-[#0E1626] dark:hover:bg-[#122036]"
               aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
               aria-pressed={!sidebarCollapsed}
             >
@@ -94,21 +99,21 @@ export default function Header({
             </button>
 
             <div className="leading-tight">
-              <div className="text-xl font-bold text-gray-900">{title}</div>
-              <div className="text-sm text-gray-500">{displaySubtitle}</div>
+              <div className="text-xl font-bold text-gray-900 dark:text-slate-100">{title}</div>
+              <div className="text-sm text-gray-500 dark:text-slate-400">{displaySubtitle}</div>
             </div>
           </div>
         </div>
 
         {/* Center: Search */}
         <div className="flex-1 px-8">
-          <div className="relative max-w-[720px] mx-auto">
+          <div className="relative max-w-180 mx-auto">
             <Search
               size={18}
               className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
             />
             <input
-              className="w-full h-11 rounded-lg border border-gray-300 bg-white pl-12 pr-4 text-base outline-none focus:border-gray-400"
+              className="w-full h-11 rounded-lg border border-gray-300 bg-white pl-12 pr-4 text-base outline-none focus:border-gray-400 dark:border-[#162544] dark:bg-[#0E1626] dark:text-slate-100 dark:placeholder:text-slate-400"
               placeholder="Search"
             />
           </div>
@@ -116,8 +121,8 @@ export default function Header({
 
         {/* Right: icons + profile */}
         <div className="min-w-[320px] flex items-center justify-end gap-4">
-          <IconBtn>
-            <Moon size={18} />
+          <IconBtn onClick={toggle} ariaLabel="Toggle theme">
+            {isDark ? <Sun size={18} /> : <Moon size={18} />}
           </IconBtn>
           <IconBtn>
             <Bell size={18} />
@@ -126,37 +131,37 @@ export default function Header({
             <Settings size={18} />
           </IconBtn>
 
-          <div className="h-8 w-px bg-gray-300 mx-1" />
+          <div className="h-8 w-px bg-gray-300 mx-1 dark:bg-[#162544]" />
 
           {/* User dropdown */}
           <div ref={menuRef} className="relative">
             <button
               type="button"
               onClick={() => setOpen((v) => !v)}
-              className="flex items-center gap-3 pr-1 rounded-lg hover:bg-gray-50"
+              className="flex items-center gap-3 pr-1 rounded-lg hover:bg-gray-50 dark:hover:bg-[#122036]"
               aria-haspopup="menu"
               aria-expanded={open}
             >
-              <div className="h-10 w-10 rounded-full bg-gray-200 border border-gray-300 flex items-center justify-center">
+              <div className="h-10 w-10 rounded-full bg-gray-200 border border-gray-300 flex items-center justify-center dark:bg-[#0E1626] dark:border-[#162544]">
                 <span className="h-4 w-4 rounded-full bg-white border border-gray-400" />
               </div>
 
               <div className="leading-tight text-left">
-                <div className="text-sm font-semibold text-gray-900">
+                <div className="text-sm font-semibold text-gray-900 dark:text-slate-100">
                   {displayName}
                 </div>
-                <div className="text-xs text-gray-600">{displayRole}</div>
+                <div className="text-xs text-gray-600 dark:text-slate-400">{displayRole}</div>
               </div>
 
-              <span className="h-9 w-9 rounded-md hover:bg-gray-100 flex items-center justify-center">
-                <ChevronDown size={18} className="text-gray-700" />
+              <span className="h-9 w-9 rounded-md hover:bg-gray-100 flex items-center justify-center dark:hover:bg-[#122036]">
+                <ChevronDown size={18} className="text-gray-700 dark:text-slate-300" />
               </span>
             </button>
 
             {open && (
               <div
                 role="menu"
-                className="absolute right-0 mt-2 w-52 rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden z-50"
+                className="absolute right-0 mt-2 w-52 rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden z-50 dark:border-[#162544] dark:bg-[#0E1626]"
               >
                 <MenuItem
                   icon={<User size={16} />}
@@ -176,7 +181,7 @@ export default function Header({
                   }}
                 />
 
-                <div className="h-px bg-gray-200" />
+                <div className="h-px bg-gray-200 dark:bg-[#162544]" />
 
                 <MenuItem
                   icon={<LogOut size={16} className="text-red-600" />}
@@ -190,16 +195,26 @@ export default function Header({
         </div>
       </div>
 
-      <div className="h-[3px] bg-blue-600" />
+      <div className="h-0.75 bg-blue-600 dark:bg-blue-500" />
     </header>
   );
 }
 
-function IconBtn({ children }: { children: React.ReactNode }) {
+function IconBtn({
+  children,
+  onClick,
+  ariaLabel,
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  ariaLabel?: string;
+}) {
   return (
     <button
       type="button"
-      className="h-10 w-10 rounded-md border border-gray-200 bg-white hover:bg-gray-50 flex items-center justify-center text-gray-700"
+      onClick={onClick}
+      aria-label={ariaLabel}
+      className="h-10 w-10 rounded-md border border-gray-200 bg-white hover:bg-gray-50 flex items-center justify-center text-gray-700 dark:border-[#162544] dark:bg-[#0E1626] dark:hover:bg-[#122036] dark:text-slate-200"
     >
       {children}
     </button>
@@ -224,10 +239,10 @@ function MenuItem({
       onClick={onClick}
       className={[
         "w-full px-4 py-3 flex items-center gap-3 text-sm font-semibold text-left",
-        danger ? "text-red-600 hover:bg-red-50" : "text-gray-800 hover:bg-gray-50",
+        danger ? "text-red-600 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10" : "text-gray-800 hover:bg-gray-50 dark:text-slate-200 dark:hover:bg-[#122036]",
       ].join(" ")}
     >
-      <span className="text-gray-700">{icon}</span>
+      <span className="text-gray-700 dark:text-slate-300">{icon}</span>
       {label}
     </button>
   );
