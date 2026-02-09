@@ -38,8 +38,8 @@ export function LifelineLogo({
   const wrapperClass =
     variant === "sidebar"
       ? collapsed
-        ? "flex justify-center pt-7 pb-7"
-        : "flex items-center gap-1 px-15 pt-7 pb-7"
+        ? "flex justify-center pt-4 pb-3"
+        : "flex items-center gap-1 px-6 pt-4 pb-3"
       : "flex items-center";
 
   const logoSrc = logoColor === "blue" ? lifelineLogoBlue : lifelineLogoRed;

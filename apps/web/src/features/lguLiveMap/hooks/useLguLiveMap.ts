@@ -1,0 +1,544 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import mapboxgl from "mapbox-gl";
+
+import type { MapEmergencyPin } from "../../emergency/components/EmergencyMap";
+import { normalizeEmergencyType } from "../../emergency/constants/emergency.constants";
+import { useLguEmergencies } from "../../emergency/hooks/useLguEmergencies";
+
+import { useHazardZones } from "../../hazardZones/hooks/useHazardZones";
+import { HAZARD_TYPES } from "../../hazardZones/constants/hazardZones.constants";
+import {
+  ensureHazardZonesLayers,
+  setHazardZonesData,
+  setHazardZonesVisibility,
+} from "../../hazardZones/utils/hazardZones.mapbox";
+
+import {
+  clearHazardDraft,
+  ensureHazardDraftLayers,
+  setHazardDraftData,
+  setHazardDraftVisibility,
+} from "../../hazardZones/utils/hazardDraft.mapbox";
+
+import { DAGUPAN_CENTER, MAP_STYLE_URL, MOCK_VOLUNTEERS } from "../constants/lguLiveMap.constants";
+import type {
+  HazardDraft,
+  HazardDraftFormState,
+  LguEmergencyDetails,
+  MapStyleKey,
+  Volunteer,
+} from "../models/lguLiveMap.types";
+import { colorForVolunteerStatus } from "../utils/lguLiveMap.colors";
+
+type LngLat = [number, number];
+
+export function useLguLiveMap() {
+  const mapRef = useRef<mapboxgl.Map | null>(null);
+  const volunteerMarkersRef = useRef<mapboxgl.Marker[]>([]);
+  const meMarkerRef = useRef<mapboxgl.Marker | null>(null);
+
+  const [mapReady, setMapReady] = useState(false);
+
+  // UI
+  const [query, setQuery] = useState("");
+  const [layersOpen, setLayersOpen] = useState(false);
+
+  // visibility toggles
+  const [showEmergencies, setShowEmergencies] = useState(true);
+  const [showVolunteers, setShowVolunteers] = useState(true);
+  const [showHazardZones, setShowHazardZones] = useState(true);
+
+  // map style
+  const [mapStyleKey, setMapStyleKey] = useState<MapStyleKey>("satellite-streets-v12");
+
+  // left details panel
+  const [selectedEmergencyId, setSelectedEmergencyId] = useState<string | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+
+  // hazard draw + save form
+  const [isDrawingHazard, setIsDrawingHazard] = useState(false);
+  const pointsRef = useRef<LngLat[]>([]);
+
+  const [hazardDraft, setHazardDraft] = useState<HazardDraft | null>(null);
+  const [draftForm, setDraftForm] = useState<HazardDraftFormState>({
+    name: "",
+    hazardType: HAZARD_TYPES[0],
+  });
+
+  // data
+  const {
+    reports,
+    loading: emergenciesLoading,
+    error: emergenciesError,
+    refetch: refetchEmergencies,
+  } = useLguEmergencies();
+
+  const {
+    hazardZones,
+    loading: hazardZonesLoading,
+    error: hazardZonesError,
+    refetch: refetchHazardZones,
+    create: createHazardZone,
+  } = useHazardZones();
+
+  const volunteers: Volunteer[] = useMemo(() => MOCK_VOLUNTEERS, []);
+
+  const filteredVolunteers = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return volunteers;
+    return volunteers.filter((v) => {
+      return (
+        v.name.toLowerCase().includes(q) ||
+        v.skill.toLowerCase().includes(q) ||
+        v.status.toLowerCase().includes(q)
+      );
+    });
+  }, [volunteers, query]);
+
+  const emergencyPins: MapEmergencyPin[] = useMemo(() => {
+    if (!showEmergencies) return [];
+    return (reports ?? [])
+      .filter((r) => r?.location?.coordinates?.length === 2)
+      .map((r) => {
+        const [lng, lat] = r.location.coordinates;
+        return {
+          id: r._id,
+          type: normalizeEmergencyType(r.emergencyType),
+          lng,
+          lat,
+        };
+      });
+  }, [reports, showEmergencies]);
+
+  const selectedEmergency = useMemo(() => {
+    if (!selectedEmergencyId) return undefined;
+    return reports.find((r) => r._id === selectedEmergencyId);
+  }, [reports, selectedEmergencyId]);
+
+  const selectedEmergencyDetails: LguEmergencyDetails | null = useMemo(() => {
+    if (!selectedEmergency?.location?.coordinates) return null;
+    const [lng, lat] = selectedEmergency.location.coordinates;
+    return {
+      id: selectedEmergency._id,
+      emergencyType: normalizeEmergencyType(selectedEmergency.emergencyType),
+      status: selectedEmergency.status,
+      source: selectedEmergency.source ?? null,
+      lng,
+      lat,
+      notes: selectedEmergency.notes ?? null,
+      reportedAt: selectedEmergency.reportedAt,
+      barangayName: (selectedEmergency as any).barangayName ?? null,
+    };
+  }, [selectedEmergency]);
+
+  // ✅ only mark ready after map load (prevents style-related nulls)
+  const onMapReady = (m: mapboxgl.Map) => {
+    mapRef.current = m;
+
+    const setReady = () => setMapReady(true);
+
+    const loadedFn = (m as any).loaded?.bind(m);
+    if (typeof loadedFn === "function" && loadedFn()) {
+      setReady();
+      return;
+    }
+
+    if (m.isStyleLoaded?.()) {
+      setReady();
+      return;
+    }
+
+    m.once("load", setReady);
+  };
+
+  const flyTo = (lng: number, lat: number, zoom = 14) => {
+    mapRef.current?.flyTo({ center: [lng, lat], zoom, essential: true });
+  };
+
+  const centerDagupan = () => {
+    mapRef.current?.flyTo({ center: DAGUPAN_CENTER, zoom: 12.6, essential: true });
+  };
+
+  const locateMe = () => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported on this device/browser.");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lng = pos.coords.longitude;
+        const lat = pos.coords.latitude;
+
+        meMarkerRef.current?.remove();
+
+        const el = document.createElement("div");
+        el.style.width = "14px";
+        el.style.height = "14px";
+        el.style.borderRadius = "999px";
+        el.style.background = "#2563eb";
+        el.style.border = "2px solid rgba(255,255,255,0.95)";
+        el.style.boxShadow = "0 12px 20px rgba(37, 99, 235, 0.25)";
+
+        meMarkerRef.current = new mapboxgl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
+        flyTo(lng, lat, 15);
+      },
+      () => alert("Unable to get your location. Please enable location permission."),
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+  // volunteer markers overlay
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+
+    volunteerMarkersRef.current.forEach((m) => m.remove());
+    volunteerMarkersRef.current = [];
+
+    if (!showVolunteers) return;
+
+    filteredVolunteers.forEach((v) => {
+      const el = document.createElement("div");
+      const color = colorForVolunteerStatus(v.status);
+
+      el.style.width = "12px";
+      el.style.height = "12px";
+      el.style.borderRadius = "999px";
+      el.style.background = color;
+      el.style.border = "2px solid rgba(255,255,255,0.95)";
+      el.style.boxShadow = "0 10px 18px rgba(0,0,0,0.2)";
+      el.style.cursor = "pointer";
+
+      el.addEventListener("click", (ev) => ev.stopPropagation());
+
+      const popup = new mapboxgl.Popup({ offset: 14, closeButton: false }).setHTML(`
+        <div style="font-family: ui-sans-serif; min-width: 220px;">
+          <div style="font-weight: 800; color: #111827; font-size: 14px;">${v.name}</div>
+          <div style="margin-top: 6px; color: #6b7280; font-size: 12px;">Skill: ${v.skill}</div>
+          <div style="margin-top: 10px; display:inline-flex; gap:8px; align-items:center;">
+            <span style="display:inline-block;width:8px;height:8px;border-radius:999px;background:${color};"></span>
+            <span style="font-size:12px;color:#374151;font-weight:700;">${v.status.toUpperCase()}</span>
+          </div>
+        </div>
+      `);
+
+      const marker = new mapboxgl.Marker({ element: el }).setLngLat([v.lng, v.lat]).setPopup(popup).addTo(map);
+      volunteerMarkersRef.current.push(marker);
+    });
+
+    return () => {
+      volunteerMarkersRef.current.forEach((m) => m.remove());
+      volunteerMarkersRef.current = [];
+    };
+  }, [filteredVolunteers, showVolunteers, mapReady]);
+
+  useEffect(() => {
+    return () => {
+      volunteerMarkersRef.current.forEach((m) => m.remove());
+      volunteerMarkersRef.current = [];
+      meMarkerRef.current?.remove();
+      meMarkerRef.current = null;
+    };
+  }, []);
+
+  // hazards (saved): ensure layers + keep data after style switches
+  useEffect(() => {
+  const map = mapRef.current;
+  if (!map || !mapReady) return;
+
+  let cancelled = false;
+
+  const apply = () => {
+    if (cancelled) return;
+
+    // ✅ if style still rebuilding, wait for idle then retry
+    if (!map.isStyleLoaded()) {
+      map.once("idle", apply);
+      return;
+    }
+
+    try {
+      ensureHazardZonesLayers(map);
+      setHazardZonesData(map, hazardZones);
+      setHazardZonesVisibility(map, showHazardZones);
+    } catch (e) {
+      // If style is rebuilding, try again once it becomes idle
+      map.once("idle", apply);
+    }
+  };
+
+  apply();
+  map.on("style.load", apply);
+
+  return () => {
+    cancelled = true;
+    try {
+      map.off("style.load", apply);
+    } catch {
+      // ignore
+    }
+  };
+}, [mapReady, hazardZones, showHazardZones]);
+
+  // ✅ Native polygon drawing (Mapbox GL v3 compatible)
+  useEffect(() => {
+  const map = mapRef.current;
+  if (!map || !mapReady) return;
+  if (!isDrawingHazard) return;
+
+  let active = true;
+  let attached = false;
+
+  const canvas = map.getCanvas();
+  const prevCursor = canvas.style.cursor;
+
+  const attach = () => {
+    if (!active) return;
+    if (!map.isStyleLoaded()) return;
+
+    // make sure draft layers exist (no silent fail)
+    ensureHazardDraftLayers(map);
+    setHazardDraftVisibility(map, true);
+    clearHazardDraft(map);
+    setHazardDraftData(map, pointsRef.current, false);
+
+    canvas.style.cursor = "crosshair";
+    try {
+      map.doubleClickZoom.disable();
+    } catch {
+      // ignore
+    }
+
+    const onClick = (ev: mapboxgl.MapMouseEvent) => {
+      const p: [number, number] = [ev.lngLat.lng, ev.lngLat.lat];
+      pointsRef.current = [...pointsRef.current, p];
+      // ensure layers still exist (style switches)
+      ensureHazardDraftLayers(map);
+      setHazardDraftData(map, pointsRef.current, false);
+    };
+
+    const onDblClick = (ev: mapboxgl.MapMouseEvent) => {
+      ev.preventDefault();
+
+      if (pointsRef.current.length < 3) return;
+
+      // finalize polygon draft
+      setHazardDraftData(map, pointsRef.current, true);
+
+      const ring = [...pointsRef.current, pointsRef.current[0]];
+      setHazardDraft({
+        geometry: { type: "Polygon", coordinates: [ring] },
+      });
+
+      setIsDrawingHazard(false);
+      setLayersOpen(true);
+    };
+
+    map.on("click", onClick);
+    map.on("dblclick", onDblClick);
+    attached = true;
+
+    // cleanup handler refs stored on map instance (for cleanup)
+    (map as any).__hazDraftClick = onClick;
+    (map as any).__hazDraftDbl = onDblClick;
+  };
+
+  const idleCb = () => {
+    if (!active) return;
+    if (!map.isStyleLoaded()) return;
+    map.off("idle", idleCb);
+    attach();
+  };
+
+  if (!map.isStyleLoaded()) {
+    map.on("idle", idleCb);
+  } else {
+    attach();
+  }
+
+  return () => {
+    active = false;
+
+    try {
+      map.off("idle", idleCb);
+    } catch {
+      // ignore
+    }
+
+    if (attached) {
+      const onClick = (map as any).__hazDraftClick;
+      const onDbl = (map as any).__hazDraftDbl;
+      if (onClick) map.off("click", onClick);
+      if (onDbl) map.off("dblclick", onDbl);
+      (map as any).__hazDraftClick = null;
+      (map as any).__hazDraftDbl = null;
+    }
+
+    canvas.style.cursor = prevCursor;
+    try {
+      map.doubleClickZoom.enable();
+    } catch {
+      // ignore
+    }
+  };
+}, [mapReady, isDrawingHazard]);
+
+  const startDrawHazard = () => {
+  const map = mapRef.current;
+  if (!map) return;
+
+  // reset
+  setHazardDraft(null);
+  setDraftForm({ name: "", hazardType: HAZARD_TYPES[0] });
+  pointsRef.current = [];
+
+  const begin = () => {
+    if (!map.isStyleLoaded()) return;
+
+    // create draft layers safely
+    ensureHazardDraftLayers(map);
+    setHazardDraftVisibility(map, true);
+    clearHazardDraft(map);
+
+    setIsDrawingHazard(true);
+  };
+
+  // if style is still loading (esp after switching map style), wait for idle
+  if (!map.isStyleLoaded()) {
+    map.once("idle", begin);
+  } else {
+    begin();
+  }
+};
+
+
+  const cancelDrawHazard = () => {
+  const map = mapRef.current;
+
+  pointsRef.current = [];
+  setIsDrawingHazard(false);
+  setHazardDraft(null);
+
+  if (map) {
+    const clear = () => {
+      if (!map.isStyleLoaded()) return;
+      ensureHazardDraftLayers(map);
+      clearHazardDraft(map);
+      setHazardDraftVisibility(map, false);
+      try {
+        map.doubleClickZoom.enable();
+      } catch {
+        // ignore
+      }
+    };
+
+    if (!map.isStyleLoaded()) map.once("idle", clear);
+    else clear();
+  }
+};
+
+
+  const saveHazardDraft = async () => {
+    if (!hazardDraft) return;
+
+    const name = draftForm.name.trim();
+    if (!name) {
+      alert("Please enter a hazard zone name.");
+      return;
+    }
+
+    await createHazardZone({
+      name,
+      hazardType: draftForm.hazardType,
+      geometry: hazardDraft.geometry,
+    });
+
+    const map = mapRef.current;
+    pointsRef.current = [];
+    setHazardDraft(null);
+    setIsDrawingHazard(false);
+
+    if (map) {
+      try {
+        clearHazardDraft(map);
+        setHazardDraftVisibility(map, false);
+      } catch {
+        // ignore
+      }
+    }
+
+    await refetchHazardZones();
+  };
+
+  const onEmergencyPinClick = (pin: MapEmergencyPin) => {
+    setSelectedEmergencyId(pin.id);
+    setDetailsOpen(true);
+    flyTo(pin.lng, pin.lat, 15);
+  };
+
+  const onMapClick = () => {
+    if (isDrawingHazard) return;
+    setDetailsOpen(false);
+  };
+
+  const cleanupDetails = () => {
+    setDetailsOpen(false);
+    setSelectedEmergencyId(null);
+  };
+
+  return {
+    mapReady,
+    onMapReady,
+    mapStyleKey,
+    setMapStyleKey,
+    mapStyleUrl: MAP_STYLE_URL[mapStyleKey],
+    center: DAGUPAN_CENTER,
+    centerDagupan,
+    locateMe,
+    flyTo,
+
+    query,
+    setQuery,
+
+    layersOpen,
+    setLayersOpen,
+
+    showEmergencies,
+    setShowEmergencies,
+    showVolunteers,
+    setShowVolunteers,
+    showHazardZones,
+    setShowHazardZones,
+
+    emergencyPins,
+    emergenciesLoading,
+    emergenciesError,
+    refetchEmergencies,
+    onEmergencyPinClick,
+    onMapClick,
+
+    selectedEmergencyDetails,
+    detailsOpen,
+    setDetailsOpen,
+    cleanupDetails,
+
+    hazardsCount: hazardZones.length,
+    volunteersCount: volunteers.length,
+    emergenciesCount: reports.length,
+    hazardZonesLoading,
+    hazardZonesError,
+    refetchHazardZones,
+
+    isDrawingHazard,
+    startDrawHazard,
+    cancelDrawHazard,
+    hazardDraft,
+    draftForm,
+    setDraftForm,
+    saveHazardDraft,
+  };
+}
