@@ -121,3 +121,18 @@
 *::-webkit-scrollbar-thumb:hover{
   background: var(--sb-thumb-hover);
 }
+
+
+/* Lifeline: remove Mapbox popup white bubble behind our card */
+.lifeline-map-popup .mapboxgl-popup-content {
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* optional: remove the little white triangle/tip */
+.lifeline-map-popup .mapboxgl-popup-tip {
+  display: none !important;
+}

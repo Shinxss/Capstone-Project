@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
+import { useSearchParams } from "react-router-dom";
 
 import type { MapEmergencyPin } from "../../emergency/components/EmergencyMap";
 import { normalizeEmergencyType } from "../../emergency/constants/emergency.constants";
@@ -20,7 +21,7 @@ import {
   setHazardDraftVisibility,
 } from "../../hazardZones/utils/hazardDraft.mapbox";
 
-import { DAGUPAN_CENTER, MAP_STYLE_URL, MOCK_VOLUNTEERS } from "../constants/lguLiveMap.constants";
+import { DAGUPAN_CENTER, MAP_STYLE_URL } from "../constants/lguLiveMap.constants";
 import type {
   HazardDraft,
   HazardDraftFormState,
@@ -29,10 +30,19 @@ import type {
   Volunteer,
 } from "../models/lguLiveMap.types";
 import { colorForVolunteerStatus } from "../utils/lguLiveMap.colors";
+import { dispatchToVolunteers } from "../services/dispatch.service";
+import { fetchDispatchVolunteers } from "../services/volunteers.service";
 
 type LngLat = [number, number];
 
 export function useLguLiveMap() {
+  const [searchParams] = useSearchParams();
+  const focusEmergencyId = searchParams.get("emergencyId");
+
+  // Prevent re-opening details if the user already closed it manually.
+  const autoFocusedIdRef = useRef<string | null>(null);
+  const autoFlewIdRef = useRef<string | null>(null);
+
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const volunteerMarkersRef = useRef<mapboxgl.Marker[]>([]);
   const meMarkerRef = useRef<mapboxgl.Marker | null>(null);
@@ -80,28 +90,49 @@ export function useLguLiveMap() {
     refetch: refetchHazardZones,
     create: createHazardZone,
     remove: removeHazardZone,
+    setStatus: setHazardZoneStatus,
   } = useHazardZones();
 
-  // per-zone visibility (used by the dropdown list)
-  const [hiddenHazardIds, setHiddenHazardIds] = useState<Record<string, boolean>>({});
-
-  // keep hidden state clean when data changes
-  useEffect(() => {
-    setHiddenHazardIds((prev) => {
-      const next: Record<string, boolean> = {};
-      (hazardZones ?? []).forEach((z: any) => {
-        const id = String(z._id);
-        if (prev[id]) next[id] = true;
-      });
-      return next;
-    });
+  // ✅ only ACTIVE hazard zones are rendered on the map
+  // older docs may not have isActive yet -> treat as true
+  const activeHazardZones = useMemo(() => {
+    return (hazardZones ?? []).filter((z: any) => (z as any).isActive !== false);
   }, [hazardZones]);
 
-  const filteredHazardZones = useMemo(() => {
-    return (hazardZones ?? []).filter((z: any) => !hiddenHazardIds[String(z._id)]);
-  }, [hazardZones, hiddenHazardIds]);
+  const hazardsTotalCount = (hazardZones ?? []).length;
+  const hazardsActiveCount = activeHazardZones.length;
 
-  const volunteers: Volunteer[] = useMemo(() => MOCK_VOLUNTEERS, []);
+  // Volunteers loaded from MongoDB (Users collection)
+  // Stored in state so we can update status when dispatching.
+  const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
+  const [volunteersLoading, setVolunteersLoading] = useState(false);
+  const [volunteersError, setVolunteersError] = useState<string | null>(null);
+
+  const refetchVolunteers = useCallback(async () => {
+    setVolunteersLoading(true);
+    setVolunteersError(null);
+    try {
+      const items = await fetchDispatchVolunteers();
+      setVolunteers(items);
+    } catch (err: any) {
+      setVolunteersError(err?.response?.data?.message ?? err?.message ?? "Failed to load volunteers");
+    } finally {
+      setVolunteersLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refetchVolunteers();
+  }, [refetchVolunteers]);
+
+  // Per-emergency responder assignment (volunteer ids)
+  const [assignmentsByEmergency, setAssignmentsByEmergency] = useState<Record<string, string[]>>({});
+
+  // Dispatch + tracking UI state
+  const [dispatchModalOpen, setDispatchModalOpen] = useState(false);
+  const [dispatchSelection, setDispatchSelection] = useState<string[]>([]);
+  const [trackOpen, setTrackOpen] = useState(false);
+  const [dispatching, setDispatching] = useState(false);
 
   const filteredVolunteers = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -151,9 +182,74 @@ export function useLguLiveMap() {
     };
   }, [selectedEmergency]);
 
+  // Reset action panels when switching selected emergency
+  useEffect(() => {
+    setDispatchModalOpen(false);
+    setDispatchSelection([]);
+    setTrackOpen(false);
+  }, [selectedEmergencyId]);
+
+  const assignedResponderIds = useMemo(() => {
+    if (!selectedEmergencyId) return [] as string[];
+    return assignmentsByEmergency[selectedEmergencyId] ?? [];
+  }, [assignmentsByEmergency, selectedEmergencyId]);
+
+  const assignedResponders = useMemo(() => {
+    return assignedResponderIds
+      .map((id) => volunteers.find((v) => v.id === id))
+      .filter(Boolean) as Volunteer[];
+  }, [assignedResponderIds, volunteers]);
+
+  // ✅ If user arrives from the dashboard (e.g., /lgu/live-map?emergencyId=...), auto-open details.
+  useEffect(() => {
+    if (!focusEmergencyId) {
+      autoFocusedIdRef.current = null;
+      autoFlewIdRef.current = null;
+      return;
+    }
+
+    const found = (reports ?? []).find((r) => String(r._id) === String(focusEmergencyId));
+    if (!found) return;
+
+    if (autoFocusedIdRef.current === String(focusEmergencyId)) return;
+    autoFocusedIdRef.current = String(focusEmergencyId);
+    autoFlewIdRef.current = null;
+
+    // ensure emergencies are visible when deep-linking
+    setShowEmergencies(true);
+
+    // open details
+    setSelectedEmergencyId(String(found._id));
+    setDetailsOpen(true);
+  }, [focusEmergencyId, reports]);
+
+  // ✅ Fly to the focused emergency once the map is ready (separate effect)
+  useEffect(() => {
+    if (!focusEmergencyId) return;
+    if (!mapReady) return;
+
+    const found = (reports ?? []).find((r) => String(r._id) === String(focusEmergencyId));
+    if (!found) return;
+
+    if (autoFlewIdRef.current === String(focusEmergencyId)) return;
+
+    const coords = found.location?.coordinates;
+    if (Array.isArray(coords) && coords.length === 2) {
+      const [lng, lat] = coords as [number, number];
+      if (Number.isFinite(lng) && Number.isFinite(lat)) {
+        flyTo(lng, lat, 15);
+        autoFlewIdRef.current = String(focusEmergencyId);
+      }
+    }
+  }, [focusEmergencyId, reports, mapReady]);
+
   // ✅ only mark ready after map load (prevents style-related nulls)
-  const onMapReady = (m: mapboxgl.Map) => {
+  // IMPORTANT: must be stable (useCallback) so EmergencyMap won't recreate the whole map on every render.
+  const onMapReady = useCallback((m: mapboxgl.Map) => {
     mapRef.current = m;
+
+    // if a new map instance gets attached, reset readiness until it's loaded
+    setMapReady(false);
 
     const setReady = () => setMapReady(true);
 
@@ -169,7 +265,7 @@ export function useLguLiveMap() {
     }
 
     m.once("load", setReady);
-  };
+  }, []);
 
   const flyTo = (lng: number, lat: number, zoom = 14) => {
     mapRef.current?.flyTo({ center: [lng, lat], zoom, essential: true });
@@ -222,6 +318,8 @@ export function useLguLiveMap() {
     if (!showVolunteers) return;
 
     filteredVolunteers.forEach((v) => {
+      // Skip map marker if volunteer has no coordinates yet
+      if (!Number.isFinite(v.lng) || !Number.isFinite(v.lat)) return;
       const el = document.createElement("div");
       const color = colorForVolunteerStatus(v.status);
 
@@ -246,7 +344,10 @@ export function useLguLiveMap() {
         </div>
       `);
 
-      const marker = new mapboxgl.Marker({ element: el }).setLngLat([v.lng, v.lat]).setPopup(popup).addTo(map);
+      const marker = new mapboxgl.Marker({ element: el })
+        .setLngLat([v.lng as number, v.lat as number])
+        .setPopup(popup)
+        .addTo(map);
       volunteerMarkersRef.current.push(marker);
     });
 
@@ -283,8 +384,8 @@ export function useLguLiveMap() {
 
     try {
       ensureHazardZonesLayers(map);
-      // only render hazards that are not hidden from the dropdown
-      setHazardZonesData(map, filteredHazardZones);
+      // ✅ only render ACTIVE hazards
+      setHazardZonesData(map, activeHazardZones);
       setHazardZonesVisibility(map, showHazardZones);
     } catch (e) {
       // If style is rebuilding, try again once it becomes idle
@@ -303,7 +404,7 @@ export function useLguLiveMap() {
       // ignore
     }
   };
-}, [mapReady, filteredHazardZones, showHazardZones]);
+}, [mapReady, activeHazardZones, showHazardZones]);
 
   // ✅ Native polygon drawing (Mapbox GL v3 compatible)
   useEffect(() => {
@@ -495,24 +596,137 @@ export function useLguLiveMap() {
     await refetchHazardZones();
   };
 
-  const onEmergencyPinClick = (pin: MapEmergencyPin) => {
+  const onEmergencyPinClick = useCallback((pin: MapEmergencyPin) => {
     setSelectedEmergencyId(pin.id);
     setDetailsOpen(true);
     flyTo(pin.lng, pin.lat, 15);
-  };
+  }, []);
 
-  const onMapClick = () => {
-    if (isDrawingHazard) return;
-    setDetailsOpen(false);
-  };
-
-  const cleanupDetails = () => {
+  // ✅ Fully close details (no minimize tab)
+  const cleanupDetails = useCallback(() => {
     setDetailsOpen(false);
     setSelectedEmergencyId(null);
-  };
+    setDispatchModalOpen(false);
+    setDispatchSelection([]);
+    setTrackOpen(false);
+  }, []);
 
-  const toggleHazardZoneItem = (id: string) => {
-    setHiddenHazardIds((prev) => ({ ...prev, [id]: !prev[id] }));
+  // ✅ Clicking empty map closes the details panel entirely
+  const onMapClick = useCallback(() => {
+    if (isDrawingHazard) return;
+    cleanupDetails();
+  }, [isDrawingHazard, cleanupDetails]);
+
+  const openDispatchResponders = useCallback(() => {
+    if (!selectedEmergencyDetails) return;
+
+    const available = volunteers.filter((v) => v.status === "available");
+    if (available.length === 0) {
+      alert("No available responders right now.");
+      return;
+    }
+
+    // Preselect nearest 2 available responders (only if nothing is selected yet)
+    setDispatchSelection((prev) => {
+      if (prev.length) return prev;
+      const withCoords = available.filter((v) => Number.isFinite(v.lng) && Number.isFinite(v.lat));
+      if (withCoords.length) {
+        const sorted = [...withCoords].sort((a, b) => {
+          const da = ((a.lng as number) - selectedEmergencyDetails.lng) ** 2 + ((a.lat as number) - selectedEmergencyDetails.lat) ** 2;
+          const db = ((b.lng as number) - selectedEmergencyDetails.lng) ** 2 + ((b.lat as number) - selectedEmergencyDetails.lat) ** 2;
+          return da - db;
+        });
+        return sorted.slice(0, 2).map((v) => v.id);
+      }
+      // fallback if no coordinates exist yet
+      return available.slice(0, 2).map((v) => v.id);
+    });
+
+    setDispatchModalOpen(true);
+  }, [selectedEmergencyDetails, volunteers]);
+
+  const closeDispatchResponders = useCallback(() => {
+    setDispatchModalOpen(false);
+    setDispatchSelection([]);
+  }, []);
+
+  const toggleDispatchResponder = useCallback(
+    (volunteerId: string) => {
+      const v = volunteers.find((x) => x.id === volunteerId);
+      if (!v || v.status !== "available") return;
+
+      setDispatchSelection((prev) =>
+        prev.includes(volunteerId)
+          ? prev.filter((id) => id !== volunteerId)
+          : [...prev, volunteerId]
+      );
+    },
+    [volunteers]
+  );
+
+  const confirmDispatchResponders = useCallback(async () => {
+    if (!selectedEmergencyId) return;
+    if (dispatching) return;
+
+    const availableSet = new Set(
+      volunteers.filter((v) => v.status === "available").map((v) => v.id)
+    );
+    const chosen = dispatchSelection.filter((id) => availableSet.has(id));
+
+    if (chosen.length === 0) {
+      alert("Select at least one available responder.");
+      return;
+    }
+
+    setDispatching(true);
+    try {
+      // ✅ Create dispatch offers in MongoDB
+      await dispatchToVolunteers(selectedEmergencyId, chosen);
+
+      setAssignmentsByEmergency((prev) => {
+        const existing = prev[selectedEmergencyId] ?? [];
+        const merged = Array.from(new Set([...existing, ...chosen]));
+        return { ...prev, [selectedEmergencyId]: merged };
+      });
+
+      // UI-only: mark as busy locally (backend has no per-task BUSY yet)
+      setVolunteers((prev) =>
+        prev.map((v) => (chosen.includes(v.id) ? { ...v, status: "busy" } : v))
+      );
+
+      setDispatchModalOpen(false);
+      setDispatchSelection([]);
+      setTrackOpen(true);
+    } catch (e: any) {
+      alert(e?.response?.data?.message ?? e?.message ?? "Failed to dispatch responders");
+    } finally {
+      setDispatching(false);
+    }
+  }, [dispatchSelection, selectedEmergencyId, volunteers, dispatching]);
+
+  const toggleTrackPanel = useCallback(() => {
+    setTrackOpen((v) => !v);
+  }, []);
+
+  const centerOnResponder = useCallback(
+    (volunteerId: string) => {
+      const v = volunteers.find((x) => x.id === volunteerId);
+      if (!v) return;
+      if (!Number.isFinite(v.lng) || !Number.isFinite(v.lat)) {
+        alert("This responder has no live location yet.");
+        return;
+      }
+      flyTo(v.lng as number, v.lat as number, 15);
+    },
+    [volunteers, flyTo]
+  );
+
+  // ✅ persisted on/off status
+  const toggleHazardZoneItem = async (id: string) => {
+    const z = (hazardZones ?? []).find((x: any) => String(x._id) === String(id));
+    if (!z) return;
+    const current = (z as any).isActive !== false; // missing field => treat as true
+    await setHazardZoneStatus(String(id), !current);
   };
 
   const deleteHazardZoneItem = async (id: string) => {
@@ -521,11 +735,6 @@ export function useLguLiveMap() {
 
     await removeHazardZone(id);
     await refetchHazardZones();
-    setHiddenHazardIds((prev) => {
-      const next = { ...prev };
-      delete next[String(id)];
-      return next;
-    });
   };
 
   return {
@@ -564,13 +773,31 @@ export function useLguLiveMap() {
     setDetailsOpen,
     cleanupDetails,
 
-    hazardsCount: hazardZones.length,
+    // responders dispatch + tracking (live map only)
+    volunteers,
+    volunteersLoading,
+    volunteersError,
+    refetchVolunteers,
+    dispatchModalOpen,
+    openDispatchResponders,
+    closeDispatchResponders,
+    dispatchSelection,
+    toggleDispatchResponder,
+    confirmDispatchResponders,
+    dispatching,
+    trackOpen,
+    toggleTrackPanel,
+    assignedResponders,
+    centerOnResponder,
+
+    // show active hazards count in pills (matches what's shown on the map)
+    hazardsCount: hazardsActiveCount,
+    hazardsTotalCount,
     volunteersCount: volunteers.length,
     emergenciesCount: reports.length,
 
     // hazard zones list + per-zone controls (dropdown)
     hazardZones,
-    hiddenHazardIds,
     toggleHazardZoneItem,
     deleteHazardZoneItem,
 

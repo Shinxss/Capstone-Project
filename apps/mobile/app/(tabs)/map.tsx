@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -14,8 +14,12 @@ import MapboxGL, { Logger } from "@rnmapbox/maps";
 import { useMapStyle } from "../../features/map/hooks/useMapStyle";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
+import { useFocusEffect } from "@react-navigation/native";
+import { useSession } from "../../features/auth/hooks/useSession";
+import { useActiveDispatch } from "../../features/dispatch/hooks/useActiveDispatch";
 
-type EmergencyType = "SOS" | "Flood" | "Fire" | "Typhoon" | "Earthquake" | "Collapse";
+// Server-style types (normalize on UI)
+type EmergencyType = "SOS" | "FLOOD" | "FIRE" | "EARTHQUAKE" | "MEDICAL" | "OTHER";
 
 type EmergencyReport = {
   id: string;
@@ -38,16 +42,16 @@ if (TOKEN) {
 
 const colorForType = (type: EmergencyType) => {
   switch (type) {
-    case "Flood":
+    case "FLOOD":
       return "#2563EB";
-    case "Fire":
+    case "FIRE":
       return "#DC2626";
-    case "Typhoon":
-      return "#B91C1C";
-    case "Earthquake":
+    case "EARTHQUAKE":
       return "#F59E0B";
-    case "Collapse":
-      return "#CA8A04";
+    case "MEDICAL":
+      return "#16A34A";
+    case "OTHER":
+      return "#64748B";
     case "SOS":
       return "#EF4444";
     default:
@@ -58,16 +62,14 @@ const colorForType = (type: EmergencyType) => {
 // ✅ MaterialCommunityIcons mapping
 const mciForType = (type: EmergencyType) => {
   switch (type) {
-    case "Fire":
+    case "FIRE":
       return "fire";
-    case "Flood":
+    case "FLOOD":
       return "water";
-    case "Typhoon":
-      return "weather-hurricane";
-    case "Earthquake":
+    case "EARTHQUAKE":
       return "chart-bell-curve-cumulative";
-    case "Collapse":
-      return "home-city";
+    case "MEDICAL":
+      return "medical-bag";
     case "SOS":
       return "alarm-light";
     default:
@@ -169,48 +171,46 @@ export default function MapTab() {
   const [query, setQuery] = useState("");
   const { key: styleKey, styleURL, next } = useMapStyle("dark");
 
-  // ✅ hardcoded emergencies (Dagupan-only)
-  const reports: EmergencyReport[] = useMemo(
-    () => [
-      {
-        id: "sos-1",
-        type: "SOS",
-        title: "SOS: Flood Rescue Needed",
-        description: "Caller stranded near Calmay area.",
-        lng: 120.3298,
-        lat: 16.0562,
-        updated: "15 min ago",
-      },
-      {
-        id: "fire-1",
-        type: "Fire",
-        title: "Residential Fire",
-        description: "Reported smoke in Poblacion.",
-        lng: 120.3339,
-        lat: 16.0446,
-        updated: "32 min ago",
-      },
-      {
-        id: "collapse-1",
-        type: "Collapse",
-        title: "Structure Collapse",
-        description: "Possible injuries near Pantal.",
-        lng: 120.3475,
-        lat: 16.047,
-        updated: "2 hours ago",
-      },
-      {
-        id: "typhoon-1",
-        type: "Typhoon",
-        title: "Typhoon Evac Support",
-        description: "Evacuation support needed.",
-        lng: 120.304,
-        lat: 16.0328,
-        updated: "45 min ago",
-      },
-    ],
-    []
+  const { session, isUser } = useSession();
+  const role = (isUser && session?.mode === "user" ? session.user.role : undefined) as string | undefined;
+  const isVolunteer = role === "VOLUNTEER";
+
+  const { active: activeDispatch, refresh: refreshDispatch } = useActiveDispatch();
+
+  // Refresh active dispatch when the Map tab gains focus
+  useFocusEffect(
+    useCallback(() => {
+      refreshDispatch();
+    }, [refreshDispatch])
   );
+
+  const assigned = useMemo(() => {
+    if (!activeDispatch) return null;
+    if (activeDispatch.status !== "ACCEPTED") return null;
+    const e = activeDispatch.emergency;
+    if (!Number.isFinite(e?.lng) || !Number.isFinite(e?.lat)) return null;
+    return e;
+  }, [activeDispatch]);
+
+  // ✅ ONLY show the assigned emergency (if any)
+  const reports: EmergencyReport[] = useMemo(() => {
+    if (!assigned) return [];
+    const type = String(assigned.emergencyType ?? "SOS").toUpperCase() as EmergencyType;
+    const title = `${type}: Response Needed`;
+    const desc = assigned.notes ?? undefined;
+    const updated = assigned.reportedAt ? new Date(assigned.reportedAt).toLocaleString() : undefined;
+    return [
+      {
+        id: assigned.id,
+        type,
+        title,
+        description: desc,
+        lng: assigned.lng,
+        lat: assigned.lat,
+        updated,
+      },
+    ];
+  }, [assigned]);
 
   const filteredReports = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -223,19 +223,35 @@ export default function MapTab() {
     );
   }, [reports, query]);
 
-  const camera = useMemo(
-    () => ({
-      centerCoordinate: DAGUPAN,
-      zoomLevel: 12,
-      animationDuration: 0,
-    }),
-    []
-  );
+  const [camera, setCamera] = useState<{
+    centerCoordinate: [number, number];
+    zoomLevel: number;
+    animationDuration: number;
+  }>({
+    centerCoordinate: DAGUPAN,
+    zoomLevel: 12,
+    animationDuration: 0,
+  });
 
   // ✅ draggable “Google Maps-ish” sheet
   const sheetRef = useRef<BottomSheet>(null);
   const snapPoints = useMemo(() => ["22%", "45%"], []);
   const [selected, setSelected] = useState<EmergencyReport | null>(null);
+
+  // ✅ When an assigned emergency exists, auto-zoom + open details
+  useEffect(() => {
+    if (reports.length === 1) {
+      const r = reports[0];
+      setCamera({ centerCoordinate: [r.lng, r.lat], zoomLevel: 15, animationDuration: 800 });
+      setSelected(r);
+      requestAnimationFrame(() => sheetRef.current?.snapToIndex(0));
+      return;
+    }
+
+    setCamera({ centerCoordinate: DAGUPAN, zoomLevel: 12, animationDuration: 0 });
+    setSelected(null);
+    sheetRef.current?.close();
+  }, [reports]);
 
   const openSheet = (r: EmergencyReport) => {
     setSelected(r);

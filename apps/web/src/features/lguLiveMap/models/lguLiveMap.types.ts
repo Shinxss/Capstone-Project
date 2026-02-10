@@ -7,9 +7,12 @@ export type Volunteer = {
   id: string;
   name: string;
   status: VolunteerStatus;
-  lng: number;
-  lat: number;
+  // May be missing until the mobile app starts sending live GPS updates
+  lng?: number;
+  lat?: number;
   skill: string;
+  barangayName?: string;
+  municipality?: string;
 };
 
 export type MapStyleKey = "satellite-streets-v12" | "streets-v12" | "dark-v11";

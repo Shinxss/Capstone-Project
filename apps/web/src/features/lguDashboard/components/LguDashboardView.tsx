@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 import { useThemeMode } from "../../theme/hooks/useThemeMode";
 import {
   Activity,
@@ -6,7 +7,10 @@ import {
   ClipboardList,
   RefreshCcw,
   Users,
+  ShieldAlert,
 } from "lucide-react";
+
+import mapboxgl from "mapbox-gl";
 
 import EmergencyMap from "../../emergency/components/EmergencyMap";
 import {
@@ -14,6 +18,16 @@ import {
   iconForEmergency,
 } from "../../emergency/constants/emergency.constants";
 import type { DashboardEmergencyItem, DashboardStats } from "../models/lguDashboard.types";
+
+import EmergencyQuickView from "./EmergencyQuickView";
+
+import type { HazardZone } from "../../hazardZones/models/hazardZones.types";
+import { useHazardZones } from "../../hazardZones/hooks/useHazardZones";
+import {
+  ensureHazardZonesLayers,
+  setHazardZonesData,
+  setHazardZonesVisibility,
+} from "../../hazardZones/utils/hazardZones.mapbox";
 
 function timeAgo(iso?: string) {
   if (!iso) return "-";
@@ -90,6 +104,23 @@ function ProgressRing({ percent, isDark }: { percent: number; isDark: boolean })
   );
 }
 
+function MapPill({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: number;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-white text-xs font-bold">
+      {icon}
+      {value} {label}
+    </span>
+  );
+}
+
 export default function LguDashboardView({
   loading,
   error,
@@ -97,6 +128,9 @@ export default function LguDashboardView({
   stats,
   pins,
   recent,
+  hazardZones,
+  hazardsLoading,
+  hazardsError,
 }: {
   loading: boolean;
   error: string | null;
@@ -104,17 +138,148 @@ export default function LguDashboardView({
   stats: DashboardStats;
   pins: DashboardEmergencyItem[];
   recent: DashboardEmergencyItem[];
+  // ✅ be defensive: API shape changes or missing prop should not crash the dashboard
+  hazardZones?: HazardZone[];
+  hazardsLoading: boolean;
+  hazardsError: string | null;
 }) {
+  const navigate = useNavigate();
   const { isDark } = useThemeMode();
 
-  const activeEmergencies = recent
+  const [quickView, setQuickView] = useState<DashboardEmergencyItem | null>(null);
+
+  // ✅ Allow clicking a map marker on the dashboard to open the quick view.
+  const emergencyById = useMemo(() => {
+    const m = new Map<string, DashboardEmergencyItem>();
+    for (const e of recent ?? []) m.set(String(e.id), e);
+    return m;
+  }, [recent]);
+
+  // Dashboard safety: fetch hazard zones here too so the dashboard map never shows 0 by accident.
+  // (This is harmless if the parent already fetched them.)
+  const {
+    hazardZones: hzFromHook,
+    loading: hzLoading,
+    error: hzError,
+    refetch: refetchHazards,
+  } = useHazardZones();
+
+  const effectiveHazardZones = (hazardZones && hazardZones.length ? hazardZones : hzFromHook) ?? [];
+  const effectiveHazardsLoading = hazardsLoading || hzLoading;
+  const effectiveHazardsError = hazardsError || hzError;
+
+  const handleRefresh = () => {
+    onRefresh();
+    // ensure hazards refresh too (in case onRefresh only refetches emergencies)
+    void refetchHazards();
+  };
+
+  const openInLiveMap = (id: string) => {
+    // Deep link so Live Map can auto-open the details panel.
+    setQuickView(null);
+    navigate(`/lgu/live-map?emergencyId=${encodeURIComponent(id)}`);
+  };
+
+
+  // --- Map instance (for hazard zones overlay)
+  // IMPORTANT: use state so effects re-run once the map is available.
+  // (Using only a ref can miss the initial onMapReady timing.)
+  const [map, setMap] = useState<mapboxgl.Map | null>(null);
+  const [mapReady, setMapReady] = useState(false);
+
+  // ✅ When opening the quick view from the list, pan/zoom the dashboard map to that emergency.
+  useEffect(() => {
+    if (!quickView || !map || !mapReady) return;
+    if (!Number.isFinite(quickView.lng) || !Number.isFinite(quickView.lat)) return;
+
+    try {
+      map.flyTo({
+        center: [quickView.lng, quickView.lat],
+        zoom: Math.max(map.getZoom(), 15),
+        speed: 1.2,
+        essential: true,
+      });
+    } catch {
+      // ignore
+    }
+  }, [quickView?.id, quickView?.lng, quickView?.lat, map, mapReady]);
+
+  const onMapReady = useCallback((m: mapboxgl.Map) => {
+    setMap(m);
+    setMapReady(false);
+
+    const setReady = () => setMapReady(true);
+
+    // If already loaded, mark ready immediately.
+    const loadedFn = (m as any).loaded?.bind(m);
+    if (typeof loadedFn === "function" && loadedFn()) {
+      setReady();
+      return;
+    }
+    if (m.isStyleLoaded?.()) {
+      setReady();
+      return;
+    }
+
+    m.once("load", setReady);
+  }, []);
+
+  const safePins = pins ?? [];
+  const safeRecent = recent ?? [];
+
+  // ✅ only ACTIVE hazards are drawn on the dashboard map
+  // older docs may not have isActive yet -> treat as true
+  const safeHazardZones = useMemo(() => {
+    return (effectiveHazardZones ?? []).filter((z: any) => (z as any).isActive !== false);
+  }, [effectiveHazardZones]);
+
+  // --- Apply hazard zones on the dashboard map
+  useEffect(() => {
+    if (!map || !mapReady) return;
+
+    let cancelled = false;
+
+    const apply = () => {
+      if (cancelled) return;
+
+      if (!map.isStyleLoaded()) {
+        map.once("idle", apply);
+        return;
+      }
+
+      try {
+        ensureHazardZonesLayers(map);
+        setHazardZonesData(map, safeHazardZones);
+        setHazardZonesVisibility(map, true);
+      } catch {
+        map.once("idle", apply);
+      }
+    };
+
+    apply();
+    map.on("style.load", apply);
+
+    return () => {
+      cancelled = true;
+      try {
+        map.off("style.load", apply);
+      } catch {
+        // ignore
+      }
+    };
+  }, [map, mapReady, safeHazardZones]);
+
+  const emergenciesCount = safePins.length;
+  const hazardsCount = safeHazardZones.length;
+
+  const activeEmergencies = safeRecent
     .filter((e) => {
       const s = String(e.status || "").toUpperCase();
       return s === "OPEN" || s === "ACKNOWLEDGED" || s === "RESOLVED";
     })
     .slice(0, 6);
 
-  const activity = recent.slice(0, 5).map((e) => {
+  const activity = safeRecent.slice(0, 5).map((e) => {
     const type = EMERGENCY_TYPE_LABEL[e.type] ?? e.type;
     return {
       text: `New ${type} report logged`,
@@ -131,7 +296,7 @@ export default function LguDashboardView({
         </div>
 
         <button
-          onClick={onRefresh}
+          onClick={handleRefresh}
           className="inline-flex items-center gap-2 text-xs font-semibold bg-white border border-gray-200 rounded-md px-3 py-2 hover:bg-gray-50 dark:bg-[#0E1626] dark:border-[#162544] dark:hover:bg-[#122036] dark:text-slate-200"
         >
           <RefreshCcw size={14} />
@@ -173,18 +338,75 @@ export default function LguDashboardView({
         />
       </div>
 
-      {/* Map */}
-      <div className="mb-4">
+      {/* Map (with hazard zones overlay + LiveMap-style pills)
+          NOTE: keep map under the dashboard panels so it never steals clicks.
+      */}
+      <div className="mb-4 relative z-0">
         <EmergencyMap
-          title="Emergency Map (Dagupan)"
-          legendVariant="legacy"
+          title={null}
+          showHeader={false}
           heightClassName="h-125"
           reports={pins.map((p) => ({ id: p.id, type: p.type, lng: p.lng, lat: p.lat }))}
+          onPinClick={(pin) => {
+            const hit = emergencyById.get(String(pin.id));
+            // If the pin is not in `recent` for some reason, still open a minimal view.
+            setQuickView(
+              hit ?? {
+                id: String(pin.id),
+                type: pin.type,
+                status: "OPEN",
+                lng: pin.lng,
+                lat: pin.lat,
+              }
+            );
+          }}
+          onMapClick={() => {
+            // Google Maps behavior: click empty map space closes the card
+            setQuickView(null);
+          }}
+          onMapReady={onMapReady}
+          fitReports="initial"
+          // ✅ Render the Google Maps-style card INSIDE the map (Mapbox Popup)
+          popup={
+            quickView
+              ? {
+                  lng: quickView.lng,
+                  lat: quickView.lat,
+                  onClose: () => setQuickView(null),
+                  content: (
+                    <EmergencyQuickView
+                      variant="map"
+                      item={quickView}
+                      onClose={() => setQuickView(null)}
+                      onOpenInMap={(id) => openInLiveMap(id)}
+                    />
+                  ),
+                }
+              : null
+          }
         />
+
+        {/* LiveMap-style pill bar */}
+        <div className="absolute top-3 right-3 z-20 pointer-events-none">
+          <div className="pointer-events-auto inline-flex items-center gap-2 rounded-full bg-black/55 backdrop-blur px-2 py-1 border border-white/10">
+            <MapPill icon={<AlertTriangle size={14} />} label="Emergencies" value={emergenciesCount} />
+            <MapPill icon={<ShieldAlert size={14} />} label="Hazards" value={hazardsCount} />
+          </div>
+        </div>
+
+        {(effectiveHazardsLoading || effectiveHazardsError) && (
+          <div className="absolute bottom-3 left-3 z-20 pointer-events-none">
+            <div className="pointer-events-auto rounded-lg bg-black/60 text-white text-xs font-bold px-3 py-2 border border-white/10 backdrop-blur">
+              {effectiveHazardsLoading ? "Loading hazard zones…" : `Hazards: ${String(effectiveHazardsError)}`}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Bottom panels (old layout) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {/* Bottom panels (old layout)
+          Ensure these stay above the map canvas for pointer events.
+      */}
+      <div className="relative z-[120] grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 bg-white border border-gray-200 rounded-lg shadow-sm dark:bg-[#0E1626] dark:border-[#162544]">
           <div className="px-4 py-3 flex items-center justify-between border-b border-gray-200 dark:border-[#162544]">
             <div>
@@ -208,7 +430,8 @@ export default function LguDashboardView({
               return (
                 <div
                   key={e.id}
-                  className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg p-3 dark:bg-[#0B1324] dark:border-[#162544]"
+                  className="relative z-[130] flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg p-3 dark:bg-[#0B1324] dark:border-[#162544] cursor-pointer hover:bg-gray-100 dark:hover:bg-[#0E1626]"
+                  onClick={() => setQuickView(e)}
                 >
                   <div className="flex items-start gap-3 min-w-0">
                     <div className="h-12 w-12 rounded-md bg-white border border-gray-200 flex items-center justify-center shrink-0 dark:bg-[#0E1626] dark:border-[#162544]">
@@ -271,6 +494,8 @@ export default function LguDashboardView({
           </div>
         </div>
       </div>
+
+      {/* Popup is rendered inside the map now */}
     </div>
   );
 }

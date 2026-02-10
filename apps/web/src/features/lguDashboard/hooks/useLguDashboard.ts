@@ -1,7 +1,8 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useLguEmergencies } from "../../emergency/hooks/useLguEmergencies";
 import { normalizeEmergencyType } from "../../emergency/constants/emergency.constants";
 import type { DashboardEmergencyItem, DashboardStats } from "../models/lguDashboard.types";
+import { useHazardZones } from "../../hazardZones/hooks/useHazardZones";
 
 function fullName(first?: string, last?: string) {
   const name = `${first ?? ""} ${last ?? ""}`.trim();
@@ -10,6 +11,16 @@ function fullName(first?: string, last?: string) {
 
 export function useLguDashboard() {
   const { reports, loading, error, refetch } = useLguEmergencies();
+  const {
+    hazardZones,
+    loading: hazardsLoading,
+    error: hazardsError,
+    refetch: refetchHazards,
+  } = useHazardZones();
+
+  const refetchAll = useCallback(async () => {
+    await Promise.all([refetch(), refetchHazards()]);
+  }, [refetch, refetchHazards]);
 
   const items: DashboardEmergencyItem[] = useMemo(() => {
     return (reports ?? [])
@@ -58,11 +69,16 @@ export function useLguDashboard() {
   }, [items]);
 
   return {
-    loading,
+    loading: loading || hazardsLoading,
     error,
-    refetch,
+    refetch: refetchAll,
     stats,
     pins: items,
     recent,
+
+    hazardZones,
+    hazardsLoading,
+    hazardsError,
+    refetchHazards,
   };
 }

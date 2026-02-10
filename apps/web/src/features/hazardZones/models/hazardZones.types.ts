@@ -10,6 +10,9 @@ export type HazardZone = {
   name: string;
   hazardType: HazardType | string;
   geometry: GeoJSONPolygon;
+  /** Persisted visibility status (default true if missing from older docs) */
+  isActive?: boolean;
+  deletedAt?: string | null;
   createdAt?: string;
 };
 

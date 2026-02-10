@@ -1,6 +1,11 @@
 import { Router } from "express";
 import { requireAuth } from "../../middlewares/requireAuth";
-import { createHazardZone, deleteHazardZone, listHazardZones } from "./hazardZone.controller";
+import {
+  createHazardZone,
+  deleteHazardZone,
+  listHazardZones,
+  updateHazardZoneStatus,
+} from "./hazardZone.controller";
 
 const router = Router();
 
@@ -12,5 +17,8 @@ router.post("/", requireAuth, createHazardZone);
 
 // DELETE /api/hazard-zones/:id
 router.delete("/:id", requireAuth, deleteHazardZone);
+
+// PATCH /api/hazard-zones/:id/status
+router.patch("/:id/status", requireAuth, updateHazardZoneStatus);
 
 export default router;

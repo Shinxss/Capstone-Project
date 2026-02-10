@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import type { CreateHazardZoneInput, HazardZone } from "../models/hazardZones.types";
-import { createHazardZone, deleteHazardZone, fetchHazardZones } from "../services/hazardZones.service";
+import {
+  createHazardZone,
+  deleteHazardZone,
+  fetchHazardZones,
+  setHazardZoneStatus,
+} from "../services/hazardZones.service";
 
 export function useHazardZones() {
   const [hazardZones, setHazardZones] = useState<HazardZone[]>([]);
@@ -35,5 +40,13 @@ export function useHazardZones() {
     setHazardZones((prev) => prev.filter((z) => String(z._id) !== String(id)));
   }, []);
 
-  return { hazardZones, loading, error, refetch, create, remove };
+  const setStatus = useCallback(async (id: string, isActive: boolean) => {
+    const updated = await setHazardZoneStatus(id, isActive);
+    setHazardZones((prev) =>
+      prev.map((z) => (String(z._id) === String(id) ? { ...z, ...updated } : z))
+    );
+    return updated;
+  }, []);
+
+  return { hazardZones, loading, error, refetch, create, remove, setStatus };
 }

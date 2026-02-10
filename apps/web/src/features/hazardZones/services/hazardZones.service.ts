@@ -17,3 +17,10 @@ export async function deleteHazardZone(id: string) {
   const res = await api.delete<{ data: { ok: true } }>(`/api/hazard-zones/${id}`);
   return res.data.data;
 }
+
+export async function setHazardZoneStatus(id: string, isActive: boolean) {
+  const res = await api.patch<{ data: HazardZone }>(`/api/hazard-zones/${id}/status`, {
+    isActive,
+  });
+  return res.data.data;
+}

@@ -12,6 +12,10 @@ export interface IHazardZone {
   hazardType: HazardType;
   geometry: GeoJSONPolygon;
   createdBy?: Types.ObjectId;
+  /** Persisted visibility status */
+  isActive: boolean;
+  /** Soft delete marker */
+  deletedAt?: Date | null;
 }
 
 const hazardZoneSchema = new Schema<IHazardZone>(
@@ -33,6 +37,12 @@ const hazardZoneSchema = new Schema<IHazardZone>(
     },
 
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: false },
+
+    // ✅ persisted on/off status
+    isActive: { type: Boolean, default: true, index: true },
+
+    // ✅ soft delete
+    deletedAt: { type: Date, default: null, index: true },
   },
   { timestamps: true }
 );

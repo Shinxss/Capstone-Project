@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import mapboxgl from "mapbox-gl";
 import { createRoot, type Root } from "react-dom/client";
 import EmergencyMarker from "./EmergencyMarker";
@@ -10,6 +10,9 @@ export type MapEmergencyPin = {
   lng: number;
   lat: number;
 };
+
+// ✅ Stable defaults (avoid new array identity on every render)
+const DEFAULT_CENTER: [number, number] = [120.3333, 16.0431];
 
 type Props = {
   reports: MapEmergencyPin[];
@@ -32,6 +35,23 @@ type Props = {
   /** Marker interaction */
   onPinClick?: (pin: MapEmergencyPin) => void;
   onMapClick?: (lng: number, lat: number) => void;
+
+  /**
+   * Optional Mapbox popup anchored to coordinates (Google Maps-like card).
+   * Keep rendering responsibility in the parent; the map mounts it as a Mapbox Popup.
+   */
+  popup?: {
+    lng: number;
+    lat: number;
+    content: ReactNode;
+    onClose?: () => void;
+  } | null;
+
+  /** Additional styling hook for popup container */
+  popupClassName?: string;
+
+  /** Popup offset in pixels (how far above the marker) */
+  popupOffset?: number;
 
   /**
    * Fit map view to markers.
@@ -67,12 +87,15 @@ export default function EmergencyMap({
   showHeader = true,
   showLocateButton = true,
   onMapReady,
-  center = [120.3333, 16.0431],
+  center = DEFAULT_CENTER,
   zoom = 13,
   mapStyle = "mapbox://styles/mapbox/satellite-streets-v12",
   maxBounds,
   onPinClick,
   onMapClick,
+  popup = null,
+  popupClassName,
+  popupOffset = 18,
   fitReports = "always",
   navPosition = "top-right",
   attributionPosition = "bottom-right",
@@ -80,6 +103,7 @@ export default function EmergencyMap({
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const mapElRef = useRef<HTMLDivElement | null>(null);
   const markersRef = useRef<{ marker: mapboxgl.Marker; root: Root }[]>([]);
+  const popupRef = useRef<{ popup: mapboxgl.Popup; root: Root } | null>(null);
   const [loaded, setLoaded] = useState(false);
   const didInitialFitRef = useRef(false);
 
@@ -175,6 +199,13 @@ export default function EmergencyMap({
         safeUnmount(root);
       });
       markersRef.current = [];
+
+      if (popupRef.current) {
+        popupRef.current.popup.remove();
+        safeUnmount(popupRef.current.root);
+        popupRef.current = null;
+      }
+
       map.remove();
       mapRef.current = null;
       setLoaded(false);
@@ -184,7 +215,63 @@ export default function EmergencyMap({
       styleSwitchScheduledRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [center, zoom, maxBounds, onMapReady, navPosition, attributionPosition]);
+  }, [center?.[0], center?.[1], zoom, maxBounds, onMapReady, navPosition, attributionPosition]);
+
+  // ✅ Optional Mapbox Popup (Google Maps-like card anchored to a coordinate)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !loaded) return;
+
+    // Remove popup if parent cleared it
+    if (!popup) {
+      if (popupRef.current) {
+        popupRef.current.popup.remove();
+        safeUnmount(popupRef.current.root);
+        popupRef.current = null;
+      }
+      return;
+    }
+
+    // Create once, then update location + content
+    if (!popupRef.current) {
+      const container = document.createElement("div");
+      const root = createRoot(container);
+
+      const p = new mapboxgl.Popup({
+        closeButton: false,
+        closeOnClick: false,
+        offset: popupOffset,
+        className: `lifeline-map-popup ${popupClassName ?? ""}`.trim(),
+      })
+        .setLngLat([popup.lng, popup.lat])
+        .setDOMContent(container)
+        .addTo(map);
+
+      // If Mapbox ever closes it (ESC), keep state in sync
+      p.on("close", () => popup.onClose?.());
+
+      popupRef.current = { popup: p, root };
+    } else {
+      popupRef.current.popup.setLngLat([popup.lng, popup.lat]);
+      // offset can change
+      try {
+        popupRef.current.popup.setOffset(popupOffset as any);
+      } catch {
+        // ignore
+      }
+    }
+
+    // Render latest React content. Stop propagation so map clicks don't close it.
+    popupRef.current.root.render(
+      <div
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
+      >
+        {popup.content}
+      </div>
+    );
+  }, [popup, loaded, popupClassName, popupOffset]);
 
   /**
    * ✅ v3-safe style switching:

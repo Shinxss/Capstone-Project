@@ -21,6 +21,8 @@ import {
   Mountain,
 } from "lucide-react";
 
+import DispatchRespondersModal from "./DispatchRespondersModal";
+
 import {
   HAZARD_TYPE_COLOR,
   HAZARD_TYPE_LABEL,
@@ -126,6 +128,20 @@ export default function LguLiveMapView(props: Props) {
     setDetailsOpen,
     cleanupDetails,
 
+    // responders dispatch + tracking
+    volunteers,
+    dispatchModalOpen,
+    openDispatchResponders,
+    closeDispatchResponders,
+    dispatchSelection,
+    toggleDispatchResponder,
+    confirmDispatchResponders,
+    dispatching,
+    trackOpen,
+    toggleTrackPanel,
+    assignedResponders,
+    centerOnResponder,
+
     // style selector
     mapStyleKey,
     setMapStyleKey,
@@ -137,7 +153,6 @@ export default function LguLiveMapView(props: Props) {
 
     // hazard zones dropdown list
     hazardZones,
-    hiddenHazardIds,
     toggleHazardZoneItem,
     deleteHazardZoneItem,
 
@@ -159,6 +174,17 @@ export default function LguLiveMapView(props: Props) {
   const [legendMinimized, setLegendMinimized] = useState(false);
   const [hazardsDropdownOpen, setHazardsDropdownOpen] = useState(true);
 
+  // ✅ IMPORTANT: keep maxBounds reference stable.
+  // EmergencyMap recreates the Mapbox instance when maxBounds changes (dependency in its init effect).
+  const maxBounds = useMemo(
+    () =>
+      [
+        [120.25, 15.98],
+        [120.43, 16.12],
+      ] as any,
+    []
+  );
+
   const toHazardType = (v: unknown): HazardType =>
     HAZARD_TYPES.includes(v as HazardType) ? (v as HazardType) : "UNSAFE";
 
@@ -179,16 +205,18 @@ export default function LguLiveMapView(props: Props) {
 
 
   const effectiveDetailsWidth = useMemo(() => {
-    if (detailsOpen) return "w-[360px]";
-    if (selectedEmergencyDetails) return "w-[44px]";
+    // Only show panel when there is a selected emergency AND the panel is open.
+    if (detailsOpen && selectedEmergencyDetails) return "w-[360px]";
     return "w-0";
   }, [detailsOpen, selectedEmergencyDetails]);
 
-  const onMapBackgroundClick = () => {
-    onMapClick();
-  };
-
   const mapPins: MapEmergencyPin[] = useMemo(() => emergencyPins, [emergencyPins]);
+
+  const volunteerDotClass = (status: string) => {
+    if (status === "available") return "bg-emerald-500";
+    if (status === "busy") return "bg-orange-500";
+    return "bg-red-500";
+  };
 
   return (
     <div className="h-full w-full relative overflow-hidden bg-black">
@@ -203,10 +231,7 @@ export default function LguLiveMapView(props: Props) {
           center={center}
           zoom={12.6}
           mapStyle={mapStyleUrl}
-          maxBounds={[
-            [120.25, 15.98],
-            [120.43, 16.12],
-          ]}
+          maxBounds={maxBounds}
           navPosition="bottom-right"
           attributionPosition="bottom-left"
           onMapReady={onMapReady}
@@ -340,25 +365,22 @@ export default function LguLiveMapView(props: Props) {
           effectiveDetailsWidth,
         ].join(" ")}
       >
-        {detailsOpen ? (
+        {detailsOpen && selectedEmergencyDetails ? (
           <div className="h-full flex flex-col">
             <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
               <div className="text-sm font-bold text-gray-900">Emergency Details</div>
               <button
-                onClick={() => setDetailsOpen(false)}
+                onClick={cleanupDetails}
                 className="h-9 w-9 rounded-lg hover:bg-gray-100 grid place-items-center text-gray-700"
-                aria-label="Minimize details"
-                title="Minimize"
+                aria-label="Close details"
+                title="Close"
               >
                 <X size={18} />
               </button>
             </div>
 
             <div className="p-4 overflow-y-auto">
-              {!selectedEmergencyDetails ? (
-                <div className="text-sm text-gray-600">Select an emergency pin to view details.</div>
-              ) : (
-                <div className="space-y-4">
+              <div className="space-y-4">
                   <div className="rounded-xl border border-gray-200 p-4">
                     <div className="text-xs text-gray-500">Type</div>
                     <div className="text-base font-extrabold text-gray-900">
@@ -406,30 +428,91 @@ export default function LguLiveMapView(props: Props) {
                     </div>
                   </div>
 
-                  <button
-                    onClick={cleanupDetails}
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 px-4 py-3 text-sm font-bold text-gray-800"
-                  >
-                    Clear selection
-                  </button>
+                  {/* ACTIONS */}
+                  <div className="grid gap-2">
+                    <button
+                      type="button"
+                      onClick={openDispatchResponders}
+                      className="w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-extrabold text-white hover:bg-blue-500 flex items-center justify-center gap-2"
+                    >
+                      <Users size={16} />
+                      Dispatch Responders
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={toggleTrackPanel}
+                      className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-extrabold text-gray-900 hover:bg-gray-50 flex items-center justify-center gap-2"
+                    >
+                      <Navigation2 size={16} />
+                      {trackOpen ? "Hide Tracking" : "Track Responders"}
+                    </button>
+                  </div>
+
+                  {/* TRACKING */}
+                  {trackOpen ? (
+                    <div className="rounded-xl border border-gray-200 p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm font-extrabold text-gray-900">Responders</div>
+                        <div className="text-xs font-bold text-gray-600">{assignedResponders.length}</div>
+                      </div>
+
+                      {assignedResponders.length === 0 ? (
+                        <div className="mt-2 text-sm text-gray-700">
+                          No responders assigned yet. Click <span className="font-semibold">Dispatch Responders</span> to send help.
+                        </div>
+                      ) : (
+                        <div className="mt-3 space-y-2">
+                          {assignedResponders.map((r) => (
+                            <div
+                              key={r.id}
+                              className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2"
+                            >
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={[
+                                    "h-2.5 w-2.5 rounded-full",
+                                    volunteerDotClass(r.status),
+                                  ].join(" ")}
+                                />
+                                <div>
+                                  <div className="text-sm font-bold text-gray-900">{r.name}</div>
+                                  <div className="text-xs text-gray-600">{r.skill}</div>
+                                </div>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => centerOnResponder(r.id)}
+                                className="h-9 w-9 rounded-lg hover:bg-white grid place-items-center text-gray-700"
+                                title="Center on map"
+                                aria-label="Center responder"
+                              >
+                                <LocateFixed size={16} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
+
                 </div>
-              )}
             </div>
-          </div>
-        ) : selectedEmergencyDetails ? (
-          // minimized tab
-          <div className="h-full flex items-start justify-center pt-3">
-            <button
-              onClick={() => setDetailsOpen(true)}
-              className="h-10 w-10 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-200 grid place-items-center"
-              title="Open details"
-              aria-label="Open details"
-            >
-              <MapPin size={18} className="text-gray-700" />
-            </button>
           </div>
         ) : null}
       </aside>
+
+      <DispatchRespondersModal
+        open={dispatchModalOpen}
+        emergency={selectedEmergencyDetails}
+        volunteers={volunteers}
+        selectedIds={dispatchSelection}
+        onToggle={toggleDispatchResponder}
+        onClose={closeDispatchResponders}
+        onConfirm={confirmDispatchResponders}
+        loading={dispatching}
+      />
 
       {/* RIGHT LAYERS PANEL (collapsible, for styles + toggles + draw hazards) */}
       <aside
@@ -558,15 +641,18 @@ export default function LguLiveMapView(props: Props) {
 
                       {(hazardZones ?? []).map((z: any) => {
                         const id = String(z._id);
-                        const isHidden = !!hiddenHazardIds?.[id];
-                        const effectiveHidden = !showHazardZones || isHidden;
+                        // older docs may not have isActive yet -> treat as true
+                        const isActive = (z as any).isActive !== false;
                         const ht = toHazardType(z.hazardType);
                         const color = HAZARD_TYPE_COLOR[ht];
 
                         return (
                           <div
                             key={id}
-                            className="flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900/70 px-3 py-3"
+                            className={[
+                              "flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900/70 px-3 py-3",
+                              isActive ? "opacity-100" : "opacity-60",
+                            ].join(" ")}
                           >
                             <div className="flex items-center gap-3 min-w-0">
                               <div
@@ -578,7 +664,7 @@ export default function LguLiveMapView(props: Props) {
                               <div className="min-w-0">
                                 <div className="text-sm font-extrabold text-white truncate">{z.name}</div>
                                 <div className="text-xs text-slate-300 truncate">
-                                  {HAZARD_TYPE_LABEL[ht]}
+                                  {HAZARD_TYPE_LABEL[ht]} · {isActive ? "On" : "Off"}
                                 </div>
                               </div>
                             </div>
@@ -586,18 +672,17 @@ export default function LguLiveMapView(props: Props) {
                             <div className="flex items-center gap-2 shrink-0">
                               <button
                                 type="button"
-                                disabled={!showHazardZones}
                                 onClick={() => toggleHazardZoneItem(id)}
                                 className={[
                                   "h-9 w-9 rounded-lg border grid place-items-center",
-                                  showHazardZones ? "border-slate-800 hover:bg-slate-800/60" : "border-slate-800 opacity-50 cursor-not-allowed",
+                                  "border-slate-800 hover:bg-slate-800/60",
                                 ].join(" ")}
-                                aria-label={effectiveHidden ? "Show hazard zone" : "Hide hazard zone"}
-                                title={effectiveHidden ? "Show" : "Hide"}
+                                aria-label={isActive ? "Turn off hazard zone" : "Turn on hazard zone"}
+                                title={isActive ? "Turn off" : "Turn on"}
                               >
                                 <Power
                                   size={18}
-                                  className={effectiveHidden ? "text-slate-500" : "text-emerald-400"}
+                                  className={isActive ? "text-emerald-400" : "text-slate-500"}
                                 />
                               </button>
 

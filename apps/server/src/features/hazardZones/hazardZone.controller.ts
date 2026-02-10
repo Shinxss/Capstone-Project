@@ -73,10 +73,34 @@ export async function deleteHazardZone(req: AuthedRequest, res: Response) {
       return res.status(400).json({ message: "Invalid id" });
     }
 
-    const deleted = await hazardZoneService.deleteHazardZone(id);
+    // ✅ soft delete (keeps record for audit)
+    const deleted = await hazardZoneService.softDeleteHazardZone(id);
     if (!deleted) return res.status(404).json({ message: "Hazard zone not found" });
 
     return res.json({ data: { ok: true } });
+  } catch (err: any) {
+    return res.status(500).json({ message: err?.message ?? "Server error" });
+  }
+}
+
+export async function updateHazardZoneStatus(req: AuthedRequest, res: Response) {
+  try {
+    if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+
+    const id = String(req.params.id || "").trim();
+    if (!id || !Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid id" });
+    }
+
+    const { isActive } = req.body ?? {};
+    if (typeof isActive !== "boolean") {
+      return res.status(400).json({ message: "isActive must be boolean" });
+    }
+
+    const updated = await hazardZoneService.updateHazardZoneStatus(id, isActive);
+    if (!updated) return res.status(404).json({ message: "Hazard zone not found" });
+
+    return res.json({ data: updated });
   } catch (err: any) {
     return res.status(500).json({ message: err?.message ?? "Server error" });
   }
