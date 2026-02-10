@@ -79,7 +79,27 @@ export function useLguLiveMap() {
     error: hazardZonesError,
     refetch: refetchHazardZones,
     create: createHazardZone,
+    remove: removeHazardZone,
   } = useHazardZones();
+
+  // per-zone visibility (used by the dropdown list)
+  const [hiddenHazardIds, setHiddenHazardIds] = useState<Record<string, boolean>>({});
+
+  // keep hidden state clean when data changes
+  useEffect(() => {
+    setHiddenHazardIds((prev) => {
+      const next: Record<string, boolean> = {};
+      (hazardZones ?? []).forEach((z: any) => {
+        const id = String(z._id);
+        if (prev[id]) next[id] = true;
+      });
+      return next;
+    });
+  }, [hazardZones]);
+
+  const filteredHazardZones = useMemo(() => {
+    return (hazardZones ?? []).filter((z: any) => !hiddenHazardIds[String(z._id)]);
+  }, [hazardZones, hiddenHazardIds]);
 
   const volunteers: Volunteer[] = useMemo(() => MOCK_VOLUNTEERS, []);
 
@@ -263,7 +283,8 @@ export function useLguLiveMap() {
 
     try {
       ensureHazardZonesLayers(map);
-      setHazardZonesData(map, hazardZones);
+      // only render hazards that are not hidden from the dropdown
+      setHazardZonesData(map, filteredHazardZones);
       setHazardZonesVisibility(map, showHazardZones);
     } catch (e) {
       // If style is rebuilding, try again once it becomes idle
@@ -282,7 +303,7 @@ export function useLguLiveMap() {
       // ignore
     }
   };
-}, [mapReady, hazardZones, showHazardZones]);
+}, [mapReady, filteredHazardZones, showHazardZones]);
 
   // ✅ Native polygon drawing (Mapbox GL v3 compatible)
   useEffect(() => {
@@ -490,6 +511,23 @@ export function useLguLiveMap() {
     setSelectedEmergencyId(null);
   };
 
+  const toggleHazardZoneItem = (id: string) => {
+    setHiddenHazardIds((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const deleteHazardZoneItem = async (id: string) => {
+    const ok = window.confirm("Delete this hazard zone?");
+    if (!ok) return;
+
+    await removeHazardZone(id);
+    await refetchHazardZones();
+    setHiddenHazardIds((prev) => {
+      const next = { ...prev };
+      delete next[String(id)];
+      return next;
+    });
+  };
+
   return {
     mapReady,
     onMapReady,
@@ -529,6 +567,13 @@ export function useLguLiveMap() {
     hazardsCount: hazardZones.length,
     volunteersCount: volunteers.length,
     emergenciesCount: reports.length,
+
+    // hazard zones list + per-zone controls (dropdown)
+    hazardZones,
+    hiddenHazardIds,
+    toggleHazardZoneItem,
+    deleteHazardZoneItem,
+
     hazardZonesLoading,
     hazardZonesError,
     refetchHazardZones,

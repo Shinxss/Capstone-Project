@@ -63,3 +63,21 @@ export async function createHazardZone(req: AuthedRequest, res: Response) {
     return res.status(500).json({ message: err?.message ?? "Server error" });
   }
 }
+
+export async function deleteHazardZone(req: AuthedRequest, res: Response) {
+  try {
+    if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+
+    const id = String(req.params.id || "").trim();
+    if (!id || !Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid id" });
+    }
+
+    const deleted = await hazardZoneService.deleteHazardZone(id);
+    if (!deleted) return res.status(404).json({ message: "Hazard zone not found" });
+
+    return res.json({ data: { ok: true } });
+  } catch (err: any) {
+    return res.status(500).json({ message: err?.message ?? "Server error" });
+  }
+}

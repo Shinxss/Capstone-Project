@@ -12,12 +12,20 @@ import {
   ShieldAlert,
   Navigation2,
   AlertTriangle,
+  ChevronDown,
+  Power,
+  Trash2,
+  Droplets,
+  Flame,
+  Construction,
+  Mountain,
 } from "lucide-react";
 
 import {
   HAZARD_TYPE_COLOR,
   HAZARD_TYPE_LABEL,
   HAZARD_TYPES,
+  type HazardType,
 } from "../../hazardZones/constants/hazardZones.constants";
 
 type Props = ReturnType<typeof import("../hooks/useLguLiveMap").useLguLiveMap>;
@@ -127,6 +135,12 @@ export default function LguLiveMapView(props: Props) {
     volunteersCount,
     emergenciesCount,
 
+    // hazard zones dropdown list
+    hazardZones,
+    hiddenHazardIds,
+    toggleHazardZoneItem,
+    deleteHazardZoneItem,
+
     // hazard draw + save
     isDrawingHazard,
     startDrawHazard,
@@ -143,6 +157,26 @@ export default function LguLiveMapView(props: Props) {
   } = props;
 
   const [legendMinimized, setLegendMinimized] = useState(false);
+  const [hazardsDropdownOpen, setHazardsDropdownOpen] = useState(true);
+
+  const toHazardType = (v: unknown): HazardType =>
+    HAZARD_TYPES.includes(v as HazardType) ? (v as HazardType) : "UNSAFE";
+
+  const hazardIconFor = (hazardType: HazardType) => {
+    switch (hazardType) {
+      case "FLOODED":
+        return <Droplets size={16} className="text-white" />;
+      case "ROAD_CLOSED":
+        return <Construction size={16} className="text-white" />;
+      case "FIRE_RISK":
+        return <Flame size={16} className="text-white" />;
+      case "LANDSLIDE":
+        return <Mountain size={16} className="text-white" />;
+      default:
+        return <ShieldAlert size={16} className="text-white" />;
+    }
+  };
+
 
   const effectiveDetailsWidth = useMemo(() => {
     if (detailsOpen) return "w-[360px]";
@@ -496,6 +530,93 @@ export default function LguLiveMapView(props: Props) {
                     Cancel drawing
                   </button>
                 ) : null}
+
+                {/* Hazard Zones dropdown (per-zone show/hide + delete) */}
+                <div className="rounded-xl bg-slate-950/95 border border-slate-800 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setHazardsDropdownOpen((v) => !v)}
+                    className="w-full flex items-center justify-between px-4 py-3 text-white"
+                    aria-label={hazardsDropdownOpen ? "Collapse hazard zones" : "Expand hazard zones"}
+                  >
+                    <span className="text-sm font-extrabold">
+                      Hazard Zones ({hazardZones?.length ?? 0})
+                    </span>
+                    <ChevronDown
+                      size={18}
+                      className={["transition-transform", hazardsDropdownOpen ? "rotate-180" : "rotate-0"].join(
+                        " "
+                      )}
+                    />
+                  </button>
+
+                  {hazardsDropdownOpen ? (
+                    <div className="px-3 pb-3 space-y-2">
+                      {(hazardZones ?? []).length === 0 ? (
+                        <div className="text-xs text-slate-300 px-1 pb-2">No hazard zones yet.</div>
+                      ) : null}
+
+                      {(hazardZones ?? []).map((z: any) => {
+                        const id = String(z._id);
+                        const isHidden = !!hiddenHazardIds?.[id];
+                        const effectiveHidden = !showHazardZones || isHidden;
+                        const ht = toHazardType(z.hazardType);
+                        const color = HAZARD_TYPE_COLOR[ht];
+
+                        return (
+                          <div
+                            key={id}
+                            className="flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900/70 px-3 py-3"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div
+                                className="h-10 w-10 rounded-xl grid place-items-center shrink-0"
+                                style={{ backgroundColor: color }}
+                              >
+                                {hazardIconFor(ht)}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-sm font-extrabold text-white truncate">{z.name}</div>
+                                <div className="text-xs text-slate-300 truncate">
+                                  {HAZARD_TYPE_LABEL[ht]}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <button
+                                type="button"
+                                disabled={!showHazardZones}
+                                onClick={() => toggleHazardZoneItem(id)}
+                                className={[
+                                  "h-9 w-9 rounded-lg border grid place-items-center",
+                                  showHazardZones ? "border-slate-800 hover:bg-slate-800/60" : "border-slate-800 opacity-50 cursor-not-allowed",
+                                ].join(" ")}
+                                aria-label={effectiveHidden ? "Show hazard zone" : "Hide hazard zone"}
+                                title={effectiveHidden ? "Show" : "Hide"}
+                              >
+                                <Power
+                                  size={18}
+                                  className={effectiveHidden ? "text-slate-500" : "text-emerald-400"}
+                                />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => deleteHazardZoneItem(id)}
+                                className="h-9 w-9 rounded-lg border border-slate-800 hover:bg-slate-800/60 grid place-items-center"
+                                aria-label="Delete hazard zone"
+                                title="Delete"
+                              >
+                                <Trash2 size={18} className="text-red-400" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
 
                 {/* Draft save form */}
                 {hazardDraft ? (

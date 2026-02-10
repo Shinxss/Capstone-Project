@@ -3,6 +3,7 @@ import mapboxgl from "mapbox-gl";
 const DRAFT_SOURCE_ID = "hazard-draft-src";
 const DRAFT_FILL_ID = "hazard-draft-fill";
 const DRAFT_LINE_ID = "hazard-draft-line";
+const DRAFT_OUTLINE_ID = "hazard-draft-outline";
 const DRAFT_POINTS_ID = "hazard-draft-points";
 
 type LngLat = [number, number];
@@ -29,7 +30,7 @@ export function ensureHazardDraftLayers(map: mapboxgl.Map) {
       filter: ["==", ["get", "kind"], "draft-point"],
       paint: {
         "circle-radius": 7,
-        "circle-color": "#10b981",
+        "circle-color": "#60a5fa",
         "circle-stroke-width": 2,
         "circle-stroke-color": "#ffffff",
       },
@@ -44,8 +45,35 @@ export function ensureHazardDraftLayers(map: mapboxgl.Map) {
       source: DRAFT_SOURCE_ID,
       filter: ["==", ["get", "kind"], "draft-line"],
       paint: {
-        "line-color": "#10b981",
-        "line-width": 4,
+        "line-color": "#60a5fa",
+        "line-width": 2,
+        // dotted look like the sample image
+        "line-dasharray": [1.2, 1.2],
+        "line-opacity": 0.95,
+      },
+      layout: {
+        "line-cap": "round",
+        "line-join": "round",
+      },
+    } as any);
+  }
+
+  // Outline for finished polygon
+  if (!map.getLayer(DRAFT_OUTLINE_ID)) {
+    map.addLayer({
+      id: DRAFT_OUTLINE_ID,
+      type: "line",
+      source: DRAFT_SOURCE_ID,
+      filter: ["==", ["get", "kind"], "draft-polygon"],
+      paint: {
+        "line-color": "#60a5fa",
+        "line-width": 2,
+        "line-dasharray": [1.2, 1.2],
+        "line-opacity": 0.95,
+      },
+      layout: {
+        "line-cap": "round",
+        "line-join": "round",
       },
     } as any);
   }
@@ -58,7 +86,7 @@ export function ensureHazardDraftLayers(map: mapboxgl.Map) {
       source: DRAFT_SOURCE_ID,
       filter: ["==", ["get", "kind"], "draft-polygon"],
       paint: {
-        "fill-color": "#10b981",
+        "fill-color": "#3b82f6",
         "fill-opacity": 0.2,
       },
     } as any);
@@ -68,6 +96,7 @@ export function ensureHazardDraftLayers(map: mapboxgl.Map) {
 export function setHazardDraftVisibility(map: mapboxgl.Map, visible: boolean) {
   const v = visible ? "visible" : "none";
   if (map.getLayer(DRAFT_FILL_ID)) map.setLayoutProperty(DRAFT_FILL_ID, "visibility", v);
+  if (map.getLayer(DRAFT_OUTLINE_ID)) map.setLayoutProperty(DRAFT_OUTLINE_ID, "visibility", v);
   if (map.getLayer(DRAFT_LINE_ID)) map.setLayoutProperty(DRAFT_LINE_ID, "visibility", v);
   if (map.getLayer(DRAFT_POINTS_ID)) map.setLayoutProperty(DRAFT_POINTS_ID, "visibility", v);
 }

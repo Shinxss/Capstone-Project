@@ -25,3 +25,7 @@ export async function createHazardZone(input: {
 
   return doc;
 }
+
+export async function deleteHazardZone(id: string) {
+  return HazardZone.findByIdAndDelete(id).lean();
+}

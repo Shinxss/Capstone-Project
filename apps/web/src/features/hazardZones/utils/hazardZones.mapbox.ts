@@ -89,12 +89,13 @@ export function ensureHazardZonesLayers(map: mapboxgl.Map) {
       source: SOURCE_ID,
       paint: {
         "fill-color": match,
-        "fill-opacity": 0.35,
+        // softer fill like the sample screenshot
+        "fill-opacity": 0.22,
       },
     } as any);
   }
 
-  // White halo outline (makes it visible on satellite)
+  // DOTTED halo outline (keeps the dashed look visible on satellite)
   if (!map.getLayer(OUTLINE_HALO_ID)) {
     map.addLayer({
       id: OUTLINE_HALO_ID,
@@ -102,12 +103,19 @@ export function ensureHazardZonesLayers(map: mapboxgl.Map) {
       source: SOURCE_ID,
       paint: {
         "line-color": "rgba(255,255,255,0.95)",
-        "line-width": 6,
+        "line-width": 4,
+        // dotted/dashed like the sample image
+        "line-dasharray": [1.2, 1.2],
+        "line-opacity": 0.9,
+      },
+      layout: {
+        "line-cap": "round",
+        "line-join": "round",
       },
     } as any);
   }
 
-  // Colored outline
+  // Colored dotted outline
   if (!map.getLayer(OUTLINE_ID)) {
     map.addLayer({
       id: OUTLINE_ID,
@@ -115,7 +123,14 @@ export function ensureHazardZonesLayers(map: mapboxgl.Map) {
       source: SOURCE_ID,
       paint: {
         "line-color": match,
-        "line-width": 3,
+        "line-width": 2,
+        // dotted/dashed like the sample image
+        "line-dasharray": [1.2, 1.2],
+        "line-opacity": 0.95,
+      },
+      layout: {
+        "line-cap": "round",
+        "line-join": "round",
       },
     } as any);
   }

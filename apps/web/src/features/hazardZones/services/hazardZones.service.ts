@@ -12,3 +12,8 @@ export async function createHazardZone(input: CreateHazardZoneInput) {
   const res = await api.post<{ data: HazardZone }>("/api/hazard-zones", input);
   return res.data.data;
 }
+
+export async function deleteHazardZone(id: string) {
+  const res = await api.delete<{ data: { ok: true } }>(`/api/hazard-zones/${id}`);
+  return res.data.data;
+}
