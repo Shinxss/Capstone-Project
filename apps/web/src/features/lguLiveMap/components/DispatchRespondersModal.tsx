@@ -60,7 +60,7 @@ export default function DispatchRespondersModal({
         <div className="p-5">
           <div className="text-xs font-bold text-gray-700 mb-2">Available responders</div>
 
-          <div className="max-h-[340px] overflow-y-auto rounded-xl border border-gray-200">
+          <div className="max-h-85 overflow-y-auto rounded-xl border border-gray-200">
             {volunteers.length === 0 ? (
               <div className="px-4 py-3 text-sm text-gray-600">No responders found.</div>
             ) : (

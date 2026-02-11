@@ -3,6 +3,8 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 
+import { encryptBuffer } from "../../utils/aesGcm";
+
 import { EmergencyReport } from "../emergency/emergency.model";
 import { User } from "../users/user.model";
 import { DispatchOffer, DispatchStatus } from "./dispatch.model";
@@ -171,7 +173,9 @@ export async function addProofToDispatch(params: {
   const abs = path.join(dir, filename);
 
   const buf = Buffer.from(clean, "base64");
-  fs.writeFileSync(abs, buf);
+  // Encrypt before writing to disk (encryption-at-rest)
+  const encrypted = encryptBuffer(buf);
+  fs.writeFileSync(abs, encrypted);
 
   const url = `/uploads/dispatch-proofs/${filename}`;
   (offer.proofs as any) = Array.isArray(offer.proofs) ? offer.proofs : [];

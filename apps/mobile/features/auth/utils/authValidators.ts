@@ -1,8 +1,25 @@
 import type { LoginRequest, SignupRequest } from "../models/auth.types";
 
 function isEmailValid(email: string) {
-  // simple + practical
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
+
+/**
+ * Name rules:
+ * - at least 2 letters (A-Z)
+ * - allows spaces, hyphens, apostrophes (e.g., "Anne Marie", "Dela Cruz", "O'Neil", "Jean-Paul")
+ * - no numbers, no other special chars
+ */
+function isNameValid(name: string) {
+  const trimmed = name.trim().replace(/\s+/g, " ");
+  if (trimmed.length < 2) return false;
+
+  // Only letters + space + hyphen + apostrophe
+  if (!/^[A-Za-z][A-Za-z\s'-]*$/.test(trimmed)) return false;
+
+  // Must contain at least 2 letters total
+  const lettersOnly = trimmed.replace(/[^A-Za-z]/g, "");
+  return lettersOnly.length >= 2;
 }
 
 export function validateLogin(payload: LoginRequest): string | null {
@@ -18,11 +35,25 @@ export function validateSignup(args: {
 }): string | null {
   const { payload, confirmPassword, agree } = args;
 
-  if (!payload.firstName.trim() || !payload.lastName.trim() || !payload.email.trim() || !payload.password) {
+  if (
+    !payload.firstName.trim() ||
+    !payload.lastName.trim() ||
+    !payload.email.trim() ||
+    !payload.password
+  ) {
     return "Please fill in all fields.";
   }
+
+  if (!isNameValid(payload.firstName)) {
+    return "First name must be at least 2 letters and contain only letters (no numbers or special characters).";
+  }
+
+  if (!isNameValid(payload.lastName)) {
+    return "Last name must be at least 2 letters and contain only letters (no numbers or special characters).";
+  }
+
   if (!isEmailValid(payload.email)) return "Please enter a valid email.";
-  if (payload.password.length < 6) return "Password must be at least 6 characters.";
+  if (payload.password.length < 8) return "Password must be at least 8 characters.";
   if (payload.password !== confirmPassword) return "Passwords do not match.";
   if (!agree) return "Please accept the Terms & Privacy Policy.";
   return null;
