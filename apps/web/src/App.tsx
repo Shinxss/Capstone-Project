@@ -6,6 +6,8 @@ import LguEmergencies from "./pages/lgu/LguEmergencies";
 import LguLiveMap from "./pages/lgu/LguLiveMap";
 import LguApplicants from "./pages/lgu/LguApplicants";
 import LguVerifiedVolunteers from "./pages/lgu/LguVerifiedVolunteers";
+import LguTasksInProgress from "./pages/lgu/LguTasksInProgress";
+import LguTasksForReview from "./pages/lgu/LguTasksForReview";
 
 export default function App() {
   return (
@@ -24,7 +26,10 @@ export default function App() {
       <Route path="/lgu/volunteers/verified" element={<LguVerifiedVolunteers />} />
 
 
-      <Route path="/lgu/tasks" element={<PlaceholderPage title="Tasks" />} />
+      <Route path="/lgu/tasks" element={<Navigate to="/lgu/tasks/in-progress" replace />} />
+      <Route path="/lgu/tasks/in-progress" element={<LguTasksInProgress />} />
+      <Route path="/lgu/tasks/for-review" element={<LguTasksForReview />} />
+      <Route path="/lgu/tasks/completed" element={<PlaceholderPage title="Tasks (Completed)" />} />
 
       <Route path="/lgu/live-map" element={<LguLiveMap />} />
 

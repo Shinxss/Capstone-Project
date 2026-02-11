@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Alert,
   View,
   Text,
   TextInput,
@@ -11,15 +12,13 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import MapboxGL, { Logger } from "@rnmapbox/maps";
+import * as Location from "expo-location";
 import { useMapStyle } from "../../features/map/hooks/useMapStyle";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
-import { useFocusEffect } from "@react-navigation/native";
-import { useSession } from "../../features/auth/hooks/useSession";
 import { useActiveDispatch } from "../../features/dispatch/hooks/useActiveDispatch";
 
-// Server-style types (normalize on UI)
-type EmergencyType = "SOS" | "FLOOD" | "FIRE" | "EARTHQUAKE" | "MEDICAL" | "OTHER";
+type EmergencyType = "SOS" | "Flood" | "Fire" | "Typhoon" | "Earthquake" | "Collapse";
 
 type EmergencyReport = {
   id: string;
@@ -42,16 +41,16 @@ if (TOKEN) {
 
 const colorForType = (type: EmergencyType) => {
   switch (type) {
-    case "FLOOD":
+    case "Flood":
       return "#2563EB";
-    case "FIRE":
+    case "Fire":
       return "#DC2626";
-    case "EARTHQUAKE":
+    case "Typhoon":
+      return "#B91C1C";
+    case "Earthquake":
       return "#F59E0B";
-    case "MEDICAL":
-      return "#16A34A";
-    case "OTHER":
-      return "#64748B";
+    case "Collapse":
+      return "#CA8A04";
     case "SOS":
       return "#EF4444";
     default:
@@ -59,17 +58,29 @@ const colorForType = (type: EmergencyType) => {
   }
 };
 
+function normalizeEmergencyType(raw: string): EmergencyType {
+  const t = String(raw ?? "").toUpperCase();
+  if (t === "FLOOD") return "Flood";
+  if (t === "FIRE") return "Fire";
+  if (t === "EARTHQUAKE") return "Earthquake";
+  if (t === "SOS") return "SOS";
+  // keep the UI simple for now
+  return "SOS";
+}
+
 // ✅ MaterialCommunityIcons mapping
 const mciForType = (type: EmergencyType) => {
   switch (type) {
-    case "FIRE":
+    case "Fire":
       return "fire";
-    case "FLOOD":
+    case "Flood":
       return "water";
-    case "EARTHQUAKE":
+    case "Typhoon":
+      return "weather-hurricane";
+    case "Earthquake":
       return "chart-bell-curve-cumulative";
-    case "MEDICAL":
-      return "medical-bag";
+    case "Collapse":
+      return "home-city";
     case "SOS":
       return "alarm-light";
     default:
@@ -171,46 +182,74 @@ export default function MapTab() {
   const [query, setQuery] = useState("");
   const { key: styleKey, styleURL, next } = useMapStyle("dark");
 
-  const { session, isUser } = useSession();
-  const role = (isUser && session?.mode === "user" ? session.user.role : undefined) as string | undefined;
-  const isVolunteer = role === "VOLUNTEER";
+  const { activeDispatch } = useActiveDispatch({ pollMs: 8000 });
+  const [myLocation, setMyLocation] = useState<[number, number] | null>(null);
+  const [route, setRoute] = useState<
+    { feature: any; distance: number; duration: number; profile: "driving" | "walking" } | null
+  >(null);
+  const [routeLoading, setRouteLoading] = useState(false);
+  const [routeMode, setRouteMode] = useState<"driving" | "walking">("driving");
 
-  const { active: activeDispatch, refresh: refreshDispatch } = useActiveDispatch();
+  // ✅ Keep current location for routing (Direction button)
+  useEffect(() => {
+    let sub: Location.LocationSubscription | null = null;
 
-  // Refresh active dispatch when the Map tab gains focus
-  useFocusEffect(
-    useCallback(() => {
-      refreshDispatch();
-    }, [refreshDispatch])
-  );
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") return;
 
-  const assigned = useMemo(() => {
-    if (!activeDispatch) return null;
-    if (activeDispatch.status !== "ACCEPTED") return null;
-    const e = activeDispatch.emergency;
-    if (!Number.isFinite(e?.lng) || !Number.isFinite(e?.lat)) return null;
-    return e;
-  }, [activeDispatch]);
+        const current = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        setMyLocation([current.coords.longitude, current.coords.latitude]);
 
-  // ✅ ONLY show the assigned emergency (if any)
+        sub = await Location.watchPositionAsync(
+          { accuracy: Location.Accuracy.Balanced, timeInterval: 5000, distanceInterval: 10 },
+          (loc) => setMyLocation([loc.coords.longitude, loc.coords.latitude])
+        );
+      } catch {
+        // ignore
+      }
+    })();
+
+    return () => {
+      try {
+        sub?.remove();
+      } catch {
+        // ignore
+      }
+    };
+  }, []);
+
+
+  const normalizeType = (raw: string): EmergencyType => {
+    const t = String(raw ?? "").toUpperCase();
+    if (t === "FIRE") return "Fire";
+    if (t === "FLOOD") return "Flood";
+    if (t === "EARTHQUAKE") return "Earthquake";
+    if (t === "TYPHOON") return "Typhoon";
+    if (t === "COLLAPSE") return "Collapse";
+    if (t === "SOS") return "SOS";
+    return "SOS";
+  };
+
+  // ✅ Only show the ACTIVE assigned emergency (from dispatch offers)
   const reports: EmergencyReport[] = useMemo(() => {
-    if (!assigned) return [];
-    const type = String(assigned.emergencyType ?? "SOS").toUpperCase() as EmergencyType;
-    const title = `${type}: Response Needed`;
-    const desc = assigned.notes ?? undefined;
-    const updated = assigned.reportedAt ? new Date(assigned.reportedAt).toLocaleString() : undefined;
+    const e = activeDispatch?.emergency;
+    if (!e) return [];
     return [
       {
-        id: assigned.id,
-        type,
-        title,
-        description: desc,
-        lng: assigned.lng,
-        lat: assigned.lat,
-        updated,
+        id: e.id,
+        type: normalizeType(e.emergencyType),
+        title: `${normalizeType(e.emergencyType)} Emergency`,
+        description: e.notes ?? undefined,
+        lng: e.lng,
+        lat: e.lat,
+        updated: "just now",
       },
     ];
-  }, [assigned]);
+  }, [activeDispatch]);
 
   const filteredReports = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -223,40 +262,142 @@ export default function MapTab() {
     );
   }, [reports, query]);
 
-  const [camera, setCamera] = useState<{
-    centerCoordinate: [number, number];
-    zoomLevel: number;
-    animationDuration: number;
-  }>({
-    centerCoordinate: DAGUPAN,
-    zoomLevel: 12,
-    animationDuration: 0,
-  });
+  const camera = useMemo(
+    () => ({
+      centerCoordinate: DAGUPAN,
+      zoomLevel: 12,
+      animationDuration: 0,
+    }),
+    []
+  );
+
+  const cameraRef = useRef<MapboxGL.Camera>(null);
 
   // ✅ draggable “Google Maps-ish” sheet
   const sheetRef = useRef<BottomSheet>(null);
   const snapPoints = useMemo(() => ["22%", "45%"], []);
   const [selected, setSelected] = useState<EmergencyReport | null>(null);
 
-  // ✅ When an assigned emergency exists, auto-zoom + open details
-  useEffect(() => {
-    if (reports.length === 1) {
-      const r = reports[0];
-      setCamera({ centerCoordinate: [r.lng, r.lat], zoomLevel: 15, animationDuration: 800 });
-      setSelected(r);
-      requestAnimationFrame(() => sheetRef.current?.snapToIndex(0));
-      return;
-    }
-
-    setCamera({ centerCoordinate: DAGUPAN, zoomLevel: 12, animationDuration: 0 });
-    setSelected(null);
-    sheetRef.current?.close();
-  }, [reports]);
-
   const openSheet = (r: EmergencyReport) => {
     setSelected(r);
     requestAnimationFrame(() => sheetRef.current?.snapToIndex(0));
   };
+
+
+  const fetchRouteFromMapbox = async (
+    start: [number, number],
+    end: [number, number],
+    profile: "driving" | "walking"
+  ) => {
+    if (!TOKEN) throw new Error("Missing Mapbox token");
+
+    const url =
+      `https://api.mapbox.com/directions/v5/mapbox/${profile}/` +
+      `${start[0]},${start[1]};${end[0]},${end[1]}` +
+      `?geometries=geojson&overview=full&steps=false&access_token=${TOKEN}`;
+
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("Directions API failed");
+    const json: any = await res.json();
+
+    const r0 = json?.routes?.[0];
+    const coords = r0?.geometry?.coordinates;
+    if (!coords || !Array.isArray(coords) || coords.length < 2) throw new Error("No route");
+
+    return {
+      feature: { type: "Feature", properties: {}, geometry: r0.geometry } as any,
+      distance: Number(r0.distance ?? 0), // meters
+      duration: Number(r0.duration ?? 0), // seconds
+    };
+  };
+
+  const fitRoute = (coords: [number, number][]) => {
+    try {
+      let minLng = coords[0][0];
+      let maxLng = coords[0][0];
+      let minLat = coords[0][1];
+      let maxLat = coords[0][1];
+
+      for (const [lng, lat] of coords) {
+        if (lng < minLng) minLng = lng;
+        if (lng > maxLng) maxLng = lng;
+        if (lat < minLat) minLat = lat;
+        if (lat > maxLat) maxLat = lat;
+      }
+
+      // Use bounds when available (cast to any to avoid TS type issues)
+      (cameraRef.current as any)?.setCamera({
+        bounds: {
+          ne: [maxLng, maxLat],
+          sw: [minLng, minLat],
+          paddingTop: 140,
+          paddingBottom: 260,
+          paddingLeft: 60,
+          paddingRight: 60,
+        },
+        animationDuration: 900,
+      });
+    } catch {
+      // fallback
+      const midLng = (coords[0][0] + coords[coords.length - 1][0]) / 2;
+      const midLat = (coords[0][1] + coords[coords.length - 1][1]) / 2;
+      cameraRef.current?.setCamera({ centerCoordinate: [midLng, midLat], zoomLevel: 13, animationDuration: 900 });
+    }
+  };
+
+  const onPressDirection = async (profile?: "driving" | "walking") => {
+    if (!selected) return;
+
+    if (!TOKEN) {
+      Alert.alert("Missing Mapbox token", "EXPO_PUBLIC_MAPBOX_TOKEN is not set.");
+      return;
+    }
+
+    if (!myLocation) {
+      Alert.alert("Location needed", "Enable location to get directions.");
+      return;
+    }
+
+    setRouteLoading(true);
+    try {
+      const useProfile = profile ?? routeMode;
+      const result = await fetchRouteFromMapbox(myLocation, [selected.lng, selected.lat], useProfile);
+      setRoute({ ...result, profile: useProfile });
+
+      const coords = (result.feature?.geometry?.coordinates ?? []) as [number, number][];
+      if (coords.length >= 2) fitRoute(coords);
+    } catch {
+      Alert.alert("Directions unavailable", "Unable to fetch route. Try again.");
+    } finally {
+      setRouteLoading(false);
+    }
+  };
+
+  const clearRoute = () => setRoute(null);
+
+  // ✅ When a dispatch is active: zoom to the emergency and open details automatically
+  useEffect(() => {
+    const e = activeDispatch?.emergency;
+    if (!e) {
+      setSelected(null);
+      setRoute(null);
+      sheetRef.current?.close();
+      return;
+    }
+
+    cameraRef.current?.setCamera({
+      centerCoordinate: [e.lng, e.lat],
+      zoomLevel: 15,
+      animationDuration: 900,
+    });
+
+    // open sheet with the single report
+    const r = reports[0];
+    if (r) {
+      setSelected(r);
+      requestAnimationFrame(() => sheetRef.current?.snapToIndex(0));
+    }
+  }, [activeDispatch, reports]);
 
   // ✅ chips (replace old status pill)
   const chips = useMemo(
@@ -288,10 +429,36 @@ export default function MapTab() {
            }}
         >
           <MapboxGL.Camera
+            ref={cameraRef}
             centerCoordinate={camera.centerCoordinate}
             zoomLevel={camera.zoomLevel}
             animationDuration={camera.animationDuration}
           />
+
+
+          {route ? (
+            <MapboxGL.ShapeSource
+              id="routeSource"
+              shape={{ type: "FeatureCollection", features: [route.feature] } as any}
+            >
+              <MapboxGL.LineLayer
+                id="routeLine"
+                style={{
+                  lineColor: "#111827",
+                  lineWidth: 5,
+                  lineCap: "round",
+                  lineJoin: "round",
+                  ...(route.profile === "walking" ? { lineDasharray: [1.5, 1.5] } : null),
+                } as any}
+              />
+            </MapboxGL.ShapeSource>
+          ) : null}
+
+          {myLocation ? (
+            <MapboxGL.MarkerView coordinate={myLocation} anchor={{ x: 0.5, y: 0.5 }}>
+              <View style={styles.meDot} />
+            </MapboxGL.MarkerView>
+          ) : null}
 
           {filteredReports.map((r) => (
             <MapboxGL.MarkerView
@@ -305,6 +472,17 @@ export default function MapTab() {
             </MapboxGL.MarkerView>
           ))}
         </MapboxGL.MapView>
+
+        {!activeDispatch?.emergency ? (
+          <View pointerEvents="none" style={styles.noAssignmentWrap}>
+            <View style={styles.noAssignmentCard}>
+              <Text style={styles.noAssignmentTitle}>No assigned emergency</Text>
+              <Text style={styles.noAssignmentSub}>
+                You'll see the emergency here once LGU dispatches you.
+              </Text>
+            </View>
+          </View>
+        ) : null}
 
         {/* ✅ Google-Maps-like top UI */}
         <View pointerEvents="box-none" style={styles.overlay}>
@@ -431,6 +609,72 @@ export default function MapTab() {
                   <Text style={styles.updatedText}>Updated {selected.updated ?? "just now"}</Text>
                 </View>
               ) : null}
+
+              {selected ? (
+                <View style={styles.actionsRow}>
+                  <View style={styles.modeToggle}>
+                    <Pressable
+                      onPress={() => {
+                        setRouteMode("driving");
+                        if (route && selected && myLocation && !routeLoading) onPressDirection("driving");
+                      }}
+                      style={[styles.modePill, routeMode === "driving" && styles.modePillActive]}
+                    >
+                      <MaterialCommunityIcons
+                        name="car"
+                        size={15}
+                        color={routeMode === "driving" ? "#111" : "#444"}
+                      />
+                      <Text style={[styles.modePillText, routeMode === "driving" && styles.modePillTextActive]}>
+                        Drive
+                      </Text>
+                    </Pressable>
+
+                    <Pressable
+                      onPress={() => {
+                        setRouteMode("walking");
+                        if (route && selected && myLocation && !routeLoading) onPressDirection("walking");
+                      }}
+                      style={[styles.modePill, routeMode === "walking" && styles.modePillActive]}
+                    >
+                      <MaterialCommunityIcons
+                        name="walk"
+                        size={15}
+                        color={routeMode === "walking" ? "#111" : "#444"}
+                      />
+                      <Text style={[styles.modePillText, routeMode === "walking" && styles.modePillTextActive]}>
+                        Walk
+                      </Text>
+                    </Pressable>
+                  </View>
+
+                  <Pressable
+                    onPress={() => onPressDirection()}
+                    disabled={routeLoading}
+                    style={[styles.actionBtn, routeLoading && { opacity: 0.7 }]}
+                  >
+                    <Feather name="navigation" size={16} color="#111" />
+                    <Text style={styles.actionBtnText}>
+                      {routeLoading ? "Loading..." : "Direction"}
+                    </Text>
+                  </Pressable>
+
+                  {route ? (
+                    <Pressable onPress={clearRoute} style={styles.actionBtnSecondary}>
+                      <Feather name="x-circle" size={16} color="#111" />
+                      <Text style={styles.actionBtnText}>Clear</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              ) : null}
+
+              {route && selected ? (
+                <View style={styles.routeMetaRow}>
+                  <Text style={styles.routeMetaText}>
+                    {(route.profile === "walking" ? "Walking" : "Driving")} • {(route.distance / 1000).toFixed(1)} km • {Math.round(route.duration / 60)} min
+                  </Text>
+                </View>
+              ) : null}
             </View>
           </BottomSheetView>
         </BottomSheet>
@@ -446,6 +690,30 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "black" },
   root: { flex: 1, position: "relative" },
   map: { flex: 1 },
+
+  noAssignmentWrap: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 18,
+  },
+  noAssignmentCard: {
+    backgroundColor: "rgba(17,24,39,0.75)",
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  noAssignmentTitle: {
+    color: "#fff",
+    fontWeight: "800",
+    fontSize: 15,
+  },
+  noAssignmentSub: {
+    marginTop: 6,
+    color: "rgba(255,255,255,0.85)",
+    fontSize: 12,
+    fontWeight: "600",
+  },
 
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "transparent" },
 
@@ -553,6 +821,70 @@ const styles = StyleSheet.create({
     borderRadius: 9999,
     backgroundColor: "rgba(0,0,0,0.03)",
   },
+
+  meDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 999,
+    backgroundColor: "#2563EB",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.95)",
+    shadowColor: "#000",
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 6,
+  },
+
+  actionsRow: { marginTop: 12, flexDirection: "row", alignItems: "center", gap: 10 },
+  modeToggle: {
+    height: 44,
+    borderRadius: 999,
+    backgroundColor: "rgba(0,0,0,0.06)",
+    padding: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+  modePill: {
+    height: 40,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  modePillActive: {
+    backgroundColor: "#FFFFFF",
+  },
+  modePillText: { fontSize: 12, fontWeight: "800", color: "#444" },
+  modePillTextActive: { color: "#111" },
+  actionBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.08)",
+  },
+  actionBtnSecondary: {
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: "rgba(0,0,0,0.06)",
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  actionBtnText: { fontSize: 14, fontWeight: "800", color: "#111" },
+  routeMetaRow: { marginTop: 10 },
+  routeMetaText: { fontSize: 12, color: "#444", fontWeight: "700" },
 
   // sheet
   sheetBg: { backgroundColor: "rgba(255,255,255,0.95)" },

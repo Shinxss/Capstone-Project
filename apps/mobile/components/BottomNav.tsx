@@ -15,7 +15,7 @@ type TabKey = "index" | "map" | "alert" | "more";
 const TABS: { name: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { name: "index", label: "Home", icon: "home-outline" },
   { name: "map", label: "Map", icon: "map-outline" },
-  { name: "alert", label: "Alert", icon: "notifications-outline" },
+  { name: "alert", label: "Tasks", icon: "clipboard-outline" },
   { name: "more", label: "More", icon: "ellipsis-horizontal" },
 ];
 

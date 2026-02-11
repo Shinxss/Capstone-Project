@@ -136,7 +136,6 @@ export default function LguLiveMapView(props: Props) {
     dispatchSelection,
     toggleDispatchResponder,
     confirmDispatchResponders,
-    dispatching,
     trackOpen,
     toggleTrackPanel,
     assignedResponders,
@@ -511,7 +510,6 @@ export default function LguLiveMapView(props: Props) {
         onToggle={toggleDispatchResponder}
         onClose={closeDispatchResponders}
         onConfirm={confirmDispatchResponders}
-        loading={dispatching}
       />
 
       {/* RIGHT LAYERS PANEL (collapsible, for styles + toggles + draw hazards) */}

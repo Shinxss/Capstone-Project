@@ -1,73 +1,169 @@
-import type { Request, Response } from "express";
+import { Request, Response } from "express";
 import {
+  addProofToDispatch,
+  completeDispatch,
   createDispatchOffers,
-  getLatestPendingOfferForVolunteer,
-  respondToOffer,
+  getMyActiveDispatch,
+  getMyCurrentDispatch,
+  getMyPendingDispatch,
+  listDispatchTasksForLgu,
+  respondToDispatch,
+  toDispatchDTO,
+  verifyDispatch,
 } from "./dispatch.service";
+import type { DispatchStatus } from "./dispatch.model";
 
-function getUser(req: Request): { id: string; role: string } | null {
-  return (req as any).user ?? null;
+function getAuth(req: Request) {
+  const role = (req as any).user?.role ?? (req as any).role;
+  const userId = (req as any).user?.id ?? (req as any).userId;
+  return { role: String(role || ""), userId: String(userId || "") };
 }
 
-export async function dispatchToVolunteers(req: Request, res: Response) {
+export async function postDispatchOffers(req: Request, res: Response) {
   try {
-    const user = getUser(req);
-    if (!user) return res.status(401).json({ message: "Unauthorized" });
-    if (!['LGU','ADMIN'].includes(user.role)) return res.status(403).json({ message: "Forbidden" });
+    const { role, userId } = getAuth(req);
 
-    const { emergencyId, volunteerIds } = (req.body ?? {}) as any;
-    if (!emergencyId || !Array.isArray(volunteerIds) || volunteerIds.length === 0) {
-      return res.status(400).json({ message: "emergencyId and volunteerIds[] are required" });
+    if (role !== "LGU" && role !== "ADMIN") {
+      return res.status(403).json({ message: "Forbidden" });
     }
 
-    const data = await createDispatchOffers({
-      emergencyId: String(emergencyId),
-      volunteerIds: volunteerIds.map(String),
-      dispatchedById: user.id,
+    const { emergencyId, volunteerIds } = (req.body ?? {}) as {
+      emergencyId?: string;
+      volunteerIds?: string[];
+    };
+
+    const created = await createDispatchOffers({
+      emergencyId: String(emergencyId ?? ""),
+      volunteerIds: Array.isArray(volunteerIds) ? volunteerIds : [],
+      createdByUserId: String(userId),
     });
 
-    return res.json({ data });
+    return res.status(201).json({ message: "Dispatch offers created", count: created.length });
   } catch (e: any) {
-    const status = e?.statusCode ?? 500;
-    return res.status(status).json({ message: e?.message ?? "Failed to dispatch" });
+    return res.status(400).json({ message: e?.message ?? "Failed to dispatch" });
   }
 }
 
-export async function getMyPendingDispatch(req: Request, res: Response) {
+export async function getMyPending(req: Request, res: Response) {
   try {
-    const user = getUser(req);
-    if (!user) return res.status(401).json({ message: "Unauthorized" });
-    if (user.role !== 'VOLUNTEER') return res.status(403).json({ message: "Forbidden" });
+    const { role, userId } = getAuth(req);
+    if (role !== "VOLUNTEER") return res.status(403).json({ message: "Forbidden" });
 
-    const data = await getLatestPendingOfferForVolunteer(user.id);
-    return res.json({ data });
+    const pending = await getMyPendingDispatch(String(userId));
+    return res.json({ data: toDispatchDTO(pending) });
   } catch (e: any) {
-    return res.status(500).json({ message: e?.message ?? "Failed to fetch pending dispatch" });
+    return res.status(400).json({ message: e?.message ?? "Failed" });
   }
 }
 
-export async function respondToMyDispatch(req: Request, res: Response) {
+export async function getMyActive(req: Request, res: Response) {
   try {
-    const user = getUser(req);
-    if (!user) return res.status(401).json({ message: "Unauthorized" });
-    if (user.role !== 'VOLUNTEER') return res.status(403).json({ message: "Forbidden" });
+    const { role, userId } = getAuth(req);
+    if (role !== "VOLUNTEER") return res.status(403).json({ message: "Forbidden" });
 
-    const offerId = String((req.params as any).id ?? "");
-    const decisionRaw = String((req.body as any)?.decision ?? "").toUpperCase();
-    if (!offerId) return res.status(400).json({ message: "offer id is required" });
-    if (!['ACCEPT','DECLINE'].includes(decisionRaw)) {
+    const active = await getMyActiveDispatch(String(userId));
+    return res.json({ data: toDispatchDTO(active) });
+  } catch (e: any) {
+    return res.status(400).json({ message: e?.message ?? "Failed" });
+  }
+}
+
+export async function getMyCurrent(req: Request, res: Response) {
+  try {
+    const { role, userId } = getAuth(req);
+    if (role !== "VOLUNTEER") return res.status(403).json({ message: "Forbidden" });
+
+    const current = await getMyCurrentDispatch(String(userId));
+    return res.json({ data: toDispatchDTO(current) });
+  } catch (e: any) {
+    return res.status(400).json({ message: e?.message ?? "Failed" });
+  }
+}
+
+export async function patchRespond(req: Request, res: Response) {
+  try {
+    const { role, userId } = getAuth(req);
+    if (role !== "VOLUNTEER") return res.status(403).json({ message: "Forbidden" });
+
+    const decision = String(req.body?.decision ?? "").toUpperCase();
+    if (decision !== "ACCEPT" && decision !== "DECLINE") {
       return res.status(400).json({ message: "decision must be ACCEPT or DECLINE" });
     }
 
-    const data = await respondToOffer({
-      offerId,
-      volunteerId: user.id,
-      decision: decisionRaw as any,
+    const offer = await respondToDispatch({
+      dispatchId: String(req.params.id),
+      volunteerUserId: String(userId),
+      decision: decision as any,
     });
 
-    return res.json({ data });
+    return res.json({ data: toDispatchDTO(offer) });
   } catch (e: any) {
-    const status = e?.statusCode ?? 500;
-    return res.status(status).json({ message: e?.message ?? "Failed to respond" });
+    return res.status(400).json({ message: e?.message ?? "Failed" });
+  }
+}
+
+export async function postProof(req: Request, res: Response) {
+  try {
+    const { role, userId } = getAuth(req);
+    if (role !== "VOLUNTEER") return res.status(403).json({ message: "Forbidden" });
+
+    const { base64, mimeType, fileName } = (req.body ?? {}) as {
+      base64?: string;
+      mimeType?: string;
+      fileName?: string;
+    };
+
+    const updated = await addProofToDispatch({
+      dispatchId: String(req.params.id),
+      volunteerUserId: String(userId),
+      base64: String(base64 ?? ""),
+      mimeType: mimeType ? String(mimeType) : undefined,
+      fileName: fileName ? String(fileName) : undefined,
+    });
+
+    return res.json({ data: toDispatchDTO(updated) });
+  } catch (e: any) {
+    return res.status(400).json({ message: e?.message ?? "Failed" });
+  }
+}
+
+export async function patchComplete(req: Request, res: Response) {
+  try {
+    const { role, userId } = getAuth(req);
+    if (role !== "VOLUNTEER") return res.status(403).json({ message: "Forbidden" });
+
+    const updated = await completeDispatch({ dispatchId: String(req.params.id), volunteerUserId: String(userId) });
+    return res.json({ data: toDispatchDTO(updated) });
+  } catch (e: any) {
+    return res.status(400).json({ message: e?.message ?? "Failed" });
+  }
+}
+
+export async function getLguTasks(req: Request, res: Response) {
+  try {
+    const { role, userId } = getAuth(req);
+    if (role !== "LGU" && role !== "ADMIN") return res.status(403).json({ message: "Forbidden" });
+
+    const raw = String((req.query as any).status ?? "").trim();
+    const statuses: DispatchStatus[] = raw
+      ? (raw.split(",").map((s) => s.trim().toUpperCase()) as any)
+      : ["ACCEPTED"];
+
+    const docs = await listDispatchTasksForLgu({ statuses });
+    return res.json({ data: docs.map(toDispatchDTO), count: docs.length });
+  } catch (e: any) {
+    return res.status(400).json({ message: e?.message ?? "Failed" });
+  }
+}
+
+export async function patchVerify(req: Request, res: Response) {
+  try {
+    const { role, userId } = getAuth(req);
+    if (role !== "LGU" && role !== "ADMIN") return res.status(403).json({ message: "Forbidden" });
+
+    const updated = await verifyDispatch({ dispatchId: String(req.params.id), verifierUserId: String(userId) });
+    return res.json({ data: toDispatchDTO(updated) });
+  } catch (e: any) {
+    return res.status(400).json({ message: e?.message ?? "Failed" });
   }
 }

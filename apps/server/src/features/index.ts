@@ -14,6 +14,6 @@ router.use("/emergencies", emergencyRoutes); // Emergencies
 router.use("/volunteer-applications", volunteerApplicationRoutes); // Volunteer Applications
 router.use("/hazard-zones", hazardZoneRoutes); // Hazard Zones
 router.use("/users", userRoutes); // Users
-router.use("/dispatches", dispatchRoutes); // Dispatches
+router.use("/dispatches", dispatchRoutes); // Dispatch Offers
 
 export default router;

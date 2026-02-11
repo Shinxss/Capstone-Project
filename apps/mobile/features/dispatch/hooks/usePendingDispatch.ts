@@ -1,58 +1,49 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { DispatchOffer } from "../models/dispatch.types";
-import { getMyPendingDispatch } from "../services/dispatchApi";
+import type { DispatchOffer } from "../models/dispatch";
+import { fetchMyPendingDispatch } from "../services/dispatchApi";
 
-type Options = {
-  enabled: boolean;
-  pollMs?: number;
-};
-
-export function usePendingDispatch(opts: Options) {
-  const { enabled, pollMs = 5000 } = opts;
-
+export function usePendingDispatch(options?: { pollMs?: number; enabled?: boolean }) {
+  const pollMs = options?.pollMs ?? 8000;
+  const enabled = options?.enabled ?? true;
   const [pending, setPending] = useState<DispatchOffer | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
+  const [loading, setLoading] = useState(true);
   const timerRef = useRef<any>(null);
-  const inflightRef = useRef(false);
 
-  const fetchNow = useCallback(async () => {
+  const refresh = useCallback(async () => {
     if (!enabled) return;
-    if (inflightRef.current) return;
-    inflightRef.current = true;
-    setLoading(true);
-    setError(null);
-
     try {
-      const offer = await getMyPendingDispatch();
-      setPending(offer);
-    } catch (e: any) {
-      // if volunteer isn't authorized, don't spam UI
-      setError(e?.response?.data?.message ?? e?.message ?? "Failed to fetch dispatch");
-    } finally {
-      setLoading(false);
-      inflightRef.current = false;
+      const server = await fetchMyPendingDispatch();
+      setPending(server);
+    } catch {
+      // keep existing
     }
   }, [enabled]);
 
   useEffect(() => {
-    if (!enabled) {
-      setPending(null);
-      setError(null);
-      if (timerRef.current) clearInterval(timerRef.current);
-      timerRef.current = null;
-      return;
-    }
+    let alive = true;
+    (async () => {
+      setLoading(true);
+      await refresh();
+      if (alive) setLoading(false);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [refresh]);
 
-    fetchNow();
-    timerRef.current = setInterval(fetchNow, pollMs);
-
+  useEffect(() => {
+    if (!enabled) return;
+    if (pollMs <= 0) return;
+    timerRef.current = setInterval(() => {
+      refresh();
+    }, pollMs);
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       timerRef.current = null;
     };
-  }, [enabled, pollMs, fetchNow]);
+  }, [pollMs, refresh, enabled]);
 
-  return { pending, loading, error, refetch: fetchNow, clear: () => setPending(null) };
+  const clear = useCallback(() => setPending(null), []);
+
+  return { pendingDispatch: pending, loading, refresh, clear };
 }

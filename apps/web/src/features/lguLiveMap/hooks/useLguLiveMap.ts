@@ -30,7 +30,7 @@ import type {
   Volunteer,
 } from "../models/lguLiveMap.types";
 import { colorForVolunteerStatus } from "../utils/lguLiveMap.colors";
-import { dispatchToVolunteers } from "../services/dispatch.service";
+import { createDispatchOffers } from "../services/dispatch.service";
 import { fetchDispatchVolunteers } from "../services/volunteers.service";
 
 type LngLat = [number, number];
@@ -132,7 +132,6 @@ export function useLguLiveMap() {
   const [dispatchModalOpen, setDispatchModalOpen] = useState(false);
   const [dispatchSelection, setDispatchSelection] = useState<string[]>([]);
   const [trackOpen, setTrackOpen] = useState(false);
-  const [dispatching, setDispatching] = useState(false);
 
   const filteredVolunteers = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -666,7 +665,6 @@ export function useLguLiveMap() {
 
   const confirmDispatchResponders = useCallback(async () => {
     if (!selectedEmergencyId) return;
-    if (dispatching) return;
 
     const availableSet = new Set(
       volunteers.filter((v) => v.status === "available").map((v) => v.id)
@@ -678,31 +676,29 @@ export function useLguLiveMap() {
       return;
     }
 
-    setDispatching(true);
+    // ✅ Persist dispatch offers to the backend (web → backend → mobile)
     try {
-      // ✅ Create dispatch offers in MongoDB
-      await dispatchToVolunteers(selectedEmergencyId, chosen);
-
-      setAssignmentsByEmergency((prev) => {
-        const existing = prev[selectedEmergencyId] ?? [];
-        const merged = Array.from(new Set([...existing, ...chosen]));
-        return { ...prev, [selectedEmergencyId]: merged };
-      });
-
-      // UI-only: mark as busy locally (backend has no per-task BUSY yet)
-      setVolunteers((prev) =>
-        prev.map((v) => (chosen.includes(v.id) ? { ...v, status: "busy" } : v))
-      );
-
-      setDispatchModalOpen(false);
-      setDispatchSelection([]);
-      setTrackOpen(true);
+      await createDispatchOffers({ emergencyId: selectedEmergencyId, volunteerIds: chosen });
     } catch (e: any) {
-      alert(e?.response?.data?.message ?? e?.message ?? "Failed to dispatch responders");
-    } finally {
-      setDispatching(false);
+      alert(e?.response?.data?.message ?? e?.message ?? "Failed to dispatch responders.");
+      return;
     }
-  }, [dispatchSelection, selectedEmergencyId, volunteers, dispatching]);
+
+    setAssignmentsByEmergency((prev) => {
+      const existing = prev[selectedEmergencyId] ?? [];
+      const merged = Array.from(new Set([...existing, ...chosen]));
+      return { ...prev, [selectedEmergencyId]: merged };
+    });
+
+    // Mark dispatched responders as busy (mock behavior)
+    setVolunteers((prev) =>
+      prev.map((v) => (chosen.includes(v.id) ? { ...v, status: "busy" } : v))
+    );
+
+    setDispatchModalOpen(false);
+    setDispatchSelection([]);
+    setTrackOpen(true);
+  }, [dispatchSelection, selectedEmergencyId, volunteers]);
 
   const toggleTrackPanel = useCallback(() => {
     setTrackOpen((v) => !v);
@@ -784,7 +780,6 @@ export function useLguLiveMap() {
     dispatchSelection,
     toggleDispatchResponder,
     confirmDispatchResponders,
-    dispatching,
     trackOpen,
     toggleTrackPanel,
     assignedResponders,

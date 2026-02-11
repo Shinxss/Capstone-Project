@@ -1,9 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { STORAGE_KEYS } from "../../../constants/storageKeys";
-import type { DispatchOffer } from "../models/dispatch.types";
+import type { DispatchOffer } from "../models/dispatch";
 
-export async function getActiveDispatch(): Promise<DispatchOffer | null> {
-  const raw = await AsyncStorage.getItem(STORAGE_KEYS.ACTIVE_DISPATCH);
+const KEY = STORAGE_KEYS.ACTIVE_DISPATCH;
+
+export async function getStoredActiveDispatch(): Promise<DispatchOffer | null> {
+  const raw = await AsyncStorage.getItem(KEY);
   if (!raw) return null;
   try {
     return JSON.parse(raw) as DispatchOffer;
@@ -12,10 +14,10 @@ export async function getActiveDispatch(): Promise<DispatchOffer | null> {
   }
 }
 
-export async function setActiveDispatch(offer: DispatchOffer | null) {
+export async function setStoredActiveDispatch(offer: DispatchOffer | null) {
   if (!offer) {
-    await AsyncStorage.removeItem(STORAGE_KEYS.ACTIVE_DISPATCH);
+    await AsyncStorage.removeItem(KEY);
     return;
   }
-  await AsyncStorage.setItem(STORAGE_KEYS.ACTIVE_DISPATCH, JSON.stringify(offer));
+  await AsyncStorage.setItem(KEY, JSON.stringify(offer));
 }

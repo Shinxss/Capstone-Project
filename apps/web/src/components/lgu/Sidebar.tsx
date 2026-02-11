@@ -391,8 +391,8 @@ export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) 
                     basePath="/lgu/tasks"
                     collapsed={collapsed}
                     items={[
-                      { label: "Active Tasks", to: "/lgu/tasks/active", icon: CircleDot },
-                      { label: "Pending Verification", to: "/lgu/tasks/pending", icon: Clock4 },
+                      { label: "In Progress", to: "/lgu/tasks/in-progress", icon: CircleDot },
+                      { label: "For Review", to: "/lgu/tasks/for-review", icon: Clock4 },
                       { label: "Completed", to: "/lgu/tasks/completed", icon: CheckCircle2 },
                       { label: "Cancelled / Archived", to: "/lgu/tasks/archived", icon: ArchiveX },
                     ]}

@@ -10,7 +10,6 @@ type Props = {
   onToggle: (volunteerId: string) => void;
   onClose: () => void;
   onConfirm: () => void;
-  loading?: boolean;
 };
 
 const statusStyles: Record<Volunteer["status"], { dot: string; pill: string; label: string }> = {
@@ -27,7 +26,6 @@ export default function DispatchRespondersModal({
   onToggle,
   onClose,
   onConfirm,
-  loading,
 }: Props) {
   if (!open) return null;
 
@@ -137,14 +135,14 @@ export default function DispatchRespondersModal({
               type="button"
               onClick={onConfirm}
               className="w-1/2 rounded-lg bg-blue-600 py-2 font-semibold text-white hover:bg-blue-500 disabled:opacity-60"
-              disabled={selectedIds.length === 0 || !!loading}
+              disabled={selectedIds.length === 0}
             >
-              {loading ? "Dispatching..." : "Dispatch"}
+              Dispatch
             </button>
           </div>
 
           <div className="mt-3 text-[11px] text-gray-500">
-            Volunteers will receive a prompt on mobile to <span className="font-semibold">Accept</span> or <span className="font-semibold">Decline</span> the dispatch. (Busy state is UI-only for now.)
+            Note: This is a demo dispatch flow. Dispatched responders are marked as <span className="font-semibold">Busy</span>.
           </div>
         </div>
       </div>

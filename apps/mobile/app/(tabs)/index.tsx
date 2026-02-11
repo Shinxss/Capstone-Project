@@ -5,24 +5,21 @@ import { HomeView } from "../../features/home/components/HomeView";
 import { useSession } from "../../features/auth/hooks/useSession";
 import { useSosHold } from "../../features/emergency/hooks/useSosHold";
 import { useSosReport } from "../../features/emergency/hooks/useSosReport";
+import { DispatchOfferModal } from "../../features/dispatch/components/DispatchOfferModal";
+import { useActiveDispatch } from "../../features/dispatch/hooks/useActiveDispatch";
 import { usePendingDispatch } from "../../features/dispatch/hooks/usePendingDispatch";
 import { respondToDispatch } from "../../features/dispatch/services/dispatchApi";
-import { useActiveDispatch } from "../../features/dispatch/hooks/useActiveDispatch";
-import { DispatchOfferModal } from "../../features/dispatch/components/DispatchOfferModal";
+import { setStoredActiveDispatch } from "../../features/dispatch/services/dispatchStorage";
 
 export default function HomeScreen() {
-  const { session, displayName, isUser } = useSession();
+  const { displayName, session } = useSession();
   const { sendSos } = useSosReport();
+  const isVolunteer = useMemo(() => session?.mode === "user" && String(session.user.role ?? "").toUpperCase() === "VOLUNTEER", [session]);
 
-  const role = (isUser && session?.mode === "user" ? session.user.role : undefined) as string | undefined;
-  const isVolunteer = role === "VOLUNTEER";
-
-  const { active: activeDispatch, set: setActiveDispatch } = useActiveDispatch();
-  const hasActive = useMemo(() => !!activeDispatch && activeDispatch.status === "ACCEPTED", [activeDispatch]);
-
-  const { pending, clear: clearPending } = usePendingDispatch({
-    enabled: isVolunteer && !hasActive,
-    pollMs: 4000,
+  const { activeDispatch, refresh: refreshActive } = useActiveDispatch({ pollMs: 8000 });
+  const { pendingDispatch, refresh: refreshPending, clear: clearPending } = usePendingDispatch({
+    pollMs: 8000,
+    enabled: isVolunteer && !activeDispatch,
   });
 
   const [dispatchBusy, setDispatchBusy] = useState(false);
@@ -41,37 +38,35 @@ export default function HomeScreen() {
     onTriggered: onSosTriggered,
   });
 
-  const acceptDispatch = useCallback(async () => {
-    if (!pending) return;
-    if (dispatchBusy) return;
-
-    setDispatchBusy(true);
+  const onAcceptDispatch = useCallback(async () => {
+    if (!pendingDispatch) return;
     try {
-      const updated = await respondToDispatch(pending.id, "ACCEPT");
-      await setActiveDispatch(updated);
+      setDispatchBusy(true);
+      const updated = await respondToDispatch(pendingDispatch.id, "ACCEPT");
+      await setStoredActiveDispatch(updated);
       clearPending();
-      router.push("/map");
+      await refreshActive();
+      router.push("/(tabs)/map");
     } catch (e: any) {
       Alert.alert("Failed", e?.response?.data?.message ?? e?.message ?? "Unable to accept dispatch.");
     } finally {
       setDispatchBusy(false);
     }
-  }, [pending, dispatchBusy, setActiveDispatch, clearPending]);
+  }, [pendingDispatch, refreshActive, clearPending]);
 
-  const declineDispatch = useCallback(async () => {
-    if (!pending) return;
-    if (dispatchBusy) return;
-
-    setDispatchBusy(true);
+  const onDeclineDispatch = useCallback(async () => {
+    if (!pendingDispatch) return;
     try {
-      await respondToDispatch(pending.id, "DECLINE");
+      setDispatchBusy(true);
+      await respondToDispatch(pendingDispatch.id, "DECLINE");
       clearPending();
+      await refreshPending();
     } catch (e: any) {
       Alert.alert("Failed", e?.response?.data?.message ?? e?.message ?? "Unable to decline dispatch.");
     } finally {
       setDispatchBusy(false);
     }
-  }, [pending, dispatchBusy, clearPending]);
+  }, [pendingDispatch, refreshPending, clearPending]);
 
   return (
     <>
@@ -85,14 +80,13 @@ export default function HomeScreen() {
         onPressApplyVolunteer={() => router.push("/volunteer-apply-modal")}
       />
 
-      {pending ? (
+      {isVolunteer && !activeDispatch && pendingDispatch ? (
         <DispatchOfferModal
-          visible={!!pending}
-          offer={pending}
-          loading={dispatchBusy}
-          onAccept={acceptDispatch}
-          onDecline={declineDispatch}
-          onClose={clearPending}
+          visible
+          offer={pendingDispatch}
+          onAccept={onAcceptDispatch}
+          onDecline={onDeclineDispatch}
+          busy={dispatchBusy}
         />
       ) : null}
     </>
