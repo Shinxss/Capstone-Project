@@ -4,12 +4,6 @@ function isEmailValid(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
 
-/**
- * Name rules:
- * - at least 2 letters (A-Z)
- * - allows spaces, hyphens, apostrophes (e.g., "Anne Marie", "Dela Cruz", "O'Neil", "Jean-Paul")
- * - no numbers, no other special chars
- */
 function isNameValid(name: string) {
   const trimmed = name.trim().replace(/\s+/g, " ");
   if (trimmed.length < 2) return false;

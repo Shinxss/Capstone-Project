@@ -6,11 +6,6 @@ import { getLguToken } from "../../features/auth/services/authStorage";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-function getAccessToken() {
-  // adjust this key if you store it differently
-  return localStorage.getItem("accessToken") || localStorage.getItem("token") || "";
-}
-
 async function fetchProofBlob(proofUrl: string) {
   const token = getLguToken();
   if (!token) throw new Error("Missing access token. Please login again.");
@@ -35,6 +30,7 @@ async function fetchProofBlob(proofUrl: string) {
 export default function LguTasksForReview() {
   const { tasks, loading, error, refetch } = useLguTasks("DONE");
   const [verifying, setVerifying] = useState<string | null>(null);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
 
   // proof preview state
   const [proofOpen, setProofOpen] = useState(false);
@@ -47,9 +43,12 @@ export default function LguTasksForReview() {
 
   const onVerify = async (id: string) => {
     try {
+      setVerifyError(null);
       setVerifying(id);
       await verifyTask(id);
       await refetch();
+    } catch (e: any) {
+      setVerifyError(e?.response?.data?.message ?? e?.message ?? "Failed to verify task");
     } finally {
       setVerifying(null);
     }
@@ -114,6 +113,9 @@ export default function LguTasksForReview() {
       )}
       {error && (
         <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">{error}</div>
+      )}
+      {verifyError && (
+        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">{verifyError}</div>
       )}
 
       {!loading && !error && rows.length === 0 && (

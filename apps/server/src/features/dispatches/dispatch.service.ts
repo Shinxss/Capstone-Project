@@ -8,6 +8,7 @@ import { encryptBuffer } from "../../utils/aesGcm";
 import { EmergencyReport } from "../emergency/emergency.model";
 import { User } from "../users/user.model";
 import { DispatchOffer, DispatchStatus } from "./dispatch.model";
+import { recordVerifiedDispatchOnChain } from "../blockchain/taskLedger";
 
 export type CreateDispatchInput = {
   emergencyId: string;
@@ -217,13 +218,31 @@ export async function verifyDispatch(params: { dispatchId: string; verifierUserI
   const offer = await DispatchOffer.findById(dispatchId);
   if (!offer) throw new Error("Dispatch offer not found");
 
+  // Idempotent: if already verified, just return.
+  if (offer.status === "VERIFIED") {
+    return offer;
+  }
+
   if (offer.status !== "DONE") {
     throw new Error("Only DONE tasks can be verified");
   }
 
+  // ✅ Blockchain write (hash-only) BEFORE we mark VERIFIED in DB.
+  // If chain write fails, we keep the task in DONE state so LGU can retry.
+  const chain = await recordVerifiedDispatchOnChain({
+    dispatchId: String(offer._id),
+    emergencyId: String(offer.emergencyId),
+    volunteerId: String(offer.volunteerId),
+    completedAt: offer.completedAt ?? null,
+    proofUrls: Array.isArray((offer as any).proofs)
+      ? (offer as any).proofs.map((p: any) => String(p?.url || "")).filter(Boolean)
+      : [],
+  });
+
   offer.status = "VERIFIED";
   offer.verifiedAt = new Date();
   offer.verifiedBy = new Types.ObjectId(verifierUserId);
+  (offer as any).chainRecord = chain;
   await offer.save();
 
   // Optional: mark emergency resolved when at least one task is verified
@@ -267,6 +286,7 @@ export function toDispatchDTO(doc: any) {
     respondedAt: doc.respondedAt ?? null,
     completedAt: doc.completedAt ?? null,
     verifiedAt: doc.verifiedAt ?? null,
+    chainRecord: doc.chainRecord ?? null,
     proofs: Array.isArray(doc.proofs) ? doc.proofs : [],
     volunteer,
     emergency: {

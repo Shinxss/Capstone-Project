@@ -111,7 +111,7 @@ export function useLguLogin() {
     error,
     onSubmit,
 
-    // ✅ MFA props
+    // MFA props
     mfaOpen,
     emailMasked,
     otp,

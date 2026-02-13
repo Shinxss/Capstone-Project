@@ -42,6 +42,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/morgan": "^1.9.10",
     "@types/nodemailer": "^7.0.9",
+    "ganache": "^7.9.2",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }

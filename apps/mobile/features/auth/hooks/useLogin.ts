@@ -34,7 +34,7 @@ export function useLogin() {
 
       const { accessToken, user } = await loginCommunity({ email: email.trim(), password });
 
-        // ✅ set session so Home header shows firstName
+        // set session so Home header shows firstName
         await loginAsUser({
           id: user.id,
           firstName: user.firstName,

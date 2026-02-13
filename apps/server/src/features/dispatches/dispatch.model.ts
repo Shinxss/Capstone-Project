@@ -45,6 +45,16 @@ export type DispatchOfferDoc = {
   verifiedAt?: Date;
   verifiedBy?: Types.ObjectId;
 
+  // Blockchain audit trail (hash-only)
+  chainRecord?: {
+    network: string;
+    contractAddress: string;
+    txHash: string;
+    blockNumber?: number;
+    recordHash: string;
+    recordedAt: Date;
+  };
+
   emergencySnapshot: EmergencySnapshot;
 
   createdAt: Date;
@@ -81,6 +91,24 @@ const DispatchOfferSchema = new Schema<DispatchOfferDoc>(
 
     verifiedAt: { type: Date },
     verifiedBy: { type: Schema.Types.ObjectId, ref: "User" },
+
+    chainRecord: {
+      network: { type: String },
+      contractAddress: { type: String },
+      txHash: { type: String },
+      blockNumber: { type: Number },
+      recordHash: { type: String },
+      recordedAt: { type: Date },
+    },
+
+    chainRecord: {
+      network: { type: String },
+      contractAddress: { type: String },
+      txHash: { type: String },
+      blockNumber: { type: Number },
+      recordHash: { type: String },
+      recordedAt: { type: Date },
+    },
 
     emergencySnapshot: {
       id: { type: String, required: true },
