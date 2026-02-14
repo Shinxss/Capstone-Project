@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
-import LguShell from "../../components/lgu/LguShell";
-import { useLguTasks } from "../../features/tasks/hooks/useLguTasks";
-import { verifyTask } from "../../features/tasks/services/tasksApi";
-import { getLguToken } from "../../features/auth/services/authStorage";
+import LguShell from "../../../components/lgu/LguShell";
+import { useLguTasks } from "../../../features/tasks/hooks/useLguTasks";
+import { verifyTask } from "../../../features/tasks/services/tasksApi";
+import { getLguToken } from "../../../features/auth/services/authStorage";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 

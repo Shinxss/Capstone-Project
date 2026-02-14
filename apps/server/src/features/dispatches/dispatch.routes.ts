@@ -49,6 +49,6 @@ router.post("/:id/proof", requireAuth, requireRole("VOLUNTEER"), validate(dispat
 router.patch("/:id/complete", requireAuth, requireRole("VOLUNTEER"), validate(dispatchIdParamsSchema, "params"), patchComplete);
 
 // LGU verifies a done task
-router.patch("/:id/verify", requireAuth, requireRole("LGU", "ADMIN"), validate(dispatchIdParamsSchema, "params"), patchVerify);
+router.patch("/:id/verify", requireAuth, requireRole("LGU"), validate(dispatchIdParamsSchema, "params"), patchVerify);
 
 export default router;

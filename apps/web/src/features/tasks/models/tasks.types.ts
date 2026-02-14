@@ -5,6 +5,15 @@ export type TaskProof = {
   fileName?: string;
 };
 
+export type TaskChainRecord = {
+  network: string;
+  contractAddress: string;
+  txHash: string;
+  blockNumber?: number;
+  recordHash: string;
+  recordedAt: string;
+};
+
 export type TaskVolunteer = {
   id: string;
   name: string;
@@ -28,6 +37,7 @@ export type DispatchTask = {
   respondedAt?: string | null;
   completedAt?: string | null;
   verifiedAt?: string | null;
+  chainRecord?: TaskChainRecord | null;
   proofs?: TaskProof[];
   volunteer?: TaskVolunteer | null;
   emergency: TaskEmergency;

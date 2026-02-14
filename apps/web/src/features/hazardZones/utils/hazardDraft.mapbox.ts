@@ -1,4 +1,4 @@
-import mapboxgl from "mapbox-gl";
+import type { GeoJSONSource, Map } from "mapbox-gl";
 
 const DRAFT_SOURCE_ID = "hazard-draft-src";
 const DRAFT_FILL_ID = "hazard-draft-fill";
@@ -12,7 +12,7 @@ function emptyFC() {
   return { type: "FeatureCollection", features: [] as any[] };
 }
 
-export function ensureHazardDraftLayers(map: mapboxgl.Map) {
+export function ensureHazardDraftLayers(map: Map) {
   // Source
   if (!map.getSource(DRAFT_SOURCE_ID)) {
     map.addSource(DRAFT_SOURCE_ID, {
@@ -93,7 +93,7 @@ export function ensureHazardDraftLayers(map: mapboxgl.Map) {
   }
 }
 
-export function setHazardDraftVisibility(map: mapboxgl.Map, visible: boolean) {
+export function setHazardDraftVisibility(map: Map, visible: boolean) {
   const v = visible ? "visible" : "none";
   if (map.getLayer(DRAFT_FILL_ID)) map.setLayoutProperty(DRAFT_FILL_ID, "visibility", v);
   if (map.getLayer(DRAFT_OUTLINE_ID)) map.setLayoutProperty(DRAFT_OUTLINE_ID, "visibility", v);
@@ -101,14 +101,14 @@ export function setHazardDraftVisibility(map: mapboxgl.Map, visible: boolean) {
   if (map.getLayer(DRAFT_POINTS_ID)) map.setLayoutProperty(DRAFT_POINTS_ID, "visibility", v);
 }
 
-export function clearHazardDraft(map: mapboxgl.Map) {
-  const src = map.getSource(DRAFT_SOURCE_ID) as mapboxgl.GeoJSONSource | undefined;
+export function clearHazardDraft(map: Map) {
+  const src = map.getSource(DRAFT_SOURCE_ID) as GeoJSONSource | undefined;
   if (!src) return;
   src.setData(emptyFC() as any);
 }
 
-export function setHazardDraftData(map: mapboxgl.Map, points: LngLat[], closed: boolean) {
-  const src = map.getSource(DRAFT_SOURCE_ID) as mapboxgl.GeoJSONSource | undefined;
+export function setHazardDraftData(map: Map, points: LngLat[], closed: boolean) {
+  const src = map.getSource(DRAFT_SOURCE_ID) as GeoJSONSource | undefined;
   if (!src) return;
 
   const features: any[] = [];

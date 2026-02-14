@@ -1,4 +1,4 @@
-import mapboxgl from "mapbox-gl";
+import type { GeoJSONSource, Map } from "mapbox-gl";
 import type { HazardZone } from "../models/hazardZones.types";
 import { HAZARD_TYPE_COLOR } from "../constants/hazardZones.constants";
 
@@ -66,7 +66,7 @@ function normalizeGeometry(g: any) {
   return { type: "MultiPolygon", coordinates: polys };
 }
 
-export function ensureHazardZonesLayers(map: mapboxgl.Map) {
+export function ensureHazardZonesLayers(map: Map) {
   if (!map.getSource(SOURCE_ID)) {
     map.addSource(SOURCE_ID, {
       type: "geojson",
@@ -157,8 +157,8 @@ export function ensureHazardZonesLayers(map: mapboxgl.Map) {
   }
 }
 
-export function setHazardZonesData(map: mapboxgl.Map, zones: HazardZone[]) {
-  const src = map.getSource(SOURCE_ID) as mapboxgl.GeoJSONSource | undefined;
+export function setHazardZonesData(map: Map, zones: HazardZone[]) {
+  const src = map.getSource(SOURCE_ID) as GeoJSONSource | undefined;
   if (!src) return;
 
   const features = (zones ?? [])
@@ -181,7 +181,7 @@ export function setHazardZonesData(map: mapboxgl.Map, zones: HazardZone[]) {
   src.setData({ type: "FeatureCollection", features } as any);
 }
 
-export function setHazardZonesVisibility(map: mapboxgl.Map, visible: boolean) {
+export function setHazardZonesVisibility(map: Map, visible: boolean) {
   const v = visible ? "visible" : "none";
   if (map.getLayer(FILL_ID)) map.setLayoutProperty(FILL_ID, "visibility", v);
   if (map.getLayer(OUTLINE_HALO_ID)) map.setLayoutProperty(OUTLINE_HALO_ID, "visibility", v);

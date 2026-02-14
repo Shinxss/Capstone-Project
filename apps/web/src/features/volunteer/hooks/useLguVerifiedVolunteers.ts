@@ -43,14 +43,12 @@ export function useLguVerifiedVolunteers() {
 
   // details modal state
   const [open, setOpen] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selected, setSelected] = useState<VolunteerApplication | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsError, setDetailsError] = useState<string | null>(null);
 
   const openDetails = useCallback(async (id: string) => {
     setOpen(true);
-    setSelectedId(id);
     setSelected(null);
     setDetailsError(null);
     setDetailsLoading(true);
@@ -67,7 +65,6 @@ export function useLguVerifiedVolunteers() {
 
   const closeDetails = useCallback(() => {
     setOpen(false);
-    setSelectedId(null);
     setSelected(null);
     setDetailsError(null);
   }, []);

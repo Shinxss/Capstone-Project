@@ -51,7 +51,8 @@ export type DispatchOfferDoc = {
     contractAddress: string;
     txHash: string;
     blockNumber?: number;
-    recordHash: string;
+    taskIdHash: string;
+    payloadHash: string;
     recordedAt: Date;
   };
 
@@ -97,16 +98,8 @@ const DispatchOfferSchema = new Schema<DispatchOfferDoc>(
       contractAddress: { type: String },
       txHash: { type: String },
       blockNumber: { type: Number },
-      recordHash: { type: String },
-      recordedAt: { type: Date },
-    },
-
-    chainRecord: {
-      network: { type: String },
-      contractAddress: { type: String },
-      txHash: { type: String },
-      blockNumber: { type: Number },
-      recordHash: { type: String },
+      taskIdHash: { type: String },
+      payloadHash: { type: String },
       recordedAt: { type: Date },
     },
 

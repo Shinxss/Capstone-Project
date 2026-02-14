@@ -394,7 +394,7 @@ export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) 
                       { label: "In Progress", to: "/lgu/tasks/in-progress", icon: CircleDot },
                       { label: "For Review", to: "/lgu/tasks/for-review", icon: Clock4 },
                       { label: "Completed", to: "/lgu/tasks/completed", icon: CheckCircle2 },
-                      { label: "Cancelled / Archived", to: "/lgu/tasks/archived", icon: ArchiveX },
+                      { label: "Canceled", to: "/lgu/tasks/canceled", icon: ArchiveX },
                     ]}
                   />
                 </>

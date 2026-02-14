@@ -68,6 +68,11 @@ function normalizeEmergencyType(raw: string): EmergencyType {
   return "SOS";
 }
 
+function isResolvedEmergencyStatus(raw?: string) {
+  const up = String(raw ?? "").toUpperCase();
+  return up === "RESOLVED" || up === "CANCELLED";
+}
+
 // ✅ MaterialCommunityIcons mapping
 const mciForType = (type: EmergencyType) => {
   switch (type) {
@@ -238,6 +243,7 @@ export default function MapTab() {
   const reports: EmergencyReport[] = useMemo(() => {
     const e = activeDispatch?.emergency;
     if (!e) return [];
+    if (isResolvedEmergencyStatus(e.status)) return [];
     return [
       {
         id: e.id,
@@ -250,6 +256,8 @@ export default function MapTab() {
       },
     ];
   }, [activeDispatch]);
+
+  const hasActiveEmergency = reports.length > 0;
 
   const filteredReports = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -378,7 +386,7 @@ export default function MapTab() {
   // ✅ When a dispatch is active: zoom to the emergency and open details automatically
   useEffect(() => {
     const e = activeDispatch?.emergency;
-    if (!e) {
+    if (!e || isResolvedEmergencyStatus(e.status)) {
       setSelected(null);
       setRoute(null);
       sheetRef.current?.close();
@@ -444,7 +452,7 @@ export default function MapTab() {
               <MapboxGL.LineLayer
                 id="routeLine"
                 style={{
-                  lineColor: "#111827",
+                  lineColor: "#3C83F6",
                   lineWidth: 5,
                   lineCap: "round",
                   lineJoin: "round",
@@ -473,12 +481,12 @@ export default function MapTab() {
           ))}
         </MapboxGL.MapView>
 
-        {!activeDispatch?.emergency ? (
+        {!hasActiveEmergency ? (
           <View pointerEvents="none" style={styles.noAssignmentWrap}>
             <View style={styles.noAssignmentCard}>
               <Text style={styles.noAssignmentTitle}>No assigned emergency</Text>
               <Text style={styles.noAssignmentSub}>
-                You'll see the emergency here once LGU dispatches you.
+                {"You'll see the emergency here once LGU dispatches you."}
               </Text>
             </View>
           </View>

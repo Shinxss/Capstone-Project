@@ -159,10 +159,10 @@ export async function getLguTasks(req: Request, res: Response) {
 export async function patchVerify(req: Request, res: Response) {
   try {
     const { role, userId } = getAuth(req);
-    if (role !== "LGU" && role !== "ADMIN") return res.status(403).json({ message: "Forbidden" });
+    if (role !== "LGU") return res.status(403).json({ message: "Forbidden" });
 
-    const updated = await verifyDispatch({ dispatchId: String(req.params.id), verifierUserId: String(userId) });
-    return res.json({ data: toDispatchDTO(updated) });
+    const { txHash } = await verifyDispatch({ dispatchId: String(req.params.id), verifierUserId: String(userId) });
+    return res.json({ success: true, txHash });
   } catch (e: any) {
     return res.status(400).json({ message: e?.message ?? "Failed" });
   }

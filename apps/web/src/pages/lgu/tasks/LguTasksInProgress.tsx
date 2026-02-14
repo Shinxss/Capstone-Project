@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import LguShell from "../../components/lgu/LguShell";
-import { useLguTasks } from "../../features/tasks/hooks/useLguTasks";
+import LguShell from "../../../components/lgu/LguShell";
+import { useLguTasks } from "../../../features/tasks/hooks/useLguTasks";
 
 export default function LguTasksInProgress() {
   const { tasks, loading, error, refetch } = useLguTasks("ACCEPTED");

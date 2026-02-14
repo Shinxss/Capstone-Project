@@ -374,7 +374,10 @@ export default function LguEmergencies() {
   const { reports, loading, error, refetch } = useLguEmergencies();
 
   // ✅ Convert backend reports to UI list
-  const data: EmergencyItem[] = useMemo(() => reports.map(toItem), [reports]);
+  const data: EmergencyItem[] = useMemo(
+    () => reports.map(toItem).filter((d) => d.status !== "resolved"),
+    [reports]
+  );
 
   const sosCount = data.filter((d) => d.isSOS).length;
 

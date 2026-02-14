@@ -16,10 +16,10 @@ export default function HomeScreen() {
   const { sendSos } = useSosReport();
   const isVolunteer = useMemo(() => session?.mode === "user" && String(session.user.role ?? "").toUpperCase() === "VOLUNTEER", [session]);
 
-  const { activeDispatch, refresh: refreshActive } = useActiveDispatch({ pollMs: 8000 });
+  const { refresh: refreshActive } = useActiveDispatch({ pollMs: 8000 });
   const { pendingDispatch, refresh: refreshPending, clear: clearPending } = usePendingDispatch({
     pollMs: 8000,
-    enabled: isVolunteer && !activeDispatch,
+    enabled: isVolunteer,
   });
 
   const [dispatchBusy, setDispatchBusy] = useState(false);
@@ -80,7 +80,7 @@ export default function HomeScreen() {
         onPressApplyVolunteer={() => router.push("/volunteer-apply-modal")}
       />
 
-      {isVolunteer && !activeDispatch && pendingDispatch ? (
+      {isVolunteer && pendingDispatch?.status === "PENDING" ? (
         <DispatchOfferModal
           visible
           offer={pendingDispatch}

@@ -125,7 +125,6 @@ export default function LguLiveMapView(props: Props) {
     // left details
     selectedEmergencyDetails,
     detailsOpen,
-    setDetailsOpen,
     cleanupDetails,
 
     // responders dispatch + tracking

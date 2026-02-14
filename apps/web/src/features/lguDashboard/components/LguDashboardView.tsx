@@ -10,8 +10,6 @@ import {
   ShieldAlert,
 } from "lucide-react";
 
-import mapboxgl from "mapbox-gl";
-
 import EmergencyMap from "../../emergency/components/EmergencyMap";
 import {
   EMERGENCY_TYPE_LABEL,

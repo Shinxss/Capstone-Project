@@ -1,13 +1,6 @@
-import { X, MapPin } from "lucide-react";
+import { MapPin, X } from "lucide-react";
 import { EMERGENCY_TYPE_LABEL } from "../../emergency/constants/emergency.constants";
 import type { DashboardEmergencyItem } from "../models/lguDashboard.types";
-
-function fmtDate(iso?: string) {
-  if (!iso) return "—";
-  const t = new Date(iso);
-  if (Number.isNaN(t.getTime())) return "—";
-  return t.toLocaleString();
-}
 
 export default function EmergencyQuickView({
   item,
@@ -18,7 +11,6 @@ export default function EmergencyQuickView({
   item: DashboardEmergencyItem;
   onClose: () => void;
   onOpenInMap: (id: string) => void;
- 
   variant?: "floating" | "map";
 }) {
   const typeLabel = EMERGENCY_TYPE_LABEL[item.type] ?? String(item.type);
@@ -50,18 +42,18 @@ export default function EmergencyQuickView({
         </div>
 
         <div className="px-4 py-2">
-
           <div>
             <div className="text-[11px] text-gray-500">Reporter</div>
-            <div className="text-sm font-bold text-gray-900">{item.reporterName ?? "—"}</div>
+            <div className="text-sm font-bold text-gray-900">{item.reporterName ?? "-"}</div>
           </div>
 
-          <div>
+          <div className="mt-2">
             <div className="text-xs text-gray-900">
-              {item.barangayName ? `Barangay ${item.barangayName}` : "—"}
+              {item.barangayName ? `Barangay ${item.barangayName}` : "-"}
               {item.barangayCity ? `, ${item.barangayCity}` : ""}
             </div>
           </div>
+
           <div className="pt-2">
             <button
               type="button"
@@ -77,3 +69,4 @@ export default function EmergencyQuickView({
     </div>
   );
 }
+

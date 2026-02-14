@@ -35,6 +35,11 @@ import { fetchDispatchVolunteers } from "../services/volunteers.service";
 
 type LngLat = [number, number];
 
+function isResolvedEmergencyStatus(raw?: string) {
+  const up = String(raw ?? "").toUpperCase();
+  return up === "RESOLVED" || up === "CANCELLED";
+}
+
 export function useLguLiveMap() {
   const [searchParams] = useSearchParams();
   const focusEmergencyId = searchParams.get("emergencyId");
@@ -82,6 +87,10 @@ export function useLguLiveMap() {
     error: emergenciesError,
     refetch: refetchEmergencies,
   } = useLguEmergencies();
+
+  const activeReports = useMemo(() => {
+    return (reports ?? []).filter((r) => !isResolvedEmergencyStatus(r.status));
+  }, [reports]);
 
   const {
     hazardZones,
@@ -147,7 +156,7 @@ export function useLguLiveMap() {
 
   const emergencyPins: MapEmergencyPin[] = useMemo(() => {
     if (!showEmergencies) return [];
-    return (reports ?? [])
+    return activeReports
       .filter((r) => r?.location?.coordinates?.length === 2)
       .map((r) => {
         const [lng, lat] = r.location.coordinates;
@@ -158,12 +167,12 @@ export function useLguLiveMap() {
           lat,
         };
       });
-  }, [reports, showEmergencies]);
+  }, [activeReports, showEmergencies]);
 
   const selectedEmergency = useMemo(() => {
     if (!selectedEmergencyId) return undefined;
-    return reports.find((r) => r._id === selectedEmergencyId);
-  }, [reports, selectedEmergencyId]);
+    return activeReports.find((r) => r._id === selectedEmergencyId);
+  }, [activeReports, selectedEmergencyId]);
 
   const selectedEmergencyDetails: LguEmergencyDetails | null = useMemo(() => {
     if (!selectedEmergency?.location?.coordinates) return null;
@@ -180,6 +189,18 @@ export function useLguLiveMap() {
       barangayName: (selectedEmergency as any).barangayName ?? null,
     };
   }, [selectedEmergency]);
+
+  // If the selected emergency becomes RESOLVED/CANCELLED, hide it (and close details).
+  useEffect(() => {
+    if (!selectedEmergencyId) return;
+    if (selectedEmergency) return;
+
+    setSelectedEmergencyId(null);
+    setDetailsOpen(false);
+    setDispatchModalOpen(false);
+    setDispatchSelection([]);
+    setTrackOpen(false);
+  }, [selectedEmergencyId, selectedEmergency]);
 
   // Reset action panels when switching selected emergency
   useEffect(() => {
@@ -207,7 +228,7 @@ export function useLguLiveMap() {
       return;
     }
 
-    const found = (reports ?? []).find((r) => String(r._id) === String(focusEmergencyId));
+    const found = activeReports.find((r) => String(r._id) === String(focusEmergencyId));
     if (!found) return;
 
     if (autoFocusedIdRef.current === String(focusEmergencyId)) return;
@@ -220,14 +241,14 @@ export function useLguLiveMap() {
     // open details
     setSelectedEmergencyId(String(found._id));
     setDetailsOpen(true);
-  }, [focusEmergencyId, reports]);
+  }, [focusEmergencyId, activeReports]);
 
   // ✅ Fly to the focused emergency once the map is ready (separate effect)
   useEffect(() => {
     if (!focusEmergencyId) return;
     if (!mapReady) return;
 
-    const found = (reports ?? []).find((r) => String(r._id) === String(focusEmergencyId));
+    const found = activeReports.find((r) => String(r._id) === String(focusEmergencyId));
     if (!found) return;
 
     if (autoFlewIdRef.current === String(focusEmergencyId)) return;
@@ -240,7 +261,7 @@ export function useLguLiveMap() {
         autoFlewIdRef.current = String(focusEmergencyId);
       }
     }
-  }, [focusEmergencyId, reports, mapReady]);
+  }, [focusEmergencyId, activeReports, mapReady]);
 
   // ✅ only mark ready after map load (prevents style-related nulls)
   // IMPORTANT: must be stable (useCallback) so EmergencyMap won't recreate the whole map on every render.
@@ -789,7 +810,7 @@ export function useLguLiveMap() {
     hazardsCount: hazardsActiveCount,
     hazardsTotalCount,
     volunteersCount: volunteers.length,
-    emergenciesCount: reports.length,
+    emergenciesCount: activeReports.length,
 
     // hazard zones list + per-zone controls (dropdown)
     hazardZones,

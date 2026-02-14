@@ -8,7 +8,7 @@ import { encryptBuffer } from "../../utils/aesGcm";
 import { EmergencyReport } from "../emergency/emergency.model";
 import { User } from "../users/user.model";
 import { DispatchOffer, DispatchStatus } from "./dispatch.model";
-import { recordVerifiedDispatchOnChain } from "../blockchain/taskLedger";
+import { recordTaskVerification } from "@lifeline/blockchain";
 
 export type CreateDispatchInput = {
   emergencyId: string;
@@ -208,7 +208,9 @@ export async function completeDispatch(params: { dispatchId: string; volunteerUs
   return offer;
 }
 
-export async function verifyDispatch(params: { dispatchId: string; verifierUserId: string }) {
+export async function verifyDispatch(
+  params: { dispatchId: string; verifierUserId: string }
+): Promise<{ txHash: string }> {
   const { dispatchId, verifierUserId } = params;
 
   if (!Types.ObjectId.isValid(dispatchId)) {
@@ -218,31 +220,55 @@ export async function verifyDispatch(params: { dispatchId: string; verifierUserI
   const offer = await DispatchOffer.findById(dispatchId);
   if (!offer) throw new Error("Dispatch offer not found");
 
-  // Idempotent: if already verified, just return.
+  // Idempotent: if already verified, just return the stored txHash (if available).
   if (offer.status === "VERIFIED") {
-    return offer;
+    const existingTxHash = (offer as any).chainRecord?.txHash;
+    return { txHash: typeof existingTxHash === "string" ? existingTxHash : "already-verified" };
   }
 
   if (offer.status !== "DONE") {
-    throw new Error("Only DONE tasks can be verified");
+    // "DONE" is the current codebase equivalent of "FOR_REVIEW".
+    throw new Error("Only DONE (FOR_REVIEW) tasks can be verified");
   }
 
-  // ✅ Blockchain write (hash-only) BEFORE we mark VERIFIED in DB.
+  // Blockchain write (hash-only) BEFORE we mark VERIFIED in DB.
   // If chain write fails, we keep the task in DONE state so LGU can retry.
-  const chain = await recordVerifiedDispatchOnChain({
+  const proofUrls = Array.isArray((offer as any).proofs)
+    ? (offer as any).proofs.map((p: any) => String(p?.url || "")).filter(Boolean).sort()
+    : [];
+
+  const payload = {
     dispatchId: String(offer._id),
     emergencyId: String(offer.emergencyId),
     volunteerId: String(offer.volunteerId),
-    completedAt: offer.completedAt ?? null,
-    proofUrls: Array.isArray((offer as any).proofs)
-      ? (offer as any).proofs.map((p: any) => String(p?.url || "")).filter(Boolean)
-      : [],
+    completedAt: offer.completedAt ? new Date(offer.completedAt).toISOString() : null,
+    proofUrls,
+  };
+
+  const rpcUrl = mustEnv("SEPOLIA_RPC_URL");
+  const privateKey = mustEnv("SEPOLIA_PRIVATE_KEY");
+  const contractAddress = mustEnv("TASK_LEDGER_CONTRACT_ADDRESS").trim();
+
+  const chain = await recordTaskVerification({
+    rpcUrl,
+    privateKey,
+    contractAddress,
+    taskId: String(offer._id),
+    payload,
   });
 
   offer.status = "VERIFIED";
   offer.verifiedAt = new Date();
   offer.verifiedBy = new Types.ObjectId(verifierUserId);
-  (offer as any).chainRecord = chain;
+  (offer as any).chainRecord = {
+    network: "sepolia",
+    contractAddress,
+    txHash: chain.txHash,
+    blockNumber: chain.blockNumber,
+    taskIdHash: chain.taskIdHash,
+    payloadHash: chain.payloadHash,
+    recordedAt: new Date(),
+  };
   await offer.save();
 
   // Optional: mark emergency resolved when at least one task is verified
@@ -252,7 +278,7 @@ export async function verifyDispatch(params: { dispatchId: string; verifierUserI
     // ignore
   }
 
-  return offer;
+  return { txHash: chain.txHash };
 }
 
 export async function listDispatchTasksForLgu(params: { statuses: DispatchStatus[] }) {
@@ -323,4 +349,10 @@ function guessExt(mimeType?: string, fileName?: string) {
   if (mt.includes("heic")) return "heic";
 
   return "bin";
+}
+
+function mustEnv(key: string) {
+  const v = process.env[key];
+  if (!v) throw new Error(`Missing env var: ${key}`);
+  return v;
 }
