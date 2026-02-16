@@ -1,12 +1,18 @@
 import { useCallback, useState } from "react";
-import { Alert } from "react-native";
 import { useRouter } from "expo-router";
-import { registerCommunity } from "../services/authApi";
+import { signupRequestOtp } from "../services/otpAuth.api";
 import { validateSignup } from "../utils/authValidators";
 import { getErrorMessage } from "../utils/authErrors";
+import { useGoogleLogin } from "./useGoogleLogin";
 
 export function useSignup() {
   const router = useRouter();
+  const {
+    start: startGoogleLogin,
+    loading: googleLoading,
+    error: googleError,
+    clearError: clearGoogleError,
+  } = useGoogleLogin();
 
   const [firstName, setFirst] = useState("");
   const [lastName, setLast] = useState("");
@@ -22,8 +28,9 @@ export function useSignup() {
   const [error, setError] = useState<string | null>(null);
 
   const onSignup = useCallback(async () => {
-    if (loading) return;
+    if (loading || googleLoading) return;
     setError(null);
+    clearGoogleError();
 
     const validation = validateSignup({
       payload: { firstName, lastName, email, password },
@@ -38,21 +45,41 @@ export function useSignup() {
 
     setLoading(true);
     try {
-      const msg = await registerCommunity({
+      const normalizedEmail = email.trim().toLowerCase();
+      await signupRequestOtp({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        email: email.trim(),
+        email: normalizedEmail,
         password,
       });
 
-      Alert.alert("Success", msg);
-      router.replace("/login");
+      router.push({
+        pathname: "/otp-verification",
+        params: { mode: "signup", email: normalizedEmail },
+      });
     } catch (err) {
       setError(getErrorMessage(err, "Signup failed"));
     } finally {
       setLoading(false);
     }
-  }, [agree, confirm, email, firstName, lastName, loading, password, router]);
+  }, [
+    agree,
+    clearGoogleError,
+    confirm,
+    email,
+    firstName,
+    googleLoading,
+    lastName,
+    loading,
+    password,
+    router,
+  ]);
+
+  const onGoogle = useCallback(async () => {
+    if (loading || googleLoading) return;
+    setError(null);
+    await startGoogleLogin();
+  }, [googleLoading, loading, startGoogleLogin]);
 
   return {
     firstName,
@@ -63,8 +90,9 @@ export function useSignup() {
     showPassword,
     showConfirm,
     agree,
-    loading,
-    error,
+    loading: loading || googleLoading,
+    googleLoading,
+    error: error ?? googleError,
     setFirst,
     setLast,
     setEmail,
@@ -74,6 +102,7 @@ export function useSignup() {
     toggleShowConfirm: () => setShowConfirm((s) => !s),
     toggleAgree: () => setAgree((v) => !v),
     onSignup,
+    onGoogle,
     goLogin: () => router.push("/login"),
   };
 }

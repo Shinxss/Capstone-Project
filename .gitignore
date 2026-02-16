@@ -95,3 +95,6 @@ apps/mobile/yarn-cache/
 # =========================
 data/
 dump/
+
+apps/mobile/android/app/debug.keystore
+**/debug.keystore

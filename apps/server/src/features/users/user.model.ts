@@ -2,22 +2,24 @@ import { Schema, model, models } from "mongoose";
 
 export type UserRole = "ADMIN" | "LGU" | "VOLUNTEER" | "COMMUNITY";
 export type VolunteerStatus = "NONE" | "PENDING" | "APPROVED";
+export type AuthProvider = "local" | "google" | "both";
 
 export type UserDoc = {
-  username?: string; // LGU / Admin can use this
-  email?: string; // Community uses this
+  username?: string;
+  email?: string;
 
-  // ✅ Used by all roles (including LGU)
   firstName: string;
   lastName: string;
 
-  passwordHash: string;
+  passwordHash?: string;
+  googleSub?: string;
+  authProvider?: AuthProvider;
+  emailVerified: boolean;
 
   role: UserRole;
 
-  // ✅ LGU-only fields
   lguName?: string;
-  lguPosition?: string; // ✅ NEW (e.g., "MDRRMO Officer", "Barangay Captain")
+  lguPosition?: string;
   barangay?: string;
   municipality?: string;
 
@@ -31,15 +33,16 @@ export type UserDoc = {
 
 const UserSchema = new Schema<UserDoc>(
   {
-    // LGU uses username, Community uses email
     username: { type: String, trim: true },
     email: { type: String, lowercase: true, trim: true },
 
-    // ✅ Names (LGU included)
     firstName: { type: String, default: "", trim: true },
     lastName: { type: String, default: "", trim: true },
 
-    passwordHash: { type: String, required: true },
+    passwordHash: { type: String, default: "" },
+    googleSub: { type: String, default: "", trim: true },
+    authProvider: { type: String, enum: ["local", "google", "both"], default: "local" },
+    emailVerified: { type: Boolean, default: false, index: true },
 
     role: {
       type: String,
@@ -48,9 +51,8 @@ const UserSchema = new Schema<UserDoc>(
       index: true,
     },
 
-    // ✅ Optional LGU fields
     lguName: { type: String, default: "", trim: true },
-    lguPosition: { type: String, default: "", trim: true }, // ✅ NEW
+    lguPosition: { type: String, default: "", trim: true },
     barangay: { type: String, default: "", trim: true },
     municipality: { type: String, default: "", trim: true },
 
@@ -79,6 +81,14 @@ UserSchema.index(
   {
     unique: true,
     partialFilterExpression: { email: { $type: "string", $ne: "" } },
+  }
+);
+
+UserSchema.index(
+  { googleSub: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { googleSub: { $type: "string", $ne: "" } },
   }
 );
 

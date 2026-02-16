@@ -23,6 +23,7 @@ lguAuthRouter.post("/login", async (req, res) => {
 
     if (!user) return res.status(401).json({ success: false, error: "Invalid credentials" });
     if (!user.isActive) return res.status(403).json({ success: false, error: "Account is disabled" });
+    if (!user.passwordHash) return res.status(401).json({ success: false, error: "Invalid credentials" });
 
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return res.status(401).json({ success: false, error: "Invalid credentials" });

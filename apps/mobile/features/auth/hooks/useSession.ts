@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import type { AuthUser, Session } from "../models/session";
-import { clearSession, getSession, setGuestSession, setUserSession } from "../services/sessionStorage";
-import { setApiAuthToken } from "../../../lib/api"; // ✅ add this import
+import {
+  clearSession,
+  getSession,
+  patchUserSession,
+  setGuestSession,
+  setUserSession,
+} from "../services/sessionStorage";
+import { setApiAuthToken } from "../../../lib/api";
 
 export function useSession() {
   const [session, setSessionState] = useState<Session | null>(null);
@@ -18,7 +25,6 @@ export function useSession() {
     refresh();
   }, [refresh]);
 
-  // ✅ keep axios auth header synced with session
   useEffect(() => {
     const token = session?.mode === "user" ? session.user.accessToken : null;
     setApiAuthToken(token);
@@ -38,13 +44,26 @@ export function useSession() {
     await refresh();
   }, [refresh]);
 
-  const loginAsUser = useCallback(async (user: AuthUser) => {
-    await setUserSession(user);
-    await refresh();
-  }, [refresh]);
+  const loginAsUser = useCallback(
+    async (user: AuthUser) => {
+      await setUserSession(user);
+      await refresh();
+    },
+    [refresh]
+  );
+
+  const updateUser = useCallback(
+    async (partial: Partial<AuthUser>) => {
+      await patchUserSession(partial);
+      await refresh();
+    },
+    [refresh]
+  );
 
   const logout = useCallback(async () => {
     await clearSession();
+    await GoogleSignin.revokeAccess().catch(() => undefined);
+    await GoogleSignin.signOut().catch(() => undefined);
     await refresh();
   }, [refresh]);
 
@@ -57,6 +76,7 @@ export function useSession() {
     refresh,
     loginAsGuest,
     loginAsUser,
+    updateUser,
     logout,
   };
 }

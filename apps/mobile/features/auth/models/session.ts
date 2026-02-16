@@ -4,6 +4,11 @@ export type AuthUser = {
   lastName?: string;
   email?: string;
   role?: string;
+  volunteerStatus?: string;
+  authProvider?: "local" | "google" | "both";
+  emailVerified?: boolean;
+  passwordSet?: boolean;
+  googleLinked?: boolean;
   accessToken: string;
 };
 

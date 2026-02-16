@@ -13,6 +13,7 @@ type Props = {
   showConfirm: boolean;
   agree: boolean;
   loading: boolean;
+  googleLoading: boolean;
   error: string | null;
 
   onChangeFirst: (v: string) => void;
@@ -40,6 +41,7 @@ export default function SignupForm({
   showConfirm,
   agree,
   loading,
+  googleLoading,
   error,
   onChangeFirst,
   onChangeLast,
@@ -161,10 +163,16 @@ export default function SignupForm({
 
         <Pressable
           onPress={onGoogle}
+          disabled={googleLoading}
           className="h-14 flex-row items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white"
+          style={({ pressed }) => ({
+            opacity: pressed || googleLoading ? 0.75 : 1,
+          })}
         >
           <GoogleIcon />
-          <Text className="text-[15px] text-gray-800">Continue with Google</Text>
+          <Text className="text-[15px] text-gray-800">
+            {googleLoading ? "Signing in with Google..." : "Continue with Google"}
+          </Text>
         </Pressable>
 
         <View className="mt-6 flex-row justify-center">

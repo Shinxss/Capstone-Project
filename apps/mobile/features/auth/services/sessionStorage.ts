@@ -23,6 +23,21 @@ export async function setUserSession(user: AuthUser): Promise<void> {
   await AsyncStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(session));
 }
 
+export async function patchUserSession(partial: Partial<AuthUser>): Promise<void> {
+  const session = await getSession();
+  if (!session || session.mode !== "user") return;
+
+  const next: Session = {
+    mode: "user",
+    user: {
+      ...session.user,
+      ...partial,
+    },
+  };
+
+  await AsyncStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(next));
+}
+
 export async function clearSession(): Promise<void> {
   await AsyncStorage.removeItem(STORAGE_KEYS.SESSION);
 }

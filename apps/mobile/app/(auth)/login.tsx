@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, Pressable, Alert } from "react-native";
+import { View, Text, Pressable } from "react-native";
 import AuthBackground from "../../components/AuthBackground";
 import LoginForm from "../../features/auth/components/LoginForm";
 import { useLogin } from "../../features/auth/hooks/useLogin";
@@ -20,13 +20,14 @@ export default function LoginScreen() {
         password={vm.password}
         showPassword={vm.showPassword}
         loading={vm.loading}
+        googleLoading={vm.googleLoading}
         error={vm.error}
         onChangeEmail={vm.setEmail}
         onChangePassword={vm.setPassword}
         onToggleShowPassword={vm.toggleShowPassword}
-        onForgotPassword={() => Alert.alert("Forgot Password", "Add your reset flow here.")}
+        onForgotPassword={vm.goForgotPassword}
         onLogin={vm.onLogin}
-        onGoogle={() => Alert.alert("Google Sign-In", "We can wire this after the basic auth is done.")}
+        onGoogle={vm.onGoogle}
         onGoSignup={vm.goSignup}
       />
     </AuthBackground>

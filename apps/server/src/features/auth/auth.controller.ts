@@ -3,6 +3,7 @@ import { authenticateUser } from "./auth.service";
 import { signAccessToken } from "../../utils/jwt";
 import { User } from "../users/user.model";
 import { verifyMfaChallenge } from "../../utils/mfa";
+import { toAuthUserPayload } from "./otp.utils";
 
 export async function login(req: Request, res: Response) {
   try {
@@ -21,13 +22,8 @@ export async function login(req: Request, res: Response) {
 
     return res.status(200).json({
       token,
-      user: {
-        id: user._id.toString(),
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        role: user.role,
-      },
+      accessToken: token,
+      user: toAuthUserPayload(user),
     });
   } catch (e) {
     return res.status(500).json({ message: "Login failed." });
@@ -75,17 +71,13 @@ export async function me(req: Request, res: Response) {
     const userId = (req as any).userId as string | undefined;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-    const user = await User.findById(userId).select("firstName lastName email role");
+    const user = await User.findById(userId).select(
+      "firstName lastName email role authProvider passwordHash googleSub emailVerified volunteerStatus"
+    );
     if (!user) return res.status(404).json({ message: "User not found" });
 
     return res.status(200).json({
-      user: {
-        id: user._id.toString(),
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        role: user.role,
-      },
+      user: toAuthUserPayload(user),
     });
   } catch {
     return res.status(500).json({ message: "Failed to fetch profile." });
