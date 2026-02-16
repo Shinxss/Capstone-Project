@@ -285,6 +285,31 @@ export default function LguDashboardView({
     };
   });
 
+  if (loading) {
+    return (
+      <div className="rounded-lg border border-gray-200 bg-white p-4 text-gray-600 dark:bg-[#0B1220] dark:border-[#162544] dark:text-slate-300">
+        Loading...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-500/10 dark:border-red-500/25 dark:text-red-200">
+        <div className="flex items-center justify-between gap-3">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={handleRefresh}
+            className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6">
       <div className="mb-7 flex items-start justify-between gap-4">
@@ -301,12 +326,6 @@ export default function LguDashboardView({
           Refresh
         </button>
       </div>
-
-      {error ? (
-        <div className="mb-4 bg-red-50 border border-red-200 text-red-700 dark:bg-red-500/10 dark:border-red-500/25 dark:text-red-200 rounded-lg p-3 text-sm">
-          {error}
-        </div>
-      ) : null}
 
       {/* Stats (keeps old design, but Active Emergencies is real) */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
@@ -404,7 +423,7 @@ export default function LguDashboardView({
       {/* Bottom panels (old layout)
           Ensure these stay above the map canvas for pointer events.
       */}
-      <div className="relative z-[120] grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="relative z-120 grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 bg-white border border-gray-200 rounded-lg shadow-sm dark:bg-[#0E1626] dark:border-[#162544]">
           <div className="px-4 py-3 flex items-center justify-between border-b border-gray-200 dark:border-[#162544]">
             <div>
@@ -428,7 +447,7 @@ export default function LguDashboardView({
               return (
                 <div
                   key={e.id}
-                  className="relative z-[130] flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg p-3 dark:bg-[#0B1324] dark:border-[#162544] cursor-pointer hover:bg-gray-100 dark:hover:bg-[#0E1626]"
+                  className="relative z-130 flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg p-3 dark:bg-[#0B1324] dark:border-[#162544] cursor-pointer hover:bg-gray-100 dark:hover:bg-[#0E1626]"
                   onClick={() => setQuickView(e)}
                 >
                   <div className="flex items-start gap-3 min-w-0">

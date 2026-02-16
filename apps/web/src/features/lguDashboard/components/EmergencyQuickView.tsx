@@ -23,17 +23,17 @@ export default function EmergencyQuickView({
           : "w-65 max-w-[calc(100vw-2rem)]"
       }
     >
-      <div className="rounded-2xl bg-white shadow-2xl border border-gray-200 overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+      <div className="rounded-2xl bg-white shadow-2xl border border-gray-200 overflow-hidden dark:bg-[#0B1220] dark:border-[#162544]">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-[#162544]">
           <div className="min-w-0">
-            <div className="text-xs font-bold text-gray-900 truncate">{typeLabel}</div>
-            <div className="text-xs text-gray-500 truncate">Emergency details</div>
+            <div className="text-xs font-bold text-gray-900 truncate dark:text-slate-100">{typeLabel}</div>
+            <div className="text-xs text-gray-500 truncate dark:text-slate-500">Emergency details</div>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="h-9 w-9 rounded-xl hover:bg-gray-100 grid place-items-center text-gray-700"
+            className="h-9 w-9 rounded-xl hover:bg-gray-100 grid place-items-center text-gray-700 dark:text-slate-300 dark:hover:bg-[#122036]"
             aria-label="Close"
             title="Close"
           >
@@ -43,12 +43,12 @@ export default function EmergencyQuickView({
 
         <div className="px-4 py-2">
           <div>
-            <div className="text-[11px] text-gray-500">Reporter</div>
-            <div className="text-sm font-bold text-gray-900">{item.reporterName ?? "-"}</div>
+            <div className="text-[11px] text-gray-500 dark:text-slate-500">Reporter</div>
+            <div className="text-sm font-bold text-gray-900 dark:text-slate-100">{item.reporterName ?? "-"}</div>
           </div>
 
           <div className="mt-2">
-            <div className="text-xs text-gray-900">
+            <div className="text-xs text-gray-900 dark:text-slate-300">
               {item.barangayName ? `Barangay ${item.barangayName}` : "-"}
               {item.barangayCity ? `, ${item.barangayCity}` : ""}
             </div>
@@ -69,4 +69,3 @@ export default function EmergencyQuickView({
     </div>
   );
 }
-

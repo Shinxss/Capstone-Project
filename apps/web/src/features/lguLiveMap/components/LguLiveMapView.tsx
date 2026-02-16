@@ -46,8 +46,8 @@ function ToggleRow({
   activeColorClass?: string;
 }) {
   return (
-    <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-      <div className="flex items-center gap-2 text-sm font-bold text-gray-800">
+    <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-[#162544] dark:bg-[#0E1626]">
+      <div className="flex items-center gap-2 text-sm font-bold text-gray-800 dark:text-slate-200">
         {icon}
         {label}
       </div>
@@ -63,7 +63,7 @@ function ToggleRow({
       >
         <span
           className={[
-            "absolute top-0.5 h-6 w-6 rounded-full bg-white transition-transform",
+            "absolute top-0.5 h-6 w-6 rounded-full bg-white dark:bg-[#0B1220] transition-transform",
             checked ? "translate-x-6" : "translate-x-1",
           ].join(" ")}
         />
@@ -89,8 +89,36 @@ function Pill({
   );
 }
 
+function LoadingPanel() {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-4 text-gray-600 dark:bg-[#0B1220] dark:border-[#162544] dark:text-slate-300">
+      Loading...
+    </div>
+  );
+}
+
+function ErrorPanel({ error, onRetry }: { error: string; onRetry: () => void }) {
+  return (
+    <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-500/10 dark:border-red-500/25 dark:text-red-200">
+      <div className="flex items-center justify-between gap-3">
+        <span>{error}</span>
+        <button
+          type="button"
+          onClick={onRetry}
+          className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
+        >
+          Retry
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function LguLiveMapView(props: Props) {
   const {
+    loading,
+    error,
+    onRefresh,
     // map
     mapStyleUrl,
     onMapReady,
@@ -216,6 +244,9 @@ export default function LguLiveMapView(props: Props) {
     return "bg-red-500";
   };
 
+  if (loading) return <LoadingPanel />;
+  if (error) return <ErrorPanel error={error} onRetry={onRefresh} />;
+
   return (
     <div className="h-full w-full relative overflow-hidden bg-black">
       {/* MAP */}
@@ -247,7 +278,7 @@ export default function LguLiveMapView(props: Props) {
           placeholder="Search..."
           className="pointer-events-auto h-10 w-[320px] max-w-[70vw]
                      rounded-md bg-white border-2 border-blue-500 px-3 text-sm
-                     outline-none shadow-sm"
+                     outline-none shadow-sm dark:bg-[#0E1626] dark:text-slate-100 dark:placeholder:text-slate-500"
         />
       </div>
 
@@ -263,7 +294,7 @@ export default function LguLiveMapView(props: Props) {
           onClick={centerDagupan}
           className="pointer-events-auto inline-flex items-center gap-2
                      rounded-md bg-white px-3 py-2 text-sm font-semibold
-                     border border-gray-200 shadow-sm hover:bg-gray-50"
+                     border border-gray-200 shadow-sm hover:bg-gray-50 dark:bg-[#0E1626] dark:border-[#162544] dark:text-slate-200 dark:hover:bg-[#122036]"
         >
           <RefreshCcw size={16} />
           Center Dagupan
@@ -273,7 +304,7 @@ export default function LguLiveMapView(props: Props) {
           onClick={() => setLayersOpen(true)}
           className="pointer-events-auto h-10 w-10 rounded-md bg-white
                      border border-gray-200 shadow-sm hover:bg-gray-50
-                     grid place-items-center"
+                     grid place-items-center dark:bg-[#0E1626] dark:border-[#162544] dark:text-slate-200 dark:hover:bg-[#122036]"
           aria-label="Open layers panel"
           title="Layers"
         >
@@ -348,28 +379,28 @@ export default function LguLiveMapView(props: Props) {
           className="pointer-events-auto
                      h-7.25 w-7.25 rounded-sm bg-white
                      border border-gray-300 shadow-sm hover:bg-gray-50
-                     grid place-items-center"
+                     grid place-items-center dark:bg-[#0E1626] dark:border-[#22365D] dark:hover:bg-[#122036]"
           aria-label="Locate me"
           title="Locate Me"
         >
-          <LocateFixed size={15} className="text-gray-900" />
+          <LocateFixed size={15} className="text-gray-900 dark:text-slate-100" />
         </button>
       </div>
 
       {/* LEFT DETAILS PANEL (only opens on emergency pin click) */}
       <aside
         className={[
-          "absolute left-0 top-0 h-full z-30 bg-white border-r border-gray-200 transition-all duration-200 overflow-hidden",
+          "absolute left-0 top-0 h-full z-30 bg-white border-r border-gray-200 transition-all duration-200 overflow-hidden dark:bg-[#0B1220] dark:border-[#162544]",
           effectiveDetailsWidth,
         ].join(" ")}
       >
         {detailsOpen && selectedEmergencyDetails ? (
           <div className="h-full flex flex-col">
-            <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-              <div className="text-sm font-bold text-gray-900">Emergency Details</div>
+            <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between dark:border-[#162544]">
+              <div className="text-sm font-bold text-gray-900 dark:text-slate-100">Emergency Details</div>
               <button
                 onClick={cleanupDetails}
-                className="h-9 w-9 rounded-lg hover:bg-gray-100 grid place-items-center text-gray-700"
+                className="h-9 w-9 rounded-lg hover:bg-gray-100 grid place-items-center text-gray-700 dark:text-slate-300 dark:hover:bg-[#122036]"
                 aria-label="Close details"
                 title="Close"
               >
@@ -379,35 +410,35 @@ export default function LguLiveMapView(props: Props) {
 
             <div className="p-4 overflow-y-auto">
               <div className="space-y-4">
-                  <div className="rounded-xl border border-gray-200 p-4">
-                    <div className="text-xs text-gray-500">Type</div>
-                    <div className="text-base font-extrabold text-gray-900">
+                  <div className="rounded-xl border border-gray-200 p-4 dark:border-[#162544]">
+                    <div className="text-xs text-gray-500 dark:text-slate-500">Type</div>
+                    <div className="text-base font-extrabold text-gray-900 dark:text-slate-100">
                       {selectedEmergencyDetails.emergencyType}
                     </div>
 
                     <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
                       <div>
-                        <div className="text-xs text-gray-500">Status</div>
-                        <div className="font-bold text-gray-900">{selectedEmergencyDetails.status}</div>
+                        <div className="text-xs text-gray-500 dark:text-slate-500">Status</div>
+                        <div className="font-bold text-gray-900 dark:text-slate-100">{selectedEmergencyDetails.status}</div>
                       </div>
                       <div>
-                        <div className="text-xs text-gray-500">Source</div>
-                        <div className="font-bold text-gray-900">
+                        <div className="text-xs text-gray-500 dark:text-slate-500">Source</div>
+                        <div className="font-bold text-gray-900 dark:text-slate-100">
                           {selectedEmergencyDetails.source ?? "—"}
                         </div>
                       </div>
                     </div>
 
                     <div className="mt-3">
-                      <div className="text-xs text-gray-500">Barangay</div>
-                      <div className="font-bold text-gray-900">
+                      <div className="text-xs text-gray-500 dark:text-slate-500">Barangay</div>
+                      <div className="font-bold text-gray-900 dark:text-slate-100">
                         {selectedEmergencyDetails.barangayName ?? "—"}
                       </div>
                     </div>
 
                     <div className="mt-3">
-                      <div className="text-xs text-gray-500">Reported At</div>
-                      <div className="font-bold text-gray-900">
+                      <div className="text-xs text-gray-500 dark:text-slate-500">Reported At</div>
+                      <div className="font-bold text-gray-900 dark:text-slate-100">
                         {selectedEmergencyDetails.reportedAt
                           ? new Date(selectedEmergencyDetails.reportedAt).toLocaleString()
                           : "—"}
@@ -415,13 +446,13 @@ export default function LguLiveMapView(props: Props) {
                     </div>
 
                     <div className="mt-3">
-                      <div className="text-xs text-gray-500">Notes</div>
-                      <div className="text-sm text-gray-800 whitespace-pre-wrap">
+                      <div className="text-xs text-gray-500 dark:text-slate-500">Notes</div>
+                      <div className="text-sm text-gray-800 whitespace-pre-wrap dark:text-slate-300">
                         {selectedEmergencyDetails.notes ?? "—"}
                       </div>
                     </div>
 
-                    <div className="mt-3 text-xs text-gray-500">
+                    <div className="mt-3 text-xs text-gray-500 dark:text-slate-500">
                       {selectedEmergencyDetails.lng.toFixed(6)}, {selectedEmergencyDetails.lat.toFixed(6)}
                     </div>
                   </div>
@@ -440,7 +471,7 @@ export default function LguLiveMapView(props: Props) {
                     <button
                       type="button"
                       onClick={toggleTrackPanel}
-                      className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-extrabold text-gray-900 hover:bg-gray-50 flex items-center justify-center gap-2"
+                      className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-extrabold text-gray-900 hover:bg-gray-50 flex items-center justify-center gap-2 dark:border-[#22365D] dark:bg-[#0E1626] dark:text-slate-100 dark:hover:bg-[#122036]"
                     >
                       <Navigation2 size={16} />
                       {trackOpen ? "Hide Tracking" : "Track Responders"}
@@ -449,14 +480,14 @@ export default function LguLiveMapView(props: Props) {
 
                   {/* TRACKING */}
                   {trackOpen ? (
-                    <div className="rounded-xl border border-gray-200 p-4">
+                    <div className="rounded-xl border border-gray-200 p-4 dark:border-[#162544]">
                       <div className="flex items-center justify-between">
-                        <div className="text-sm font-extrabold text-gray-900">Responders</div>
-                        <div className="text-xs font-bold text-gray-600">{assignedResponders.length}</div>
+                        <div className="text-sm font-extrabold text-gray-900 dark:text-slate-100">Responders</div>
+                        <div className="text-xs font-bold text-gray-600 dark:text-slate-400">{assignedResponders.length}</div>
                       </div>
 
                       {assignedResponders.length === 0 ? (
-                        <div className="mt-2 text-sm text-gray-700">
+                        <div className="mt-2 text-sm text-gray-700 dark:text-slate-300">
                           No responders assigned yet. Click <span className="font-semibold">Dispatch Responders</span> to send help.
                         </div>
                       ) : (
@@ -464,7 +495,7 @@ export default function LguLiveMapView(props: Props) {
                           {assignedResponders.map((r) => (
                             <div
                               key={r.id}
-                              className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2"
+                              className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 dark:border-[#162544] dark:bg-[#0E1626]"
                             >
                               <div className="flex items-center gap-2">
                                 <span
@@ -474,15 +505,15 @@ export default function LguLiveMapView(props: Props) {
                                   ].join(" ")}
                                 />
                                 <div>
-                                  <div className="text-sm font-bold text-gray-900">{r.name}</div>
-                                  <div className="text-xs text-gray-600">{r.skill}</div>
+                                  <div className="text-sm font-bold text-gray-900 dark:text-slate-100">{r.name}</div>
+                                  <div className="text-xs text-gray-600 dark:text-slate-400">{r.skill}</div>
                                 </div>
                               </div>
 
                               <button
                                 type="button"
                                 onClick={() => centerOnResponder(r.id)}
-                                className="h-9 w-9 rounded-lg hover:bg-white grid place-items-center text-gray-700"
+                                className="h-9 w-9 rounded-lg hover:bg-white grid place-items-center text-gray-700 dark:text-slate-300 dark:hover:bg-[#122036]"
                                 title="Center on map"
                                 aria-label="Center responder"
                               >
@@ -514,17 +545,17 @@ export default function LguLiveMapView(props: Props) {
       {/* RIGHT LAYERS PANEL (collapsible, for styles + toggles + draw hazards) */}
       <aside
         className={[
-          "absolute right-0 top-0 h-full z-30 bg-white border-l border-gray-200 transition-all duration-200 overflow-hidden",
+          "absolute right-0 top-0 h-full z-30 bg-white border-l border-gray-200 transition-all duration-200 overflow-hidden dark:bg-[#0B1220] dark:border-[#162544]",
           layersOpen ? "w-90" : "w-0 border-l-0",
         ].join(" ")}
       >
         {layersOpen ? (
           <div className="h-full flex flex-col">
-            <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-              <div className="text-sm font-bold text-gray-900">Layers & Map</div>
+            <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between dark:border-[#162544]">
+              <div className="text-sm font-bold text-gray-900 dark:text-slate-100">Layers & Map</div>
               <button
                 onClick={() => setLayersOpen(false)}
-                className="h-9 w-9 rounded-lg hover:bg-gray-100 grid place-items-center text-gray-700"
+                className="h-9 w-9 rounded-lg hover:bg-gray-100 grid place-items-center text-gray-700 dark:text-slate-300 dark:hover:bg-[#122036]"
                 aria-label="Close panel"
                 title="Close"
               >
@@ -535,7 +566,7 @@ export default function LguLiveMapView(props: Props) {
             <div className="p-4 space-y-6 overflow-y-auto">
               {/* MAP STYLE */}
               <div className="space-y-3">
-                <div className="text-xs font-bold text-gray-500 uppercase tracking-wide">Map style</div>
+                <div className="text-xs font-bold text-gray-500 uppercase tracking-wide dark:text-slate-500">Map style</div>
                 <div className="space-y-2">
                   {[
                     { key: "satellite-streets-v12", label: "Satellite + Streets" },
@@ -544,9 +575,9 @@ export default function LguLiveMapView(props: Props) {
                   ].map((opt) => (
                     <label
                       key={opt.key}
-                      className="flex items-center justify-between rounded-xl border border-gray-200 bg-white hover:bg-gray-50 px-4 py-3 cursor-pointer"
+                      className="flex items-center justify-between rounded-xl border border-gray-200 bg-white hover:bg-gray-50 px-4 py-3 cursor-pointer dark:border-[#162544] dark:bg-[#0E1626] dark:hover:bg-[#122036]"
                     >
-                      <div className="text-sm font-bold text-gray-800">{opt.label}</div>
+                      <div className="text-sm font-bold text-gray-800 dark:text-slate-200">{opt.label}</div>
                       <input
                         type="radio"
                         name="map-style"
@@ -560,10 +591,10 @@ export default function LguLiveMapView(props: Props) {
 
               {/* LAYERS */}
               <div className="space-y-3">
-                <div className="text-xs font-bold text-gray-500 uppercase tracking-wide">Layers</div>
+                <div className="text-xs font-bold text-gray-500 uppercase tracking-wide dark:text-slate-500">Layers</div>
 
                 <ToggleRow
-                  icon={<MapPin size={16} className="text-gray-600" />}
+                  icon={<MapPin size={16} className="text-gray-600 dark:text-slate-400" />}
                   label="Emergencies"
                   checked={showEmergencies}
                   onToggle={() => setShowEmergencies((v) => !v)}
@@ -571,7 +602,7 @@ export default function LguLiveMapView(props: Props) {
                 />
 
                 <ToggleRow
-                  icon={<Users size={16} className="text-gray-600" />}
+                  icon={<Users size={16} className="text-gray-600 dark:text-slate-400" />}
                   label="Volunteers"
                   checked={showVolunteers}
                   onToggle={() => setShowVolunteers((v) => !v)}
@@ -579,7 +610,7 @@ export default function LguLiveMapView(props: Props) {
                 />
 
                 <ToggleRow
-                  icon={<ShieldAlert size={16} className="text-gray-600" />}
+                  icon={<ShieldAlert size={16} className="text-gray-600 dark:text-slate-400" />}
                   label="Hazard Zones"
                   checked={showHazardZones}
                   onToggle={() => setShowHazardZones((v) => !v)}
@@ -589,7 +620,7 @@ export default function LguLiveMapView(props: Props) {
 
               {/* TOOLS */}
               <div className="space-y-3">
-                <div className="text-xs font-bold text-gray-500 uppercase tracking-wide">Tools</div>
+                <div className="text-xs font-bold text-gray-500 uppercase tracking-wide dark:text-slate-500">Tools</div>
 
                 <button
                   onClick={() => {
@@ -605,7 +636,7 @@ export default function LguLiveMapView(props: Props) {
                 {isDrawingHazard ? (
                   <button
                     onClick={cancelDrawHazard}
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 px-4 py-3 text-sm font-bold text-gray-800"
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 px-4 py-3 text-sm font-bold text-gray-800 dark:border-[#162544] dark:bg-[#0E1626] dark:text-slate-200 dark:hover:bg-[#122036]"
                   >
                     Cancel drawing
                   </button>
@@ -702,27 +733,27 @@ export default function LguLiveMapView(props: Props) {
 
                 {/* Draft save form */}
                 {hazardDraft ? (
-                  <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
-                    <div className="text-sm font-extrabold text-gray-900">Save hazard zone</div>
+                  <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3 dark:border-[#162544] dark:bg-[#0E1626]">
+                    <div className="text-sm font-extrabold text-gray-900 dark:text-slate-100">Save hazard zone</div>
 
                     <div>
-                      <div className="text-xs font-bold text-gray-500 mb-1">Name</div>
+                      <div className="text-xs font-bold text-gray-500 mb-1 dark:text-slate-500">Name</div>
                       <input
                         value={draftForm.name}
                         onChange={(e) => setDraftForm((s) => ({ ...s, name: e.target.value }))}
-                        className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                        className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:border-[#162544] dark:bg-[#0B1220] dark:text-slate-100 dark:placeholder:text-slate-500"
                         placeholder="e.g., Flooded road segment"
                       />
                     </div>
 
                     <div>
-                      <div className="text-xs font-bold text-gray-500 mb-1">Hazard type</div>
+                      <div className="text-xs font-bold text-gray-500 mb-1 dark:text-slate-500">Hazard type</div>
                       <select
                         value={draftForm.hazardType}
                         onChange={(e) =>
                           setDraftForm((s) => ({ ...s, hazardType: e.target.value as any }))
                         }
-                        className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                        className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:border-[#162544] dark:bg-[#0B1220] dark:text-slate-100"
                       >
                         {HAZARD_TYPES.map((t) => (
                           <option key={t} value={t}>
@@ -739,25 +770,25 @@ export default function LguLiveMapView(props: Props) {
                       Save
                     </button>
 
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-gray-500 dark:text-slate-500">
                       Polygon captured. Saving will store this in MongoDB.
                     </div>
                   </div>
                 ) : null}
 
-                <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-                  <div className="text-xs font-bold text-gray-500">Sync</div>
+                <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-[#162544] dark:bg-[#0E1626]">
+                  <div className="text-xs font-bold text-gray-500 dark:text-slate-500">Sync</div>
                   <div className="mt-2 flex flex-wrap gap-2">
                     <button
                       onClick={() => refetchEmergencies()}
-                      className="rounded-lg border border-gray-200 bg-white hover:bg-gray-50 px-3 py-2 text-xs font-bold text-gray-800"
+                      className="rounded-lg border border-gray-200 bg-white hover:bg-gray-50 px-3 py-2 text-xs font-bold text-gray-800 dark:border-[#162544] dark:bg-[#0B1220] dark:text-slate-200 dark:hover:bg-[#122036]"
                       title="Refresh emergencies"
                     >
                       Refresh emergencies
                     </button>
                     <button
                       onClick={() => refetchHazardZones()}
-                      className="rounded-lg border border-gray-200 bg-white hover:bg-gray-50 px-3 py-2 text-xs font-bold text-gray-800"
+                      className="rounded-lg border border-gray-200 bg-white hover:bg-gray-50 px-3 py-2 text-xs font-bold text-gray-800 dark:border-[#162544] dark:bg-[#0B1220] dark:text-slate-200 dark:hover:bg-[#122036]"
                       title="Refresh hazard zones"
                     >
                       Refresh hazards
@@ -765,7 +796,7 @@ export default function LguLiveMapView(props: Props) {
                   </div>
 
                   {(emergenciesLoading || hazardZonesLoading) && (
-                    <div className="mt-2 text-xs text-gray-500">Loading…</div>
+                    <div className="mt-2 text-xs text-gray-500 dark:text-slate-500">Loading...</div>
                   )}
                   {emergenciesError ? (
                     <div className="mt-2 text-xs text-red-600">Emergencies: {String(emergenciesError)}</div>
@@ -777,16 +808,16 @@ export default function LguLiveMapView(props: Props) {
               </div>
 
               {/* Quick info */}
-              <div className="rounded-xl border border-gray-200 bg-white p-4">
-                <div className="text-xs font-bold text-gray-500 uppercase tracking-wide">Quick info</div>
+              <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-[#162544] dark:bg-[#0E1626]">
+                <div className="text-xs font-bold text-gray-500 uppercase tracking-wide dark:text-slate-500">Quick info</div>
                 <div className="mt-2 grid grid-cols-2 gap-3 text-sm">
-                  <div className="rounded-lg bg-gray-50 border border-gray-200 px-3 py-2">
-                    <div className="text-xs text-gray-500">Emergencies</div>
-                    <div className="font-extrabold text-gray-900">{emergenciesCount}</div>
+                  <div className="rounded-lg bg-gray-50 border border-gray-200 px-3 py-2 dark:border-[#162544] dark:bg-[#0B1220]">
+                    <div className="text-xs text-gray-500 dark:text-slate-500">Emergencies</div>
+                    <div className="font-extrabold text-gray-900 dark:text-slate-100">{emergenciesCount}</div>
                   </div>
-                  <div className="rounded-lg bg-gray-50 border border-gray-200 px-3 py-2">
-                    <div className="text-xs text-gray-500">Hazards</div>
-                    <div className="font-extrabold text-gray-900">{hazardsCount}</div>
+                  <div className="rounded-lg bg-gray-50 border border-gray-200 px-3 py-2 dark:border-[#162544] dark:bg-[#0B1220]">
+                    <div className="text-xs text-gray-500 dark:text-slate-500">Hazards</div>
+                    <div className="font-extrabold text-gray-900 dark:text-slate-100">{hazardsCount}</div>
                   </div>
                 </div>
               </div>

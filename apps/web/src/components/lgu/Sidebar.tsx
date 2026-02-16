@@ -276,7 +276,7 @@ function SidebarSubmenu({
           "relative w-full flex items-center rounded-md transition-colors",
           "py-2 text-sm font-medium text-gray-800 hover:bg-gray-100 dark:text-slate-200 dark:hover:bg-[#0E1A30]",
           "gap-3 px-3",
-          active ? "bg-gray-200 text-gray-900" : "",
+          active ? "bg-gray-200 text-gray-900 dark:bg-[#0F1A2E] dark:text-slate-100" : "",
           active
             ? "before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:rounded-r before:bg-blue-600 dark:before:bg-blue-500"
             : "",
@@ -310,7 +310,7 @@ function SidebarSubmenu({
                         "relative flex items-center gap-2 rounded-md",
                         "py-1.5 text-sm transition-colors px-3",
                         isActive
-                          ? "bg-gray-200 text-gray-900"
+                          ? "bg-gray-200 text-gray-900 dark:bg-[#0F1A2E] dark:text-slate-100"
                           : "text-gray-700 hover:bg-gray-100 dark:text-slate-300 dark:hover:bg-[#0E1A30]",
                       ].join(" ")
                     }

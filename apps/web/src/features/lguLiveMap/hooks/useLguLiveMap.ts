@@ -754,7 +754,17 @@ export function useLguLiveMap() {
     await refetchHazardZones();
   };
 
+  const onRefresh = useCallback(async () => {
+    await Promise.all([refetchEmergencies(), refetchHazardZones(), refetchVolunteers()]);
+  }, [refetchEmergencies, refetchHazardZones, refetchVolunteers]);
+
+  const loading = emergenciesLoading || hazardZonesLoading || volunteersLoading;
+  const error = emergenciesError || hazardZonesError || volunteersError || null;
+
   return {
+    loading,
+    error,
+    onRefresh,
     mapReady,
     onMapReady,
     mapStyleKey,

@@ -1,0 +1,14 @@
+{
+  "name": "@lifeline/ai",
+  "private": true,
+  "version": "0.0.1",
+  "scripts": {
+    "venv:create": "python -m venv .venv",
+    "venv:install": ".\\.venv\\Scripts\\python -m pip install -r requirements.txt",
+    "train:routing": ".\\.venv\\Scripts\\python src/routing-risk/train.py",
+    "export:routing": ".\\.venv\\Scripts\\python src/routing-risk/export_onnx.py",
+    "train:priority": ".\\.venv\\Scripts\\python src/emergency-priority/train.py",
+    "export:priority": ".\\.venv\\Scripts\\python src/emergency-priority/export_onnx.py",
+    "preprocess:routing": ".\\.venv\\Scripts\\python src/routing-risk/preprocess.py"
+  }
+}

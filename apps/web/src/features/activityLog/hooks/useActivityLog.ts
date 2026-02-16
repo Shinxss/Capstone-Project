@@ -21,16 +21,20 @@ const defaultFilters: ActivityLogFilters = {
 
 export function useActivityLog() {
   const [entries, setEntries] = useState<ActivityLogEntry[]>([]);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<ActivityLogFilters>(defaultFilters);
 
   const refresh = useCallback(() => {
+    setLoading(true);
     try {
       setError(null);
       seedActivityLogIfEmpty();
       setEntries(listActivityLogEntries());
     } catch (e: any) {
       setError(e?.message || "Failed to load activity log");
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -69,6 +73,7 @@ export function useActivityLog() {
   return {
     entries,
     filtered,
+    loading,
     error,
     filters,
     setFilters,
@@ -78,4 +83,3 @@ export function useActivityLog() {
     clearFilters: () => setFilters(defaultFilters),
   };
 }
-

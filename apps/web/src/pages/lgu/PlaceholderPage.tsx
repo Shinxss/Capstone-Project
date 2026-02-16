@@ -1,15 +1,18 @@
-import Sidebar from "../../components/lgu/Sidebar";
+import LguShell from "../../components/lgu/LguShell";
+import LguPlaceholderView from "../../features/placeholder/components/LguPlaceholderView";
+import { useLguPlaceholder } from "../../features/placeholder/hooks/useLguPlaceholder";
 
-export default function PlaceholderPage({ title }: { title: string }) {
+type Props = {
+  title: string;
+  subtitle?: string;
+};
+
+export default function PlaceholderPage({ title, subtitle = "Page coming soon" }: Props) {
+  const vm = useLguPlaceholder(title);
+
   return (
-    <div className="min-h-screen bg-[#F6F7F9] flex">
-      <Sidebar />
-      <main className="flex-1 p-6">
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <div className="text-2xl font-bold text-gray-900">{title}</div>
-          <div className="text-sm text-gray-500 mt-1">Placeholder page (coming soon)</div>
-        </div>
-      </main>
-    </div>
+    <LguShell title={title} subtitle={subtitle}>
+      <LguPlaceholderView loading={vm.loading} error={vm.error} onRefresh={vm.refetch} title={title} />
+    </LguShell>
   );
 }

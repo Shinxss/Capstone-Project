@@ -9,11 +9,13 @@ export type SettingsPatch = {
 
 export function useLguSettings() {
   const [settings, setSettings] = useState<LguSettings>(defaultSettings());
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
+    setLoading(true);
     try {
       setError(null);
       const cur = loadSettings();
@@ -21,6 +23,8 @@ export function useLguSettings() {
       setSavedAt(cur.updatedAt);
     } catch (e: any) {
       setError(e?.message || "Failed to load settings");
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -56,5 +60,5 @@ export function useLguSettings() {
     setSavedAt(d.updatedAt);
   }, []);
 
-  return { settings, update, refresh, save, reset, saving, error, savedAt };
+  return { settings, update, refresh, save, reset, loading, saving, error, savedAt };
 }

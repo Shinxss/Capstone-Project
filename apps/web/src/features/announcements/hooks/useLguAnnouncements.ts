@@ -21,16 +21,20 @@ export type AnnouncementFormErrors = Partial<Record<keyof AnnouncementDraftInput
 
 export function useLguAnnouncements() {
   const [items, setItems] = useState<Announcement[]>([]);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
+    setLoading(true);
     try {
       setError(null);
       seedAnnouncementsIfEmpty();
       setItems(listAnnouncements());
     } catch (e: any) {
       setError(e?.message || "Failed to load announcements");
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -128,6 +132,7 @@ export function useLguAnnouncements() {
   }, [refresh]);
 
   return {
+    loading,
     announcements: items,
     error,
     busyId,
@@ -141,4 +146,3 @@ export function useLguAnnouncements() {
     validate,
   };
 }
-
