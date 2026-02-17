@@ -1,6 +1,7 @@
 import React, { useCallback } from "react";
 import { Alert, Pressable, SafeAreaView, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
+import { useAuth } from "../../features/auth/AuthProvider";
 import { useSession } from "../../features/auth/hooks/useSession";
 import { useGoogleLogin } from "../../features/auth/hooks/useGoogleLogin";
 import { linkGoogleAccount } from "../../features/auth/services/authApi";
@@ -30,7 +31,8 @@ function SettingsRow({ title, subtitle, onPress, disabled }: SettingsRowProps) {
 
 export default function MoreScreen() {
   const router = useRouter();
-  const { logout, displayName, isUser, session, updateUser } = useSession();
+  const { signOut } = useAuth();
+  const { displayName, isUser, session, updateUser } = useSession();
 
   const user = session?.mode === "user" ? session.user : null;
   const hasPassword =
@@ -63,18 +65,30 @@ export default function MoreScreen() {
   });
 
   const onLogout = useCallback(() => {
+    if (!isUser) {
+      void (async () => {
+        await signOut();
+        router.replace("/(auth)/login");
+      })();
+      return;
+    }
+
     Alert.alert("Log out", "Are you sure you want to log out?", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Log out",
         style: "destructive",
         onPress: async () => {
-          await logout();
-          router.replace("/(auth)/login");
+          try {
+            await signOut();
+            router.replace("/(auth)/login");
+          } catch {
+            Alert.alert("Logout failed", "Please try again.");
+          }
         },
       },
     ]);
-  }, [logout, router]);
+  }, [isUser, router, signOut]);
 
   const onResetPassword = useCallback(() => {
     router.push("/forgot-password");
@@ -126,12 +140,12 @@ export default function MoreScreen() {
         </View>
 
         <Pressable style={[styles.btn, !isUser && styles.btnDisabled]} onPress={onLogout}>
-          <Text style={styles.btnText}>Log out</Text>
+          <Text style={styles.btnText}>{isUser ? "Log out" : "Log in"}</Text>
         </Pressable>
 
         {!isUser && (
           <Text style={styles.hint}>
-            You are using Guest mode. Logging out will return you to Login.
+            You are in Guest mode. Tap Log in to continue with your account.
           </Text>
         )}
       </View>

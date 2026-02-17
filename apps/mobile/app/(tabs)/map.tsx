@@ -185,7 +185,7 @@ function PulseMarker({ type }: { type: EmergencyType }) {
 export default function MapTab() {
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState("");
-  const { key: styleKey, styleURL, next } = useMapStyle("dark");
+  const { key: styleKey, styleURL, next } = useMapStyle("streets");
 
   const { activeDispatch } = useActiveDispatch({ pollMs: 8000 });
   const [myLocation, setMyLocation] = useState<[number, number] | null>(null);

@@ -1,14 +1,13 @@
 import { useCallback, useState } from "react";
 import { useRouter } from "expo-router";
-import { loginCommunity } from "../services/authApi";
 import { validateLogin } from "../utils/authValidators";
 import { getErrorMessage } from "../utils/authErrors";
-import { useSession } from "./useSession";
 import { useGoogleLogin } from "./useGoogleLogin";
+import { useAuth } from "../AuthProvider";
 
 export function useLogin() {
   const router = useRouter();
-  const { loginAsGuest, loginAsUser } = useSession();
+  const { signIn, continueAsGuest } = useAuth();
   const {
     start: onGoogle,
     loading: googleLoading,
@@ -37,29 +36,13 @@ export function useLogin() {
 
     setLoading(true);
     try {
-      const { accessToken, user } = await loginCommunity({ email: email.trim(), password });
-
-      await loginAsUser({
-        id: user.id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        accessToken,
-        role: user.role,
-        volunteerStatus: user.volunteerStatus,
-        authProvider: user.authProvider,
-        emailVerified: user.emailVerified,
-        passwordSet: user.passwordSet,
-        googleLinked: user.googleLinked,
-      });
-
-      router.replace("/(tabs)");
+      await signIn(email.trim(), password);
     } catch (err) {
       setError(getErrorMessage(err, "Login failed"));
     } finally {
       setLoading(false);
     }
-  }, [email, password, loading, googleLoading, clearGoogleError, router, loginAsUser]);
+  }, [email, password, loading, googleLoading, clearGoogleError, signIn]);
 
   const skip = useCallback(async () => {
     if (loading || googleLoading) return;
@@ -67,12 +50,12 @@ export function useLogin() {
     clearGoogleError();
 
     try {
-      await loginAsGuest();
+      await continueAsGuest();
       router.replace("/(tabs)");
     } catch (err) {
       setError(getErrorMessage(err, "Failed to enter guest mode"));
     }
-  }, [loading, googleLoading, clearGoogleError, loginAsGuest, router]);
+  }, [loading, googleLoading, clearGoogleError, continueAsGuest, router]);
 
   return {
     email,

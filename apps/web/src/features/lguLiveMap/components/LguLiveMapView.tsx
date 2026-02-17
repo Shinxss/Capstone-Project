@@ -82,7 +82,7 @@ function Pill({
   value: number;
 }) {
   return (
-    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-white text-xs font-bold">
+    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/65 border border-white/70 text-gray-800 text-xs font-bold dark:bg-white/10 dark:border-white/20 dark:text-white">
       {icon}
       {value} {label}
     </span>
@@ -284,7 +284,7 @@ export default function LguLiveMapView(props: Props) {
 
       {/* Top-right: pills + center + layers */}
       <div className="absolute top-3 right-3 z-20 flex items-center gap-2 pointer-events-none">
-        <div className="pointer-events-auto inline-flex items-center gap-2 rounded-full bg-black/55 backdrop-blur px-2 py-1 border border-white/10">
+        <div className="pointer-events-auto inline-flex items-center gap-2 rounded-full bg-white/70 backdrop-blur px-2 py-1 border border-white/70 shadow-sm dark:bg-black/55 dark:border-white/10">
           <Pill icon={<AlertTriangle size={14} />} label="Emergencies" value={emergenciesCount} />
           <Pill icon={<ShieldAlert size={14} />} label="Hazards" value={hazardsCount} />
           <Pill icon={<Users size={14} />} label="Volunteers" value={volunteersCount} />
@@ -323,12 +323,12 @@ export default function LguLiveMapView(props: Props) {
 
       {/* Floating Legend (outside layers) */}
       <div className="absolute top-16 right-3 z-20 pointer-events-none">
-        <div className="pointer-events-auto rounded-xl bg-black/65 text-white backdrop-blur shadow-lg border border-white/10 overflow-hidden">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-white/10">
+        <div className="pointer-events-auto rounded-xl bg-white/70 text-gray-900 backdrop-blur shadow-lg border border-white/70 overflow-hidden dark:bg-black/65 dark:text-white dark:border-white/10">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-white/70 dark:border-white/10">
             <div className="text-xs font-extrabold">Legend</div>
             <button
               onClick={() => setLegendMinimized((v) => !v)}
-              className="h-7 w-7 rounded-md hover:bg-white/10 grid place-items-center"
+              className="h-7 w-7 rounded-md hover:bg-white/60 dark:hover:bg-white/10 grid place-items-center"
               aria-label={legendMinimized ? "Expand legend" : "Minimize legend"}
               title={legendMinimized ? "Expand" : "Minimize"}
             >
@@ -340,7 +340,7 @@ export default function LguLiveMapView(props: Props) {
 
           {!legendMinimized ? (
             <div className="px-3 py-3 w-65">
-              <div className="text-[11px] font-bold text-white/85 mb-2">Hazard Zones</div>
+              <div className="text-[11px] font-bold text-gray-600 mb-2 dark:text-white/85">Hazard Zones</div>
               <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[12px]">
                 {HAZARD_TYPES.map((t) => (
                   <div key={t} className="flex items-center gap-2">
@@ -350,7 +350,7 @@ export default function LguLiveMapView(props: Props) {
                 ))}
               </div>
 
-              <div className="mt-3 text-[11px] font-bold text-white/85 mb-2">Volunteers</div>
+              <div className="mt-3 text-[11px] font-bold text-gray-600 mb-2 dark:text-white/85">Volunteers</div>
               <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[12px]">
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-emerald-500" />
@@ -367,7 +367,7 @@ export default function LguLiveMapView(props: Props) {
               </div>
             </div>
           ) : (
-            <div className="px-3 py-2 text-[12px] text-white/80">Legend minimized</div>
+            <div className="px-3 py-2 text-[12px] text-gray-600 dark:text-white/80">Legend minimized</div>
           )}
         </div>
       </div>

@@ -31,7 +31,7 @@ export function useResetPassword(email: string, resetToken: string) {
     try {
       await resetPassword(email, resetToken, newPassword, confirmPassword);
       Alert.alert("Password Updated", "Your password has been reset.", [
-        { text: "OK", onPress: () => router.replace("/login") },
+        { text: "OK", onPress: () => router.replace("/(auth)/login") },
       ]);
     } catch (err) {
       setError(getErrorMessage(err, "Failed to reset password"));

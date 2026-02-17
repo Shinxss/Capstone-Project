@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import { Platform } from "react-native";
-import { useRouter } from "expo-router";
 import * as Google from "expo-auth-session/providers/google";
 import {
   GoogleSignin,
@@ -10,15 +9,14 @@ import {
 } from "@react-native-google-signin/google-signin";
 import { loginWithGoogle } from "../services/authApi";
 import { getErrorMessage } from "../utils/authErrors";
-import { useSession } from "./useSession";
+import { useAuth } from "../AuthProvider";
 
 type UseGoogleLoginOptions = {
   onIdToken?: (idToken: string) => Promise<void>;
 };
 
 export function useGoogleLogin(options: UseGoogleLoginOptions = {}) {
-  const router = useRouter();
-  const { loginAsUser } = useSession();
+  const { signInWithToken } = useAuth();
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,25 +51,10 @@ export function useGoogleLogin(options: UseGoogleLoginOptions = {}) {
         return;
       }
 
-      const { accessToken, user } = await loginWithGoogle({ idToken });
-
-      await loginAsUser({
-        id: user.id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        accessToken,
-        role: user.role,
-        volunteerStatus: user.volunteerStatus,
-        authProvider: user.authProvider,
-        emailVerified: user.emailVerified,
-        passwordSet: user.passwordSet,
-        googleLinked: user.googleLinked,
-      });
-
-      router.replace("/(tabs)");
+      const { accessToken } = await loginWithGoogle({ idToken });
+      await signInWithToken(accessToken);
     },
-    [loginAsUser, options, router]
+    [options, signInWithToken]
   );
 
   const startNativeAndroid = useCallback(async () => {

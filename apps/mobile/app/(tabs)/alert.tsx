@@ -2,11 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
+import { useRouter } from "expo-router";
 
 import type { DispatchOffer } from "../../features/dispatch/models/dispatch";
 import { completeDispatch, fetchMyCurrentDispatch, uploadDispatchProof } from "../../features/dispatch/services/dispatchApi";
+import { useTasksAccess } from "../../features/auth/hooks/useTasksAccess";
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || "";
+// Backend must still enforce auth + role checks on Tasks APIs (return 401/403 as needed).
 
 function absUrl(relative: string) {
   if (!relative) return relative;
@@ -23,6 +26,8 @@ function pill(status: string) {
 }
 
 export default function TasksScreen() {
+  const router = useRouter();
+  const { hydrated, canAccessTasks } = useTasksAccess();
   const [task, setTask] = useState<DispatchOffer | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -31,6 +36,11 @@ export default function TasksScreen() {
   const proofs = useMemo(() => (task?.proofs ?? []).slice().reverse(), [task]);
 
   const refresh = useCallback(async () => {
+    if (!canAccessTasks) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       const current = await fetchMyCurrentDispatch();
@@ -40,13 +50,20 @@ export default function TasksScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [canAccessTasks]);
 
   useEffect(() => {
+    if (!hydrated) return;
+    if (!canAccessTasks) {
+      router.replace("/(auth)/login");
+      return;
+    }
+
     refresh();
-  }, [refresh]);
+  }, [canAccessTasks, hydrated, refresh, router]);
 
   const pickAndUpload = useCallback(async () => {
+    if (!canAccessTasks) return;
     if (!task) return;
     try {
       setBusy(true);
@@ -83,9 +100,10 @@ export default function TasksScreen() {
     } finally {
       setBusy(false);
     }
-  }, [task]);
+  }, [canAccessTasks, task]);
 
   const markDone = useCallback(async () => {
+    if (!canAccessTasks) return;
     if (!task) return;
 
     Alert.alert(
@@ -111,7 +129,9 @@ export default function TasksScreen() {
         },
       ]
     );
-  }, [task]);
+  }, [canAccessTasks, task]);
+
+  if (!hydrated || !canAccessTasks) return null;
 
   return (
     <View className="flex-1 bg-gray-50">

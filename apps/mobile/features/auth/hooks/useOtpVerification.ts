@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { Alert } from "react-native";
 import { useRouter } from "expo-router";
-import { useSession } from "./useSession";
+import { useAuth } from "../AuthProvider";
 import {
   requestPasswordOtp,
   signupResendOtp,
@@ -14,7 +14,7 @@ export type OtpMode = "signup" | "reset";
 
 export function useOtpVerification(mode: OtpMode, email: string) {
   const router = useRouter();
-  const { loginAsUser } = useSession();
+  const { signInWithToken } = useAuth();
 
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
@@ -40,26 +40,13 @@ export function useOtpVerification(mode: OtpMode, email: string) {
     try {
       if (mode === "signup") {
         const result = await signupVerifyOtp(email, code);
-        if (result.accessToken && result.user?.id) {
-          await loginAsUser({
-            id: result.user.id,
-            email: result.user.email,
-            firstName: result.user.firstName,
-            lastName: result.user.lastName,
-            role: result.user.role,
-            volunteerStatus: result.user.volunteerStatus,
-            authProvider: result.user.authProvider,
-            emailVerified: result.user.emailVerified,
-            passwordSet: result.user.passwordSet,
-            googleLinked: result.user.googleLinked,
-            accessToken: result.accessToken,
-          });
-          router.replace("/(tabs)");
+        if (result.accessToken) {
+          await signInWithToken(result.accessToken);
           return;
         }
 
         Alert.alert("Success", "Signup completed. Please login.");
-        router.replace("/login");
+        router.replace("/(auth)/login");
         return;
       }
 
@@ -73,7 +60,7 @@ export function useOtpVerification(mode: OtpMode, email: string) {
     } finally {
       setLoading(false);
     }
-  }, [email, loading, loginAsUser, mode, otp, router]);
+  }, [email, loading, mode, otp, router, signInWithToken]);
 
   const resend = useCallback(async () => {
     if (resending) return;

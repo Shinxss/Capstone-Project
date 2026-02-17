@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, Pressable } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import AuthBackground from "../../components/AuthBackground";
 import LoginForm from "../../features/auth/components/LoginForm";
 import { useLogin } from "../../features/auth/hooks/useLogin";

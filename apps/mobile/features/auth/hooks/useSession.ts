@@ -7,6 +7,7 @@ import {
   patchUserSession,
   setGuestSession,
   setUserSession,
+  subscribeSession,
 } from "../services/sessionStorage";
 import { setApiAuthToken } from "../../../lib/api";
 
@@ -22,7 +23,13 @@ export function useSession() {
   }, []);
 
   useEffect(() => {
-    refresh();
+    void refresh();
+  }, [refresh]);
+
+  useEffect(() => {
+    return subscribeSession(() => {
+      void refresh();
+    });
   }, [refresh]);
 
   useEffect(() => {
