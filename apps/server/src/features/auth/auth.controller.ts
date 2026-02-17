@@ -1,21 +1,29 @@
-import { Request, Response } from "express";
-import { authenticateUser } from "./auth.service";
-import { signAccessToken } from "../../utils/jwt";
+import type { Request, Response } from "express";
+import { Types } from "mongoose";
+import { logAuditEvent, getAuditActor, getAuditRequestContext } from "../audit/audit.service";
 import { User } from "../users/user.model";
 import { verifyMfaChallenge } from "../../utils/mfa";
+import { signAccessToken } from "../../utils/jwt";
+import { authenticateUser } from "./auth.service";
 import { toAuthUserPayload } from "./otp.utils";
+import { TokenBlocklist } from "./TokenBlocklist.model";
 
 export async function login(req: Request, res: Response) {
   try {
     const { email, password } = req.body as { email?: string; password?: string };
 
-    if (!email || !password) {
+    if (
+      typeof email !== "string" ||
+      typeof password !== "string" ||
+      !email.trim() ||
+      !password
+    ) {
       return res.status(400).json({ message: "Email and password are required." });
     }
 
     const user = await authenticateUser(email, password);
     if (!user) {
-      return res.status(401).json({ message: "Invalid credentials." });
+      return res.status(401).json({ message: "Invalid credentials" });
     }
 
     const token = signAccessToken({ sub: user._id.toString(), role: user.role });
@@ -25,12 +33,11 @@ export async function login(req: Request, res: Response) {
       accessToken: token,
       user: toAuthUserPayload(user),
     });
-  } catch (e) {
+  } catch {
     return res.status(500).json({ message: "Login failed." });
   }
 }
 
-// ✅ NEW: Verify admin OTP and issue JWT
 export async function adminMfaVerify(req: Request, res: Response) {
   try {
     const { challengeId, code } = req.body as { challengeId?: string; code?: string };
@@ -65,10 +72,9 @@ export async function adminMfaVerify(req: Request, res: Response) {
   }
 }
 
-// Optional but useful: GET /auth/me to fetch profile
 export async function me(req: Request, res: Response) {
   try {
-    const userId = (req as any).userId as string | undefined;
+    const userId = req.userId;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
     const user = await User.findById(userId).select(
@@ -81,5 +87,47 @@ export async function me(req: Request, res: Response) {
     });
   } catch {
     return res.status(500).json({ message: "Failed to fetch profile." });
+  }
+}
+
+export async function logout(req: Request, res: Response) {
+  try {
+    const auth = req.auth;
+    if (!auth?.jti || !auth?.sub || typeof auth.exp !== "number") {
+      return res.status(401).json({ message: "Invalid token" });
+    }
+
+    const expiresAt = new Date(auth.exp * 1000);
+    const userId = new Types.ObjectId(auth.sub);
+
+    await TokenBlocklist.updateOne(
+      { jti: auth.jti },
+      {
+        $setOnInsert: {
+          jti: auth.jti,
+          userId,
+          expiresAt,
+          reason: "logout",
+        },
+      },
+      { upsert: true }
+    );
+
+    const actor = getAuditActor(req);
+    const requestContext = getAuditRequestContext(req);
+    await logAuditEvent({
+      actorId: actor.actorId || auth.sub,
+      actorRole: actor.actorRole || auth.role || "",
+      action: "AUTH_LOGOUT",
+      targetType: "User",
+      targetId: auth.sub,
+      metadata: {},
+      ip: requestContext.ip,
+      userAgent: requestContext.userAgent,
+    });
+
+    return res.status(200).json({ success: true });
+  } catch {
+    return res.status(401).json({ message: "Invalid token" });
   }
 }

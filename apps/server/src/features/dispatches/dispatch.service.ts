@@ -10,6 +10,9 @@ import { User } from "../users/user.model";
 import { DispatchOffer, DispatchStatus } from "./dispatch.model";
 import { recordTaskVerification } from "@lifeline/blockchain";
 
+const MAX_PROOF_BYTES = 3 * 1024 * 1024; // 3MB
+const ALLOWED_PROOF_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/heic"]);
+
 export type CreateDispatchInput = {
   emergencyId: string;
   volunteerIds: string[];
@@ -165,22 +168,27 @@ export async function addProofToDispatch(params: {
     throw new Error("You can only upload proof for an accepted/done task");
   }
 
-  const clean = String(base64 || "").replace(/^data:.*;base64,/, "").trim();
-  if (!clean) throw new Error("base64 is required");
-
-  const ext = guessExt(mimeType, fileName);
+  const parsedProof = parseAndValidateProof({
+    base64: String(base64 || ""),
+    mimeType: mimeType ? String(mimeType) : undefined,
+    fileName: fileName ? String(fileName) : undefined,
+  });
   const dir = ensureUploadsDir();
-  const filename = `${dispatchId}_${Date.now()}_${crypto.randomBytes(6).toString("hex")}.${ext}`;
+  const filename = `${dispatchId}_${Date.now()}_${crypto.randomBytes(6).toString("hex")}.${parsedProof.ext}`;
   const abs = path.join(dir, filename);
 
-  const buf = Buffer.from(clean, "base64");
   // Encrypt before writing to disk (encryption-at-rest)
-  const encrypted = encryptBuffer(buf);
+  const encrypted = encryptBuffer(parsedProof.buffer);
   fs.writeFileSync(abs, encrypted);
 
   const url = `/uploads/dispatch-proofs/${filename}`;
   (offer.proofs as any) = Array.isArray(offer.proofs) ? offer.proofs : [];
-  offer.proofs.push({ url, uploadedAt: new Date(), mimeType, fileName } as any);
+  offer.proofs.push({
+    url,
+    uploadedAt: new Date(),
+    mimeType: parsedProof.mimeTypeDetected,
+    fileName: normalizeProofFileName(fileName),
+  } as any);
   await offer.save();
 
   return offer;
@@ -337,18 +345,94 @@ function ensureUploadsDir() {
   return dir;
 }
 
-function guessExt(mimeType?: string, fileName?: string) {
-  const name = (fileName || "").toLowerCase();
-  if (name.endsWith(".png")) return "png";
-  if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "jpg";
-  if (name.endsWith(".heic")) return "heic";
+function normalizeProofFileName(fileName?: string) {
+  const cleaned = String(fileName ?? "").trim();
+  if (!cleaned) return undefined;
+  return cleaned.slice(0, 255);
+}
 
-  const mt = (mimeType || "").toLowerCase();
-  if (mt.includes("png")) return "png";
-  if (mt.includes("jpeg") || mt.includes("jpg")) return "jpg";
-  if (mt.includes("heic")) return "heic";
+function parseAndValidateProof(input: { base64: string; mimeType?: string; fileName?: string }) {
+  const raw = String(input.base64 ?? "").trim();
+  if (!raw) throw new Error("base64 is required");
 
-  return "bin";
+  const dataUrlMatch = raw.match(/^data:([^;,]+);base64,(.+)$/i);
+  const fromDataUrl = dataUrlMatch?.[1]?.toLowerCase();
+  const encoded = (dataUrlMatch?.[2] ?? raw).replace(/\s+/g, "");
+
+  const declaredMime = String(input.mimeType ?? "").trim().toLowerCase();
+  if (declaredMime && !ALLOWED_PROOF_MIME_TYPES.has(declaredMime)) {
+    throw new Error("Invalid file type");
+  }
+
+  if (fromDataUrl && !ALLOWED_PROOF_MIME_TYPES.has(fromDataUrl)) {
+    throw new Error("Invalid file type");
+  }
+
+  if (!/^[A-Za-z0-9+/=]+$/.test(encoded) || encoded.length % 4 === 1) {
+    throw new Error("Invalid file type");
+  }
+
+  const buffer = Buffer.from(encoded, "base64");
+  if (buffer.length === 0) {
+    throw new Error("Invalid file type");
+  }
+
+  if (buffer.length > MAX_PROOF_BYTES) {
+    throw new Error("File too large");
+  }
+
+  const detected = detectFileTypeByMagicBytes(buffer);
+  if (!detected) {
+    throw new Error("Invalid file type");
+  }
+
+  if (declaredMime && declaredMime !== detected.mimeType) {
+    throw new Error("Invalid file type");
+  }
+
+  if (fromDataUrl && fromDataUrl !== detected.mimeType) {
+    throw new Error("Invalid file type");
+  }
+
+  return {
+    buffer,
+    ext: detected.ext,
+    mimeTypeDetected: detected.mimeType,
+  };
+}
+
+function detectFileTypeByMagicBytes(buffer: Buffer): { ext: "png" | "jpg" | "heic"; mimeType: "image/png" | "image/jpeg" | "image/heic" } | null {
+  if (isPng(buffer)) {
+    return { ext: "png", mimeType: "image/png" };
+  }
+
+  if (isJpeg(buffer)) {
+    return { ext: "jpg", mimeType: "image/jpeg" };
+  }
+
+  if (isHeic(buffer)) {
+    return { ext: "heic", mimeType: "image/heic" };
+  }
+
+  return null;
+}
+
+function isPng(buffer: Buffer) {
+  if (buffer.length < 8) return false;
+  const signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  return signature.every((byte, index) => buffer[index] === byte);
+}
+
+function isJpeg(buffer: Buffer) {
+  if (buffer.length < 3) return false;
+  return buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+}
+
+function isHeic(buffer: Buffer) {
+  if (buffer.length < 16) return false;
+  if (buffer.toString("ascii", 4, 8) !== "ftyp") return false;
+  const brand = buffer.toString("ascii", 8, 12);
+  return ["heic", "heix", "hevc", "hevx", "mif1", "msf1"].includes(brand);
 }
 
 function mustEnv(key: string) {

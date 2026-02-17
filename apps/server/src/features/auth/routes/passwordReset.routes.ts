@@ -4,6 +4,7 @@ import { z } from "zod";
 import { User } from "../../users/user.model";
 import { PasswordResetRequest } from "../models/PasswordResetRequest.model";
 import { sendPasswordResetOtpEmail } from "../../../utils/mailer";
+import { zodPasswordSchema } from "../password.policy";
 import {
   OTP_EXPIRY_MINUTES,
   OTP_MAX_VERIFY_ATTEMPTS,
@@ -16,21 +17,25 @@ import {
 
 const passwordResetRoutes = Router();
 
-const forgotPasswordSchema = z.object({
-  email: z.string().trim().email("Invalid email"),
-});
+const forgotPasswordSchema = z
+  .object({
+    email: z.string().trim().email("Invalid email"),
+  })
+  .strict();
 
-const verifyPasswordOtpSchema = z.object({
-  email: z.string().trim().email("Invalid email"),
-  otp: z.string().trim().regex(/^\d{6}$/, "OTP must be a 6-digit code"),
-});
+const verifyPasswordOtpSchema = z
+  .object({
+    email: z.string().trim().email("Invalid email"),
+    otp: z.string().trim().regex(/^\d{6}$/, "OTP must be a 6-digit code"),
+  })
+  .strict();
 
 const resetPasswordSchema = z
   .object({
     email: z.string().trim().email("Invalid email"),
     resetToken: z.string().trim().min(1, "Reset token is required"),
-    newPassword: z.string().min(8, "Password must be at least 8 characters"),
-    confirmPassword: z.string().min(8, "Confirm password is required"),
+    newPassword: zodPasswordSchema(),
+    confirmPassword: zodPasswordSchema(),
   })
   .superRefine((value, ctx) => {
     if (value.newPassword !== value.confirmPassword) {

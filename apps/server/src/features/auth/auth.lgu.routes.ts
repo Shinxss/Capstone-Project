@@ -1,41 +1,44 @@
-import { Router } from "express";
 import bcrypt from "bcryptjs";
+import { Router } from "express";
+import { logAuditEvent, getAuditRequestContext } from "../audit/audit.service";
 import { User } from "../users/user.model";
+import { loginLimiter } from "../../middlewares/rateLimit";
+import { validate } from "../../middlewares/validate";
 import { signAccessToken } from "../../utils/jwt";
+import { lguLoginSchema } from "./auth.schemas";
 import { createMfaChallenge, maskEmail } from "../../utils/mfa";
 import { sendOtpEmail } from "../../utils/mailer";
 
+const INVALID_CREDENTIALS = "Invalid credentials";
+
 export const lguAuthRouter = Router();
 
-lguAuthRouter.post("/login", async (req, res) => {
+lguAuthRouter.post("/login", loginLimiter, validate(lguLoginSchema), async (req, res) => {
   try {
-    const { username, password } = req.body as { username?: string; password?: string };
+    const { username, password } = req.body as { username: string; password: string };
 
-    if (!username || !password) {
-      return res.status(400).json({ success: false, error: "username and password are required" });
-    }
-
-    //  both LGU and ADMIN use this same login endpoint
     const user = await User.findOne({
       username,
       role: { $in: ["LGU", "ADMIN"] },
     }).lean();
 
-    if (!user) return res.status(401).json({ success: false, error: "Invalid credentials" });
-    if (!user.isActive) return res.status(403).json({ success: false, error: "Account is disabled" });
-    if (!user.passwordHash) return res.status(401).json({ success: false, error: "Invalid credentials" });
+    if (!user || !user.isActive || !user.passwordHash) {
+      return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });
+    }
 
     const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) return res.status(401).json({ success: false, error: "Invalid credentials" });
+    if (!ok) {
+      return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });
+    }
 
-    // ADMIN => MFA required (send OTP email)
+    const requestContext = getAuditRequestContext(req);
+
     if (user.role === "ADMIN") {
       if (!user.email) {
-        return res.status(400).json({ success: false, error: "Admin email missing for MFA" });
+        return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });
       }
 
       const { challengeId, code } = await createMfaChallenge(user._id, 5);
-
       await sendOtpEmail({
         to: user.email,
         otp: code,
@@ -43,26 +46,46 @@ lguAuthRouter.post("/login", async (req, res) => {
         expiryTime: 5,
       });
 
+      await logAuditEvent({
+        actorId: user._id.toString(),
+        actorRole: user.role,
+        action: "AUTH_ADMIN_PASSWORD_SUCCESS",
+        targetType: "User",
+        targetId: user._id.toString(),
+        metadata: { mfaRequired: true },
+        ip: requestContext.ip,
+        userAgent: requestContext.userAgent,
+      });
+
       return res.json({
-      success: true,
-      data: {
-        mfaRequired: true,
-        role: "ADMIN",
-        challengeId,
-        emailMasked: maskEmail(user.email),
-        user: {
-          id: user._id.toString(),
-          username: user.username,
-          role: user.role,
-          firstName: user.firstName,
-          lastName: user.lastName,
+        success: true,
+        data: {
+          mfaRequired: true,
+          role: "ADMIN",
+          challengeId,
+          emailMasked: maskEmail(user.email),
+          user: {
+            id: user._id.toString(),
+            username: user.username,
+            role: user.role,
+            firstName: user.firstName,
+            lastName: user.lastName,
+          },
         },
-      },
-    });
+      });
     }
 
-    // LGU => token immediately
     const token = signAccessToken({ sub: user._id.toString(), role: user.role });
+    await logAuditEvent({
+      actorId: user._id.toString(),
+      actorRole: user.role,
+      action: "AUTH_LGU_LOGIN_SUCCESS",
+      targetType: "User",
+      targetId: user._id.toString(),
+      metadata: { role: user.role },
+      ip: requestContext.ip,
+      userAgent: requestContext.userAgent,
+    });
 
     return res.json({
       success: true,
@@ -82,7 +105,6 @@ lguAuthRouter.post("/login", async (req, res) => {
         },
       },
     });
-
   } catch (err) {
     console.error(err);
     return res.status(500).json({ success: false, error: "Server error" });

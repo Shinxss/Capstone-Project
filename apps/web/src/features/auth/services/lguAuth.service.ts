@@ -33,3 +33,7 @@ export async function adminMfaVerify(payload: AdminMfaVerifyRequest): Promise<Ad
 
   return data;
 }
+
+export async function logout(): Promise<void> {
+  await api.post(AUTH_ENDPOINTS.logout);
+}

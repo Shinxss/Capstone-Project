@@ -224,6 +224,9 @@ importers:
 
   apps/server:
     dependencies:
+      '@exortek/express-mongo-sanitize':
+        specifier: ^1.1.1
+        version: 1.1.1
       '@lifeline/blockchain':
         specifier: workspace:*
         version: link:../blockchain
@@ -248,6 +251,9 @@ importers:
       express:
         specifier: ^5.2.1
         version: 5.2.1
+      express-rate-limit:
+        specifier: ^8.2.1
+        version: 8.2.1(express@5.2.1)
       google-auth-library:
         specifier: ^10.5.0
         version: 10.5.0
@@ -1216,6 +1222,9 @@ packages:
 
   '@ethersproject/web@5.8.0':
     resolution: {integrity: sha512-j7+Ksi/9KfGviws6Qtf9Q7KCqRhpwrYKQPs+JBA/rKVFF/yaWLHJEH3zfVP2plVu+eys0d2DlFmhoQJayFewcw==}
+
+  '@exortek/express-mongo-sanitize@1.1.1':
+    resolution: {integrity: sha512-IFJfkJ5fON/2JZcjTV3aT5UeTlp/DDJeQqWAbkM6nNsWd07dfG8jP1UtX0bVK0laVr2KV08eLBjxssNK9D8Dxw==}
 
   '@expo/cli@54.0.22':
     resolution: {integrity: sha512-BTH2FCczhJLfj1cpfcKrzhKnvRLTOztgW4bVloKDqH+G3ZSohWLRFNAIz56XtdjPxBbi2/qWhGBAkl7kBon/Jw==}
@@ -2606,10 +2615,6 @@ packages:
 
   '@types/minimatch@5.1.2':
     resolution: {integrity: sha512-K0VQKziLUWkVKiRVrx4a40iPaxTUefQmjtkQofBkYRcoaaL/8rhwDWww9qWbrgicNOgnpIsMxyNIUM4+n6dUIA==}
-
-  '@types/minimatch@6.0.0':
-    resolution: {integrity: sha512-zmPitbQ8+6zNutpwgcQuLcsEpn/Cj54Kbn7L5pX0Os5kdWplB7xPgEh/g+SWOB/qmows2gpuCaPyduq8ZZRnxA==}
-    deprecated: This is a stub types definition. minimatch provides its own type definitions, so you do not need this installed.
 
   '@types/mocha@10.0.10':
     resolution: {integrity: sha512-xPyYSz1cMPnJQhl0CLMH68j3gprKZaTjG3s5Vi+fDgx+uhG9NOXwbVt52eFS8ECyXhyKcjDLCBEqBExKuiZb7Q==}
@@ -4464,6 +4469,12 @@ packages:
   exponential-backoff@3.1.3:
     resolution: {integrity: sha512-ZgEeZXj30q+I0EN+CbSSpIyPaJ5HVQD18Z1m+u1FXbAeT94mr1zw50q4q6jiiC447Nl/YTcIYSAftiGqetwXCA==}
 
+  express-rate-limit@8.2.1:
+    resolution: {integrity: sha512-PCZEIEIxqwhzw4KF0n7QF4QqruVTcF73O5kFKUnGOyjbCCgizBBiFaYpd/fnBLUMPw/BWw9OsiN7GgrNYr7j6g==}
+    engines: {node: '>= 16'}
+    peerDependencies:
+      express: '>= 4.11'
+
   express@5.2.1:
     resolution: {integrity: sha512-hIS4idWWai69NezIdRt2xFVofaF4j+6INOpJlVOLDO8zXGpUVEVzIYk12UUi2JzjEzWL3IOAxcTubgz9Po0yXw==}
     engines: {node: '>= 18'}
@@ -5071,6 +5082,10 @@ packages:
 
   io-ts@1.10.4:
     resolution: {integrity: sha512-b23PteSnYXSONJ6JQXRAlvJhuw8KOtkqa87W4wDtvMrud/DTJd5X+NpOOI+O/zZwVq6v0VLAaJ+1EDViKEuN9g==}
+
+  ip-address@10.0.1:
+    resolution: {integrity: sha512-NWv9YLW4PoW2B7xtzaS3NCot75m6nK7Icdv0o3lfMceJVRfSoQwqD4wEH5rLwoKJwUiZ/rfpiVBhnaF0FK4HoA==}
+    engines: {node: '>= 12'}
 
   ipaddr.js@1.9.1:
     resolution: {integrity: sha512-0KI/607xoxSToH7GjN1FfSbLoU0+btTicjsQSWQlh/hZykN8KpmMf7uYwPW3R+akZ6R/w18ZlXSHBYXiYUPO3g==}
@@ -8958,6 +8973,8 @@ snapshots:
       '@ethersproject/properties': 5.8.0
       '@ethersproject/strings': 5.8.0
 
+  '@exortek/express-mongo-sanitize@1.1.1': {}
+
   '@expo/cli@54.0.22(bufferutil@4.0.7)(expo-router@6.0.22)(expo@54.0.32)(react-native@0.81.5(@babel/core@7.28.6)(@types/react@19.1.17)(bufferutil@4.0.7)(react@19.1.0)(utf-8-validate@5.0.7))(utf-8-validate@5.0.7)':
     dependencies:
       '@0no-co/graphql.web': 1.2.0
@@ -10622,7 +10639,7 @@ snapshots:
 
   '@types/glob@7.2.0':
     dependencies:
-      '@types/minimatch': 6.0.0
+      '@types/minimatch': 5.1.2
       '@types/node': 24.1.0
 
   '@types/graceful-fs@4.1.9':
@@ -10661,10 +10678,6 @@ snapshots:
   '@types/mapbox__point-geometry@0.1.4': {}
 
   '@types/minimatch@5.1.2': {}
-
-  '@types/minimatch@6.0.0':
-    dependencies:
-      minimatch: 10.2.0
 
   '@types/mocha@10.0.10': {}
 
@@ -12950,6 +12963,11 @@ snapshots:
 
   exponential-backoff@3.1.3: {}
 
+  express-rate-limit@8.2.1(express@5.2.1):
+    dependencies:
+      express: 5.2.1
+      ip-address: 10.0.1
+
   express@5.2.1:
     dependencies:
       accepts: 2.0.0
@@ -13729,6 +13747,8 @@ snapshots:
   io-ts@1.10.4:
     dependencies:
       fp-ts: 1.19.3
+
+  ip-address@10.0.1: {}
 
   ipaddr.js@1.9.1: {}
 

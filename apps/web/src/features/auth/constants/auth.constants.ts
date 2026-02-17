@@ -11,4 +11,5 @@ export const AUTH_ROUTES = {
 export const AUTH_ENDPOINTS = {
   lguLogin: "/api/auth/lgu/login",
   adminMfaVerify: "/api/auth/admin/mfa/verify",
+  logout: "/api/auth/logout",
 } as const;

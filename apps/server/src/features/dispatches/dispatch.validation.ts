@@ -21,9 +21,9 @@ export const respondSchema = z
 
 export const proofSchema = z
   .object({
-    base64: z.string().min(1),
-    mimeType: z.string().min(1).optional(),
-    fileName: z.string().min(1).optional(),
+    base64: z.string().trim().min(1, "base64 is required").max(4_500_000, "Proof payload is too large"),
+    mimeType: z.enum(["image/png", "image/jpeg", "image/heic"]).optional(),
+    fileName: z.string().trim().min(1).max(255).optional(),
   })
   .strict();
 

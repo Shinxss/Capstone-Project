@@ -7,6 +7,7 @@ import { clearSession, setUserSession } from "./services/sessionStorage";
 
 const COMMUNITY_LOGIN_PATH = "/api/auth/community/login";
 const AUTH_ME_PATH = "/api/auth/me";
+const LOGOUT_PATH = "/api/auth/logout";
 const LEGACY_ACCESS_TOKEN_KEY = STORAGE_KEYS.accessToken;
 
 type AnonymousBootstrapResult = {
@@ -200,5 +201,10 @@ export async function signInWithAccessToken(accessToken: string): Promise<Authed
 }
 
 export async function signOut(): Promise<void> {
+  try {
+    await api.post(LOGOUT_PATH);
+  } catch {
+    // Best effort server-side invalidation.
+  }
   await cleanupToAnonymous();
 }

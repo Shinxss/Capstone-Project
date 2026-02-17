@@ -1,27 +1,25 @@
-import { Router } from "express";
 import bcrypt from "bcryptjs";
+import { Router } from "express";
+import { logAuditEvent, getAuditRequestContext } from "../audit/audit.service";
 import { User } from "../users/user.model";
+import { loginLimiter, registerLimiter } from "../../middlewares/rateLimit";
+import { validate } from "../../middlewares/validate";
 import { signAccessToken } from "../../utils/jwt";
+import { communityLoginSchema, communityRegisterSchema } from "./auth.schemas";
 import { toAuthUserPayload } from "./otp.utils";
+
+const INVALID_CREDENTIALS = "Invalid credentials";
 
 export const communityAuthRouter = Router();
 
-/**
- * POST /api/auth/community/register
- * body: { firstName, lastName, email, password }
- */
-communityAuthRouter.post("/register", async (req, res) => {
+communityAuthRouter.post("/register", registerLimiter, validate(communityRegisterSchema), async (req, res) => {
   try {
     const { firstName, lastName, email, password } = req.body as {
-      firstName?: string;
-      lastName?: string;
-      email?: string;
-      password?: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+      password: string;
     };
-
-    if (!firstName || !lastName || !email || !password) {
-      return res.status(400).json({ success: false, error: "All fields are required." });
-    }
 
     const cleanEmail = email.trim().toLowerCase();
     const exists = await User.findOne({ email: cleanEmail });
@@ -30,7 +28,6 @@ communityAuthRouter.post("/register", async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-
     const user = await User.create({
       email: cleanEmail,
       firstName: firstName.trim(),
@@ -59,41 +56,36 @@ communityAuthRouter.post("/register", async (req, res) => {
   }
 });
 
-/**
- * POST /api/auth/community/login
- * body: { email, password }
- * ✅ also allows VOLUNTEER role later using same account
- */
-communityAuthRouter.post("/login", async (req, res) => {
+communityAuthRouter.post("/login", loginLimiter, validate(communityLoginSchema), async (req, res) => {
   try {
-    const { email, password } = req.body as { email?: string; password?: string };
-
-    if (!email || !password) {
-      return res.status(400).json({ success: false, error: "Email and password are required." });
-    }
-
+    const { email, password } = req.body as { email: string; password: string };
     const cleanEmail = email.trim().toLowerCase();
     const user = await User.findOne({
       email: cleanEmail,
       role: { $in: ["COMMUNITY", "VOLUNTEER"] },
     });
 
-    if (!user) return res.status(401).json({ success: false, error: "Invalid credentials" });
-    if (!user.isActive) return res.status(403).json({ success: false, error: "Account disabled" });
-    if (!user.emailVerified) {
-      return res.status(403).json({ success: false, error: "Please verify your email before logging in." });
-    }
-    if (!user.passwordHash) {
-      return res.status(401).json({ success: false, error: "Invalid credentials" });
+    if (!user || !user.isActive || !user.emailVerified || !user.passwordHash) {
+      return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });
     }
 
     const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) return res.status(401).json({ success: false, error: "Invalid credentials" });
-
-    const secret = process.env.JWT_ACCESS_SECRET || "";
-    if (!secret) return res.status(500).json({ success: false, error: "Missing JWT_ACCESS_SECRET" });
+    if (!ok) {
+      return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });
+    }
 
     const token = signAccessToken({ sub: user._id.toString(), role: user.role });
+    const requestContext = getAuditRequestContext(req);
+    await logAuditEvent({
+      actorId: user._id.toString(),
+      actorRole: user.role,
+      action: "AUTH_COMMUNITY_LOGIN_SUCCESS",
+      targetType: "User",
+      targetId: user._id.toString(),
+      metadata: { role: user.role },
+      ip: requestContext.ip,
+      userAgent: requestContext.userAgent,
+    });
 
     return res.json({
       success: true,

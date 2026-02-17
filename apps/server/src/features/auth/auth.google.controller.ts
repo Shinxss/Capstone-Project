@@ -5,6 +5,7 @@ import type { TokenPayload } from "google-auth-library";
 import { signAccessToken } from "../../utils/jwt";
 import { User } from "../users/user.model";
 import { toAuthUserPayload } from "./otp.utils";
+import { zodPasswordSchema } from "./password.policy";
 
 const googleClient = new OAuth2Client();
 
@@ -16,6 +17,11 @@ type SetPasswordBody = {
   newPassword?: string;
   confirmPassword?: string;
 };
+
+const INVALID_CREDENTIALS = "Invalid credentials";
+const GENERIC_GOOGLE_LOGIN_ERROR = "Google login failed.";
+const INVALID_REQUEST = "Invalid request";
+const LINKING_FAILED = "Linking failed";
 
 function normalizeText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -75,12 +81,10 @@ export async function loginWithGoogle(req: Request, res: Response) {
       payload = await verifyGoogleIdTokenOrThrow(idToken);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Invalid Google ID token.";
-      const statusCode = /Missing GOOGLE_ANDROID_CLIENT_ID\/GOOGLE_WEB_CLIENT_ID/.test(message)
-        ? 500
-        : /Invalid/.test(message)
-          ? 401
-          : 400;
-      return res.status(statusCode).json({ success: false, error: message });
+      if (/Missing GOOGLE_ANDROID_CLIENT_ID\/GOOGLE_WEB_CLIENT_ID/.test(message)) {
+        return res.status(500).json({ success: false, error: GENERIC_GOOGLE_LOGIN_ERROR });
+      }
+      return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });
     }
 
     const email = normalizeText(payload.email).toLowerCase();
@@ -104,17 +108,11 @@ export async function loginWithGoogle(req: Request, res: Response) {
       });
     } else {
       if (user.role !== "COMMUNITY" && user.role !== "VOLUNTEER") {
-        return res.status(403).json({
-          success: false,
-          error: "Google login is only available for community accounts.",
-        });
+        return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });
       }
 
       if (user.googleSub && user.googleSub !== googleSub) {
-        return res.status(409).json({
-          success: false,
-          error: "This email is already linked to a different Google account.",
-        });
+        return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });
       }
 
       let shouldSave = false;
@@ -151,7 +149,7 @@ export async function loginWithGoogle(req: Request, res: Response) {
     }
 
     if (!user.isActive) {
-      return res.status(403).json({ success: false, error: "Account disabled." });
+      return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });
     }
 
     const accessToken = signAccessToken({ sub: user._id.toString(), role: user.role });
@@ -177,9 +175,19 @@ export async function setPassword(req: Request, res: Response) {
     }
 
     const { newPassword, confirmPassword } = req.body as SetPasswordBody;
+    if (typeof newPassword !== "string" || typeof confirmPassword !== "string") {
+      return res.status(400).json({
+        success: false,
+        error: "Password must be at least 8 characters and include at least one letter and one number.",
+      });
+    }
 
-    if (!newPassword || newPassword.length < 8) {
-      return res.status(400).json({ success: false, error: "Password must be at least 8 characters." });
+    const parsedPassword = zodPasswordSchema().safeParse(newPassword);
+    if (!parsedPassword.success) {
+      return res.status(400).json({
+        success: false,
+        error: parsedPassword.error.issues[0]?.message ?? "Invalid password.",
+      });
     }
 
     if (newPassword !== confirmPassword) {
@@ -210,42 +218,35 @@ export async function linkGoogle(req: Request, res: Response) {
   try {
     const userId = req.userId;
     if (!userId) {
-      return res.status(401).json({ success: false, error: "Unauthorized" });
+      return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });
     }
 
     const { idToken } = req.body as GoogleLoginBody;
     if (!idToken || typeof idToken !== "string") {
-      return res.status(400).json({ success: false, error: "idToken is required." });
+      return res.status(400).json({ success: false, error: INVALID_REQUEST });
     }
 
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({ success: false, error: "User not found" });
+      return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });
     }
 
     let payload: TokenPayload;
     try {
       payload = await verifyGoogleIdTokenOrThrow(idToken);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Invalid Google ID token.";
-      const statusCode = /Missing GOOGLE_ANDROID_CLIENT_ID\/GOOGLE_WEB_CLIENT_ID/.test(message)
-        ? 500
-        : 401;
-      return res.status(statusCode).json({ success: false, error: message });
+    } catch {
+      return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });
     }
 
     const payloadEmail = normalizeText(payload.email).toLowerCase();
     const userEmail = normalizeText(user.email).toLowerCase();
     if (!payloadEmail || !userEmail || payloadEmail !== userEmail) {
-      return res.status(400).json({ success: false, error: "Google account email must match your account email." });
+      return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });
     }
 
     const googleSub = normalizeText(payload.sub);
     if (user.googleSub && user.googleSub !== googleSub) {
-      return res.status(409).json({
-        success: false,
-        error: "Your account is already linked to another Google account.",
-      });
+      return res.status(409).json({ success: false, error: LINKING_FAILED });
     }
 
     const linkedElsewhere = await User.findOne({
@@ -254,10 +255,7 @@ export async function linkGoogle(req: Request, res: Response) {
     });
 
     if (linkedElsewhere) {
-      return res.status(409).json({
-        success: false,
-        error: "This Google account is already linked to another user.",
-      });
+      return res.status(409).json({ success: false, error: LINKING_FAILED });
     }
 
     user.googleSub = googleSub;

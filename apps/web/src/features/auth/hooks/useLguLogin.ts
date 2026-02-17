@@ -27,11 +27,13 @@ function hasAccessToken(result: PortalLoginData): result is Extract<PortalLoginD
 export function useLguLogin() {
   const navigate = useNavigate();
 
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsernameValue] = useState("");
+  const [password, setPasswordValue] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   // ✅ MFA modal state
   const [mfaOpen, setMfaOpen] = useState(false);
@@ -45,10 +47,20 @@ export function useLguLogin() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    const nextUsernameError = username.trim() ? null : "Username is required";
+    const nextPasswordError = password.trim() ? null : "Password is required";
+
+    setUsernameError(nextUsernameError);
+    setPasswordError(nextPasswordError);
+
+    if (nextUsernameError || nextPasswordError) {
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const result = await lguLogin({ username, password });
+      const result = await lguLogin({ username: username.trim(), password });
 
       // ✅ ADMIN => show modal
       if (isMfaRequired(result)) {
@@ -74,6 +86,18 @@ export function useLguLogin() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function setUsername(v: string) {
+    setUsernameValue(v);
+    if (usernameError && v.trim()) setUsernameError(null);
+    if (error) setError(null);
+  }
+
+  function setPassword(v: string) {
+    setPasswordValue(v);
+    if (passwordError && v.trim()) setPasswordError(null);
+    if (error) setError(null);
   }
 
   async function onVerifyOtp() {
@@ -109,6 +133,8 @@ export function useLguLogin() {
     setPassword,
     loading,
     error,
+    usernameError,
+    passwordError,
     onSubmit,
 
     // MFA props

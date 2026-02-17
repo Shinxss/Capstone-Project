@@ -1,31 +1,29 @@
-import { Request, Response } from "express";
+import type { Request, Response } from "express";
+import { getAuditRequestContext, logAuditEvent } from "../audit/audit.service";
+import {
+  getMyLatestApplication,
+  getVolunteerApplicationByIdForReviewer,
+  listVolunteerApplicationsForReviewer,
+  reviewVolunteerApplication,
+  submitVolunteerApplication,
+} from "./volunteerApplication.service";
 import {
   createVolunteerApplicationSchema,
   reviewVolunteerApplicationSchema,
 } from "./volunteerApplication.validation";
-import {
-  getMyLatestApplication,
-  reviewVolunteerApplication,
-  submitVolunteerApplication,
-  listVolunteerApplicationsForReviewer,
-  getVolunteerApplicationByIdForReviewer,
-} from "./volunteerApplication.service";
 
 type UserCtx = { id: string; role: string };
-function getUser(req: Request) {
-  return (req as any).user as UserCtx | undefined;
-}
-
-// ✅ Typed Query (this removes string|string[])
 type ListQuery = {
-  status?: string; // comma-separated: "pending_verification,needs_info"
+  status?: string;
   q?: string;
   page?: string;
   limit?: string;
 };
-
-// ✅ Typed Params
 type IdParams = { id: string };
+
+function getUser(req: Request) {
+  return (req as any).user as UserCtx | undefined;
+}
 
 export async function postVolunteerApplication(req: Request, res: Response) {
   const user = getUser(req);
@@ -33,18 +31,26 @@ export async function postVolunteerApplication(req: Request, res: Response) {
 
   const parsed = createVolunteerApplicationSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res
-      .status(400)
-      .json({ message: "Invalid form data", errors: parsed.error.flatten() });
+    return res.status(400).json({ message: "Invalid form data", errors: parsed.error.flatten() });
   }
 
   try {
     const created = await submitVolunteerApplication(user.id, parsed.data);
+    const requestContext = getAuditRequestContext(req);
+    await logAuditEvent({
+      actorId: user.id,
+      actorRole: user.role,
+      action: "VOL_APP_SUBMIT",
+      targetType: "VolunteerApplication",
+      targetId: String((created as any)?._id ?? ""),
+      metadata: { status: (created as any)?.status ?? "pending_verification" },
+      ip: requestContext.ip,
+      userAgent: requestContext.userAgent,
+    });
+
     return res.status(201).json(created);
   } catch (e: any) {
-    return res
-      .status(400)
-      .json({ message: e.message || "Failed to submit application" });
+    return res.status(400).json({ message: e.message || "Failed to submit application" });
   }
 }
 
@@ -67,9 +73,7 @@ export async function postReview(req: Request<IdParams>, res: Response) {
 
   const parsed = reviewVolunteerApplicationSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res
-      .status(400)
-      .json({ message: "Invalid review payload", errors: parsed.error.flatten() });
+    return res.status(400).json({ message: "Invalid review payload", errors: parsed.error.flatten() });
   }
 
   const updated = await reviewVolunteerApplication({
@@ -80,10 +84,22 @@ export async function postReview(req: Request<IdParams>, res: Response) {
   });
 
   if (!updated) return res.status(404).json({ message: "Application not found" });
+
+  const requestContext = getAuditRequestContext(req);
+  await logAuditEvent({
+    actorId: user.id,
+    actorRole: user.role,
+    action: "VOL_APP_REVIEW",
+    targetType: "VolunteerApplication",
+    targetId: String((updated as any)?._id ?? req.params.id),
+    metadata: { action: parsed.data.action },
+    ip: requestContext.ip,
+    userAgent: requestContext.userAgent,
+  });
+
   return res.json(updated);
 }
 
-// ✅ HERE: req.query is now ListQuery (all strings)
 export async function listVolunteerApplications(
   req: Request<{}, {}, {}, ListQuery>,
   res: Response
@@ -96,15 +112,11 @@ export async function listVolunteerApplications(
   }
 
   const statusParam = (req.query.status ?? "").trim();
-  const statuses = statusParam
-    ? statusParam.split(",").map((s) => s.trim()).filter(Boolean)
-    : undefined;
+  const statuses = statusParam ? statusParam.split(",").map((s) => s.trim()).filter(Boolean) : undefined;
 
   const q = (req.query.q ?? "").trim() || undefined;
-
   const pageRaw = parseInt(req.query.page ?? "1", 10);
   const limitRaw = parseInt(req.query.limit ?? "20", 10);
-
   const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
   const limit = Number.isFinite(limitRaw) ? Math.min(100, Math.max(1, limitRaw)) : 20;
 

@@ -5,6 +5,7 @@ import { User } from "../../users/user.model";
 import { EmailVerificationRequest } from "../models/EmailVerificationRequest.model";
 import { sendSignupVerificationOtpEmail } from "../../../utils/mailer";
 import { signAccessToken } from "../../../utils/jwt";
+import { communityRegisterSchema } from "../auth.schemas";
 import {
   OTP_EXPIRY_MINUTES,
   OTP_MAX_VERIFY_ATTEMPTS,
@@ -17,21 +18,20 @@ import {
 
 const signupOtpRoutes = Router();
 
-const signupSchema = z.object({
-  firstName: z.string().trim().min(1, "First name is required"),
-  lastName: z.string().trim().min(1, "Last name is required"),
-  email: z.string().trim().email("Invalid email"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-});
+const signupSchema = communityRegisterSchema;
 
-const verifySignupOtpSchema = z.object({
-  email: z.string().trim().email("Invalid email"),
-  otp: z.string().trim().regex(/^\d{6}$/, "OTP must be a 6-digit code"),
-});
+const verifySignupOtpSchema = z
+  .object({
+    email: z.string().trim().email("Invalid email"),
+    otp: z.string().trim().regex(/^\d{6}$/, "OTP must be a 6-digit code"),
+  })
+  .strict();
 
-const resendSignupOtpSchema = z.object({
-  email: z.string().trim().email("Invalid email"),
-});
+const resendSignupOtpSchema = z
+  .object({
+    email: z.string().trim().email("Invalid email"),
+  })
+  .strict();
 
 async function sendSignupOtpForUser(userId: string, email: string) {
   const now = new Date();

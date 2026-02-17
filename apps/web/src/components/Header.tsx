@@ -3,6 +3,7 @@ import { useThemeMode } from "../features/theme/hooks/useThemeMode";
 import { useNavigate } from "react-router-dom";
 import { useLguSession } from "../features/auth/hooks/useLguSession";
 import { clearLguSession } from "../features/auth/services/authStorage";
+import { logout } from "../features/auth/services/lguAuth.service";
 
 import {
   Search,
@@ -72,7 +73,13 @@ export default function Header({
     };
   }, [open]);
 
-  function handleLogout() {
+  async function handleLogout() {
+    try {
+      await logout();
+    } catch {
+      // Best effort only.
+    }
+
     clearLguSession(); // ✅ clears token + user
     setOpen(false);
     navigate("/lgu/login", { replace: true });

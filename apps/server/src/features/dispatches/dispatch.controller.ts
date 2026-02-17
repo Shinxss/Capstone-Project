@@ -12,6 +12,7 @@ import {
   verifyDispatch,
 } from "./dispatch.service";
 import type { DispatchStatus } from "./dispatch.model";
+import { getAuditRequestContext, logAuditEvent } from "../audit/audit.service";
 
 function getAuth(req: Request) {
   const role = (req as any).user?.role ?? (req as any).role;
@@ -121,6 +122,20 @@ export async function postProof(req: Request, res: Response) {
       fileName: fileName ? String(fileName) : undefined,
     });
 
+    const requestContext = getAuditRequestContext(req);
+    await logAuditEvent({
+      actorId: userId,
+      actorRole: role,
+      action: "DISPATCH_PROOF_UPLOAD",
+      targetType: "DispatchOffer",
+      targetId: String(req.params.id),
+      metadata: {
+        proofCount: Array.isArray((updated as any).proofs) ? (updated as any).proofs.length : 0,
+      },
+      ip: requestContext.ip,
+      userAgent: requestContext.userAgent,
+    });
+
     return res.json({ data: toDispatchDTO(updated) });
   } catch (e: any) {
     return res.status(400).json({ message: e?.message ?? "Failed" });
@@ -162,6 +177,18 @@ export async function patchVerify(req: Request, res: Response) {
     if (role !== "LGU") return res.status(403).json({ message: "Forbidden" });
 
     const { txHash } = await verifyDispatch({ dispatchId: String(req.params.id), verifierUserId: String(userId) });
+    const requestContext = getAuditRequestContext(req);
+    await logAuditEvent({
+      actorId: userId,
+      actorRole: role,
+      action: "DISPATCH_VERIFY",
+      targetType: "DispatchOffer",
+      targetId: String(req.params.id),
+      metadata: { txHash },
+      ip: requestContext.ip,
+      userAgent: requestContext.userAgent,
+    });
+
     return res.json({ success: true, txHash });
   } catch (e: any) {
     return res.status(400).json({ message: e?.message ?? "Failed" });

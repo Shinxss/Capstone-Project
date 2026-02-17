@@ -13,6 +13,8 @@ type Props = {
   setPassword: (v: string) => void;
   loading: boolean;
   error: string | null;
+  usernameError: string | null;
+  passwordError: string | null;
   onSubmit: (e: React.FormEvent) => void;
 
   // ✅ MFA props
@@ -33,6 +35,8 @@ export default function LguLoginView({
   setPassword,
   loading,
   error,
+  usernameError,
+  passwordError,
   onSubmit,
 
   mfaOpen,
@@ -93,12 +97,18 @@ export default function LguLoginView({
                   Username
                 </label>
                 <input
-                  className="w-full rounded border border-gray-300 bg-gray-100 px-3 py-2 font-semibold text-sm text-slate-900 outline-none focus:border-gray-400 placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-100 dark:placeholder:text-slate-400 dark:focus:border-slate-500"
+                  className={`w-full rounded border bg-gray-100 px-3 py-2 font-semibold text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:bg-slate-900/60 dark:text-slate-100 dark:placeholder:text-slate-400 ${
+                    usernameError
+                      ? "border-red-500 focus:border-red-500 dark:border-red-500 dark:focus:border-red-500"
+                      : "border-gray-300 focus:border-gray-400 dark:border-slate-700 dark:focus:border-slate-500"
+                  }`}
                   placeholder="Enter your username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   autoComplete="username"
+                  aria-invalid={!!usernameError}
                 />
+                {usernameError && <div className="mt-1 text-sm text-red-600 dark:text-red-300">{usernameError}</div>}
               </div>
 
               <div>
@@ -109,11 +119,16 @@ export default function LguLoginView({
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
-                    className="w-full rounded border border-gray-300 bg-gray-100 px-3 py-2 pr-11 font-semibold text-sm text-slate-900 outline-none focus:border-gray-400 placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-100 dark:placeholder:text-slate-400 dark:focus:border-slate-500"
+                    className={`w-full rounded border bg-gray-100 px-3 py-2 pr-11 font-semibold text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:bg-slate-900/60 dark:text-slate-100 dark:placeholder:text-slate-400 ${
+                      passwordError
+                        ? "border-red-500 focus:border-red-500 dark:border-red-500 dark:focus:border-red-500"
+                        : "border-gray-300 focus:border-gray-400 dark:border-slate-700 dark:focus:border-slate-500"
+                    }`}
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     autoComplete="current-password"
+                    aria-invalid={!!passwordError}
                   />
 
                   <button
@@ -125,6 +140,7 @@ export default function LguLoginView({
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
+                {passwordError && <div className="mt-1 text-sm text-red-600 dark:text-red-300">{passwordError}</div>}
               </div>
 
               {error && <div className="text-sm text-red-600">{error}</div>}
