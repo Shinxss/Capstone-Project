@@ -68,6 +68,23 @@ export function VolunteerApplicationView({
     return errors?.[key];
   };
 
+  const sectionFields: Record<Exclude<SectionKey, "verify">, VolunteerFieldKey[]> = {
+    personal: ["fullName", "sex", "birthdate"],
+    contact: ["mobile", "email"],
+    address: ["barangay"],
+    emergency: ["emergencyContact.name", "emergencyContact.relationship", "emergencyContact.mobile"],
+    skills: [],
+    certs: [],
+    availability: [],
+    preferred: [],
+    health: [],
+    consent: ["consent.truth", "consent.rules", "consent.data"],
+  };
+
+  const hasSectionError = (section: Exclude<SectionKey, "verify">) => {
+    return sectionFields[section].some((key) => !!fieldError(key));
+  };
+
   return (
     <View style={styles.safe}>
       {/* Header */}
@@ -96,6 +113,7 @@ export function VolunteerApplicationView({
           label="Section A"
           title="Personal Information"
           icon="person-outline"
+          hasError={hasSectionError("personal")}
           isOpen={open === "personal"}
           onToggle={() => setOpen(open === "personal" ? "contact" : "personal")}
         >
@@ -129,6 +147,7 @@ export function VolunteerApplicationView({
           label="Section B"
           title="Contact Information"
           icon="call-outline"
+          hasError={hasSectionError("contact")}
           isOpen={open === "contact"}
           onToggle={() => setOpen(open === "contact" ? "address" : "contact")}
         >
@@ -155,6 +174,7 @@ export function VolunteerApplicationView({
           label="Section C"
           title="Address"
           icon="location-outline"
+          hasError={hasSectionError("address")}
           isOpen={open === "address"}
           onToggle={() => setOpen(open === "address" ? "emergency" : "address")}
         >
@@ -190,6 +210,7 @@ export function VolunteerApplicationView({
           label="Section D"
           title="Emergency Contact"
           icon="heart-outline"
+          hasError={hasSectionError("emergency")}
           isOpen={open === "emergency"}
           onToggle={() => setOpen(open === "emergency" ? "skills" : "emergency")}
         >
@@ -239,6 +260,7 @@ export function VolunteerApplicationView({
           label="Section E"
           title="Skills & Capabilities"
           icon="ribbon-outline"
+          hasError={hasSectionError("skills")}
           isOpen={open === "skills"}
           onToggle={() => setOpen(open === "skills" ? "certs" : "skills")}
         >
@@ -254,6 +276,7 @@ export function VolunteerApplicationView({
           label="Section F"
           title="Certifications"
           icon="document-attach-outline"
+          hasError={hasSectionError("certs")}
           isOpen={open === "certs"}
           onToggle={() => setOpen(open === "certs" ? "availability" : "certs")}
         >
@@ -271,6 +294,7 @@ export function VolunteerApplicationView({
           label="Section G"
           title="Availability"
           icon="time-outline"
+          hasError={hasSectionError("availability")}
           isOpen={open === "availability"}
           onToggle={() =>
             setOpen(open === "availability" ? "preferred" : "availability")
@@ -290,6 +314,7 @@ export function VolunteerApplicationView({
           label="Section H"
           title="Preferred Assignment"
           icon="briefcase-outline"
+          hasError={hasSectionError("preferred")}
           isOpen={open === "preferred"}
           onToggle={() => setOpen(open === "preferred" ? "health" : "preferred")}
         >
@@ -307,6 +332,7 @@ export function VolunteerApplicationView({
           label="Section J"
           title="Health & Safety"
           icon="medkit-outline"
+          hasError={hasSectionError("health")}
           isOpen={open === "health"}
           onToggle={() => setOpen(open === "health" ? "verify" : "health")}
         >
@@ -322,6 +348,7 @@ export function VolunteerApplicationView({
           label="Section K"
           title="Verification Requirements"
           icon="shield-checkmark-outline"
+          hasError={false}
           isOpen={open === "verify"}
           onToggle={() => setOpen(open === "verify" ? "consent" : "verify")}
         >
@@ -336,6 +363,7 @@ export function VolunteerApplicationView({
           label="Section L"
           title="Consent & Agreement"
           icon="document-text-outline"
+          hasError={hasSectionError("consent")}
           isOpen={open === "consent"}
           onToggle={() => setOpen("consent")}
         >
@@ -395,19 +423,20 @@ function Accordion(props: {
   label: string;
   title: string;
   icon: keyof typeof Ionicons.glyphMap;
+  hasError?: boolean;
   isOpen: boolean;
   onToggle: () => void;
   children?: React.ReactNode;
 }) {
   return (
-    <View style={styles.sectionCard}>
+    <View style={[styles.sectionCard, props.hasError && styles.sectionCardError]}>
       <Pressable style={styles.sectionHeader} onPress={props.onToggle}>
-        <View style={styles.sectionIcon}>
-          <Ionicons name={props.icon} size={20} color="#EF4444" />
+        <View style={[styles.sectionIcon, props.hasError && styles.sectionIconError]}>
+          <Ionicons name={props.icon} size={20} color={props.hasError ? "#B91C1C" : "#EF4444"} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.sectionLabel}>{props.label}</Text>
-          <Text style={styles.sectionTitle}>{props.title}</Text>
+          <Text style={[styles.sectionLabel, props.hasError && styles.sectionLabelError]}>{props.label}</Text>
+          <Text style={[styles.sectionTitle, props.hasError && styles.sectionTitleError]}>{props.title}</Text>
         </View>
         <Ionicons
           name={props.isOpen ? "chevron-up" : "chevron-down"}
@@ -524,6 +553,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     overflow: "hidden",
   },
+  sectionCardError: { borderColor: "#EF4444" },
   sectionHeader: {
     padding: 14,
     flexDirection: "row",
@@ -538,13 +568,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  sectionIconError: { backgroundColor: "#FEE2E2" },
   sectionLabel: { fontSize: 12, color: "#9CA3AF", fontWeight: "700" },
+  sectionLabelError: { color: "#B91C1C" },
   sectionTitle: {
     fontSize: 15,
     color: "#111827",
     fontWeight: "900",
     marginTop: 2,
   },
+  sectionTitleError: { color: "#B91C1C" },
   sectionBody: { paddingHorizontal: 14, paddingBottom: 14 },
 
   fieldLabel: {

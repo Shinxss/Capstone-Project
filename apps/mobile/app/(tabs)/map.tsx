@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { StatusBar } from "expo-status-bar";
 import {
   Alert,
   View,
@@ -422,7 +423,8 @@ export default function MapTab() {
   const [activeChip, setActiveChip] = useState<string>("home");
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
+    <SafeAreaView style={styles.safe} edges={["left", "right"]}>
+      <StatusBar style="dark" translucent backgroundColor="transparent" />
       <View style={styles.root}>
         <MapboxGL.MapView
           style={styles.map}
@@ -695,7 +697,7 @@ const PULSE_SIZE = 120;
 const PIN_SIZE = 34;
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "black" },
+  safe: { flex: 1, backgroundColor: "#F3F4F6" },
   root: { flex: 1, position: "relative" },
   map: { flex: 1 },
 

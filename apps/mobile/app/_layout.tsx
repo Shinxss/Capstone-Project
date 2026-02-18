@@ -15,11 +15,14 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   const inAuthGroup = segments[0] === "(auth)";
   const inTabsGroup = segments[0] === "(tabs)";
+  const inVolunteerFlow =
+    segments[0] === "volunteer-apply-modal" ||
+    segments[0] === "volunteer-application";
 
   useEffect(() => {
     if (!hydrated) return;
 
-    if ((mode === "authed" || mode === "guest") && !inTabsGroup) {
+    if ((mode === "authed" || mode === "guest") && !inTabsGroup && !inVolunteerFlow) {
       router.replace("/(tabs)");
       return;
     }
@@ -27,7 +30,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     if (mode === "anonymous" && !inAuthGroup) {
       router.replace("/(auth)/login");
     }
-  }, [hydrated, mode, inAuthGroup, inTabsGroup, router]);
+  }, [hydrated, mode, inAuthGroup, inTabsGroup, inVolunteerFlow, router]);
 
   if (!hydrated) {
     return <SplashScreen />;

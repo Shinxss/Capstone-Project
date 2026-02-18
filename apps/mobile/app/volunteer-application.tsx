@@ -47,7 +47,7 @@ export default function VolunteerApplicationScreen() {
       error={error}
       errors={errors}
       showErrors={submitAttempted}
-      submitDisabled={!isValid || submitting}
+      submitDisabled={submitting}
       onBack={onBack}
       onSubmit={onSubmit}
     />
