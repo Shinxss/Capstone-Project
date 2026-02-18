@@ -1,5 +1,7 @@
+import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
+import hpp from "hpp";
 import mongoSanitize from "@exortek/express-mongo-sanitize";
 import fs from "fs";
 import helmet from "helmet";
@@ -9,6 +11,7 @@ import routes from "./features";
 import { requireAuth } from "./middlewares/requireAuth";
 import { requireRole } from "./middlewares/requireRole";
 import { decryptBuffer } from "./utils/aesGcm";
+import { doubleCsrfProtection } from "./middlewares/csrf";
 
 export const app = express();
 
@@ -36,8 +39,16 @@ app.use(
   cors({
     origin: corsOrigin,
     credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization", "x-csrf-token"],
+    exposedHeaders: ["x-csrf-token"],
   })
 );
+
+// ── Cookie parser (required before CSRF) ──
+app.use(cookieParser());
+
+// ── HTTP parameter pollution protection ──
+app.use(hpp());
 
 const isProduction = process.env.NODE_ENV === "production";
 app.use(
@@ -57,7 +68,7 @@ app.use(
   })
 );
 
-app.use(express.json({ limit: "12mb" }));
+app.use(express.json({ limit: "1mb" }));
 
 app.use(
   mongoSanitize({
@@ -88,6 +99,11 @@ app.use((req, _res, next) => {
   req.params = sanitizeMongoKeys(req.params) as Record<string, string>;
   next();
 });
+
+// ── CSRF protection (double-submit cookie) ──
+// Enforced on unsafe methods for browser-origin requests only.
+// Mobile clients (no Origin/Referer) bypass automatically.
+app.use(doubleCsrfProtection);
 
 const uploadsDir = path.join(process.cwd(), "uploads");
 fs.mkdirSync(uploadsDir, { recursive: true });
@@ -124,3 +140,22 @@ app.get(
 );
 
 app.use("/api", routes);
+
+// ── Global error handler (returns JSON, avoids Express's raw stack dump) ──
+import type { ErrorRequestHandler } from "express";
+const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
+  const status: number =
+    typeof err.status === "number" ? err.status :
+    typeof err.statusCode === "number" ? err.statusCode : 500;
+
+  // Only log unexpected (5xx) errors with full stack
+  if (status >= 500) {
+    console.error(err);
+  }
+
+  res.status(status).json({
+    error: err.message || "Internal server error",
+    code: err.code,
+  });
+};
+app.use(errorHandler);

@@ -20,7 +20,7 @@ export interface IHazardZone {
 
 const hazardZoneSchema = new Schema<IHazardZone>(
   {
-    name: { type: String, required: true, index: true },
+    name: { type: String, required: true, index: true, maxlength: 300 },
     hazardType: {
       type: String,
       required: true,
@@ -44,7 +44,22 @@ const hazardZoneSchema = new Schema<IHazardZone>(
     // ✅ soft delete
     deletedAt: { type: Date, default: null, index: true },
   },
-  { timestamps: true }
+  {
+    strict: "throw",
+    timestamps: true,
+    toJSON: {
+      transform(_doc: unknown, ret: Record<string, unknown>) {
+        delete ret.__v;
+        return ret;
+      },
+    },
+    toObject: {
+      transform(_doc: unknown, ret: Record<string, unknown>) {
+        delete ret.__v;
+        return ret;
+      },
+    },
+  }
 );
 
 // geo queries need this

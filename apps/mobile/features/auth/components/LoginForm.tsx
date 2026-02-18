@@ -10,6 +10,7 @@ type Props = {
   showPassword: boolean;
   loading: boolean;
   googleLoading: boolean;
+  loginCooldownSeconds: number;
   error: string | null;
   onChangeEmail: (v: string) => void;
   onChangePassword: (v: string) => void;
@@ -26,6 +27,7 @@ export default function LoginForm({
   showPassword,
   loading,
   googleLoading,
+  loginCooldownSeconds,
   error,
   onChangeEmail,
   onChangePassword,
@@ -82,7 +84,7 @@ export default function LoginForm({
 
         <Pressable
           onPress={onLogin}
-          disabled={loading}
+          disabled={loading || loginCooldownSeconds > 0}
           style={({ pressed }) => ({
             marginTop: 14,
             height: 48,
@@ -91,7 +93,7 @@ export default function LoginForm({
             backgroundColor: "#EF4444",
             alignItems: "center",
             justifyContent: "center",
-            opacity: pressed || loading ? 0.75 : 1,
+            opacity: pressed || loading || loginCooldownSeconds > 0 ? 0.75 : 1,
           })}
         >
           <Text style={{ color: "#fff", fontSize: 15, fontWeight: "700" }}>

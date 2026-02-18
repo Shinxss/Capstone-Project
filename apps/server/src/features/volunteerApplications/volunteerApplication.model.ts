@@ -74,17 +74,17 @@ const VolunteerApplicationSchema = new Schema<VolunteerApplicationDoc>(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
 
-    fullName: { type: String, required: true, trim: true },
+    fullName: { type: String, required: true, trim: true, maxlength: 200 },
     sex: { type: String, required: true, enum: ["Male", "Female", "Prefer not to say"] },
-    birthdate: { type: String, required: true, trim: true },
+    birthdate: { type: String, required: true, trim: true, maxlength: 10 },
 
-    mobile: { type: String, required: true, trim: true },
-    email: { type: String, default: "", trim: true, lowercase: true },
+    mobile: { type: String, required: true, trim: true, maxlength: 20 },
+    email: { type: String, default: "", trim: true, lowercase: true, maxlength: 254 },
 
-    street: { type: String, default: "", trim: true },
-    barangay: { type: String, required: true, trim: true, index: true },
-    city: { type: String, default: "", trim: true },
-    province: { type: String, default: "", trim: true },
+    street: { type: String, default: "", trim: true, maxlength: 300 },
+    barangay: { type: String, required: true, trim: true, index: true, maxlength: 200 },
+    city: { type: String, default: "", trim: true, maxlength: 200 },
+    province: { type: String, default: "", trim: true, maxlength: 200 },
 
     emergencyContact: { type: EmergencyContactSchema, required: true },
 
@@ -108,7 +108,22 @@ const VolunteerApplicationSchema = new Schema<VolunteerApplicationDoc>(
     reviewedAt: { type: Date },
     reviewNotes: { type: String, default: "", trim: true },
   },
-  { timestamps: true }
+  {
+    strict: "throw",
+    timestamps: true,
+    toJSON: {
+      transform(_doc: unknown, ret: Record<string, unknown>) {
+        delete ret.__v;
+        return ret;
+      },
+    },
+    toObject: {
+      transform(_doc: unknown, ret: Record<string, unknown>) {
+        delete ret.__v;
+        return ret;
+      },
+    },
+  }
 );
 
 export const VolunteerApplication =

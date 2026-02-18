@@ -12,7 +12,7 @@ const TokenBlocklistSchema = new Schema<TokenBlocklistDoc>(
   {
     jti: { type: String, required: true, unique: true, index: true },
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
-    expiresAt: { type: Date, required: true, index: true },
+    expiresAt: { type: Date, required: true },
     reason: { type: String, default: "" },
   },
   { timestamps: { createdAt: true, updatedAt: false } }

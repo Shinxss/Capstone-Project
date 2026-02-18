@@ -20,6 +20,40 @@
   - Files: `apps/server/src/app.ts`
   - Test route(s): `POST /api/auth/community/login`, `POST /api/auth/lgu/login`
 
+- [Implemented] CSRF protection for browser-origin unsafe requests (double-submit cookie)
+  - What it is:
+    - Browser requests using unsafe methods (`POST`, `PATCH`, `PUT`, `DELETE`) must provide a valid CSRF header token that matches server validation state.
+    - Non-browser clients (mobile/server-to-server without Origin/Referer) are intentionally skipped and continue using Bearer token auth.
+  - Enforcement files:
+    - `apps/server/src/middlewares/csrf.ts`
+    - `apps/server/src/features/security/security.routes.ts`
+    - `apps/server/src/app.ts`
+    - `apps/web/src/lib/api.ts` (client token bootstrap + header attach)
+  - Test route(s):
+    - `GET /api/security/csrf`
+    - Any unsafe browser endpoint, e.g. `POST /api/auth/logout`, `POST /api/dispatches`
+
+- [Implemented] Stronger DB hardening (strict schemas, strict query mode, index and input hygiene)
+  - What it is:
+    - Global Mongo query hardening via strict query mode.
+    - Schema-level strictness (`strict: "throw"`) on key models to reject unexpected fields.
+    - Controlled indexing/TTL for sensitive collections and OTP/session cleanup.
+    - Global key sanitization for request payload/query/params before DB usage.
+  - Hardening files:
+    - `apps/server/src/config/db.ts` (Mongoose `strictQuery`, connection guards, prod `autoIndex` policy)
+    - `apps/server/src/app.ts` (NoSQL sanitize middleware and param sanitization)
+    - `apps/server/src/features/users/user.model.ts`
+    - `apps/server/src/features/dispatches/dispatch.model.ts`
+    - `apps/server/src/features/hazardZones/hazardZone.model.ts`
+    - `apps/server/src/features/volunteerApplications/volunteerApplication.model.ts`
+    - `apps/server/src/features/auth/TokenBlocklist.model.ts`
+    - `apps/server/src/features/auth/MfaChallenge.ts`
+    - `apps/server/src/features/auth/models/EmailVerificationRequest.model.ts`
+    - `apps/server/src/features/auth/models/PasswordResetRequest.model.ts`
+  - Test route(s):
+    - Injection-shaped auth payload checks on login routes
+    - OTP/login/logout flows (for TTL/indexed collections)
+
 - [Implemented] XSS hardening headers (Helmet + CSP + production HSTS)
   - Files: `apps/server/src/app.ts`
   - Test route(s): `GET /health` (inspect response headers)

@@ -5,10 +5,12 @@ import volunteerApplicationRoutes from "./volunteerApplications/volunteerApplica
 import hazardZoneRoutes from "./hazardZones/hazardZone.routes";
 import userRoutes from "./users/user.routes";
 import dispatchRoutes from "./dispatches/dispatch.routes";
+import securityRoutes from "./security/security.routes";
 
 const router = Router();
 
 // feature routes
+router.use("/security", securityRoutes); // CSRF token endpoint
 router.use("/auth", authRoutes); //Login
 router.use("/emergencies", emergencyRoutes); // Emergencies
 router.use("/volunteer-applications", volunteerApplicationRoutes); // Volunteer Applications

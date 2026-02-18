@@ -1,73 +1,69 @@
-# React + TypeScript + Vite
+# Lifeline Web (LGU/Admin)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Web client for LGU/Admin operations in the Lifeline emergency volunteer response platform.
 
-Currently, two official plugins are available:
+## Setup
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+1. Install dependencies:
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+pnpm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+2. Create `.env` in `apps/web` with required variables (see below).
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+3. Run development server:
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+pnpm dev
 ```
+
+4. Build for production:
+
+```bash
+pnpm build
+```
+
+## Environment Variables
+
+- `VITE_API_URL` (required)
+  - Example: `http://localhost:5000`
+- `VITE_MAPBOX_TOKEN` (required for map screens)
+- `VITE_USE_PROFILE_API` (optional, set to `1` to enable profile API calls)
+
+## Backend Connection and Auth
+
+- API client is configured in `src/lib/api.ts`.
+- `VITE_API_URL` is used as base URL.
+- Access tokens are sent as `Authorization: Bearer <token>`.
+- Browser requests include credentials (`withCredentials: true`) for CSRF cookie handling.
+
+## CSRF Token Flow
+
+For browser unsafe methods (`POST`, `PATCH`, `PUT`, `DELETE`):
+
+1. On app boot, web client calls:
+   - `GET /api/security/csrf`
+2. Server returns `{ csrfToken }` and sets CSRF cookie.
+3. Web client stores token in memory.
+4. Unsafe requests send header:
+   - `x-csrf-token: <csrfToken>`
+
+If token/cookie is missing or invalid, server responds with `403` (`CSRF_INVALID`).
+
+## Main Screens / Modules
+
+- Auth
+  - `Login`
+- LGU Core
+  - `Dashboard`, `Notifications`, `Emergencies`, `Live Map`
+- Volunteers
+  - `Applicants`, `Verified Volunteers`
+- Tasks
+  - `In Progress`, `For Review`, `Completed`, `Canceled`
+- Operations
+  - `Approvals`, `Activity Log`, `Reports`, `Announcements`
+- User
+  - `Profile`, `Settings`
+
+Route definitions are in `src/App.tsx`.

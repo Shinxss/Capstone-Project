@@ -1,50 +1,57 @@
-# Welcome to your Expo app 👋
+# Lifeline Mobile (Expo)
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Mobile client for community and volunteer workflows in the Lifeline emergency response platform.
 
-## Get started
+## Expo Setup
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+1. Install dependencies:
 
 ```bash
-npm run reset-project
+pnpm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+2. Create `.env` in `apps/mobile` with required variables.
 
-## Learn more
+3. Run Android build:
 
-To learn more about developing your project with Expo, look at the following resources:
+```bash
+pnpm android
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Optional local dev server:
 
-## Join the community
+```bash
+pnpm start
+```
 
-Join our community of developers creating universal apps.
+## Environment Variables
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- `EXPO_PUBLIC_API_URL` (required)
+  - Base URL of Lifeline backend (example: `http://10.0.2.2:5000` for Android emulator)
+- `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` (required for Google auth)
+- `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` (required for Google auth flow)
+- `EXPO_PUBLIC_MAPBOX_TOKEN` (required for map tab)
+
+## API Base URL Configuration
+
+- API client is configured in `lib/api.ts`.
+- `baseURL` is read from `EXPO_PUBLIC_API_URL`.
+- Feature services call backend paths under `/api/...`.
+
+## Authentication Token Storage Notes
+
+- Primary token/session state is persisted in `AsyncStorage`.
+- Legacy token compatibility path also reads from secure storage (`expo-secure-store`).
+- Axios request interceptor attaches `Authorization: Bearer <token>` automatically when available.
+
+## Push Notifications / WebSockets Notes
+
+- `socket.io-client` is present as a dependency, but no active socket connection flow is currently wired in app code.
+- Native push notification handling is not currently implemented in this codebase.
+
+## Related Modules
+
+- Auth/session bootstrap and login flows: `features/auth`
+- Emergency SOS submission: `features/emergency`
+- Volunteer application flow: `features/volunteer`
+- Dispatch task workflow: `features/dispatch`

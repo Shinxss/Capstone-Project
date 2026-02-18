@@ -31,13 +31,21 @@ export type UserDoc = {
   updatedAt: Date;
 };
 
+/** Sensitive fields stripped from JSON / object serialisation */
+const SENSITIVE_FIELDS = ["passwordHash", "googleSub", "__v"] as const;
+
+function stripSensitive(_doc: unknown, ret: Record<string, unknown>) {
+  for (const f of SENSITIVE_FIELDS) delete ret[f];
+  return ret;
+}
+
 const UserSchema = new Schema<UserDoc>(
   {
-    username: { type: String, trim: true },
-    email: { type: String, lowercase: true, trim: true },
+    username: { type: String, trim: true, maxlength: 64 },
+    email: { type: String, lowercase: true, trim: true, maxlength: 254 },
 
-    firstName: { type: String, default: "", trim: true },
-    lastName: { type: String, default: "", trim: true },
+    firstName: { type: String, default: "", trim: true, maxlength: 100 },
+    lastName: { type: String, default: "", trim: true, maxlength: 100 },
 
     passwordHash: { type: String, default: "" },
     googleSub: { type: String, default: "", trim: true },
@@ -51,10 +59,10 @@ const UserSchema = new Schema<UserDoc>(
       index: true,
     },
 
-    lguName: { type: String, default: "", trim: true },
-    lguPosition: { type: String, default: "", trim: true },
-    barangay: { type: String, default: "", trim: true },
-    municipality: { type: String, default: "", trim: true },
+    lguName: { type: String, default: "", trim: true, maxlength: 200 },
+    lguPosition: { type: String, default: "", trim: true, maxlength: 200 },
+    barangay: { type: String, default: "", trim: true, maxlength: 200 },
+    municipality: { type: String, default: "", trim: true, maxlength: 200 },
 
     volunteerStatus: {
       type: String,
@@ -65,7 +73,12 @@ const UserSchema = new Schema<UserDoc>(
 
     isActive: { type: Boolean, default: true },
   },
-  { timestamps: true }
+  {
+    strict: "throw",
+    timestamps: true,
+    toJSON: { transform: stripSensitive },
+    toObject: { transform: stripSensitive },
+  }
 );
 
 UserSchema.index(

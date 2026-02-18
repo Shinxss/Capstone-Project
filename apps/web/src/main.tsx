@@ -7,8 +7,12 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 
 import { initTheme } from "./features/theme/services/themeService";
+import { fetchCsrfToken } from "./lib/api";
 
 initTheme();
+
+// Fetch CSRF token on app load (non-blocking)
+fetchCsrfToken();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

@@ -338,4 +338,78 @@ curl -i -X POST "$BASE_URL/api/hazard-zones" \
   - Even if logout call fails, local cleanup still happens.
 - Screenshot evidence:
   - Network tab/proxy logs showing `POST /api/auth/logout`.
+
+## 12) How to Verify CSRF
+
+- Checklist item: CSRF enforcement for browser-origin unsafe requests
+- Files:
+  - `apps/server/src/middlewares/csrf.ts`
+  - `apps/server/src/features/security/security.routes.ts`
+  - `apps/server/src/app.ts`
+  - `apps/web/src/lib/api.ts`
+- Manual verification steps:
+  1. Obtain CSRF token:
+
+```bash
+curl -i -c cookies.txt "$BASE_URL/api/security/csrf"
+```
+
+  2. Call an unsafe endpoint without CSRF header (browser-like origin):
+
+```bash
+curl -i -X POST "$BASE_URL/api/auth/logout" \
+  -H "Authorization: Bearer $LGU_TOKEN" \
+  -H "Origin: http://localhost:5173" \
+  -b cookies.txt
+```
+
+  3. Repeat with valid CSRF header from step 1 response body:
+
+```bash
+curl -i -X POST "$BASE_URL/api/auth/logout" \
+  -H "Authorization: Bearer $LGU_TOKEN" \
+  -H "Origin: http://localhost:5173" \
+  -H "x-csrf-token: <csrf_token_from_step_1>" \
+  -b cookies.txt
+```
+
+- Expected:
+  - Step 2: `403` with CSRF error (`CSRF_INVALID` / validation failed)
+  - Step 3: `200` success
+- Additional expected behavior:
+  - Non-browser mobile-style request (no Origin/Referer) is not CSRF-blocked if auth is valid.
+
+## 13) How to Verify DB Hardening
+
+- Checklist item: DB hardening (strict query/schema and sanitization)
+- What to check in config/models:
+  - `apps/server/src/config/db.ts`
+    - `mongoose.set("strictQuery", true)`
+    - production `autoIndex: false`
+  - `apps/server/src/app.ts`
+    - global mongo sanitize middleware
+    - key replacement for `$` and `.` in body/query/params
+  - strict model schemas (`strict: "throw"`) in:
+    - `apps/server/src/features/users/user.model.ts`
+    - `apps/server/src/features/dispatches/dispatch.model.ts`
+    - `apps/server/src/features/hazardZones/hazardZone.model.ts`
+    - `apps/server/src/features/volunteerApplications/volunteerApplication.model.ts`
+
+- Manual verification steps:
+  1. Injection-shaped login payload should never authenticate:
+
+```bash
+curl -i -X POST "$BASE_URL/api/auth/community/login" \
+  -H "Content-Type: application/json" \
+  -d '{"email":{"$ne":null},"password":{"$ne":null}}'
+```
+
+  2. Payload with dotted/dollar keys should be sanitized/rejected by validation flow.
+  3. Confirm TTL/index-backed collections exist and are used for expiring auth artifacts:
+     - `TokenBlocklist`, `MfaChallenge`, `EmailVerificationRequest`, `PasswordResetRequest`
+
+- Expected:
+  - Injection payload returns `400` or `401`, never authenticated success.
+  - Unknown/unsafe keys do not pass through as executable Mongo operators.
+  - Expirable auth artifacts are indexed/TTL-managed in schema definitions.
   - Follow-up `401 Invalid token` on old token.

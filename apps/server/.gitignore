@@ -1,0 +1,70 @@
+# =========================
+# Node / TypeScript
+# =========================
+node_modules/
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# =========================
+# Env / Secrets (NEVER COMMIT)
+# =========================
+.env
+.env.*
+!.env.example
+
+# Keys / Certificates
+*.pem
+*.key
+*.p12
+*.pfx
+
+# =========================
+# Logs / Debug
+# =========================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+debug.log
+
+# =========================
+# Coverage / Reports
+# =========================
+coverage/
+.nyc_output/
+reports/
+junit*.xml
+
+# =========================
+# OS / Editor
+# =========================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# =========================
+# Runtime / Temp / Uploads
+# =========================
+tmp/
+temp/
+.cache/
+uploads/
+storage/
+public/uploads/
+
+# =========================
+# Docker / Local overrides
+# =========================
+docker-compose.override.yml
+
+# =========================
+# Misc
+# =========================
+*.zip

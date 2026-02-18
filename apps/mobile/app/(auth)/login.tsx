@@ -21,6 +21,7 @@ export default function LoginScreen() {
         showPassword={vm.showPassword}
         loading={vm.loading}
         googleLoading={vm.googleLoading}
+        loginCooldownSeconds={vm.loginCooldownSeconds}
         error={vm.error}
         onChangeEmail={vm.setEmail}
         onChangePassword={vm.setPassword}

@@ -124,7 +124,22 @@ const DispatchOfferSchema = new Schema<DispatchOfferDoc>(
       barangayName: { type: String, default: null },
     },
   },
-  { timestamps: true }
+  {
+    strict: "throw",
+    timestamps: true,
+    toJSON: {
+      transform(_doc: unknown, ret: Record<string, unknown>) {
+        delete ret.__v;
+        return ret;
+      },
+    },
+    toObject: {
+      transform(_doc: unknown, ret: Record<string, unknown>) {
+        delete ret.__v;
+        return ret;
+      },
+    },
+  }
 );
 
 DispatchOfferSchema.index({ volunteerId: 1, status: 1, updatedAt: -1 });
