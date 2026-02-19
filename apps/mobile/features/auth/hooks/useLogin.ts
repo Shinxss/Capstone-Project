@@ -7,7 +7,12 @@ import { useGoogleLogin } from "./useGoogleLogin";
 import { useAuth } from "../AuthProvider";
 
 const MAX_FAILED_LOGIN_ATTEMPTS = 5;
-const LOGIN_COOLDOWN_SECONDS = 60;
+const LOGIN_COOLDOWN_MIN_SECONDS = 5 * 60;
+const LOGIN_COOLDOWN_MAX_SECONDS = 10 * 60;
+
+function clampCooldown(seconds: number) {
+  return Math.min(LOGIN_COOLDOWN_MAX_SECONDS, Math.max(LOGIN_COOLDOWN_MIN_SECONDS, seconds));
+}
 
 function formatCooldown(seconds: number) {
   const safeSeconds = Math.max(0, Math.floor(seconds));
@@ -89,13 +94,16 @@ export function useLogin() {
       if (axios.isAxiosError(err) && err.response?.status === 429) {
         const retryAfterRaw = err.response.headers?.["retry-after"];
         const retryAfter = Number.parseInt(String(retryAfterRaw ?? ""), 10);
-        const cooldown = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : LOGIN_COOLDOWN_SECONDS;
+        const cooldown =
+          Number.isFinite(retryAfter) && retryAfter > 0
+            ? clampCooldown(retryAfter)
+            : LOGIN_COOLDOWN_MIN_SECONDS;
         startCooldown(cooldown);
         setFailedAttempts(0);
       } else {
         const nextFailedAttempts = failedAttempts + 1;
         if (nextFailedAttempts >= MAX_FAILED_LOGIN_ATTEMPTS) {
-          startCooldown(LOGIN_COOLDOWN_SECONDS);
+          startCooldown(LOGIN_COOLDOWN_MIN_SECONDS);
           setFailedAttempts(0);
         } else {
           setFailedAttempts(nextFailedAttempts);
