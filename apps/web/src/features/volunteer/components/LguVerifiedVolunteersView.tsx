@@ -55,7 +55,7 @@ export default function LguVerifiedVolunteersView(props: Props) {
 
   return (
     <>
-      <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="mb-5 grid grid-cols-1 mx-6 gap-4 md:grid-cols-3">
         <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white p-5 dark:border-[#162544] dark:bg-[#0B1220]">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-green-100 bg-green-50 dark:border-green-500/25 dark:bg-green-500/10">
             <ShieldCheck className="text-green-700" size={18} />

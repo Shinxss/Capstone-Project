@@ -71,22 +71,32 @@ function StatCard({
   badge: string;
 }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm flex items-center justify-between h-24 dark:bg-[#0E1626] dark:border-[#162544]">
-      <div className="flex items-start gap-3">
-        <div className="h-8 w-8 rounded-md bg-gray-100 flex items-center justify-center dark:bg-[#0B1324]">
+    <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm h-40 dark:bg-[#0E1626] dark:border-[#162544] mb-5">
+      {/* top row */}
+      <div className="flex items-start justify-between">
+        <div className="h-12 w-12 rounded-2xl bg-gray-100 flex items-center justify-center dark:bg-[#0B1324]">
           {icon}
         </div>
-        <div>
-          <div className="text-xl font-bold text-gray-900 dark:text-slate-100">{value}</div>
-          <div className="text-xs text-gray-500 dark:text-slate-400">{label}</div>
+
+        <span className="text-xs font-semibold bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300 px-2 py-1 rounded-full">
+          {badge}
+        </span>
+      </div>
+
+      {/* value + label */}
+      <div className="mt-2 ml-3">
+        <div className="text-4xl font-bold leading-none text-gray-900 dark:text-slate-100">
+          {value}
+        </div>
+        <div className="mt-1 text-sm text-gray-500 dark:text-slate-400">
+          {label}
         </div>
       </div>
-      <span className="text-xs font-semibold bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300 px-2 py-1 rounded-full">
-        {badge}
-      </span>
     </div>
   );
 }
+
+
 
 function ProgressRing({ percent, isDark }: { percent: number; isDark: boolean }) {
   const p = Math.max(0, Math.min(100, percent));
@@ -311,22 +321,7 @@ export default function LguDashboardView({
   }
 
   return (
-    <div className="p-6">
-      <div className="mb-7 flex items-start justify-between gap-4">
-        <div>
-          <div className="text-4xl font-bold text-gray-900 dark:text-slate-100">Command Center</div>
-          <div className="text-base text-gray-400 dark:text-slate-400">Real-time emergency coordination dashboard</div>
-        </div>
-
-        <button
-          onClick={handleRefresh}
-          className="inline-flex items-center gap-2 text-xs font-semibold bg-white border border-gray-200 rounded-md px-3 py-2 hover:bg-gray-50 dark:bg-[#0E1626] dark:border-[#162544] dark:hover:bg-[#122036] dark:text-slate-200"
-        >
-          <RefreshCcw size={14} />
-          Refresh
-        </button>
-      </div>
-
+    <div className="p-4">
       {/* Stats (keeps old design, but Active Emergencies is real) */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
         <StatCard
@@ -335,7 +330,7 @@ export default function LguDashboardView({
           value={String(stats.active)}
           badge={loading ? "sync" : `${stats.open} open`}
         />
-        <StatCard
+        <StatCard 
           icon={<Users size={16} className="text-green-600" />}
           label="Available Volunteers"
           value="—"

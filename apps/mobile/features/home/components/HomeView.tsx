@@ -37,7 +37,7 @@ export function HomeView({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.container,
-          { paddingBottom: 140 + insets.bottom },
+          { paddingBottom: 1 + insets.bottom },
         ]}
       >
         {/* Top bar */}
@@ -124,7 +124,7 @@ export function HomeView({
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#F3F4F6" },
-  container: { paddingHorizontal: 16, paddingTop: 50 },
+  container: { paddingHorizontal: 16, paddingTop: 60 },
 
   topRow: {
     flexDirection: "row",
@@ -156,16 +156,16 @@ const styles = StyleSheet.create({
     borderColor: "#E5E7EB",
   },
 
-  headerBlock: { marginTop: 50, alignItems: "center" },
+  headerBlock: { marginTop: 60, alignItems: "center" },
   h1: {
-    fontSize: 35,
+    fontSize: 40,
     fontWeight: "900",
     color: "#6B7280",
     textAlign: "center",
     lineHeight: 38,
   },
   h2: {
-    fontSize: 12,
+    fontSize: 15,
     color: "#9CA3AF",
     textAlign: "center",
     marginTop: 40,

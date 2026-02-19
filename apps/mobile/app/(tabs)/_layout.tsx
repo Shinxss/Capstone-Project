@@ -9,7 +9,7 @@ import { useAuth } from "../../features/auth/AuthProvider";
 export default function TabLayout() {
   const router = useRouter();
   const { signOut } = useAuth();
-  const { canAccessTasks, blockReason } = useTasksAccess();
+  const { canAccessTasks, blockReason, role } = useTasksAccess();
   const [showAuthRequired, setShowAuthRequired] = useState(false);
 
   const goLogin = useCallback(async () => {
@@ -23,6 +23,12 @@ export default function TabLayout() {
       if (canAccessTasks) return;
 
       e.preventDefault();
+
+      if (blockReason === "role" && String(role ?? "").trim().toUpperCase() === "COMMUNITY") {
+        router.push("/volunteer-apply-modal");
+        return;
+      }
+
       if (TASKS_GUARD_MODE === "redirect") {
         void goLogin();
         return;
@@ -30,7 +36,7 @@ export default function TabLayout() {
 
       setShowAuthRequired(true);
     },
-    [canAccessTasks, goLogin]
+    [blockReason, canAccessTasks, goLogin, role, router]
   );
 
   const modalTitle = blockReason === "role" ? "Access Restricted" : "Login Required";
