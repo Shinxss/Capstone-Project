@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
-import { getAuditRequestContext, logAuditEvent } from "../audit/audit.service";
+import { AUDIT_EVENT } from "../audit/audit.constants";
+import { logAudit } from "../audit/audit.service";
 import {
   getMyLatestApplication,
   getVolunteerApplicationByIdForReviewer,
@@ -36,16 +37,15 @@ export async function postVolunteerApplication(req: Request, res: Response) {
 
   try {
     const created = await submitVolunteerApplication(user.id, parsed.data);
-    const requestContext = getAuditRequestContext(req);
-    await logAuditEvent({
-      actorId: user.id,
-      actorRole: user.role,
-      action: "VOL_APP_SUBMIT",
-      targetType: "VolunteerApplication",
-      targetId: String((created as any)?._id ?? ""),
+    await logAudit(req, {
+      eventType: AUDIT_EVENT.VOLUNTEER_APPLICATION_CREATE,
+      outcome: "SUCCESS",
+      actor: { id: user.id, role: user.role },
+      target: {
+        type: "VOLUNTEER_APPLICATION",
+        id: String((created as any)?._id ?? ""),
+      },
       metadata: { status: (created as any)?.status ?? "pending_verification" },
-      ip: requestContext.ip,
-      userAgent: requestContext.userAgent,
     });
 
     return res.status(201).json(created);
@@ -85,16 +85,23 @@ export async function postReview(req: Request<IdParams>, res: Response) {
 
   if (!updated) return res.status(404).json({ message: "Application not found" });
 
-  const requestContext = getAuditRequestContext(req);
-  await logAuditEvent({
-    actorId: user.id,
-    actorRole: user.role,
-    action: "VOL_APP_REVIEW",
-    targetType: "VolunteerApplication",
-    targetId: String((updated as any)?._id ?? req.params.id),
+  const reviewAction = String(parsed.data.action).toLowerCase();
+  const reviewEventType =
+    reviewAction === "approve"
+      ? AUDIT_EVENT.VOLUNTEER_APPLICATION_APPROVE
+      : reviewAction === "reject"
+        ? AUDIT_EVENT.VOLUNTEER_APPLICATION_REJECT
+        : AUDIT_EVENT.VOLUNTEER_APPLICATION_REVIEW;
+
+  await logAudit(req, {
+    eventType: reviewEventType,
+    outcome: "SUCCESS",
+    actor: { id: user.id, role: user.role },
+    target: {
+      type: "VOLUNTEER_APPLICATION",
+      id: String((updated as any)?._id ?? req.params.id),
+    },
     metadata: { action: parsed.data.action },
-    ip: requestContext.ip,
-    userAgent: requestContext.userAgent,
   });
 
   return res.json(updated);

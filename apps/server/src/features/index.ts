@@ -6,6 +6,7 @@ import hazardZoneRoutes from "./hazardZones/hazardZone.routes";
 import userRoutes from "./users/user.routes";
 import dispatchRoutes from "./dispatches/dispatch.routes";
 import securityRoutes from "./security/security.routes";
+import auditRoutes from "./audit/audit.routes";
 
 const router = Router();
 
@@ -17,5 +18,6 @@ router.use("/volunteer-applications", volunteerApplicationRoutes); // Volunteer 
 router.use("/hazard-zones", hazardZoneRoutes); // Hazard Zones
 router.use("/users", userRoutes); // Users
 router.use("/dispatches", dispatchRoutes); // Dispatch Offers
+router.use("/audit", auditRoutes); // Audit Logs
 
 export default router;

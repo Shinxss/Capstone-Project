@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { Router } from "express";
-import { logAuditEvent, getAuditRequestContext } from "../audit/audit.service";
+import { AUDIT_EVENT } from "../audit/audit.constants";
+import { logAudit, logSecurityEvent } from "../audit/audit.service";
 import { User } from "../users/user.model";
 import { loginLimiter, registerLimiter } from "../../middlewares/rateLimit";
 import { validate } from "../../middlewares/validate";
@@ -66,25 +67,37 @@ communityAuthRouter.post("/login", loginLimiter, validate(communityLoginSchema),
     });
 
     if (!user || !user.isActive || !user.emailVerified || !user.passwordHash) {
+      await logSecurityEvent(req, AUDIT_EVENT.AUTH_LOGIN_FAIL, "FAIL", {
+        actorEmail: cleanEmail,
+      });
       return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });
     }
 
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) {
+      await logSecurityEvent(req, AUDIT_EVENT.AUTH_LOGIN_FAIL, "FAIL", {
+        actorEmail: cleanEmail,
+      });
       return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });
     }
 
     const token = signAccessToken({ sub: user._id.toString(), role: user.role });
-    const requestContext = getAuditRequestContext(req);
-    await logAuditEvent({
-      actorId: user._id.toString(),
-      actorRole: user.role,
-      action: "AUTH_COMMUNITY_LOGIN_SUCCESS",
-      targetType: "User",
-      targetId: user._id.toString(),
-      metadata: { role: user.role },
-      ip: requestContext.ip,
-      userAgent: requestContext.userAgent,
+    await logAudit(req, {
+      eventType: AUDIT_EVENT.AUTH_LOGIN_SUCCESS,
+      outcome: "SUCCESS",
+      actor: {
+        id: user._id.toString(),
+        role: user.role,
+        email: user.email,
+      },
+      target: {
+        type: "USER",
+        id: user._id.toString(),
+      },
+      metadata: {
+        role: user.role,
+        loginChannel: "password",
+      },
     });
 
     return res.json({

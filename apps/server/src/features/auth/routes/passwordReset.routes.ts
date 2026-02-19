@@ -2,6 +2,8 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { User } from "../../users/user.model";
+import { AUDIT_EVENT } from "../../audit/audit.constants";
+import { logAudit } from "../../audit/audit.service";
 import { PasswordResetRequest } from "../models/PasswordResetRequest.model";
 import { sendPasswordResetOtpEmail } from "../../../utils/mailer";
 import { zodPasswordSchema } from "../password.policy";
@@ -107,6 +109,23 @@ passwordResetRoutes.post("/forgot", async (req, res) => {
       return res.status(sent.status).json({ success: false, error: sent.message });
     }
 
+    await logAudit(req, {
+      eventType: AUDIT_EVENT.AUTH_PASSWORD_RESET_REQUEST,
+      outcome: "SUCCESS",
+      actor: {
+        id: user._id.toString(),
+        role: user.role,
+        email: user.email,
+      },
+      target: {
+        type: "USER",
+        id: user._id.toString(),
+      },
+      metadata: {
+        channel: "email_otp",
+      },
+    });
+
     return res.status(200).json({ success: true, message: "OTP sent" });
   } catch (error) {
     console.error("[auth.password] failed to request reset OTP", error);
@@ -188,6 +207,23 @@ passwordResetRoutes.post("/reset", async (req, res) => {
     await user.save();
 
     await PasswordResetRequest.deleteMany({ email });
+
+    await logAudit(req, {
+      eventType: AUDIT_EVENT.AUTH_PASSWORD_RESET_SUCCESS,
+      outcome: "SUCCESS",
+      actor: {
+        id: user._id.toString(),
+        role: user.role,
+        email: user.email,
+      },
+      target: {
+        type: "USER",
+        id: user._id.toString(),
+      },
+      metadata: {
+        method: "email_otp",
+      },
+    });
 
     return res.status(200).json({ success: true, message: "Password reset successful" });
   } catch (error) {

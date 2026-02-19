@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { Types } from "mongoose";
-import { logAuditEvent, getAuditActor, getAuditRequestContext } from "../audit/audit.service";
+import { AUDIT_EVENT } from "../audit/audit.constants";
+import { logAudit, logSecurityEvent } from "../audit/audit.service";
 import { User } from "../users/user.model";
 import { verifyMfaChallenge } from "../../utils/mfa";
 import { signAccessToken } from "../../utils/jwt";
@@ -23,10 +24,30 @@ export async function login(req: Request, res: Response) {
 
     const user = await authenticateUser(email, password);
     if (!user) {
+      await logSecurityEvent(req, AUDIT_EVENT.AUTH_LOGIN_FAIL, "FAIL", {
+        actorEmail: email,
+      });
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
     const token = signAccessToken({ sub: user._id.toString(), role: user.role });
+
+    await logAudit(req, {
+      eventType: AUDIT_EVENT.AUTH_LOGIN_SUCCESS,
+      outcome: "SUCCESS",
+      actor: {
+        id: user._id.toString(),
+        role: user.role,
+        email: user.email,
+      },
+      target: {
+        type: "USER",
+        id: user._id.toString(),
+      },
+      metadata: {
+        loginChannel: "password",
+      },
+    });
 
     return res.status(200).json({
       token,
@@ -55,6 +76,23 @@ export async function adminMfaVerify(req: Request, res: Response) {
 
     const token = signAccessToken({ sub: user._id.toString(), role: user.role });
 
+    await logAudit(req, {
+      eventType: AUDIT_EVENT.AUTH_MFA_VERIFY_SUCCESS,
+      outcome: "SUCCESS",
+      actor: {
+        id: user._id.toString(),
+        role: user.role,
+        email: user.email,
+      },
+      target: {
+        type: "USER",
+        id: user._id.toString(),
+      },
+      metadata: {
+        challengeId,
+      },
+    });
+
     return res.json({
       success: true,
       data: {
@@ -68,6 +106,10 @@ export async function adminMfaVerify(req: Request, res: Response) {
       },
     });
   } catch (err: any) {
+    await logSecurityEvent(req, AUDIT_EVENT.AUTH_MFA_VERIFY_FAIL, "FAIL", {
+      reason: err?.message || "OTP verification failed",
+      challengeId: req.body?.challengeId,
+    });
     return res.status(401).json({ success: false, error: err?.message || "OTP verification failed" });
   }
 }
@@ -113,17 +155,17 @@ export async function logout(req: Request, res: Response) {
       { upsert: true }
     );
 
-    const actor = getAuditActor(req);
-    const requestContext = getAuditRequestContext(req);
-    await logAuditEvent({
-      actorId: actor.actorId || auth.sub,
-      actorRole: actor.actorRole || auth.role || "",
-      action: "AUTH_LOGOUT",
-      targetType: "User",
-      targetId: auth.sub,
-      metadata: {},
-      ip: requestContext.ip,
-      userAgent: requestContext.userAgent,
+    await logAudit(req, {
+      eventType: AUDIT_EVENT.AUTH_LOGOUT,
+      outcome: "SUCCESS",
+      actor: {
+        id: req.userId || auth.sub,
+        role: req.role || auth.role,
+      },
+      target: {
+        type: "USER",
+        id: auth.sub,
+      },
     });
 
     return res.status(200).json({ success: true });

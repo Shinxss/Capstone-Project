@@ -1,5 +1,13 @@
 # Troubleshooting
 
+## Security Documentation References
+
+- Security architecture and controls: `apps/server/docs/security_documentation.md`
+- Security control-to-code map: `apps/server/docs/SECURITY_CHECKLIST_MAP.md`
+- Security test procedures: `apps/server/docs/SECURITY_CHECKLIST_TESTS.md`
+
+Use the checklist tests as the source of truth for command-level verification steps.
+
 ## DB Connection Failures
 
 ### Symptoms
@@ -83,6 +91,67 @@
 3. Verify sender identity and domain policy at provider.
 4. Re-test OTP endpoints after config updates.
 
+## Security Verification Checklist Issues
+
+### Rate Limit test does not return 429
+
+#### Checks
+- Confirm you are hitting rate-limited auth routes (for example `/api/auth/login`, `/api/auth/community/login`, `/api/auth/lgu/login`).
+- Ensure repeated requests are inside the limiter window.
+- Verify request path/method exactly match the protected route.
+
+#### Fix Steps
+1. Re-run rapid repeated requests on the same route.
+2. Confirm response eventually returns `429`.
+3. Check audit events for `SECURITY_RATE_LIMIT_HIT`.
+
+### Generic login error behavior is inconsistent
+
+#### Checks
+- Compare wrong-email and wrong-password responses on the same login endpoint.
+- Verify both cases return the same invalid credentials pattern.
+
+#### Fix Steps
+1. Retest with controlled inputs and identical request shape.
+2. Confirm status remains `401` for invalid credentials.
+3. Review auth route used (community, LGU, or general auth) to avoid mixing flows.
+
+### Logout does not invalidate token
+
+#### Checks
+- Ensure logout call is made with a valid Bearer token.
+- Reuse the same token on a protected route after logout.
+- Confirm token includes `jti` and blocklist lookup is active.
+
+#### Fix Steps
+1. Login and capture token.
+2. Call `POST /api/auth/logout` with that token.
+3. Retry `GET /api/auth/me` with the same token; expect `401`.
+
+### CSRF test not reproducing expected 403/200
+
+#### Checks
+- Browser-origin request should include `Origin`/`Referer`.
+- Call `GET /api/security/csrf` first to obtain token.
+- Unsafe method must include `x-csrf-token` and cookie.
+
+#### Fix Steps
+1. Test unsafe request without token/header for expected `403`.
+2. Add `x-csrf-token` from bootstrap response and retry.
+3. Confirm request succeeds when CSRF requirements are met.
+
+### Audit event not visible after security test
+
+#### Checks
+- Query `/api/audit` with admin/LGU credentials.
+- Filter by expected event type (for example `AUTH_LOGIN_FAIL`, `SECURITY_ACCESS_DENIED`, `SECURITY_CSRF_FAIL`).
+- Verify time window and pagination (`page`, `limit`) are sufficient.
+
+#### Fix Steps
+1. Re-run the triggering test case once.
+2. Query `/api/audit?eventType=<EVENT>&page=1&limit=20`.
+3. Inspect `requestId` and `correlationId` fields for traceability.
+
 ## Common Fix Sequence
 
 1. Confirm environment variables and restart service.
@@ -90,3 +159,4 @@
 3. Validate `/health` and one protected route using a fresh token.
 4. Re-test CSRF flow (web) and auth flow (mobile/web).
 5. Inspect server logs and `audit_logs` for context.
+6. If validating security controls for presentation, follow `apps/server/docs/SECURITY_CHECKLIST_TESTS.md` end-to-end.

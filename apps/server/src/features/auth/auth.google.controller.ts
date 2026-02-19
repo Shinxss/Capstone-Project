@@ -3,6 +3,8 @@ import bcrypt from "bcryptjs";
 import { OAuth2Client } from "google-auth-library";
 import type { TokenPayload } from "google-auth-library";
 import { signAccessToken } from "../../utils/jwt";
+import { AUDIT_EVENT } from "../audit/audit.constants";
+import { logAudit, logSecurityEvent } from "../audit/audit.service";
 import { User } from "../users/user.model";
 import { toAuthUserPayload } from "./otp.utils";
 import { zodPasswordSchema } from "./password.policy";
@@ -81,6 +83,9 @@ export async function loginWithGoogle(req: Request, res: Response) {
       payload = await verifyGoogleIdTokenOrThrow(idToken);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Invalid Google ID token.";
+      await logSecurityEvent(req, AUDIT_EVENT.AUTH_OAUTH_GOOGLE_FAIL, "FAIL", {
+        reason: message,
+      });
       if (/Missing GOOGLE_ANDROID_CLIENT_ID\/GOOGLE_WEB_CLIENT_ID/.test(message)) {
         return res.status(500).json({ success: false, error: GENERIC_GOOGLE_LOGIN_ERROR });
       }
@@ -149,10 +154,30 @@ export async function loginWithGoogle(req: Request, res: Response) {
     }
 
     if (!user.isActive) {
+      await logSecurityEvent(req, AUDIT_EVENT.AUTH_OAUTH_GOOGLE_FAIL, "FAIL", {
+        reason: "Inactive account",
+      });
       return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });
     }
 
     const accessToken = signAccessToken({ sub: user._id.toString(), role: user.role });
+
+    await logAudit(req, {
+      eventType: AUDIT_EVENT.AUTH_OAUTH_GOOGLE_SUCCESS,
+      outcome: "SUCCESS",
+      actor: {
+        id: user._id.toString(),
+        role: user.role,
+        email: user.email,
+      },
+      target: {
+        type: "USER",
+        id: user._id.toString(),
+      },
+      metadata: {
+        loginChannel: "google",
+      },
+    });
 
     return res.json({
       success: true,
@@ -162,6 +187,9 @@ export async function loginWithGoogle(req: Request, res: Response) {
       },
     });
   } catch (err) {
+    await logSecurityEvent(req, AUDIT_EVENT.AUTH_OAUTH_GOOGLE_FAIL, "FAIL", {
+      reason: err instanceof Error ? err.message : "Server error",
+    });
     console.error("[auth.google] Failed to login with Google", err);
     return res.status(500).json({ success: false, error: "Server error" });
   }

@@ -61,7 +61,7 @@ const navSections: NavSection[] = [
         to: "/lgu/approvals",
         icon: ClipboardCheck,
       },
-      { label: "Audit Log", to: "/lgu/activity-log", icon: Activity },
+      { label: "Audit Log", to: "/lgu/audit-log", icon: Activity },
       { label: "Live Map", to: "/lgu/live-map", icon: MapIcon },
     ],
   },

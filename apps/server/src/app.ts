@@ -10,13 +10,17 @@ import "dotenv/config";
 import routes from "./features";
 import { requireAuth } from "./middlewares/requireAuth";
 import { requireRole } from "./middlewares/requireRole";
+import { requestContext } from "./middlewares/requestContext";
 import { decryptBuffer } from "./utils/aesGcm";
 import { doubleCsrfProtection } from "./middlewares/csrf";
+import { AUDIT_EVENT } from "./features/audit/audit.constants";
+import { logSecurityEvent } from "./features/audit/audit.service";
 
 export const app = express();
 
 app.disable("x-powered-by");
 app.set("trust proxy", 1);
+app.use(requestContext);
 
 app.get("/health", (_req, res) => res.json({ ok: true, service: "lifeline-api" }));
 
@@ -39,8 +43,8 @@ app.use(
   cors({
     origin: corsOrigin,
     credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization", "x-csrf-token"],
-    exposedHeaders: ["x-csrf-token"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-csrf-token", "x-correlation-id"],
+    exposedHeaders: ["x-csrf-token", "x-request-id", "x-correlation-id"],
   })
 );
 
@@ -143,10 +147,18 @@ app.use("/api", routes);
 
 // ── Global error handler (returns JSON, avoids Express's raw stack dump) ──
 import type { ErrorRequestHandler } from "express";
-const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
+const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
   const status: number =
     typeof err.status === "number" ? err.status :
     typeof err.statusCode === "number" ? err.statusCode : 500;
+
+  if (status === 403 && (err?.code === "CSRF_INVALID" || /csrf/i.test(String(err?.message ?? "")))) {
+    void logSecurityEvent(req, AUDIT_EVENT.SECURITY_CSRF_FAIL, "DENY", {
+      reason: err?.message,
+      path: req.originalUrl,
+      method: req.method,
+    });
+  }
 
   // Only log unexpected (5xx) errors with full stack
   if (status >= 500) {

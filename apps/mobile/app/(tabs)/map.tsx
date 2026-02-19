@@ -18,6 +18,7 @@ import { useMapStyle } from "../../features/map/hooks/useMapStyle";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { useActiveDispatch } from "../../features/dispatch/hooks/useActiveDispatch";
+import { api } from "../../lib/api";
 
 type EmergencyType = "SOS" | "Flood" | "Fire" | "Typhoon" | "Earthquake" | "Collapse";
 
@@ -29,6 +30,17 @@ type EmergencyReport = {
   lng: number;
   lat: number;
   updated?: string;
+};
+
+type HazardZone = {
+  _id: string;
+  name: string;
+  hazardType?: string;
+  isActive?: boolean;
+  geometry?: {
+    type: "Polygon" | "MultiPolygon";
+    coordinates: any;
+  };
 };
 
 const DAGUPAN: [number, number] = [120.3333, 16.0438];
@@ -57,6 +69,16 @@ const colorForType = (type: EmergencyType) => {
     default:
       return "#64748B";
   }
+};
+
+const hazardColorForType = (raw?: string) => {
+  const t = String(raw ?? "").toUpperCase();
+  if (t === "FLOODED" || t === "FLOOD") return { fill: "#0ea5e9", line: "#0ea5e9" };
+  if (t === "ROAD_CLOSED") return { fill: "#fb7185", line: "#fb7185" };
+  if (t === "FIRE_RISK" || t === "FIRE") return { fill: "#f97316", line: "#f97316" };
+  if (t === "LANDSLIDE") return { fill: "#a855f7", line: "#a855f7" };
+  if (t === "UNSAFE") return { fill: "#eab308", line: "#eab308" };
+  return { fill: "#eab308", line: "#eab308" };
 };
 
 function normalizeEmergencyType(raw: string): EmergencyType {
@@ -195,6 +217,28 @@ export default function MapTab() {
   >(null);
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeMode, setRouteMode] = useState<"driving" | "walking">("driving");
+  const [hazardZones, setHazardZones] = useState<HazardZone[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadHazardZones = async () => {
+      try {
+        const res = await api.get<{ data: HazardZone[] }>("/api/hazard-zones", {
+          params: { limit: 500 },
+        });
+        if (cancelled) return;
+        setHazardZones(res.data?.data ?? []);
+      } catch {
+        if (!cancelled) setHazardZones([]);
+      }
+    };
+
+    void loadHazardZones();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // ✅ Keep current location for routing (Direction button)
   useEffect(() => {
@@ -270,6 +314,32 @@ export default function MapTab() {
         (r.description ?? "").toLowerCase().includes(q)
     );
   }, [reports, query]);
+
+  const hazardZonesGeoJSON = useMemo(() => {
+    const features = (hazardZones ?? [])
+      .filter((z) => z?.isActive !== false)
+      .filter((z) => z?.geometry?.type === "Polygon" || z?.geometry?.type === "MultiPolygon")
+      .filter((z) => Array.isArray(z?.geometry?.coordinates))
+      .map((z) => {
+        const colors = hazardColorForType(z.hazardType);
+        return {
+          type: "Feature",
+          properties: {
+            id: String(z._id),
+            name: z.name,
+            hazardType: z.hazardType ?? "UNKNOWN",
+            fillColor: colors.fill,
+            lineColor: colors.line,
+          },
+          geometry: z.geometry,
+        };
+      });
+
+    return {
+      type: "FeatureCollection",
+      features,
+    } as any;
+  }, [hazardZones]);
 
   const camera = useMemo(
     () => ({
@@ -445,6 +515,25 @@ export default function MapTab() {
             animationDuration={camera.animationDuration}
           />
 
+          {hazardZonesGeoJSON.features.length ? (
+            <MapboxGL.ShapeSource id="hazardZonesSource" shape={hazardZonesGeoJSON}>
+              <MapboxGL.FillLayer
+                id="hazardZonesFill"
+                style={{
+                  fillColor: ["get", "fillColor"] as any,
+                  fillOpacity: 0.22,
+                }}
+              />
+              <MapboxGL.LineLayer
+                id="hazardZonesLine"
+                style={{
+                  lineColor: ["get", "lineColor"] as any,
+                  lineWidth: 2,
+                }}
+              />
+            </MapboxGL.ShapeSource>
+          ) : null}
+
 
           {route ? (
             <MapboxGL.ShapeSource
@@ -482,17 +571,6 @@ export default function MapTab() {
             </MapboxGL.MarkerView>
           ))}
         </MapboxGL.MapView>
-
-        {!hasActiveEmergency ? (
-          <View pointerEvents="none" style={styles.noAssignmentWrap}>
-            <View style={styles.noAssignmentCard}>
-              <Text style={styles.noAssignmentTitle}>No assigned emergency</Text>
-              <Text style={styles.noAssignmentSub}>
-                {"You'll see the emergency here once LGU dispatches you."}
-              </Text>
-            </View>
-          </View>
-        ) : null}
 
         {/* ✅ Google-Maps-like top UI */}
         <View pointerEvents="box-none" style={styles.overlay}>
@@ -700,30 +778,6 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#F3F4F6" },
   root: { flex: 1, position: "relative" },
   map: { flex: 1 },
-
-  noAssignmentWrap: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 18,
-  },
-  noAssignmentCard: {
-    backgroundColor: "rgba(17,24,39,0.75)",
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  noAssignmentTitle: {
-    color: "#fff",
-    fontWeight: "800",
-    fontSize: 15,
-  },
-  noAssignmentSub: {
-    marginTop: 6,
-    color: "rgba(255,255,255,0.85)",
-    fontSize: 12,
-    fontWeight: "600",
-  },
 
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "transparent" },
 

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useLguSession } from "../features/auth/hooks/useLguSession";
 import { clearLguSession } from "../features/auth/services/authStorage";
 import { logout } from "../features/auth/services/lguAuth.service";
+import { appendActivityLog } from "../features/activityLog/services/activityLog.service";
 
 import {
   Search,
@@ -79,6 +80,12 @@ export default function Header({
     } catch {
       // Best effort only.
     }
+
+    appendActivityLog({
+      action: "Auth logout",
+      entityType: "system",
+      entityId: user?.id ?? null,
+    });
 
     clearLguSession(); // ✅ clears token + user
     setOpen(false);

@@ -24,6 +24,9 @@ export function useActivityLog() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<ActivityLogFilters>(defaultFilters);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const refresh = useCallback(() => {
     setLoading(true);
@@ -45,6 +48,7 @@ export function useActivityLog() {
   const filtered = useMemo(() => {
     const qAction = filters.action.trim().toLowerCase();
     const qActor = filters.actor.trim().toLowerCase();
+    const qSearch = search.trim().toLowerCase();
 
     const fromIso = filters.dateFrom ? toStartOfDayIso(filters.dateFrom) : "";
     const toIso = filters.dateTo ? toEndOfDayIso(filters.dateTo) : "";
@@ -54,9 +58,49 @@ export function useActivityLog() {
       if (toIso && String(e.timestamp) > toIso) return false;
       if (qAction && !String(e.action || "").toLowerCase().includes(qAction)) return false;
       if (qActor && !String(e.actor || "").toLowerCase().includes(qActor)) return false;
+
+      if (qSearch) {
+        const haystack = [
+          e.actor,
+          e.action,
+          e.entityType,
+          e.entityId,
+          e.timestamp ? new Date(e.timestamp).toLocaleString() : "",
+        ]
+          .map((part) => String(part || "").toLowerCase())
+          .join(" ");
+
+        if (!haystack.includes(qSearch)) return false;
+      }
+
       return true;
     });
-  }, [entries, filters]);
+  }, [entries, filters, search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filters, search, pageSize]);
+
+  const pagination = useMemo(() => {
+    const totalItems = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+    const safePage = Math.min(page, totalPages);
+    const startIndex = (safePage - 1) * pageSize;
+    const endIndex = Math.min(startIndex + pageSize, totalItems);
+
+    return {
+      totalItems,
+      totalPages,
+      page: safePage,
+      pageSize,
+      startIndex,
+      endIndex,
+    };
+  }, [filtered.length, page, pageSize]);
+
+  const paginated = useMemo(() => {
+    return filtered.slice(pagination.startIndex, pagination.endIndex);
+  }, [filtered, pagination.startIndex, pagination.endIndex]);
 
   const actionOptions = useMemo(() => {
     const set = new Set<string>();
@@ -73,13 +117,25 @@ export function useActivityLog() {
   return {
     entries,
     filtered,
+    paginated,
     loading,
     error,
     filters,
     setFilters,
+    search,
+    setSearch,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    pagination,
     actionOptions,
     actorOptions,
     refresh,
-    clearFilters: () => setFilters(defaultFilters),
+    clearFilters: () => {
+      setFilters(defaultFilters);
+      setSearch("");
+      setPage(1);
+    },
   };
 }

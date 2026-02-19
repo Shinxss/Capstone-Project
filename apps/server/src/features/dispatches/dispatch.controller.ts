@@ -12,7 +12,8 @@ import {
   verifyDispatch,
 } from "./dispatch.service";
 import type { DispatchStatus } from "./dispatch.model";
-import { getAuditRequestContext, logAuditEvent } from "../audit/audit.service";
+import { AUDIT_EVENT } from "../audit/audit.constants";
+import { logAudit } from "../audit/audit.service";
 
 function getAuth(req: Request) {
   const role = (req as any).user?.role ?? (req as any).role;
@@ -37,6 +38,17 @@ export async function postDispatchOffers(req: Request, res: Response) {
       emergencyId: String(emergencyId ?? ""),
       volunteerIds: Array.isArray(volunteerIds) ? volunteerIds : [],
       createdByUserId: String(userId),
+    });
+
+    await logAudit(req, {
+      eventType: AUDIT_EVENT.DISPATCH_CREATE,
+      outcome: "SUCCESS",
+      actor: { id: userId, role },
+      target: { type: "DISPATCH" },
+      metadata: {
+        emergencyId: String(emergencyId ?? ""),
+        createdCount: created.length,
+      },
     });
 
     return res.status(201).json({ message: "Dispatch offers created", count: created.length });
@@ -97,6 +109,16 @@ export async function patchRespond(req: Request, res: Response) {
       decision: decision as any,
     });
 
+    await logAudit(req, {
+      eventType: AUDIT_EVENT.DISPATCH_STATUS_CHANGE,
+      outcome: "SUCCESS",
+      actor: { id: userId, role },
+      target: { type: "DISPATCH", id: String(req.params.id) },
+      metadata: {
+        decision,
+      },
+    });
+
     return res.json({ data: toDispatchDTO(offer) });
   } catch (e: any) {
     return res.status(400).json({ message: e?.message ?? "Failed" });
@@ -122,18 +144,15 @@ export async function postProof(req: Request, res: Response) {
       fileName: fileName ? String(fileName) : undefined,
     });
 
-    const requestContext = getAuditRequestContext(req);
-    await logAuditEvent({
-      actorId: userId,
-      actorRole: role,
-      action: "DISPATCH_PROOF_UPLOAD",
-      targetType: "DispatchOffer",
-      targetId: String(req.params.id),
+    await logAudit(req, {
+      eventType: AUDIT_EVENT.DISPATCH_UPDATE,
+      outcome: "SUCCESS",
+      actor: { id: userId, role },
+      target: { type: "DISPATCH", id: String(req.params.id) },
       metadata: {
+        updateType: "proof_upload",
         proofCount: Array.isArray((updated as any).proofs) ? (updated as any).proofs.length : 0,
       },
-      ip: requestContext.ip,
-      userAgent: requestContext.userAgent,
     });
 
     return res.json({ data: toDispatchDTO(updated) });
@@ -148,6 +167,17 @@ export async function patchComplete(req: Request, res: Response) {
     if (role !== "VOLUNTEER") return res.status(403).json({ message: "Forbidden" });
 
     const updated = await completeDispatch({ dispatchId: String(req.params.id), volunteerUserId: String(userId) });
+
+    await logAudit(req, {
+      eventType: AUDIT_EVENT.DISPATCH_STATUS_CHANGE,
+      outcome: "SUCCESS",
+      actor: { id: userId, role },
+      target: { type: "DISPATCH", id: String(req.params.id) },
+      metadata: {
+        nextStatus: "DONE",
+      },
+    });
+
     return res.json({ data: toDispatchDTO(updated) });
   } catch (e: any) {
     return res.status(400).json({ message: e?.message ?? "Failed" });
@@ -177,16 +207,16 @@ export async function patchVerify(req: Request, res: Response) {
     if (role !== "LGU") return res.status(403).json({ message: "Forbidden" });
 
     const { txHash } = await verifyDispatch({ dispatchId: String(req.params.id), verifierUserId: String(userId) });
-    const requestContext = getAuditRequestContext(req);
-    await logAuditEvent({
-      actorId: userId,
-      actorRole: role,
-      action: "DISPATCH_VERIFY",
-      targetType: "DispatchOffer",
-      targetId: String(req.params.id),
-      metadata: { txHash },
-      ip: requestContext.ip,
-      userAgent: requestContext.userAgent,
+
+    await logAudit(req, {
+      eventType: AUDIT_EVENT.DISPATCH_STATUS_CHANGE,
+      outcome: "SUCCESS",
+      actor: { id: userId, role },
+      target: { type: "DISPATCH", id: String(req.params.id) },
+      metadata: {
+        nextStatus: "VERIFIED",
+        txHash,
+      },
     });
 
     return res.json({ success: true, txHash });

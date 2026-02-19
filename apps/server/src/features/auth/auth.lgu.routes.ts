@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { Router } from "express";
-import { logAuditEvent, getAuditRequestContext } from "../audit/audit.service";
+import { AUDIT_EVENT } from "../audit/audit.constants";
+import { logAudit, logSecurityEvent } from "../audit/audit.service";
 import { User } from "../users/user.model";
 import { loginLimiter } from "../../middlewares/rateLimit";
 import { validate } from "../../middlewares/validate";
@@ -23,15 +24,19 @@ lguAuthRouter.post("/login", loginLimiter, validate(lguLoginSchema), async (req,
     }).lean();
 
     if (!user || !user.isActive || !user.passwordHash) {
+      await logSecurityEvent(req, AUDIT_EVENT.AUTH_LOGIN_FAIL, "FAIL", {
+        username,
+      });
       return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });
     }
 
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) {
+      await logSecurityEvent(req, AUDIT_EVENT.AUTH_LOGIN_FAIL, "FAIL", {
+        username,
+      });
       return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });
     }
-
-    const requestContext = getAuditRequestContext(req);
 
     if (user.role === "ADMIN") {
       if (!user.email) {
@@ -46,15 +51,22 @@ lguAuthRouter.post("/login", loginLimiter, validate(lguLoginSchema), async (req,
         expiryTime: 5,
       });
 
-      await logAuditEvent({
-        actorId: user._id.toString(),
-        actorRole: user.role,
-        action: "AUTH_ADMIN_PASSWORD_SUCCESS",
-        targetType: "User",
-        targetId: user._id.toString(),
-        metadata: { mfaRequired: true },
-        ip: requestContext.ip,
-        userAgent: requestContext.userAgent,
+      await logAudit(req, {
+        eventType: AUDIT_EVENT.AUTH_MFA_CHALLENGE_SENT,
+        outcome: "SUCCESS",
+        actor: {
+          id: user._id.toString(),
+          role: user.role,
+          email: user.email,
+        },
+        target: {
+          type: "USER",
+          id: user._id.toString(),
+        },
+        metadata: {
+          mfaRequired: true,
+          challengeId,
+        },
       });
 
       return res.json({
@@ -76,15 +88,23 @@ lguAuthRouter.post("/login", loginLimiter, validate(lguLoginSchema), async (req,
     }
 
     const token = signAccessToken({ sub: user._id.toString(), role: user.role });
-    await logAuditEvent({
-      actorId: user._id.toString(),
-      actorRole: user.role,
-      action: "AUTH_LGU_LOGIN_SUCCESS",
-      targetType: "User",
-      targetId: user._id.toString(),
-      metadata: { role: user.role },
-      ip: requestContext.ip,
-      userAgent: requestContext.userAgent,
+
+    await logAudit(req, {
+      eventType: AUDIT_EVENT.AUTH_LOGIN_SUCCESS,
+      outcome: "SUCCESS",
+      actor: {
+        id: user._id.toString(),
+        role: user.role,
+        email: user.email,
+      },
+      target: {
+        type: "USER",
+        id: user._id.toString(),
+      },
+      metadata: {
+        role: user.role,
+        loginChannel: "password",
+      },
     });
 
     return res.json({

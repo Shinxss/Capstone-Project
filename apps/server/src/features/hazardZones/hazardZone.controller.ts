@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { Types } from "mongoose";
-import { getAuditActor, getAuditRequestContext, logAuditEvent } from "../audit/audit.service";
+import { AUDIT_EVENT } from "../audit/audit.constants";
+import { logAudit } from "../audit/audit.service";
 import type { HazardType } from "./hazardZone.model";
 import * as hazardZoneService from "./hazardZone.service";
 
@@ -56,17 +57,18 @@ export async function createHazardZone(req: AuthedRequest, res: Response) {
       createdBy: new Types.ObjectId(req.user.id),
     });
 
-    const actor = getAuditActor(req);
-    const requestContext = getAuditRequestContext(req);
-    await logAuditEvent({
-      actorId: actor.actorId,
-      actorRole: actor.actorRole,
-      action: "HAZARD_CREATE",
-      targetType: "HazardZone",
-      targetId: String((created as any)?._id ?? ""),
+    await logAudit(req, {
+      eventType: AUDIT_EVENT.HAZARDZONE_CREATE,
+      outcome: "SUCCESS",
+      actor: {
+        id: req.user?.id,
+        role: req.user?.role,
+      },
+      target: {
+        type: "HAZARDZONE",
+        id: String((created as any)?._id ?? ""),
+      },
       metadata: { hazardType: typedHazardType },
-      ip: requestContext.ip,
-      userAgent: requestContext.userAgent,
     });
 
     return res.status(201).json({ data: created });
@@ -87,17 +89,17 @@ export async function deleteHazardZone(req: AuthedRequest, res: Response) {
     const deleted = await hazardZoneService.softDeleteHazardZone(id);
     if (!deleted) return res.status(404).json({ message: "Hazard zone not found" });
 
-    const actor = getAuditActor(req);
-    const requestContext = getAuditRequestContext(req);
-    await logAuditEvent({
-      actorId: actor.actorId,
-      actorRole: actor.actorRole,
-      action: "HAZARD_DELETE",
-      targetType: "HazardZone",
-      targetId: id,
-      metadata: {},
-      ip: requestContext.ip,
-      userAgent: requestContext.userAgent,
+    await logAudit(req, {
+      eventType: AUDIT_EVENT.HAZARDZONE_DELETE,
+      outcome: "SUCCESS",
+      actor: {
+        id: req.user?.id,
+        role: req.user?.role,
+      },
+      target: {
+        type: "HAZARDZONE",
+        id,
+      },
     });
 
     return res.json({ data: { ok: true } });
@@ -123,17 +125,18 @@ export async function updateHazardZoneStatus(req: AuthedRequest, res: Response) 
     const updated = await hazardZoneService.updateHazardZoneStatus(id, isActive);
     if (!updated) return res.status(404).json({ message: "Hazard zone not found" });
 
-    const actor = getAuditActor(req);
-    const requestContext = getAuditRequestContext(req);
-    await logAuditEvent({
-      actorId: actor.actorId,
-      actorRole: actor.actorRole,
-      action: "HAZARD_STATUS",
-      targetType: "HazardZone",
-      targetId: id,
+    await logAudit(req, {
+      eventType: AUDIT_EVENT.HAZARDZONE_UPDATE,
+      outcome: "SUCCESS",
+      actor: {
+        id: req.user?.id,
+        role: req.user?.role,
+      },
+      target: {
+        type: "HAZARDZONE",
+        id,
+      },
       metadata: { isActive },
-      ip: requestContext.ip,
-      userAgent: requestContext.userAgent,
     });
 
     return res.json({ data: updated });

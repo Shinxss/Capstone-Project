@@ -52,7 +52,8 @@ export default function App() {
       {/* Approvals / Verification (Emergency verification only) */}
       <Route path="/lgu/approvals" element={<LguApprovals />} />
 
-      <Route path="/lgu/activity-log" element={<LguActivityLog />} />
+      <Route path="/lgu/audit-log" element={<LguActivityLog />} />
+      <Route path="/lgu/activity-log" element={<Navigate to="/lgu/audit-log" replace />} />
 
       <Route path="/lgu/live-map" element={<LguLiveMap />} />
 

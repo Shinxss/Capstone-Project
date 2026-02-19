@@ -1,4 +1,6 @@
 import rateLimit from "express-rate-limit";
+import { AUDIT_EVENT } from "../features/audit/audit.constants";
+import { logSecurityEvent } from "../features/audit/audit.service";
 
 const RATE_LIMIT_MESSAGE = {
   success: false,
@@ -12,6 +14,16 @@ function createLimiter(windowMs: number, max: number) {
     standardHeaders: true,
     legacyHeaders: false,
     message: RATE_LIMIT_MESSAGE,
+    handler: (req, res) => {
+      void logSecurityEvent(req, AUDIT_EVENT.SECURITY_RATE_LIMIT_HIT, "DENY", {
+        max,
+        windowMs,
+        path: req.originalUrl,
+        method: req.method,
+      });
+
+      res.status(429).json(RATE_LIMIT_MESSAGE);
+    },
   });
 }
 

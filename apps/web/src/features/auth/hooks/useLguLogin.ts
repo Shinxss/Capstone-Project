@@ -4,6 +4,7 @@ import { lguLogin, adminMfaVerify } from "../services/lguAuth.service";
 import { setLguSession } from "../services/authStorage";
 import { AUTH_ROUTES } from "../constants/auth.constants";
 import type { PortalLoginData } from "../models/auth.types";
+import { appendActivityLog } from "../../activityLog/services/activityLog.service";
 
 // ✅ Type guards (fix union accessToken error)
 function isMfaRequired(result: PortalLoginData): result is Extract<PortalLoginData, { mfaRequired: true }> {
@@ -78,6 +79,11 @@ export function useLguLogin() {
       }
 
       setLguSession(result.accessToken, result.user);
+      appendActivityLog({
+        action: "Auth login success",
+        entityType: "system",
+        entityId: result.user?.id ?? null,
+      });
       navigate(AUTH_ROUTES.lguAfterLogin, { replace: true });
     } catch (err: any) {
       // your backend uses { success:false, error } for LGU/Admin login
@@ -107,6 +113,11 @@ export function useLguLogin() {
     try {
       const data = await adminMfaVerify({ challengeId, code: otp });
       setLguSession(data.accessToken, data.user);
+      appendActivityLog({
+        action: "Auth login success (MFA)",
+        entityType: "system",
+        entityId: data.user?.id ?? null,
+      });
       setMfaOpen(false);
       navigate(AUTH_ROUTES.adminAfterLogin, { replace: true });
 
