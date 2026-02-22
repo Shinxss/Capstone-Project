@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import Sidebar from "./Sidebar";
 import Header from "../Header";
+import { useLguNotificationsUnreadCount } from "../../features/notifications/hooks/useLguNotificationsUnreadCount";
 
 type Props = {
   title: string;
@@ -29,14 +30,17 @@ export default function LguShell({ title, subtitle, children }: Props) {
     }
   }, [collapsed]);
 
+  const unreadNotifications = useLguNotificationsUnreadCount();
+
   return (
     <div className="h-screen bg-[#F6F7F9] text-slate-900 flex overflow-hidden dark:bg-[#060C18] dark:text-slate-100">
-      <Sidebar collapsed={collapsed} />
+      <Sidebar collapsed={collapsed} unreadNotifications={unreadNotifications} />
 
       <div className="flex-1 min-w-0 flex flex-col">
         <Header
           title={title}
           subtitle={subtitle}
+          unreadNotifications={unreadNotifications}
           sidebarCollapsed={collapsed}
           onToggleSidebar={() => setCollapsed((v) => !v)}
         />

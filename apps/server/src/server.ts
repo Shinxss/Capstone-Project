@@ -1,6 +1,8 @@
 import "dotenv/config";
+import { createServer } from "node:http";
 import { app } from "./app";
 import { connectDB } from "./config/db";
+import { initNotificationsSocket } from "./realtime/notificationsSocket";
 
 async function start() {
   const MONGODB_URI = process.env.MONGODB_URI || "";
@@ -9,7 +11,10 @@ async function start() {
   await connectDB(MONGODB_URI);
 
   const PORT = Number(process.env.PORT || 5000);
-  app.listen(PORT, () => console.log(`🚀 API running at http://localhost:${PORT}`));
+  const httpServer = createServer(app);
+  initNotificationsSocket(httpServer);
+
+  httpServer.listen(PORT, () => console.log(`🚀 API running at http://localhost:${PORT}`));
 }
 
 start().catch((e) => {

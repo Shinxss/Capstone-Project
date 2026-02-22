@@ -8,6 +8,7 @@ import { logAudit, logSecurityEvent } from "../audit/audit.service";
 import { User } from "../users/user.model";
 import { toAuthUserPayload } from "./otp.utils";
 import { zodPasswordSchema } from "./password.policy";
+import { resolveAccessTokenExpiresIn } from "./accessTokenExpiry";
 
 const googleClient = new OAuth2Client();
 
@@ -160,7 +161,10 @@ export async function loginWithGoogle(req: Request, res: Response) {
       return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });
     }
 
-    const accessToken = signAccessToken({ sub: user._id.toString(), role: user.role });
+    const accessToken = signAccessToken(
+      { sub: user._id.toString(), role: user.role },
+      { expiresIn: resolveAccessTokenExpiresIn(req) }
+    );
 
     await logAudit(req, {
       eventType: AUDIT_EVENT.AUTH_OAUTH_GOOGLE_SUCCESS,

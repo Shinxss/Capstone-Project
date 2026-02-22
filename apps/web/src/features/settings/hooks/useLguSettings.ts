@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { LguSettings, NotificationPrefs, UiPrefs } from "../models/settings.types";
 import { defaultSettings, loadSettings, saveSettings } from "../services/settings.service";
+import { toastError, toastSuccess } from "@/services/feedback/toast.service";
 
 export type SettingsPatch = {
   notifications?: Partial<NotificationPrefs>;
@@ -22,7 +23,9 @@ export function useLguSettings() {
       setSettings(cur);
       setSavedAt(cur.updatedAt);
     } catch (e: any) {
-      setError(e?.message || "Failed to load settings");
+      const message = e?.message || "Failed to load settings";
+      setError(message);
+      toastError(message);
     } finally {
       setLoading(false);
     }
@@ -47,8 +50,11 @@ export function useLguSettings() {
       const saved = saveSettings({ notifications: settings.notifications, ui: settings.ui });
       setSettings(saved);
       setSavedAt(saved.updatedAt);
+      toastSuccess("Settings saved.");
     } catch (e: any) {
-      setError(e?.message || "Failed to save settings");
+      const message = e?.message || "Failed to save settings";
+      setError(message);
+      toastError(message);
     } finally {
       setSaving(false);
     }
@@ -58,6 +64,7 @@ export function useLguSettings() {
     const d = defaultSettings();
     setSettings(d);
     setSavedAt(d.updatedAt);
+    toastSuccess("Settings reset to defaults.");
   }, []);
 
   return { settings, update, refresh, save, reset, loading, saving, error, savedAt };

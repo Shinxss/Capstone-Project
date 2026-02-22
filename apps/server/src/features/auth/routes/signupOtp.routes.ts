@@ -6,6 +6,7 @@ import { EmailVerificationRequest } from "../models/EmailVerificationRequest.mod
 import { sendSignupVerificationOtpEmail } from "../../../utils/mailer";
 import { signAccessToken } from "../../../utils/jwt";
 import { communityRegisterSchema } from "../auth.schemas";
+import { resolveAccessTokenExpiresIn } from "../accessTokenExpiry";
 import {
   OTP_EXPIRY_MINUTES,
   OTP_MAX_VERIFY_ATTEMPTS,
@@ -169,7 +170,10 @@ signupOtpRoutes.post("/verify-otp", async (req, res) => {
 
     await EmailVerificationRequest.deleteMany({ email });
 
-    const accessToken = signAccessToken({ sub: user._id.toString(), role: user.role });
+    const accessToken = signAccessToken(
+      { sub: user._id.toString(), role: user.role },
+      { expiresIn: resolveAccessTokenExpiresIn(req) }
+    );
 
     return res.status(200).json({
       success: true,

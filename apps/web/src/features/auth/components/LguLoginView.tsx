@@ -13,6 +13,7 @@ type Props = {
   setPassword: (v: string) => void;
   loading: boolean;
   error: string | null;
+  loginCooldownSeconds: number;
   usernameError: string | null;
   passwordError: string | null;
   onSubmit: (e: React.FormEvent) => void;
@@ -35,6 +36,7 @@ export default function LguLoginView({
   setPassword,
   loading,
   error,
+  loginCooldownSeconds,
   usernameError,
   passwordError,
   onSubmit,
@@ -147,10 +149,10 @@ export default function LguLoginView({
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || loginCooldownSeconds > 0}
                 className="w-full rounded bg-[#DC2626] mt-2 py-3 text-base font-semibold text-white hover:bg-[#c81e1e] disabled:opacity-60 dark:bg-blue-600 dark:hover:bg-blue-500"
               >
-                {loading ? "Logging in..." : "Login"}
+                {loading ? "Logging in..." : loginCooldownSeconds > 0 ? "Please wait..." : "Login"}
               </button>
 
               <p className="pt-2 text-center text-md text-gray-500 dark:text-slate-400">

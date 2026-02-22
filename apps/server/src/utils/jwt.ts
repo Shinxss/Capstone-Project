@@ -4,7 +4,7 @@ import type { SignOptions, Secret } from "jsonwebtoken";
 
 const ACCESS_SECRET: Secret = process.env.JWT_ACCESS_SECRET ?? "dev_access_secret";
 const ACCESS_EXPIRES_IN: SignOptions["expiresIn"] =
-  (process.env.JWT_ACCESS_EXPIRES_IN as SignOptions["expiresIn"]) ?? "7d";
+  (process.env.JWT_ACCESS_EXPIRES_IN as SignOptions["expiresIn"]) ?? "30d";
 
 export type AccessTokenPayload = {
   sub: string;
@@ -17,9 +17,13 @@ export type VerifiedAccessTokenPayload = AccessTokenPayload & {
   iat?: number;
 };
 
-export function signAccessToken(payload: AccessTokenPayload) {
+type SignAccessTokenOptions = {
+  expiresIn?: SignOptions["expiresIn"];
+};
+
+export function signAccessToken(payload: AccessTokenPayload, options: SignAccessTokenOptions = {}) {
   const jti = crypto.randomUUID();
-  return jwt.sign(payload, ACCESS_SECRET, { expiresIn: ACCESS_EXPIRES_IN, jwtid: jti });
+  return jwt.sign(payload, ACCESS_SECRET, { expiresIn: options.expiresIn ?? ACCESS_EXPIRES_IN, jwtid: jti });
 }
 
 export function verifyAccessToken(token: string): VerifiedAccessTokenPayload {

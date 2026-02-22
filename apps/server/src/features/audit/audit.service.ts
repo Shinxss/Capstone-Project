@@ -1,8 +1,10 @@
 import { randomUUID } from "crypto";
-import type { FilterQuery, ProjectionType } from "mongoose";
+import type { ProjectionType } from "mongoose";
 import type { Request } from "express";
 import { AUDIT_EVENT, AUDIT_EVENT_SEVERITY, AUDIT_OUTCOME, AUDIT_SEVERITY, type AuditEventType, type AuditOutcome, type AuditSeverity } from "./audit.constants";
 import { AuditLog, type AuditLogDoc } from "./audit.model";
+
+type FilterQuery<T> = Partial<Record<keyof T, unknown>> & Record<string, unknown>;
 
 const SENSITIVE_KEY = /password|otp|token|jwt|authorization|cookie|set-cookie|secret|privatekey|refresh/i;
 const EMAIL_KEY = /email/i;
@@ -267,9 +269,10 @@ export async function queryAuditLogs(input: QueryAuditInput): Promise<{
   const filter: FilterQuery<AuditLogDoc> = {};
 
   if (input.from || input.to) {
-    filter.timestamp = {};
-    if (input.from) filter.timestamp.$gte = input.from;
-    if (input.to) filter.timestamp.$lte = input.to;
+    const timestampRange: { $gte?: Date; $lte?: Date } = {};
+    if (input.from) timestampRange.$gte = input.from;
+    if (input.to) timestampRange.$lte = input.to;
+    filter.timestamp = timestampRange;
   }
 
   if (input.eventType) {

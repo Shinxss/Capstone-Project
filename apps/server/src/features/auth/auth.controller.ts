@@ -8,6 +8,7 @@ import { signAccessToken } from "../../utils/jwt";
 import { authenticateUser } from "./auth.service";
 import { toAuthUserPayload } from "./otp.utils";
 import { TokenBlocklist } from "./TokenBlocklist.model";
+import { resolveAccessTokenExpiresIn } from "./accessTokenExpiry";
 
 export async function login(req: Request, res: Response) {
   try {
@@ -30,7 +31,10 @@ export async function login(req: Request, res: Response) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    const token = signAccessToken({ sub: user._id.toString(), role: user.role });
+    const token = signAccessToken(
+      { sub: user._id.toString(), role: user.role },
+      { expiresIn: resolveAccessTokenExpiresIn(req) }
+    );
 
     await logAudit(req, {
       eventType: AUDIT_EVENT.AUTH_LOGIN_SUCCESS,
@@ -74,7 +78,10 @@ export async function adminMfaVerify(req: Request, res: Response) {
     if (!user.isActive) return res.status(403).json({ success: false, error: "Account is disabled" });
     if (user.role !== "ADMIN") return res.status(403).json({ success: false, error: "Not allowed" });
 
-    const token = signAccessToken({ sub: user._id.toString(), role: user.role });
+    const token = signAccessToken(
+      { sub: user._id.toString(), role: user.role },
+      { expiresIn: resolveAccessTokenExpiresIn(req) }
+    );
 
     await logAudit(req, {
       eventType: AUDIT_EVENT.AUTH_MFA_VERIFY_SUCCESS,

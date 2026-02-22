@@ -6,7 +6,7 @@ export default function LguApprovals() {
   const vm = useLguApprovals();
 
   return (
-    <LguShell title="Approvals / Verification" subtitle="Emergency verification only (dispatch completion)">
+    <LguShell title="Approvals / Verification" subtitle="Review non-SOS emergency reports before map publication">
       <LguApprovalsView {...vm} loading={vm.loading} error={vm.error} onRefresh={vm.refetch} />
     </LguShell>
   );

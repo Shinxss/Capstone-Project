@@ -17,8 +17,8 @@ import * as Location from "expo-location";
 import { useMapStyle } from "../../features/map/hooks/useMapStyle";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
-import { useActiveDispatch } from "../../features/dispatch/hooks/useActiveDispatch";
 import { api } from "../../lib/api";
+import { fetchEmergencyMapReports } from "../../features/emergency/services/emergencyApi";
 
 type EmergencyType = "SOS" | "Flood" | "Fire" | "Typhoon" | "Earthquake" | "Collapse";
 
@@ -89,11 +89,6 @@ function normalizeEmergencyType(raw: string): EmergencyType {
   if (t === "SOS") return "SOS";
   // keep the UI simple for now
   return "SOS";
-}
-
-function isResolvedEmergencyStatus(raw?: string) {
-  const up = String(raw ?? "").toUpperCase();
-  return up === "RESOLVED" || up === "CANCELLED";
 }
 
 // ✅ MaterialCommunityIcons mapping
@@ -210,7 +205,6 @@ export default function MapTab() {
   const [query, setQuery] = useState("");
   const { key: styleKey, styleURL, next } = useMapStyle("streets");
 
-  const { activeDispatch } = useActiveDispatch({ pollMs: 8000 });
   const [myLocation, setMyLocation] = useState<[number, number] | null>(null);
   const [route, setRoute] = useState<
     { feature: any; distance: number; duration: number; profile: "driving" | "walking" } | null
@@ -218,6 +212,7 @@ export default function MapTab() {
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeMode, setRouteMode] = useState<"driving" | "walking">("driving");
   const [hazardZones, setHazardZones] = useState<HazardZone[]>([]);
+  const [reports, setReports] = useState<EmergencyReport[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -237,6 +232,41 @@ export default function MapTab() {
     void loadHazardZones();
     return () => {
       cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadEmergencyReports = async () => {
+      try {
+        const items = await fetchEmergencyMapReports();
+        if (cancelled) return;
+
+        setReports(
+          items.map((item) => ({
+            id: item.incidentId,
+            type: normalizeType(item.type),
+            title: `${normalizeType(item.type)} Emergency`,
+            description: item.description,
+            lng: item.location.coords.longitude,
+            lat: item.location.coords.latitude,
+            updated: item.createdAt ? new Date(item.createdAt).toLocaleString() : "just now",
+          }))
+        );
+      } catch {
+        if (!cancelled) setReports([]);
+      }
+    };
+
+    void loadEmergencyReports();
+    const timer = setInterval(() => {
+      void loadEmergencyReports();
+    }, 10000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
     };
   }, []);
 
@@ -283,27 +313,6 @@ export default function MapTab() {
     if (t === "SOS") return "SOS";
     return "SOS";
   };
-
-  // ✅ Only show the ACTIVE assigned emergency (from dispatch offers)
-  const reports: EmergencyReport[] = useMemo(() => {
-    const e = activeDispatch?.emergency;
-    if (!e) return [];
-    if (isResolvedEmergencyStatus(e.status)) return [];
-    return [
-      {
-        id: e.id,
-        type: normalizeType(e.emergencyType),
-        title: `${normalizeType(e.emergencyType)} Emergency`,
-        description: e.notes ?? undefined,
-        lng: e.lng,
-        lat: e.lat,
-        updated: "just now",
-      },
-    ];
-  }, [activeDispatch]);
-
-  const hasActiveEmergency = reports.length > 0;
-
   const filteredReports = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return reports;
@@ -453,30 +462,6 @@ export default function MapTab() {
   };
 
   const clearRoute = () => setRoute(null);
-
-  // ✅ When a dispatch is active: zoom to the emergency and open details automatically
-  useEffect(() => {
-    const e = activeDispatch?.emergency;
-    if (!e || isResolvedEmergencyStatus(e.status)) {
-      setSelected(null);
-      setRoute(null);
-      sheetRef.current?.close();
-      return;
-    }
-
-    cameraRef.current?.setCamera({
-      centerCoordinate: [e.lng, e.lat],
-      zoomLevel: 15,
-      animationDuration: 900,
-    });
-
-    // open sheet with the single report
-    const r = reports[0];
-    if (r) {
-      setSelected(r);
-      requestAnimationFrame(() => sheetRef.current?.snapToIndex(0));
-    }
-  }, [activeDispatch, reports]);
 
   // ✅ chips (replace old status pill)
   const chips = useMemo(

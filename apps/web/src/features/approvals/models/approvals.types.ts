@@ -6,10 +6,20 @@ export type EmergencyVerificationFilters = {
   dateTo: string; // YYYY-MM-DD or ""
 };
 
-export type DispatchRejection = {
-  dispatchId: string;
-  reason: string;
-  rejectedAt: string; // ISO
-  actor?: string;
+export type EmergencyApprovalStatus = "pending" | "approved" | "rejected" | "not_required";
+
+export type EmergencyApprovalItem = {
+  incidentId: string;
+  referenceNumber: string;
+  type: string;
+  barangay: string;
+  locationLabel?: string;
+  createdAt: string;
+  reporter: {
+    id?: string;
+    name: string;
+    role?: string;
+    isGuest: boolean;
+  };
 };
 

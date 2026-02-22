@@ -9,6 +9,7 @@ import { EmergencyReport } from "../emergency/emergency.model";
 import { User } from "../users/user.model";
 import { DispatchOffer, DispatchStatus } from "./dispatch.model";
 import { recordTaskVerification } from "@lifeline/blockchain";
+import { sendDispatchOfferPush } from "../notifications/pushNotification.service";
 
 const MAX_PROOF_BYTES = 3 * 1024 * 1024; // 3MB
 const ALLOWED_PROOF_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/heic"]);
@@ -30,6 +31,14 @@ export async function createDispatchOffers(input: CreateDispatchInput) {
     throw new Error("Emergency not found");
   }
 
+  // Once responders are dispatched, treat the incident as acknowledged.
+  // This removes it from "active SOS alert" queues that track unhandled reports.
+  const snapshotStatus = emergency.status === "OPEN" ? "ACKNOWLEDGED" : emergency.status;
+  if (snapshotStatus !== emergency.status) {
+    emergency.status = snapshotStatus;
+    await emergency.save();
+  }
+
   const uniqVolunteerIds = Array.from(new Set((input.volunteerIds ?? []).map(String))).filter(Boolean);
   if (uniqVolunteerIds.length === 0) {
     throw new Error("volunteerIds is required");
@@ -47,11 +56,25 @@ export async function createDispatchOffers(input: CreateDispatchInput) {
     throw new Error("No valid approved volunteers found");
   }
 
+  // Avoid duplicate PENDING offers for the same emergency/volunteer pair.
+  const existingPending = await DispatchOffer.find({
+    emergencyId: new Types.ObjectId(emergencyId),
+    volunteerId: { $in: validVolunteerIds.map((id) => new Types.ObjectId(id)) },
+    status: "PENDING",
+  }).select("volunteerId");
+
+  const existingPendingVolunteerIds = new Set(existingPending.map((d) => String(d.volunteerId)));
+  const dispatchableVolunteerIds = validVolunteerIds.filter((id) => !existingPendingVolunteerIds.has(id));
+
+  if (dispatchableVolunteerIds.length === 0) {
+    throw new Error("Selected volunteers are already dispatched for this emergency.");
+  }
+
   const snapshot = {
     id: String(emergency._id),
     emergencyType: emergency.emergencyType,
     source: emergency.source,
-    status: emergency.status,
+    status: snapshotStatus,
     location: {
       type: "Point" as const,
       coordinates: emergency.location.coordinates,
@@ -64,7 +87,7 @@ export async function createDispatchOffers(input: CreateDispatchInput) {
 
   const createdBy = new Types.ObjectId(input.createdByUserId);
 
-  const docs = validVolunteerIds.map((volunteerId) => ({
+  const docs = dispatchableVolunteerIds.map((volunteerId) => ({
     emergencyId: new Types.ObjectId(emergencyId),
     volunteerId: new Types.ObjectId(volunteerId),
     createdBy,
@@ -72,7 +95,37 @@ export async function createDispatchOffers(input: CreateDispatchInput) {
     emergencySnapshot: snapshot,
   }));
 
-  const created = await DispatchOffer.insertMany(docs);
+  let created: any[] = [];
+  try {
+    created = await DispatchOffer.insertMany(docs);
+  } catch (error: any) {
+    const isDuplicate = error?.code === 11000 || String(error?.message ?? "").includes("E11000");
+    if (isDuplicate) {
+      throw new Error("Selected volunteers are already dispatched for this emergency.");
+    }
+    throw error;
+  }
+
+  try {
+    const pushResult = await sendDispatchOfferPush({
+      volunteerUserIds: dispatchableVolunteerIds,
+      emergencyId,
+      emergencyType: String(emergency.emergencyType || "Emergency"),
+    });
+    console.info("[push] dispatch send result", {
+      emergencyId,
+      volunteerCount: dispatchableVolunteerIds.length,
+      attempted: pushResult.attempted,
+      sent: pushResult.sent,
+    });
+  } catch (error: any) {
+    console.warn("[push] dispatch send failed", {
+      emergencyId,
+      volunteerCount: dispatchableVolunteerIds.length,
+      message: error?.message,
+    });
+  }
+
   return created;
 }
 

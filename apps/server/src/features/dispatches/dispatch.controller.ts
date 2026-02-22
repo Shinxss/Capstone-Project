@@ -14,6 +14,7 @@ import {
 import type { DispatchStatus } from "./dispatch.model";
 import { AUDIT_EVENT } from "../audit/audit.constants";
 import { logAudit } from "../audit/audit.service";
+import { emitNotificationsRefresh } from "../../realtime/notificationsSocket";
 
 function getAuth(req: Request) {
   const role = (req as any).user?.role ?? (req as any).role;
@@ -119,6 +120,10 @@ export async function patchRespond(req: Request, res: Response) {
       },
     });
 
+    if (decision === "ACCEPT") {
+      emitNotificationsRefresh("dispatch_accepted", ["LGU", "ADMIN"]);
+    }
+
     return res.json({ data: toDispatchDTO(offer) });
   } catch (e: any) {
     return res.status(400).json({ message: e?.message ?? "Failed" });
@@ -178,6 +183,8 @@ export async function patchComplete(req: Request, res: Response) {
       },
     });
 
+    emitNotificationsRefresh("dispatch_completed", ["LGU", "ADMIN"]);
+
     return res.json({ data: toDispatchDTO(updated) });
   } catch (e: any) {
     return res.status(400).json({ message: e?.message ?? "Failed" });
@@ -218,6 +225,8 @@ export async function patchVerify(req: Request, res: Response) {
         txHash,
       },
     });
+
+    emitNotificationsRefresh("dispatch_verified", ["LGU", "ADMIN"]);
 
     return res.json({ success: true, txHash });
   } catch (e: any) {

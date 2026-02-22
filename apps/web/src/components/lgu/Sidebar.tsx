@@ -78,8 +78,19 @@ const navSections: NavSection[] = [
   },
 ];
 
-function SidebarItem({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
+function SidebarItem({
+  item,
+  collapsed,
+  badgeCount = 0,
+}: {
+  item: NavItem;
+  collapsed: boolean;
+  badgeCount?: number;
+}) {
   const Icon = item.icon;
+  const safeCount = Number.isFinite(badgeCount) ? Math.max(0, Math.floor(badgeCount)) : 0;
+  const showBadge = safeCount > 0;
+  const badgeLabel = safeCount > 99 ? "99+" : String(safeCount);
 
   return (
     <NavLink
@@ -99,8 +110,20 @@ function SidebarItem({ item, collapsed }: { item: NavItem; collapsed: boolean })
         ].join(" ")
       }
     >
-      <Icon size={18} className="text-gray-900 dark:text-slate-200" />
+      <span className="relative shrink-0">
+        <Icon size={18} className="text-gray-900 dark:text-slate-200" />
+        {collapsed && showBadge ? (
+          <span className="absolute -right-2 -top-2 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
+            {badgeLabel}
+          </span>
+        ) : null}
+      </span>
       {!collapsed && <span className="truncate">{item.label}</span>}
+      {!collapsed && showBadge ? (
+        <span className="ml-auto inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold text-white">
+          {badgeLabel}
+        </span>
+      ) : null}
     </NavLink>
   );
 }
@@ -331,7 +354,13 @@ function SidebarSubmenu({
 }
 
 
-export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
+export default function Sidebar({
+  collapsed = false,
+  unreadNotifications = 0,
+}: {
+  collapsed?: boolean;
+  unreadNotifications?: number;
+}) {
   const w = collapsed ? "w-[78px]" : "w-[255px]";
   const { isDark } = useThemeMode();
 
@@ -401,7 +430,12 @@ export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) 
               )}
 
               {section.items.map((item) => (
-                <SidebarItem key={item.to} item={item} collapsed={collapsed} />
+                <SidebarItem
+                  key={item.to}
+                  item={item}
+                  collapsed={collapsed}
+                  badgeCount={item.to === "/lgu/notifications" ? unreadNotifications : 0}
+                />
               ))}
             </div>
           </div>

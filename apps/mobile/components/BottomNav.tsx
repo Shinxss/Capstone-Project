@@ -3,12 +3,16 @@ import { View, Text, Pressable, StyleSheet, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { router } from "expo-router";
 import { Siren } from "lucide-react-native";
 
 const ACTIVE = "#2563EB"; // blue
 const INACTIVE = "#94A3B8"; // gray
 const RED = "#EF4444";
+
+type Props = BottomTabBarProps & {
+  onPressReportAction: () => void;
+  onPressRegularTab: () => void;
+};
 
 type TabKey = "index" | "map" | "alert" | "more";
 
@@ -19,11 +23,14 @@ const TABS: { name: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap 
   { name: "more", label: "More", icon: "ellipsis-horizontal" },
 ];
 
-export default function BottomNav(props: BottomTabBarProps) {
+export default function BottomNav(props: Props) {
   const { state, navigation } = props;
+  const { onPressReportAction, onPressRegularTab } = props;
   const insets = useSafeAreaInsets();
 
   const goTo = (name: TabKey) => {
+    onPressRegularTab();
+
     const route = state.routes.find((r) => r.name === name);
     if (!route) return;
 
@@ -56,7 +63,7 @@ export default function BottomNav(props: BottomTabBarProps) {
         {/* Center big + */}
         <View style={styles.centerSlot}>
           <Pressable
-            onPress={() => router.push("/modal")}
+            onPress={onPressReportAction}
             style={({ pressed }) => [styles.fab, pressed && { opacity: 0.9 }]}
           >
             <Siren size={27} color="#fff" strokeWidth={1.8} />

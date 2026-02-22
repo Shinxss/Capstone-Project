@@ -3,6 +3,7 @@ import mapboxgl from "mapbox-gl";
 import { createRoot, type Root } from "react-dom/client";
 import EmergencyMarker from "./EmergencyMarker";
 import type { EmergencyType } from "../constants/emergency.constants";
+import { toastWarning } from "@/services/feedback/toast.service";
 
 export type MapEmergencyPin = {
   id: string;
@@ -112,7 +113,7 @@ export default function EmergencyMap({
     if (!map) return;
 
     if (!navigator.geolocation) {
-      alert("Geolocation is not supported on this device/browser.");
+      toastWarning("Geolocation is not supported on this device/browser.");
       return;
     }
 
@@ -125,7 +126,7 @@ export default function EmergencyMap({
           essential: true,
         });
       },
-      () => alert("Unable to get your location. Please enable location permission."),
+      () => toastWarning("Unable to get your location. Please enable location permission."),
       { enableHighAccuracy: true, timeout: 10000 }
     );
   };

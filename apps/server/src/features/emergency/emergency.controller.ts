@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { Types } from "mongoose";
 import * as emergencyService from "./emergency.service";
+import { emitNotificationsRefresh } from "../../realtime/notificationsSocket";
 
 type AuthedRequest = Request & { user?: { id: string; role?: string } };
 
@@ -25,6 +26,8 @@ export async function postSos(req: AuthedRequest, res: Response) {
       accuracy: typeof accuracy === "number" ? accuracy : undefined,
       notes: typeof notes === "string" ? notes : undefined,
     });
+
+    emitNotificationsRefresh("emergency_reported", ["LGU", "ADMIN"]);
 
     return res.status(201).json({ data: report });
   } catch (err: any) {

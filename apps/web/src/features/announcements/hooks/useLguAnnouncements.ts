@@ -10,6 +10,7 @@ import {
   unpublishAnnouncement,
   updateAnnouncement,
 } from "../services/announcements.service";
+import { toastError, toastSuccess, toastWarning } from "@/services/feedback/toast.service";
 
 const announcementSchema = z.object({
   title: z.string().trim().min(3, "Title must be at least 3 characters"),
@@ -66,28 +67,40 @@ export function useLguAnnouncements() {
 
   const create = useCallback((input: AnnouncementDraftInput) => {
     const v = validate(input);
-    if (!v.ok) return v;
+    if (!v.ok) {
+      toastWarning("Please fix the form errors before saving.");
+      return v;
+    }
     try {
       setError(null);
       createAnnouncement(v.value);
       refresh();
+      toastSuccess("Announcement saved.");
       return { ok: true as const, errors: {} as AnnouncementFormErrors };
     } catch (e: any) {
-      setError(e?.message || "Failed to create announcement");
+      const message = e?.message || "Failed to create announcement";
+      setError(message);
+      toastError(message);
       return { ok: false as const, errors: {} as AnnouncementFormErrors };
     }
   }, [refresh, validate]);
 
   const update = useCallback((id: string, patch: AnnouncementDraftInput) => {
     const v = validate(patch);
-    if (!v.ok) return v;
+    if (!v.ok) {
+      toastWarning("Please fix the form errors before saving.");
+      return v;
+    }
     try {
       setError(null);
       updateAnnouncement(id, v.value);
       refresh();
+      toastSuccess("Announcement updated.");
       return { ok: true as const, errors: {} as AnnouncementFormErrors };
     } catch (e: any) {
-      setError(e?.message || "Failed to update announcement");
+      const message = e?.message || "Failed to update announcement";
+      setError(message);
+      toastError(message);
       return { ok: false as const, errors: {} as AnnouncementFormErrors };
     }
   }, [refresh, validate]);
@@ -98,8 +111,11 @@ export function useLguAnnouncements() {
       setBusyId(id);
       publishAnnouncement(id);
       refresh();
+      toastSuccess("Announcement published.");
     } catch (e: any) {
-      setError(e?.message || "Failed to publish");
+      const message = e?.message || "Failed to publish";
+      setError(message);
+      toastError(message);
     } finally {
       setBusyId(null);
     }
@@ -111,8 +127,11 @@ export function useLguAnnouncements() {
       setBusyId(id);
       unpublishAnnouncement(id);
       refresh();
+      toastSuccess("Announcement unpublished.");
     } catch (e: any) {
-      setError(e?.message || "Failed to unpublish");
+      const message = e?.message || "Failed to unpublish";
+      setError(message);
+      toastError(message);
     } finally {
       setBusyId(null);
     }
@@ -124,8 +143,11 @@ export function useLguAnnouncements() {
       setBusyId(id);
       deleteAnnouncement(id);
       refresh();
+      toastSuccess("Announcement deleted.");
     } catch (e: any) {
-      setError(e?.message || "Failed to delete");
+      const message = e?.message || "Failed to delete";
+      setError(message);
+      toastError(message);
     } finally {
       setBusyId(null);
     }

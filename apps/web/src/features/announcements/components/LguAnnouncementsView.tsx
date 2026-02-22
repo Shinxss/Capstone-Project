@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import Modal from "../../../components/ui/Modal";
 import type { Announcement, AnnouncementAudience, AnnouncementDraftInput } from "../models/announcements.types";
 import { useLguAnnouncements } from "../hooks/useLguAnnouncements";
+import { useConfirm } from "@/features/feedback/hooks/useConfirm";
 
 type Props = ReturnType<typeof useLguAnnouncements> & {
   loading: boolean;
@@ -64,6 +65,7 @@ function ErrorPanel({ error, onRetry }: { error: string; onRetry: () => void }) 
 }
 
 export default function LguAnnouncementsView(props: Props) {
+  const confirm = useConfirm();
   const { loading, error, onRefresh, announcements, audiences, busyId, create, update, publish, unpublish, remove } = props;
 
   const [editorOpen, setEditorOpen] = useState(false);
@@ -74,9 +76,6 @@ export default function LguAnnouncementsView(props: Props) {
     audience: "LGU",
   });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleteId, setDeleteId] = useState("");
 
   const rows = useMemo(() => announcements, [announcements]);
 
@@ -99,6 +98,31 @@ export default function LguAnnouncementsView(props: Props) {
     });
     setFieldErrors({});
     setEditorOpen(true);
+  };
+
+  const requestDelete = async (announcement: Announcement) => {
+    const ok = await confirm({
+      title: "Are you sure you want to delete?",
+      confirmText: "Delete",
+      cancelText: "Cancel",
+      variant: "destructive",
+    });
+
+    if (!ok) return;
+    await remove(announcement.id);
+  };
+
+  const requestUnpublish = async (announcement: Announcement) => {
+    const ok = await confirm({
+      title: "Unpublish announcement?",
+      description: `Are you sure you want to unpublish "${announcement.title}"?`,
+      confirmText: "Unpublish",
+      cancelText: "Cancel",
+      variant: "default",
+    });
+
+    if (!ok) return;
+    await unpublish(announcement.id);
   };
 
   if (loading) return <LoadingPanel />;
@@ -165,7 +189,7 @@ export default function LguAnnouncementsView(props: Props) {
                       {announcement.status === "PUBLISHED" ? (
                         <button
                           type="button"
-                          onClick={() => void unpublish(announcement.id)}
+                          onClick={() => void requestUnpublish(announcement)}
                           disabled={busyId === announcement.id}
                           className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60 dark:bg-[#0E1626] dark:border-[#162544] dark:text-slate-200 dark:hover:bg-[#122036]"
                         >
@@ -192,13 +216,11 @@ export default function LguAnnouncementsView(props: Props) {
 
                       <button
                         type="button"
-                        onClick={() => {
-                          setDeleteId(announcement.id);
-                          setDeleteOpen(true);
-                        }}
+                        onClick={() => void requestDelete(announcement)}
                         className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
+                        disabled={busyId === announcement.id}
                       >
-                        Delete
+                        {busyId === announcement.id ? "Working..." : "Delete"}
                       </button>
                     </div>
                   </td>
@@ -283,44 +305,6 @@ export default function LguAnnouncementsView(props: Props) {
         </div>
       </Modal>
 
-      <Modal
-        open={deleteOpen && !!deleteId}
-        title="Delete Announcement"
-        subtitle="This cannot be undone"
-        onClose={() => {
-          setDeleteOpen(false);
-          setDeleteId("");
-        }}
-        footer={
-          <div className="flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setDeleteOpen(false);
-                setDeleteId("");
-              }}
-              className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 dark:bg-[#0E1626] dark:border-[#162544] dark:text-slate-200 dark:hover:bg-[#122036]"
-              disabled={!!busyId}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={async () => {
-                await remove(deleteId);
-                setDeleteOpen(false);
-                setDeleteId("");
-              }}
-              className="rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700"
-              disabled={!!busyId}
-            >
-              Delete
-            </button>
-          </div>
-        }
-      >
-        <div className="text-sm text-gray-700 dark:text-slate-300">Delete this announcement permanently.</div>
-      </Modal>
     </>
   );
 }

@@ -3,6 +3,7 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as WebBrowser from "expo-web-browser";
 import { AuthProvider, useAuth } from "../features/auth/AuthProvider";
+import { usePushNotificationsBootstrap } from "../features/notifications/hooks/usePushNotificationsBootstrap";
 import SplashScreen from "../screens/SplashScreen";
 import "../global.css";
 
@@ -12,9 +13,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const segments = useSegments();
   const { hydrated, mode } = useAuth();
+  usePushNotificationsBootstrap();
 
   const inAuthGroup = segments[0] === "(auth)";
   const inTabsGroup = segments[0] === "(tabs)";
+  const inReportFlow = segments[0] === "report";
   const inVolunteerFlow =
     segments[0] === "volunteer-apply-modal" ||
     segments[0] === "volunteer-application";
@@ -22,7 +25,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!hydrated) return;
 
-    if ((mode === "authed" || mode === "guest") && !inTabsGroup && !inVolunteerFlow) {
+    if ((mode === "authed" || mode === "guest") && !inTabsGroup && !inVolunteerFlow && !inReportFlow) {
       router.replace("/(tabs)");
       return;
     }
@@ -30,7 +33,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     if (mode === "anonymous" && !inAuthGroup) {
       router.replace("/(auth)/login");
     }
-  }, [hydrated, mode, inAuthGroup, inTabsGroup, inVolunteerFlow, router]);
+  }, [hydrated, mode, inAuthGroup, inTabsGroup, inVolunteerFlow, inReportFlow, router]);
 
   if (!hydrated) {
     return <SplashScreen />;
@@ -47,6 +50,7 @@ export default function RootLayout() {
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(auth)" />
             <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="report" />
             <Stack.Screen
               name="volunteer-apply-modal"
               options={{ presentation: "transparentModal" }}

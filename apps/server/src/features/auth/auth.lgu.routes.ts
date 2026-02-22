@@ -9,6 +9,7 @@ import { signAccessToken } from "../../utils/jwt";
 import { lguLoginSchema } from "./auth.schemas";
 import { createMfaChallenge, maskEmail } from "../../utils/mfa";
 import { sendOtpEmail } from "../../utils/mailer";
+import { resolveAccessTokenExpiresIn } from "./accessTokenExpiry";
 
 const INVALID_CREDENTIALS = "Invalid credentials";
 
@@ -87,7 +88,10 @@ lguAuthRouter.post("/login", loginLimiter, validate(lguLoginSchema), async (req,
       });
     }
 
-    const token = signAccessToken({ sub: user._id.toString(), role: user.role });
+    const token = signAccessToken(
+      { sub: user._id.toString(), role: user.role },
+      { expiresIn: resolveAccessTokenExpiresIn(req) }
+    );
 
     await logAudit(req, {
       eventType: AUDIT_EVENT.AUTH_LOGIN_SUCCESS,

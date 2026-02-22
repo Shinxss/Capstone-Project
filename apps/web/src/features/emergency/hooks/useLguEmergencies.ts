@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { EmergencyReport } from "../models/emergency.types";
 import { fetchEmergencyReports } from "../services/emergency.service";
+import type { DispatchTask } from "../../tasks/models/tasks.types";
+import { fetchLguTasksByStatus } from "../../tasks/services/tasksApi";
 
 export type EmergencyType = "SOS" | "Flood" | "Fire" | "Typhoon" | "Earthquake" | "Collapse";
 type Priority = "critical" | "high" | "medium";
@@ -27,6 +29,13 @@ export type LguEmergencyItem = {
 };
 
 export type LguEmergencyTypeFilter = "ALL" | "SOS" | EmergencyType;
+
+type DispatchVolunteerCounts = {
+  assigned: number;
+  needed: number;
+};
+
+type DispatchCountsByEmergency = Record<string, DispatchVolunteerCounts>;
 
 function normalizeType(raw?: string): EmergencyType {
   const up = String(raw || "").toUpperCase();
@@ -78,9 +87,35 @@ function locationLabelFrom(report: EmergencyReport) {
   return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
 }
 
-function toEmergencyItem(report: EmergencyReport): LguEmergencyItem {
+function buildDispatchCountsByEmergency(tasks: DispatchTask[]): DispatchCountsByEmergency {
+  const counts: DispatchCountsByEmergency = {};
+
+  for (const task of tasks ?? []) {
+    const emergencyId = String(task?.emergency?.id || "").trim();
+    if (!emergencyId) continue;
+
+    const status = String(task?.status || "").toUpperCase();
+    if (status === "CANCELLED" || status === "DECLINED") continue;
+
+    const existing = counts[emergencyId] ?? { assigned: 0, needed: 0 };
+    existing.needed += 1;
+
+    if (status === "ACCEPTED" || status === "DONE" || status === "VERIFIED") {
+      existing.assigned += 1;
+    }
+
+    counts[emergencyId] = existing;
+  }
+
+  return counts;
+}
+
+function toEmergencyItem(report: EmergencyReport, volunteerCounts?: DispatchVolunteerCounts): LguEmergencyItem {
   const isSOS = String(report.emergencyType).toUpperCase() === "SOS" || String(report.source).toUpperCase() === "SOS_BUTTON";
   const created = report.reportedAt || report.createdAt || report.updatedAt;
+  const volunteersAssigned = Number(volunteerCounts?.assigned ?? 0);
+  const volunteersNeeded = Number(volunteerCounts?.needed ?? 0);
+  const progressPercent = volunteersNeeded > 0 ? Math.round((volunteersAssigned / volunteersNeeded) * 100) : 0;
 
   return {
     id: report._id,
@@ -97,14 +132,15 @@ function toEmergencyItem(report: EmergencyReport): LguEmergencyItem {
     phone: undefined,
     description: report.notes || `Reported via ${report.source}`,
     needs: [],
-    volunteersAssigned: 0,
-    volunteersNeeded: 0,
-    progressPercent: 0,
+    volunteersAssigned,
+    volunteersNeeded,
+    progressPercent,
   };
 }
 
 export function useLguEmergencies() {
   const [reports, setReports] = useState<EmergencyReport[]>([]);
+  const [dispatchCountsByEmergency, setDispatchCountsByEmergency] = useState<DispatchCountsByEmergency>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -115,8 +151,13 @@ export function useLguEmergencies() {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchEmergencyReports(200);
-      setReports(data);
+      const [reportsData, dispatchTasksData] = await Promise.all([
+        fetchEmergencyReports(200),
+        fetchLguTasksByStatus("PENDING,ACCEPTED,DONE,VERIFIED").catch(() => [] as DispatchTask[]),
+      ]);
+
+      setReports(reportsData);
+      setDispatchCountsByEmergency(buildDispatchCountsByEmergency(dispatchTasksData));
     } catch (err: any) {
       setError(err?.response?.data?.message || err?.message || "Failed to load emergencies");
     } finally {
@@ -128,7 +169,13 @@ export function useLguEmergencies() {
     void refetch();
   }, [refetch]);
 
-  const items = useMemo(() => reports.map(toEmergencyItem).filter((item) => item.status !== "resolved"), [reports]);
+  const items = useMemo(
+    () =>
+      reports
+        .map((report) => toEmergencyItem(report, dispatchCountsByEmergency[String(report._id)]))
+        .filter((item) => item.status !== "resolved"),
+    [reports, dispatchCountsByEmergency]
+  );
 
   const filtered = useMemo(() => {
     return items.filter((item) => {
@@ -151,7 +198,7 @@ export function useLguEmergencies() {
       critical: String(items.filter((item) => item.priority === "critical").length),
       high: String(items.filter((item) => item.priority === "high").length),
       inProgress: String(items.filter((item) => item.status === "in_progress").length),
-      deployed: "0",
+      deployed: String(items.reduce((sum, item) => sum + item.volunteersAssigned, 0)),
     }),
     [items, sosCount]
   );

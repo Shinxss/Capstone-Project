@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "676548645928",
+    "project_id": "lifeline-ead25",
+    "storage_bucket": "lifeline-ead25.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:676548645928:android:a246df993f0817fd16911d",
+        "android_client_info": {
+          "package_name": "com.anonymous.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDzd7kqvjE9iVaen9orV2_EUvCCPfSo3GY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

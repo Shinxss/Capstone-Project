@@ -1,4 +1,5 @@
 import { useLguSettings } from "../hooks/useLguSettings";
+import { useConfirm } from "@/features/feedback/hooks/useConfirm";
 
 type Props = ReturnType<typeof useLguSettings> & {
   loading: boolean;
@@ -56,7 +57,21 @@ function ErrorPanel({ error, onRetry }: { error: string; onRetry: () => void }) 
 }
 
 export default function LguSettingsView(props: Props) {
+  const confirm = useConfirm();
   const { loading, error, onRefresh, save, saving, savedAt, settings, update, reset } = props;
+
+  const requestReset = async () => {
+    const ok = await confirm({
+      title: "Reset settings to defaults?",
+      description: "This will replace your current local preferences.",
+      confirmText: "Reset",
+      cancelText: "Cancel",
+      variant: "destructive",
+    });
+
+    if (!ok) return;
+    reset();
+  };
 
   if (loading) return <LoadingPanel />;
   if (error) return <ErrorPanel error={error} onRetry={onRefresh} />;
@@ -139,7 +154,7 @@ export default function LguSettingsView(props: Props) {
             <div className="mt-4 flex items-center justify-end">
               <button
                 type="button"
-                onClick={reset}
+                onClick={() => void requestReset()}
                 className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-100 dark:bg-[#0E1626] dark:border-[#162544] dark:text-slate-200 dark:hover:bg-[#122036]"
               >
                 Reset to defaults

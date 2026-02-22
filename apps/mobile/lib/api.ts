@@ -2,11 +2,28 @@ import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { STORAGE_KEYS } from "../constants/storageKeys";
 import { getSecure } from "./secureStore";
+import { emitUnauthorized } from "../features/auth/auth.events";
 
 export const api = axios.create({
   baseURL: process.env.EXPO_PUBLIC_API_URL,
-  headers: { "Content-Type": "application/json" },
+  headers: {
+    "Content-Type": "application/json",
+    "x-client-platform": "mobile",
+  },
 });
+
+const AUTH_ENDPOINT_EXCLUSIONS = [
+  "/api/auth/community/login",
+  "/api/auth/community/register",
+  "/api/auth/google",
+  "/api/auth/signup",
+  "/api/auth/password/forgot",
+  "/api/auth/password/verify-otp",
+  "/api/auth/password/reset",
+  "/api/auth/logout",
+];
+
+let unauthorizedHandlingInFlight = false;
 
 export function setApiAuthToken(token: string | null) {
   if (token) {
@@ -62,3 +79,23 @@ api.interceptors.request.use(async (config) => {
     return config;
   }
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const status = error?.response?.status;
+    const requestUrl = String(error?.config?.url ?? "").toLowerCase();
+    const isAuthEndpoint = AUTH_ENDPOINT_EXCLUSIONS.some((path) => requestUrl.includes(path));
+
+    if (status === 401 && !isAuthEndpoint && !unauthorizedHandlingInFlight) {
+      unauthorizedHandlingInFlight = true;
+      try {
+        await emitUnauthorized();
+      } finally {
+        unauthorizedHandlingInFlight = false;
+      }
+    }
+
+    return Promise.reject(error);
+  }
+);

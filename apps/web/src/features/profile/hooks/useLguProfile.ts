@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import type { ChangePasswordInput, LguProfile, ProfileUpdateInput } from "../models/profile.types";
 import { changePassword, getLocalProfile, refreshProfileToLocalStorage, updateProfile } from "../services/profile.service";
+import { toastError, toastSuccess, toastWarning } from "@/services/feedback/toast.service";
 
 const profileSchema = z.object({
   firstName: z.string().trim().min(1, "First name is required"),
@@ -71,16 +72,22 @@ export function useLguProfile() {
   const saveProfile = useCallback(
     async (input: ProfileUpdateInput) => {
       const v = validateProfile(input);
-      if (!v.ok) return v;
+      if (!v.ok) {
+        toastWarning("Please fix the profile form errors.");
+        return v;
+      }
 
       setSaving(true);
       setSaveError(null);
       try {
         const updated = await updateProfile(v.value);
         setProfile(updated);
+        toastSuccess("Profile saved.");
         return { ok: true as const, errors: {} as ProfileFormErrors };
       } catch (e: any) {
-        setSaveError(e?.response?.data?.message || e?.message || "Failed to save profile");
+        const message = e?.response?.data?.message || e?.message || "Failed to save profile";
+        setSaveError(message);
+        toastError(message);
         return { ok: false as const, errors: {} as ProfileFormErrors };
       } finally {
         setSaving(false);
@@ -104,7 +111,10 @@ export function useLguProfile() {
   const submitPasswordChange = useCallback(
     async (input: ChangePasswordInput) => {
       const v = validatePassword(input);
-      if (!v.ok) return v;
+      if (!v.ok) {
+        toastWarning("Please fix the password form errors.");
+        return v;
+      }
 
       setPasswordBusy(true);
       setPasswordError(null);
@@ -112,9 +122,12 @@ export function useLguProfile() {
       try {
         await changePassword({ currentPassword: v.value.currentPassword, newPassword: v.value.newPassword });
         setPasswordSuccess("Password updated.");
+        toastSuccess("Password updated.");
         return { ok: true as const, errors: {} as PasswordFormErrors };
       } catch (e: any) {
-        setPasswordError(e?.response?.data?.message || e?.message || "Failed to change password");
+        const message = e?.response?.data?.message || e?.message || "Failed to change password";
+        setPasswordError(message);
+        toastError(message);
         return { ok: false as const, errors: {} as PasswordFormErrors };
       } finally {
         setPasswordBusy(false);

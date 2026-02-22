@@ -5,7 +5,7 @@ import App from "./App";
 import "./index.css";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
-
+import "sweetalert2/dist/sweetalert2.min.css";
 import { initTheme } from "./features/theme/services/themeService";
 import { fetchCsrfToken } from "./lib/api";
 

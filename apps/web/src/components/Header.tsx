@@ -23,6 +23,7 @@ type HeaderProps = {
   subtitle?: string;
   userName?: string;
   userRole?: string;
+  unreadNotifications?: number;
 
   sidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
@@ -33,6 +34,7 @@ export default function Header({
   subtitle = "Welcome Back, John Doe",
   userName = "John Doe",
   userRole = "Administrator",
+  unreadNotifications = 0,
   sidebarCollapsed = false,
   onToggleSidebar,
 }: HeaderProps) {
@@ -138,7 +140,11 @@ export default function Header({
           <IconBtn onClick={toggle} ariaLabel="Toggle theme">
             {isDark ? <Sun size={18} /> : <Moon size={18} />}
           </IconBtn>
-          <IconBtn>
+          <IconBtn
+            ariaLabel="Open notifications"
+            badgeCount={unreadNotifications}
+            onClick={() => navigate("/lgu/notifications")}
+          >
             <Bell size={18} />
           </IconBtn>
           <IconBtn>
@@ -218,19 +224,30 @@ function IconBtn({
   children,
   onClick,
   ariaLabel,
+  badgeCount = 0,
 }: {
   children: React.ReactNode;
   onClick?: () => void;
   ariaLabel?: string;
+  badgeCount?: number;
 }) {
+  const safeCount = Number.isFinite(badgeCount) ? Math.max(0, Math.floor(badgeCount)) : 0;
+  const showBadge = safeCount > 0;
+  const badgeLabel = safeCount > 99 ? "99+" : String(safeCount);
+
   return (
     <button
       type="button"
       onClick={onClick}
       aria-label={ariaLabel}
-      className="h-10 w-10 rounded-md border border-gray-200 bg-white hover:bg-gray-50 flex items-center justify-center text-gray-700 dark:border-[#162544] dark:bg-[#0E1626] dark:hover:bg-[#122036] dark:text-slate-200"
+      className="relative h-10 w-10 rounded-md border border-gray-200 bg-white hover:bg-gray-50 flex items-center justify-center text-gray-700 dark:border-[#162544] dark:bg-[#0E1626] dark:hover:bg-[#122036] dark:text-slate-200"
     >
       {children}
+      {showBadge ? (
+        <span className="absolute -right-1.5 -top-1.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold text-white">
+          {badgeLabel}
+        </span>
+      ) : null}
     </button>
   );
 }

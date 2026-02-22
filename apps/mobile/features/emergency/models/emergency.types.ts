@@ -22,3 +22,21 @@ export type EmergencyReport = {
   reportedBy: string; // user id (from JWT)
   reportedAt: string;
 };
+
+export type MapEmergencyReport = {
+  incidentId: string;
+  referenceNumber: string;
+  isSos: boolean;
+  type: string;
+  verificationStatus: "not_required" | "pending" | "approved" | "rejected";
+  isVisibleOnMap: boolean;
+  createdAt: string;
+  location: {
+    coords: {
+      latitude: number;
+      longitude: number;
+    };
+    label?: string;
+  };
+  description?: string;
+};

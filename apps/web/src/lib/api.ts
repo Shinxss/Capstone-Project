@@ -1,5 +1,8 @@
 import axios from "axios";
-import { getLguToken } from "../features/auth/services/authStorage";
+import { clearLguSession, getLguToken } from "../features/auth/services/authStorage";
+
+const SESSION_WARNING_KEY = "lifeline-login-warning";
+const SESSION_WARNING_MESSAGE = "Your session has expired. Please log in again.";
 
 const baseURL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const normalizedBaseURL = baseURL.replace(/\/+$/, "");
@@ -47,6 +50,18 @@ export function fetchCsrfToken(): Promise<void> {
 }
 
 const UNSAFE_METHODS = new Set(["post", "put", "patch", "delete"]);
+const AUTH_ENDPOINT_EXCLUSIONS = [
+  "/api/auth/community/login",
+  "/api/auth/community/register",
+  "/api/auth/google",
+  "/api/auth/signup",
+  "/api/auth/password/forgot",
+  "/api/auth/password/verify-otp",
+  "/api/auth/password/reset",
+  "/api/auth/logout",
+];
+
+let unauthorizedRedirectInFlight = false;
 
 // ── Request interceptor: attach Bearer + CSRF tokens ──
 api.interceptors.request.use(async (config) => {
@@ -79,6 +94,19 @@ api.interceptors.request.use(async (config) => {
 // ── Response interceptor: auto-refresh CSRF token on 403 and retry once ──
 api.interceptors.response.use(undefined, async (error) => {
   const original = error.config;
+  const status = error?.response?.status;
+  const requestUrl = String(original?.url ?? "").toLowerCase();
+  const isAuthEndpoint = AUTH_ENDPOINT_EXCLUSIONS.some((path) => requestUrl.includes(path));
+
+  if (status === 401 && !isAuthEndpoint && !unauthorizedRedirectInFlight) {
+    unauthorizedRedirectInFlight = true;
+    clearLguSession();
+    sessionStorage.setItem(SESSION_WARNING_KEY, SESSION_WARNING_MESSAGE);
+    if (window.location.pathname !== "/lgu/login") {
+      window.location.replace("/lgu/login");
+    }
+  }
+
   const isCsrfError =
     error.response?.status === 403 &&
     (error.response?.data?.code === "CSRF_INVALID" ||

@@ -6,9 +6,9 @@ import { getErrorMessage } from "../utils/authErrors";
 import { useGoogleLogin } from "./useGoogleLogin";
 import { useAuth } from "../AuthProvider";
 
-const MAX_FAILED_LOGIN_ATTEMPTS = 5;
-const LOGIN_COOLDOWN_MIN_SECONDS = 5 * 60;
-const LOGIN_COOLDOWN_MAX_SECONDS = 10 * 60;
+const MAX_FAILED_LOGIN_ATTEMPTS = 10;
+const LOGIN_COOLDOWN_MIN_SECONDS = 60;
+const LOGIN_COOLDOWN_MAX_SECONDS = 60;
 
 function clampCooldown(seconds: number) {
   return Math.min(LOGIN_COOLDOWN_MAX_SECONDS, Math.max(LOGIN_COOLDOWN_MIN_SECONDS, seconds));

@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { Alert } from "react-native";
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import type { AuthUser } from "./auth.types";
 import {
@@ -10,6 +11,7 @@ import {
 import { clearAuthState, saveAuthState } from "./auth.storage";
 import { setApiAuthToken } from "../../lib/api";
 import { clearSession, setUserSession } from "./services/sessionStorage";
+import { subscribeUnauthorized } from "./auth.events";
 
 type AuthMode = "authed" | "guest" | "anonymous";
 
@@ -76,6 +78,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     void hydrate();
   }, [hydrate]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeUnauthorized(async () => {
+      Alert.alert("Session expired", "Your session has expired. Please log in again.");
+      await signOutSession();
+      await GoogleSignin.revokeAccess().catch(() => undefined);
+      await GoogleSignin.signOut().catch(() => undefined);
+      applyAnonymous();
+    });
+
+    return unsubscribe;
+  }, [applyAnonymous]);
 
   const setAuthed = useCallback(async (nextToken: string, nextUser: AuthUser) => {
     await saveAuthState({

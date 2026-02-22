@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 
 import LguLogin from "./pages/Login";
 
@@ -24,47 +24,65 @@ import LguReports from "./pages/lgu/LguReports";
 
 import LguProfile from "./pages/lgu/LguProfile";
 import LguSettings from "./pages/lgu/LguSettings";
+import { getLguToken } from "./features/auth/services/authStorage";
+import { Toaster } from "@/components/ui/sonner";
+import { ConfirmDialogProvider } from "@/features/feedback/context/confirm.context";
+
+function RequireLguAuth() {
+  const token = getLguToken();
+
+  if (!token) {
+    return <Navigate to="/lgu/login" replace />;
+  }
+
+  return <Outlet />;
+}
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/lgu/login" element={<LguLogin />} />
+    <ConfirmDialogProvider>
+      <Toaster />
+      <Routes>
+        <Route path="/lgu/login" element={<LguLogin />} />
 
-      <Route path="/lgu/dashboard" element={<LguDashboard />} />
+        <Route element={<RequireLguAuth />}>
+          <Route path="/lgu/dashboard" element={<LguDashboard />} />
 
-      <Route path="/lgu/notifications" element={<LguNotifications />} />
+          <Route path="/lgu/notifications" element={<LguNotifications />} />
 
-      <Route path="/lgu/emergencies" element={<LguEmergencies />} />
+          <Route path="/lgu/emergencies" element={<LguEmergencies />} />
 
-      {/* Volunteers */}
-      <Route path="/lgu/volunteers" element={<PlaceholderPage title="Volunteers" />} />
-      <Route path="/lgu/volunteers/applicants" element={<LguApplicants />} />
-      <Route path="/lgu/volunteers/verified" element={<LguVerifiedVolunteers />} />
+          {/* Volunteers */}
+          <Route path="/lgu/volunteers" element={<PlaceholderPage title="Volunteers" />} />
+          <Route path="/lgu/volunteers/applicants" element={<LguApplicants />} />
+          <Route path="/lgu/volunteers/verified" element={<LguVerifiedVolunteers />} />
 
-      {/* Tasks */}
-      <Route path="/lgu/tasks" element={<Navigate to="/lgu/tasks/in-progress" replace />} />
-      <Route path="/lgu/tasks/in-progress" element={<LguTasksInProgress />} />
-      <Route path="/lgu/tasks/for-review" element={<LguTasksForReview />} />
-      <Route path="/lgu/tasks/completed" element={<LguTasksCompleted />} />
-      <Route path="/lgu/tasks/canceled" element={<LguTasksCanceled />} />
-      <Route path="/lgu/tasks/archived" element={<Navigate to="/lgu/tasks/canceled" replace />} />
+          {/* Tasks */}
+          <Route path="/lgu/tasks" element={<Navigate to="/lgu/tasks/in-progress" replace />} />
+          <Route path="/lgu/tasks/in-progress" element={<LguTasksInProgress />} />
+          <Route path="/lgu/tasks/for-review" element={<LguTasksForReview />} />
+          <Route path="/lgu/tasks/completed" element={<LguTasksCompleted />} />
+          <Route path="/lgu/tasks/canceled" element={<LguTasksCanceled />} />
+          <Route path="/lgu/tasks/archived" element={<Navigate to="/lgu/tasks/canceled" replace />} />
 
-      {/* Approvals / Verification (Emergency verification only) */}
-      <Route path="/lgu/approvals" element={<LguApprovals />} />
+          {/* Approvals / Verification (Emergency verification only) */}
+          <Route path="/lgu/approvals" element={<LguApprovals />} />
 
-      <Route path="/lgu/audit-log" element={<LguActivityLog />} />
-      <Route path="/lgu/activity-log" element={<Navigate to="/lgu/audit-log" replace />} />
+          <Route path="/lgu/audit-log" element={<LguActivityLog />} />
+          <Route path="/lgu/activity-log" element={<Navigate to="/lgu/audit-log" replace />} />
 
-      <Route path="/lgu/live-map" element={<LguLiveMap />} />
+          <Route path="/lgu/live-map" element={<LguLiveMap />} />
 
-      <Route path="/lgu/announcements" element={<LguAnnouncements />} />
-      <Route path="/lgu/reports" element={<LguReports />} />
+          <Route path="/lgu/announcements" element={<LguAnnouncements />} />
+          <Route path="/lgu/reports" element={<LguReports />} />
 
-      <Route path="/lgu/profile" element={<LguProfile />} />
-      <Route path="/lgu/settings" element={<LguSettings />} />
+          <Route path="/lgu/profile" element={<LguProfile />} />
+          <Route path="/lgu/settings" element={<LguSettings />} />
+        </Route>
 
-      <Route path="*" element={<Navigate to="/lgu/login" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/lgu/login" replace />} />
+      </Routes>
+    </ConfirmDialogProvider>
   );
 }
 

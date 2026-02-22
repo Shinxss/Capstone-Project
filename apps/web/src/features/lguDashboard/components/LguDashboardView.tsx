@@ -5,7 +5,6 @@ import {
   Activity,
   AlertTriangle,
   ClipboardList,
-  RefreshCcw,
   Users,
   ShieldAlert,
 } from "lucide-react";

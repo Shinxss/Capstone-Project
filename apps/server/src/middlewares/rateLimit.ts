@@ -31,3 +31,4 @@ export const loginLimiter = createLimiter(15 * 60 * 1000, 10);
 export const otpLimiter = createLimiter(10 * 60 * 1000, 5);
 export const passwordLimiter = createLimiter(10 * 60 * 1000, 5);
 export const registerLimiter = createLimiter(15 * 60 * 1000, 10);
+export const guestEmergencyReportLimiter = createLimiter(5 * 60 * 1000, 5);

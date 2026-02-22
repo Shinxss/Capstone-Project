@@ -2,37 +2,107 @@ import type { DispatchTask } from "../../tasks/models/tasks.types";
 import { fetchLguTasksByStatus } from "../../tasks/services/tasksApi";
 import { fetchEmergencyReports } from "../../emergency/services/emergency.service";
 import { listAnnouncements } from "../../announcements/services/announcements.service";
+import { api } from "../../../lib/api";
 import type { LguNotification, NotificationType } from "../models/notifications.types";
 
-const READ_KEY = "lifeline_lgu_notifications_read_v1";
+export const NOTIFICATIONS_LOCAL_STATE_EVENT = "lifeline:lgu-notifications-local-state";
 
-function safeJsonParse<T>(raw: string | null): T | null {
-  if (!raw) return null;
+type NotificationStateMap = Record<
+  string,
+  {
+    read?: boolean;
+    archived?: boolean;
+  }
+>;
+
+function normalizeNotificationIds(ids: string[]) {
+  return Array.from(
+    new Set(
+      (Array.isArray(ids) ? ids : [])
+        .map((id) => String(id || "").trim())
+        .filter(Boolean)
+    )
+  ).slice(0, 500);
+}
+
+function emitLocalStateEvent() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(NOTIFICATIONS_LOCAL_STATE_EVENT));
+}
+
+async function queryNotificationStates(ids: string[]): Promise<NotificationStateMap> {
+  const notificationIds = normalizeNotificationIds(ids);
+  if (notificationIds.length === 0) return {};
+
   try {
-    return JSON.parse(raw) as T;
+    const response = await api.post<{ states?: NotificationStateMap }>("/api/notifications/state/query", {
+      ids: notificationIds,
+    });
+    return response.data?.states ?? {};
   } catch {
-    return null;
+    return {};
   }
 }
 
-function readReadIds(): string[] {
-  const raw = safeJsonParse<string[]>(localStorage.getItem(READ_KEY));
-  return Array.isArray(raw) ? raw.filter((x) => typeof x === "string") : [];
+async function updateNotificationReadState(ids: string[], read: boolean) {
+  const notificationIds = normalizeNotificationIds(ids);
+  if (notificationIds.length === 0) return;
+
+  await api.patch("/api/notifications/state/read", {
+    ids: notificationIds,
+    read,
+  });
+  emitLocalStateEvent();
 }
 
-function writeReadIds(ids: string[]) {
-  localStorage.setItem(READ_KEY, JSON.stringify(Array.from(new Set(ids)).slice(0, 5000)));
+async function updateNotificationArchivedState(ids: string[], archived: boolean) {
+  const notificationIds = normalizeNotificationIds(ids);
+  if (notificationIds.length === 0) return;
+
+  await api.patch("/api/notifications/state/archive", {
+    ids: notificationIds,
+    archived,
+  });
+  emitLocalStateEvent();
+}
+
+function runStateMutation(action: Promise<void>) {
+  void action.catch(() => {
+    // Best effort only. UI stays optimistic and re-syncs on refresh/socket events.
+  });
 }
 
 export function markNotificationRead(id: string) {
-  const cur = readReadIds();
-  if (cur.includes(id)) return;
-  writeReadIds([id, ...cur]);
+  runStateMutation(updateNotificationReadState([id], true));
 }
 
 export function markNotificationsRead(ids: string[]) {
-  const cur = readReadIds();
-  writeReadIds([...ids, ...cur]);
+  runStateMutation(updateNotificationReadState(ids, true));
+}
+
+export function archiveNotification(id: string) {
+  runStateMutation(updateNotificationArchivedState([id], true));
+}
+
+export function archiveNotifications(ids: string[]) {
+  runStateMutation(updateNotificationArchivedState(ids, true));
+}
+
+export function unarchiveNotification(id: string) {
+  runStateMutation(updateNotificationArchivedState([id], false));
+}
+
+export function unarchiveNotifications(ids: string[]) {
+  runStateMutation(updateNotificationArchivedState(ids, false));
+}
+
+// Backward-compatible aliases.
+export function clearNotification(id: string) {
+  archiveNotification(id);
+}
+
+export function clearNotifications(ids: string[]) {
+  archiveNotifications(ids);
 }
 
 function safeIso(s?: string | null) {
@@ -43,7 +113,7 @@ function safeIso(s?: string | null) {
   return d.toISOString();
 }
 
-function buildDispatchNotification(task: DispatchTask): Omit<LguNotification, "read"> | null {
+function buildDispatchNotification(task: DispatchTask): Omit<LguNotification, "read" | "archived"> | null {
   const status = String(task.status || "").toUpperCase();
   const dispatchId = String(task.id || "").trim();
   const emergencyType = String(task.emergency?.emergencyType || "Emergency").trim();
@@ -96,16 +166,15 @@ function normalizeTypeKey(t: NotificationType | "ALL") {
 }
 
 export async function fetchLguNotifications(): Promise<LguNotification[]> {
-  // Derived feed: dispatches, emergencies, announcements. Read state is local.
+  // Derived feed: dispatches, emergencies, announcements. Read/archive state comes from DB.
   const [dispatches, emergencies] = await Promise.all([
     fetchLguTasksByStatus("ACCEPTED,DONE,VERIFIED"),
     fetchEmergencyReports(120),
   ]);
 
   const announcements = listAnnouncements().filter((a) => a.status === "PUBLISHED");
-  const readIds = new Set(readReadIds());
 
-  const items: Array<Omit<LguNotification, "read">> = [];
+  const items: Array<Omit<LguNotification, "read" | "archived">> = [];
 
   for (const t of dispatches) {
     const n = buildDispatchNotification(t);
@@ -143,18 +212,22 @@ export async function fetchLguNotifications(): Promise<LguNotification[]> {
     });
   }
 
-  const dedup = new Map<string, Omit<LguNotification, "read">>();
+  const dedup = new Map<string, Omit<LguNotification, "read" | "archived">>();
   for (const i of items) dedup.set(i.id, i);
 
-  const list = Array.from(dedup.values())
+  const latest = Array.from(dedup.values())
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
-    .slice(0, 250)
-    .map((n) => ({
-      ...n,
-      read: readIds.has(n.id),
-    }));
+    .slice(0, 250);
 
-  return list;
+  const states = await queryNotificationStates(latest.map((item) => item.id));
+  return latest.map((item) => {
+    const state = states[item.id] || {};
+    return {
+      ...item,
+      read: Boolean(state.read),
+      archived: Boolean(state.archived),
+    };
+  });
 }
 
 export function notificationTypeOptions(): Array<{ value: NotificationType | "ALL"; label: string }> {
@@ -171,4 +244,3 @@ export function notificationTypeOptions(): Array<{ value: NotificationType | "AL
 export function matchesNotificationType(filter: NotificationType | "ALL", t: NotificationType) {
   return normalizeTypeKey(filter) === "ALL" || normalizeTypeKey(filter) === normalizeTypeKey(t);
 }
-

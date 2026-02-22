@@ -16,6 +16,7 @@ import {
   Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import type { EmergencyType, LguEmergencyItem, LguEmergencyTypeFilter, useLguEmergencies } from "../hooks/useLguEmergencies";
 
 type Props = ReturnType<typeof useLguEmergencies> & {
@@ -119,7 +120,13 @@ function StatCard({
   );
 }
 
-function EmergencyCard({ item }: { item: LguEmergencyItem }) {
+function EmergencyCard({
+  item,
+  onActionClick,
+}: {
+  item: LguEmergencyItem;
+  onActionClick: (item: LguEmergencyItem) => void;
+}) {
   const Icon = iconForType(item.type);
   const isSOS = !!item.isSOS;
 
@@ -232,6 +239,7 @@ function EmergencyCard({ item }: { item: LguEmergencyItem }) {
 
           <button
             type="button"
+            onClick={() => onActionClick(item)}
             className="mt-2 inline-flex w-full max-w-[180px] items-center justify-center gap-2 rounded-xl bg-red-600 px-6 py-3 text-sm font-bold text-white hover:bg-red-700"
           >
             {actionLabel}
@@ -269,7 +277,24 @@ function ErrorPanel({ error, onRetry }: { error: string; onRetry: () => void }) 
 }
 
 export default function LguEmergenciesView(props: Props) {
-  const { loading, error, onRefresh, query, setQuery, typeFilter, setTypeFilter, sosCount, stats, filtered } = props;
+  const navigate = useNavigate();
+  const { loading, error, onRefresh, query, setQuery, typeFilter, setTypeFilter, items, stats, filtered } = props;
+
+  const activeItems = items.filter((item) => item.status === "active");
+  const activeSosItems = activeItems.filter((item) => item.isSOS);
+  const activeSosCount = activeSosItems.length;
+  const activeSosVolunteersAssigned = activeSosItems.reduce((sum, item) => sum + item.volunteersAssigned, 0);
+  const activeSosVolunteersNeeded = activeSosItems.reduce((sum, item) => sum + item.volunteersNeeded, 0);
+  const visibleItems = filtered.filter((item) => item.status === "active");
+
+  const handleEmergencyAction = (item: LguEmergencyItem) => {
+    const emergencyId = String(item.id || "").trim();
+    if (!emergencyId) {
+      navigate("/lgu/live-map");
+      return;
+    }
+    navigate(`/lgu/live-map?emergencyId=${encodeURIComponent(emergencyId)}`);
+  };
 
   if (loading) return <LoadingPanel />;
   if (error) return <ErrorPanel error={error} onRetry={onRefresh} />;
@@ -288,15 +313,16 @@ export default function LguEmergenciesView(props: Props) {
         </button>
       </div>
 
-      {sosCount > 0 ? (
+      {activeSosCount > 0 ? (
         <div className="heartbeat-alert flex items-center justify-between rounded-2xl border border-red-300 px-6 py-5 dark:border-red-500/25 dark:bg-red-500/10">
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-200 dark:bg-red-500/20">
               <Siren className="text-red-700" />
             </div>
             <div>
-              <div className="text-lg font-bold text-red-700">{sosCount} Active SOS Alerts</div>
+              <div className="text-lg font-bold text-red-700">{activeSosCount} Active SOS Alerts</div>
               <div className="text-sm text-gray-600 dark:text-slate-300">Urgent life-threatening situations requiring immediate response</div>
+              <div className="text-sm font-semibold text-gray-700 dark:text-slate-200">{activeSosVolunteersAssigned}/{activeSosVolunteersNeeded} Volunteers</div>
             </div>
           </div>
 
@@ -344,7 +370,7 @@ export default function LguEmergenciesView(props: Props) {
       </div>
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
-        <StatCard value={stats.activeSOS} label="Active SOS" tone="pink" icon={<Siren className="text-red-600" />} />
+        <StatCard value={String(activeSosCount)} label="Active SOS" tone="pink" icon={<Siren className="text-red-600" />} />
         <StatCard value={stats.critical} label="Critical" tone="pink" icon={<AlertTriangle className="text-red-600" />} />
         <StatCard value={stats.high} label="High Priority" tone="blue" icon={<Droplet className="text-blue-600" />} />
         <StatCard value={stats.inProgress} label="In Progress" tone="yellow" icon={<Clock className="text-yellow-700" />} />
@@ -352,16 +378,16 @@ export default function LguEmergenciesView(props: Props) {
       </div>
 
       <div className="space-y-5">
-        {filtered.length === 0 ? (
+        {visibleItems.length === 0 ? (
           <div className="rounded-2xl border border-gray-200 bg-white p-8 text-sm text-gray-600 dark:border-[#162544] dark:bg-[#0B1220] dark:text-slate-300">No emergency reports found.</div>
         ) : (
-          filtered.map((item) =>
+          visibleItems.map((item) =>
             item.isSOS ? (
               <div key={item.id} className="heartbeat-wrap rounded-2xl">
-                <EmergencyCard item={item} />
+                <EmergencyCard item={item} onActionClick={handleEmergencyAction} />
               </div>
             ) : (
-              <EmergencyCard key={item.id} item={item} />
+              <EmergencyCard key={item.id} item={item} onActionClick={handleEmergencyAction} />
             )
           )
         )}

@@ -237,9 +237,15 @@ function buildSignupVerificationHtml(otp: string, expiryMin: number) {
                 <div style="font-size:14px; color:#374151; line-height:20px; margin-bottom:14px;">
                   Welcome to Lifeline. Use the OTP below to complete signup and activate your account.
                 </div>
-                <div style="display:inline-block; background:#f3f4f6; border:1px solid #e5e7eb; border-radius:12px; padding:18px 22px; font-size:34px; font-weight:900; letter-spacing:6px; color:#DC2626;">
-                  ${escapeHtml(otp)}
-                </div>
+                <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td align="center" style="padding:10px 0 14px 0;">
+                      <div style="display:inline-block; background:#f3f4f6; border:1px solid #e5e7eb; border-radius:12px; padding:18px 22px; font-size:34px; font-weight:900; letter-spacing:6px; color:#DC2626; text-align:center;">
+                        ${escapeHtml(otp)}
+                      </div>
+                    </td>
+                  </tr>
+                </table>
                 <div style="font-size:13px; color:#6B7280; margin-top:14px;">
                   This verification code expires in <b>${expiryMin} minutes</b>.
                 </div>
@@ -299,9 +305,15 @@ function buildPasswordResetHtml(otp: string, expiryMin: number) {
                 <div style="font-size:14px; color:#374151; line-height:20px; margin-bottom:14px;">
                   We received a request to reset your Lifeline password. Use the OTP below to continue.
                 </div>
-                <div style="display:inline-block; background:#fef2f2; border:1px solid #fecaca; border-radius:12px; padding:18px 22px; font-size:34px; font-weight:900; letter-spacing:6px; color:#B91C1C;">
-                  ${escapeHtml(otp)}
-                </div>
+                <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td align="center" style="padding:10px 0 14px 0;">
+                      <div style="display:inline-block; background:#fef2f2; border:1px solid #fecaca; border-radius:12px; padding:18px 22px; font-size:34px; font-weight:900; letter-spacing:6px; color:#B91C1C; text-align:center;">
+                        ${escapeHtml(otp)}
+                      </div>
+                    </td>
+                  </tr>
+                </table>
                 <div style="font-size:13px; color:#6B7280; margin-top:14px;">
                   This reset code expires in <b>${expiryMin} minutes</b>.
                 </div>

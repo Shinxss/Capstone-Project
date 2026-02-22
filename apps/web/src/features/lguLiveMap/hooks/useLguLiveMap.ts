@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import { useSearchParams } from "react-router-dom";
+import { useConfirm } from "@/features/feedback/hooks/useConfirm";
+import { toastError, toastSuccess, toastWarning } from "@/services/feedback/toast.service";
 
 import type { MapEmergencyPin } from "../../emergency/components/EmergencyMap";
 import { normalizeEmergencyType } from "../../emergency/constants/emergency.constants";
@@ -41,6 +43,7 @@ function isResolvedEmergencyStatus(raw?: string) {
 }
 
 export function useLguLiveMap() {
+  const confirm = useConfirm();
   const [searchParams] = useSearchParams();
   const focusEmergencyId = searchParams.get("emergencyId");
 
@@ -300,7 +303,7 @@ export function useLguLiveMap() {
     if (!map) return;
 
     if (!navigator.geolocation) {
-      alert("Geolocation is not supported on this device/browser.");
+      toastWarning("Geolocation is not supported on this device/browser.");
       return;
     }
 
@@ -322,7 +325,7 @@ export function useLguLiveMap() {
         meMarkerRef.current = new mapboxgl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
         flyTo(lng, lat, 15);
       },
-      () => alert("Unable to get your location. Please enable location permission."),
+      () => toastWarning("Unable to get your location. Please enable location permission."),
       { enableHighAccuracy: true, timeout: 10000 }
     );
   };
@@ -589,15 +592,21 @@ export function useLguLiveMap() {
 
     const name = draftForm.name.trim();
     if (!name) {
-      alert("Please enter a hazard zone name.");
+      toastWarning("Please enter a hazard zone name.");
       return;
     }
 
-    await createHazardZone({
-      name,
-      hazardType: draftForm.hazardType,
-      geometry: hazardDraft.geometry,
-    });
+    try {
+      await createHazardZone({
+        name,
+        hazardType: draftForm.hazardType,
+        geometry: hazardDraft.geometry,
+      });
+    } catch (error: unknown) {
+      const parsed = error as { message?: string; response?: { data?: { message?: string } } };
+      toastError(parsed.response?.data?.message || parsed.message || "Failed to save hazard zone.");
+      return;
+    }
 
     const map = mapRef.current;
     pointsRef.current = [];
@@ -614,6 +623,7 @@ export function useLguLiveMap() {
     }
 
     await refetchHazardZones();
+    toastSuccess("Hazard zone saved.");
   };
 
   const onEmergencyPinClick = useCallback((pin: MapEmergencyPin) => {
@@ -642,7 +652,7 @@ export function useLguLiveMap() {
 
     const available = volunteers.filter((v) => v.status === "available");
     if (available.length === 0) {
-      alert("No available responders right now.");
+      toastWarning("No available responders right now.");
       return;
     }
 
@@ -693,15 +703,16 @@ export function useLguLiveMap() {
     const chosen = dispatchSelection.filter((id) => availableSet.has(id));
 
     if (chosen.length === 0) {
-      alert("Select at least one available responder.");
+      toastWarning("Select at least one available responder.");
       return;
     }
 
     // ✅ Persist dispatch offers to the backend (web → backend → mobile)
     try {
       await createDispatchOffers({ emergencyId: selectedEmergencyId, volunteerIds: chosen });
-    } catch (e: any) {
-      alert(e?.response?.data?.message ?? e?.message ?? "Failed to dispatch responders.");
+    } catch (error: unknown) {
+      const parsed = error as { message?: string; response?: { data?: { message?: string } } };
+      toastError(parsed.response?.data?.message ?? parsed.message ?? "Failed to dispatch responders.");
       return;
     }
 
@@ -719,6 +730,7 @@ export function useLguLiveMap() {
     setDispatchModalOpen(false);
     setDispatchSelection([]);
     setTrackOpen(true);
+    toastSuccess("Responders dispatched.");
   }, [dispatchSelection, selectedEmergencyId, volunteers]);
 
   const toggleTrackPanel = useCallback(() => {
@@ -730,7 +742,7 @@ export function useLguLiveMap() {
       const v = volunteers.find((x) => x.id === volunteerId);
       if (!v) return;
       if (!Number.isFinite(v.lng) || !Number.isFinite(v.lat)) {
-        alert("This responder has no live location yet.");
+        toastWarning("This responder has no live location yet.");
         return;
       }
       flyTo(v.lng as number, v.lat as number, 15);
@@ -747,11 +759,22 @@ export function useLguLiveMap() {
   };
 
   const deleteHazardZoneItem = async (id: string) => {
-    const ok = window.confirm("Delete this hazard zone?");
+    const ok = await confirm({
+      title: "Are you sure you want to delete?",
+      confirmText: "Delete",
+      cancelText: "Cancel",
+      variant: "destructive",
+    });
     if (!ok) return;
 
-    await removeHazardZone(id);
-    await refetchHazardZones();
+    try {
+      await removeHazardZone(id);
+      await refetchHazardZones();
+      toastSuccess("Hazard zone deleted.");
+    } catch (error: unknown) {
+      const parsed = error as { message?: string; response?: { data?: { message?: string } } };
+      toastError(parsed.response?.data?.message || parsed.message || "Failed to delete hazard zone.");
+    }
   };
 
   const onRefresh = useCallback(async () => {

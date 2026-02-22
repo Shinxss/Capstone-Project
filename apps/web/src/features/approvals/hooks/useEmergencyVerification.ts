@@ -1,16 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
-import type { DispatchTask } from "../../tasks/models/tasks.types";
-import type { EmergencyVerificationFilters } from "../models/approvals.types";
+import type { EmergencyApprovalItem, EmergencyVerificationFilters } from "../models/approvals.types";
 import {
-  approveAndVerifyDispatch,
+  approveEmergencyReport,
   fetchPendingEmergencyVerifications,
-  fetchProofBlob,
-  rejectDispatch,
+  rejectEmergencyReport,
 } from "../services/approvalsApi";
+import { toastError, toastSuccess } from "@/services/feedback/toast.service";
 
 const rejectSchema = z.object({
-  reason: z.string().trim().min(5, "Reason must be at least 5 characters"),
+  reason: z.string().trim().min(3, "Reason must be at least 3 characters"),
 });
 
 const defaultFilters: EmergencyVerificationFilters = {
@@ -39,32 +38,14 @@ function safeIso(v?: string | null) {
   return d.toISOString();
 }
 
-function dispatchDateForFilter(t: DispatchTask) {
-  return (
-    safeIso(t.emergency?.reportedAt) ||
-    safeIso(t.completedAt) ||
-    safeIso(t.updatedAt) ||
-    safeIso(t.createdAt) ||
-    ""
-  );
-}
-
 export function useEmergencyVerification() {
-  const [items, setItems] = useState<DispatchTask[]>([]);
+  const [items, setItems] = useState<EmergencyApprovalItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<EmergencyVerificationFilters>(defaultFilters);
 
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
-
-  // Proof preview state (used by Evidence modal)
-  const [proofOpen, setProofOpen] = useState(false);
-  const [proofLoading, setProofLoading] = useState(false);
-  const [proofError, setProofError] = useState<string | null>(null);
-  const [proofObjectUrl, setProofObjectUrl] = useState<string | null>(null);
-  const [proofFileName, setProofFileName] = useState<string>("proof");
-  const objectUrlRef = useRef<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -73,7 +54,9 @@ export function useEmergencyVerification() {
       const data = await fetchPendingEmergencyVerifications();
       setItems(data);
     } catch (e: any) {
-      setError(e?.response?.data?.message || e?.message || "Failed to load pending verifications");
+      const message = e?.response?.data?.message || e?.message || "Failed to load pending reports";
+      setError(message);
+      toastError(message);
     } finally {
       setLoading(false);
     }
@@ -85,8 +68,8 @@ export function useEmergencyVerification() {
 
   const emergencyTypeOptions = useMemo(() => {
     const set = new Set<string>();
-    for (const t of items) {
-      const v = String(t.emergency?.emergencyType || "").trim();
+    for (const item of items) {
+      const v = String(item.type || "").trim();
       if (v) set.add(v);
     }
     return ["ALL", ...Array.from(set).sort((a, b) => a.localeCompare(b))];
@@ -100,25 +83,26 @@ export function useEmergencyVerification() {
     const fromIso = filters.dateFrom ? toStartOfDayIso(filters.dateFrom) : "";
     const toIso = filters.dateTo ? toEndOfDayIso(filters.dateTo) : "";
 
-    return items.filter((t) => {
-      const dt = dispatchDateForFilter(t);
-      if (fromIso && dt && dt < fromIso) return false;
-      if (toIso && dt && dt > toIso) return false;
+    return items.filter((item) => {
+      const createdAtIso = safeIso(item.createdAt);
+      if (fromIso && createdAtIso && createdAtIso < fromIso) return false;
+      if (toIso && createdAtIso && createdAtIso > toIso) return false;
 
-      const eType = String(t.emergency?.emergencyType || "").trim();
-      if (type !== "ALL" && eType !== type) return false;
+      const itemType = String(item.type || "").trim();
+      if (type !== "ALL" && itemType !== type) return false;
 
-      const brgy = String(t.emergency?.barangayName || "").toLowerCase();
-      if (barangayQ && !brgy.includes(barangayQ)) return false;
+      const barangay = String(item.barangay || "").toLowerCase();
+      const locationLabel = String(item.locationLabel || "").toLowerCase();
+      if (barangayQ && !barangay.includes(barangayQ) && !locationLabel.includes(barangayQ)) return false;
 
       if (q) {
         const hay = [
-          t.id,
-          t.emergency?.id,
-          t.emergency?.emergencyType,
-          t.emergency?.barangayName,
-          t.volunteer?.name,
-          t.status,
+          item.incidentId,
+          item.referenceNumber,
+          item.type,
+          item.barangay,
+          item.locationLabel,
+          item.reporter?.name,
         ]
           .map((x) => String(x || "").toLowerCase())
           .join(" | ");
@@ -130,14 +114,17 @@ export function useEmergencyVerification() {
   }, [items, filters]);
 
   const verify = useCallback(
-    async (dispatchId: string) => {
+    async (incidentId: string) => {
       try {
         setError(null);
-        setVerifyingId(dispatchId);
-        await approveAndVerifyDispatch(dispatchId);
+        setVerifyingId(incidentId);
+        await approveEmergencyReport(incidentId);
+        toastSuccess("Emergency report approved.");
         await refresh();
       } catch (e: any) {
-        setError(e?.response?.data?.message || e?.message || "Failed to verify dispatch");
+        const message = e?.response?.data?.message || e?.message || "Failed to approve report";
+        setError(message);
+        toastError(message);
       } finally {
         setVerifyingId(null);
       }
@@ -152,66 +139,26 @@ export function useEmergencyVerification() {
   }, []);
 
   const reject = useCallback(
-    async (dispatchId: string, reason: string) => {
+    async (incidentId: string, reason: string) => {
       const v = validateRejectReason(reason);
       if (!v.ok) throw new Error(v.error);
 
       try {
         setError(null);
-        setRejectingId(dispatchId);
-        await rejectDispatch(dispatchId, reason.trim());
+        setRejectingId(incidentId);
+        await rejectEmergencyReport(incidentId, reason.trim());
+        toastSuccess("Emergency report rejected.");
         await refresh();
+      } catch (e: any) {
+        const message = e?.response?.data?.message || e?.message || "Failed to reject report";
+        setError(message);
+        toastError(message);
       } finally {
         setRejectingId(null);
       }
     },
     [refresh, validateRejectReason]
   );
-
-  const closeProof = useCallback(() => {
-    setProofOpen(false);
-    setProofError(null);
-    setProofLoading(false);
-    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-    objectUrlRef.current = null;
-    setProofObjectUrl(null);
-  }, []);
-
-  const openProof = useCallback(
-    async (proofUrl: string, fileName?: string) => {
-      try {
-        setProofError(null);
-        setProofLoading(true);
-        setProofOpen(true);
-
-        if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-        objectUrlRef.current = null;
-        setProofObjectUrl(null);
-
-        setProofFileName(fileName || "proof");
-
-        const blob = await fetchProofBlob(proofUrl);
-        const objectUrl = URL.createObjectURL(blob);
-        objectUrlRef.current = objectUrl;
-        setProofObjectUrl(objectUrl);
-      } catch (e: any) {
-        setProofError(e?.message || "Failed to load proof");
-      } finally {
-        setProofLoading(false);
-      }
-    },
-    []
-  );
-
-  const downloadProof = useCallback(() => {
-    if (!proofObjectUrl) return;
-    const a = document.createElement("a");
-    a.href = proofObjectUrl;
-    a.download = proofFileName;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  }, [proofObjectUrl, proofFileName]);
 
   return {
     items,
@@ -228,13 +175,5 @@ export function useEmergencyVerification() {
     verify,
     reject,
     validateRejectReason,
-    proofOpen,
-    proofLoading,
-    proofError,
-    proofObjectUrl,
-    openProof,
-    closeProof,
-    downloadProof,
   };
 }
-

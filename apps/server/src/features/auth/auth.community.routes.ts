@@ -8,6 +8,7 @@ import { validate } from "../../middlewares/validate";
 import { signAccessToken } from "../../utils/jwt";
 import { communityLoginSchema, communityRegisterSchema } from "./auth.schemas";
 import { toAuthUserPayload } from "./otp.utils";
+import { resolveAccessTokenExpiresIn } from "./accessTokenExpiry";
 
 const INVALID_CREDENTIALS = "Invalid credentials";
 
@@ -81,7 +82,10 @@ communityAuthRouter.post("/login", loginLimiter, validate(communityLoginSchema),
       return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });
     }
 
-    const token = signAccessToken({ sub: user._id.toString(), role: user.role });
+    const token = signAccessToken(
+      { sub: user._id.toString(), role: user.role },
+      { expiresIn: resolveAccessTokenExpiresIn(req) }
+    );
     await logAudit(req, {
       eventType: AUDIT_EVENT.AUTH_LOGIN_SUCCESS,
       outcome: "SUCCESS",

@@ -8,7 +8,6 @@
     "icon": "./assets/lifeline-logo.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    
     "ios": {
       "supportsTablet": true
     },
@@ -22,9 +21,9 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
+      "googleServicesFile": "./google-services.json",
       "permissions": [
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.POST_NOTIFICATIONS",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
       ],
@@ -60,11 +59,25 @@
           "locationWhenInUsePermission": "Allow Lifeline to access your location to show your position on the map and send SOS."
         }
       ],
+      [
+        "expo-notifications",
+        {
+          "sounds": [
+            "./assets/sounds/siren.wav"
+          ]
+        }
+      ],
       "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "c0c4b1ea-4aad-425d-9e1d-1a0bb16c5d5a"
+      }
     }
   }
 }
