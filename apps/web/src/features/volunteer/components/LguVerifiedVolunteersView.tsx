@@ -1,6 +1,7 @@
 import { Activity, ChevronDown, CircleCheck, Clock3, MapPin, Plus, Search, ShieldCheck, Star } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import VerifiedVolunteerDetailsModal from "./VerifiedVolunteerDetailsModal";
+import EmptyState from "../../../components/ui/EmptyState";
 import type { VolunteerApplication } from "../models/volunteerApplication.types";
 import { useLguVerifiedVolunteers } from "../hooks/useLguVerifiedVolunteers";
 
@@ -454,9 +455,10 @@ export default function LguVerifiedVolunteersView(props: Props) {
         </div>
 
         {filteredCards.length === 0 ? (
-          <div className="rounded-2xl border border-gray-200 bg-white p-8 text-sm text-gray-600 dark:border-[#162544] dark:bg-[#0B1220] dark:text-slate-300">
-            No verified volunteers match the current filters.
-          </div>
+          <EmptyState
+            icon={ShieldCheck}
+            title="No verified volunteers match the current filters."
+          />
         ) : (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {filteredCards.map((card) => (

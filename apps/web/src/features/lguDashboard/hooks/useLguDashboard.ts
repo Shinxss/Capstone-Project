@@ -1,8 +1,23 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLguEmergencies } from "../../emergency/hooks/useLguEmergencies";
 import { normalizeEmergencyType } from "../../emergency/constants/emergency.constants";
-import type { DashboardEmergencyItem, DashboardStats } from "../models/lguDashboard.types";
+import type {
+  DashboardEmergencyItem,
+  DashboardOperationalStats,
+  DashboardStats,
+} from "../models/lguDashboard.types";
 import { useHazardZones } from "../../hazardZones/hooks/useHazardZones";
+import { fetchLguDashboardOperationalStats } from "../services/lguDashboard.service";
+
+const EMPTY_OPERATIONAL_STATS: DashboardOperationalStats = {
+  availableVolunteers: 0,
+  totalVolunteers: 0,
+  tasksInProgress: 0,
+  pendingTasks: 0,
+  responseRate: 0,
+  respondedTasks: 0,
+  dispatchOffers: 0,
+};
 
 function fullName(first?: string, last?: string) {
   const name = `${first ?? ""} ${last ?? ""}`.trim();
@@ -18,9 +33,32 @@ export function useLguDashboard() {
     refetch: refetchHazards,
   } = useHazardZones();
 
+  const [operationalStats, setOperationalStats] =
+    useState<DashboardOperationalStats>(EMPTY_OPERATIONAL_STATS);
+  const [statsSyncing, setStatsSyncing] = useState(false);
+  const [statsError, setStatsError] = useState<string | null>(null);
+
+  const refetchOperationalStats = useCallback(async () => {
+    setStatsSyncing(true);
+    setStatsError(null);
+    try {
+      const next = await fetchLguDashboardOperationalStats();
+      setOperationalStats(next);
+    } catch (e: unknown) {
+      const parsed = e as { response?: { data?: { message?: string } }; message?: string };
+      setStatsError(parsed.response?.data?.message || parsed.message || "Failed to sync dashboard stats");
+    } finally {
+      setStatsSyncing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refetchOperationalStats();
+  }, [refetchOperationalStats]);
+
   const refetchAll = useCallback(async () => {
-    await Promise.all([refetch(), refetchHazards()]);
-  }, [refetch, refetchHazards]);
+    await Promise.all([refetch(), refetchHazards(), refetchOperationalStats()]);
+  }, [refetch, refetchHazards, refetchOperationalStats]);
 
   const items: DashboardEmergencyItem[] = useMemo(() => {
     return (reports ?? [])
@@ -54,8 +92,21 @@ export function useLguDashboard() {
     const acknowledged = items.filter((i) => i.status === "ACKNOWLEDGED").length;
     const resolved = items.filter((i) => i.status === "RESOLVED").length;
     const active = items.filter((i) => i.status === "OPEN" || i.status === "ACKNOWLEDGED").length;
-    return { total, active, open, acknowledged, resolved };
-  }, [items]);
+    return {
+      total,
+      active,
+      open,
+      acknowledged,
+      resolved,
+      availableVolunteers: operationalStats.availableVolunteers,
+      totalVolunteers: operationalStats.totalVolunteers,
+      tasksInProgress: operationalStats.tasksInProgress,
+      pendingTasks: operationalStats.pendingTasks,
+      responseRate: operationalStats.responseRate,
+      respondedTasks: operationalStats.respondedTasks,
+      dispatchOffers: operationalStats.dispatchOffers,
+    };
+  }, [items, operationalStats]);
 
   const recent = useMemo(() => {
     // newest first (reportedAt or createdAt)
@@ -73,6 +124,8 @@ export function useLguDashboard() {
     error,
     refetch: refetchAll,
     stats,
+    statsSyncing,
+    statsError,
     pins: items,
     recent,
 

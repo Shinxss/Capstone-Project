@@ -34,12 +34,15 @@ export async function postDispatchOffers(req: Request, res: Response) {
       emergencyId?: string;
       volunteerIds?: string[];
     };
+    const requestedVolunteerIds = Array.isArray(volunteerIds) ? volunteerIds.map((id) => String(id)).filter(Boolean) : [];
 
     const created = await createDispatchOffers({
       emergencyId: String(emergencyId ?? ""),
-      volunteerIds: Array.isArray(volunteerIds) ? volunteerIds : [],
+      volunteerIds: requestedVolunteerIds,
       createdByUserId: String(userId),
     });
+    const dispatchedVolunteerIds = created.map((item: any) => String(item?.volunteerId ?? "")).filter(Boolean);
+    const dispatchIds = created.map((item: any) => String(item?._id ?? "")).filter(Boolean);
 
     await logAudit(req, {
       eventType: AUDIT_EVENT.DISPATCH_CREATE,
@@ -49,6 +52,9 @@ export async function postDispatchOffers(req: Request, res: Response) {
       metadata: {
         emergencyId: String(emergencyId ?? ""),
         createdCount: created.length,
+        requestedVolunteerIds,
+        dispatchedVolunteerIds,
+        dispatchIds,
       },
     });
 
@@ -213,16 +219,22 @@ export async function patchVerify(req: Request, res: Response) {
     const { role, userId } = getAuth(req);
     if (role !== "LGU") return res.status(403).json({ message: "Forbidden" });
 
-    const { txHash } = await verifyDispatch({ dispatchId: String(req.params.id), verifierUserId: String(userId) });
+    const verification = await verifyDispatch({ dispatchId: String(req.params.id), verifierUserId: String(userId) });
+    const { txHash } = verification;
 
     await logAudit(req, {
       eventType: AUDIT_EVENT.DISPATCH_STATUS_CHANGE,
       outcome: "SUCCESS",
       actor: { id: userId, role },
-      target: { type: "DISPATCH", id: String(req.params.id) },
+      target: { type: "DISPATCH", id: verification.dispatchId },
       metadata: {
+        verificationType: "task_completion",
         nextStatus: "VERIFIED",
         txHash,
+        emergencyId: verification.emergencyId,
+        volunteerId: verification.volunteerId,
+        completedAt: verification.completedAt,
+        alreadyVerified: Boolean(verification.alreadyVerified),
       },
     });
 

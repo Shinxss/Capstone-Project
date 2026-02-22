@@ -5,9 +5,11 @@ import {
   Activity,
   AlertTriangle,
   ClipboardList,
+  LocateFixed,
   Users,
   ShieldAlert,
 } from "lucide-react";
+import { toastWarning } from "@/services/feedback/toast.service";
 
 import EmergencyMap from "../../emergency/components/EmergencyMap";
 import {
@@ -19,6 +21,11 @@ import type { DashboardEmergencyItem, DashboardStats } from "../models/lguDashbo
 import EmergencyQuickView from "./EmergencyQuickView";
 
 import type { HazardZone } from "../../hazardZones/models/hazardZones.types";
+import {
+  HAZARD_TYPE_COLOR,
+  HAZARD_TYPE_LABEL,
+  HAZARD_TYPES,
+} from "../../hazardZones/constants/hazardZones.constants";
 import { useHazardZones } from "../../hazardZones/hooks/useHazardZones";
 import {
   ensureHazardZonesLayers,
@@ -133,6 +140,8 @@ export default function LguDashboardView({
   error,
   onRefresh,
   stats,
+  statsSyncing,
+  statsError,
   pins,
   recent,
   hazardZones,
@@ -143,6 +152,8 @@ export default function LguDashboardView({
   error: string | null;
   onRefresh: () => void;
   stats: DashboardStats;
+  statsSyncing: boolean;
+  statsError: string | null;
   pins: DashboardEmergencyItem[];
   recent: DashboardEmergencyItem[];
   // ✅ be defensive: API shape changes or missing prop should not crash the dashboard
@@ -154,6 +165,7 @@ export default function LguDashboardView({
   const { isDark } = useThemeMode();
 
   const [quickView, setQuickView] = useState<DashboardEmergencyItem | null>(null);
+  const [legendMinimized, setLegendMinimized] = useState(false);
 
   // ✅ Allow clicking a map marker on the dashboard to open the quick view.
   const emergencyById = useMemo(() => {
@@ -193,6 +205,28 @@ export default function LguDashboardView({
   // (Using only a ref can miss the initial onMapReady timing.)
   const [map, setMap] = useState<mapboxgl.Map | null>(null);
   const [mapReady, setMapReady] = useState(false);
+
+  const locateMe = useCallback(() => {
+    if (!map) return;
+
+    if (!navigator.geolocation) {
+      toastWarning("Geolocation is not supported on this device/browser.");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        map.flyTo({
+          center: [pos.coords.longitude, pos.coords.latitude],
+          zoom: Math.max(map.getZoom(), 14),
+          speed: 1.2,
+          essential: true,
+        });
+      },
+      () => toastWarning("Unable to get your location. Please enable location permission."),
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }, [map]);
 
   // ✅ When opening the quick view from the list, pan/zoom the dashboard map to that emergency.
   useEffect(() => {
@@ -294,6 +328,29 @@ export default function LguDashboardView({
     };
   });
 
+  const volunteersValue = String(stats.availableVolunteers);
+  const volunteersBadge = statsSyncing
+    ? "sync"
+    : statsError
+      ? "retry"
+      : `${stats.totalVolunteers} total`;
+
+  const inProgressValue = String(stats.tasksInProgress);
+  const inProgressBadge = statsSyncing
+    ? "sync"
+    : statsError
+      ? "retry"
+      : `${stats.pendingTasks} pending`;
+
+  const responseValue = `${stats.responseRate}%`;
+  const responseBadge = statsSyncing
+    ? "sync"
+    : statsError
+      ? "retry"
+      : stats.dispatchOffers > 0
+        ? `${stats.respondedTasks}/${stats.dispatchOffers} responded`
+        : "No offers yet";
+
   if (loading) {
     return (
       <div className="rounded-lg border border-gray-200 bg-white p-4 text-gray-600 dark:bg-[#0B1220] dark:border-[#162544] dark:text-slate-300">
@@ -329,23 +386,23 @@ export default function LguDashboardView({
           value={String(stats.active)}
           badge={loading ? "sync" : `${stats.open} open`}
         />
-        <StatCard 
+        <StatCard
           icon={<Users size={16} className="text-green-600" />}
           label="Available Volunteers"
-          value="—"
-          badge="sync"
+          value={volunteersValue}
+          badge={volunteersBadge}
         />
         <StatCard
           icon={<ClipboardList size={16} className="text-orange-500" />}
           label="Tasks in Progress"
-          value="—"
-          badge="sync"
+          value={inProgressValue}
+          badge={inProgressBadge}
         />
         <StatCard
           icon={<Activity size={16} className="text-blue-600" />}
           label="Response Rate"
-          value="—"
-          badge="sync"
+          value={responseValue}
+          badge={responseBadge}
         />
       </div>
 
@@ -377,6 +434,9 @@ export default function LguDashboardView({
           }}
           onMapReady={onMapReady}
           fitReports="initial"
+          navPosition="bottom-right"
+          attributionPosition="bottom-left"
+          showLocateButton={false}
           // ✅ Render the Google Maps-style card INSIDE the map (Mapbox Popup)
           popup={
             quickView
@@ -403,6 +463,69 @@ export default function LguDashboardView({
             <MapPill icon={<AlertTriangle size={14} />} label="Emergencies" value={emergenciesCount} />
             <MapPill icon={<ShieldAlert size={14} />} label="Hazards" value={hazardsCount} />
           </div>
+        </div>
+
+        {/* Floating Legend (same as Live Map) */}
+        <div className="absolute top-16 right-3 z-20 pointer-events-none">
+          <div className="pointer-events-auto rounded-xl bg-white/70 text-gray-900 backdrop-blur shadow-lg border border-white/70 overflow-hidden dark:bg-black/65 dark:text-white dark:border-white/10">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-white/70 dark:border-white/10">
+              <div className="text-xs font-extrabold">Legend</div>
+              <button
+                onClick={() => setLegendMinimized((v) => !v)}
+                className="h-7 w-7 rounded-md hover:bg-white/60 dark:hover:bg-white/10 grid place-items-center"
+                aria-label={legendMinimized ? "Expand legend" : "Minimize legend"}
+                title={legendMinimized ? "Expand" : "Minimize"}
+              >
+                <span className="text-sm leading-none font-black">
+                  {legendMinimized ? "+" : "–"}
+                </span>
+              </button>
+            </div>
+
+            {!legendMinimized ? (
+              <div className="px-3 py-3 w-65">
+                <div className="text-[11px] font-bold text-gray-600 mb-2 dark:text-white/85">Hazard Zones</div>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[12px]">
+                  {HAZARD_TYPES.map((t) => (
+                    <div key={t} className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full" style={{ background: HAZARD_TYPE_COLOR[t] }} />
+                      <span>{HAZARD_TYPE_LABEL[t]}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-3 text-[11px] font-bold text-gray-600 mb-2 dark:text-white/85">Volunteers</div>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[12px]">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                    <span>Available</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-orange-500" />
+                    <span>Busy</span>
+                  </div>
+                  <div className="flex items-center gap-2 col-span-2">
+                    <span className="h-2 w-2 rounded-full bg-red-500" />
+                    <span>Offline</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="px-3 py-2 text-[12px] text-gray-600 dark:text-white/80">Legend minimized</div>
+            )}
+          </div>
+        </div>
+
+        {/* Locate icon-only (same as Live Map) */}
+        <div className="absolute right-3 z-20 pointer-events-none" style={{ bottom: 110 }}>
+          <button
+            onClick={locateMe}
+            className="pointer-events-auto h-7.25 w-7.25 rounded-sm bg-white border border-gray-300 shadow-sm hover:bg-gray-50 grid place-items-center dark:bg-[#0E1626] dark:border-[#22365D] dark:hover:bg-[#122036]"
+            aria-label="Locate me"
+            title="Locate Me"
+          >
+            <LocateFixed size={15} className="text-gray-900 dark:text-slate-100" />
+          </button>
         </div>
 
         {(effectiveHazardsLoading || effectiveHazardsError) && (

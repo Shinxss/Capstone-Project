@@ -3,6 +3,7 @@ import mapboxgl from "mapbox-gl";
 import { useSearchParams } from "react-router-dom";
 import { useConfirm } from "@/features/feedback/hooks/useConfirm";
 import { toastError, toastSuccess, toastWarning } from "@/services/feedback/toast.service";
+import { appendActivityLog } from "../../activityLog/services/activityLog.service";
 
 import type { MapEmergencyPin } from "../../emergency/components/EmergencyMap";
 import { normalizeEmergencyType } from "../../emergency/constants/emergency.constants";
@@ -715,6 +716,15 @@ export function useLguLiveMap() {
       toastError(parsed.response?.data?.message ?? parsed.message ?? "Failed to dispatch responders.");
       return;
     }
+    appendActivityLog({
+      action: "Dispatched volunteers",
+      entityType: "dispatch",
+      entityId: selectedEmergencyId,
+      metadata: {
+        volunteerIds: chosen,
+        volunteerCount: chosen.length,
+      },
+    });
 
     setAssignmentsByEmergency((prev) => {
       const existing = prev[selectedEmergencyId] ?? [];

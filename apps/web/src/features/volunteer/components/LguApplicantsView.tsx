@@ -1,5 +1,6 @@
 import { Search, Users } from "lucide-react";
 import ApplicantDetailsModal from "./ApplicantDetailsModal";
+import EmptyState from "../../../components/ui/EmptyState";
 import type { VolunteerApplicationStatus } from "../models/volunteerApplication.types";
 import { useLguApplicants } from "../hooks/useLguApplicants";
 
@@ -152,34 +153,30 @@ export default function LguApplicantsView(props: Props) {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-[#162544] dark:bg-[#0B1220]">
-        <div className="flex items-center justify-between border-b px-5 py-4 dark:border-[#162544]">
-          <div>
-            <div className="text-lg font-black text-gray-900 dark:text-slate-100">Applicants</div>
-            <div className="text-sm text-gray-600 dark:text-slate-400">Review and verify volunteer applications</div>
+      {items.length === 0 ? (
+        <EmptyState className="mt-4" icon={Users} title="No applicants found." />
+      ) : (
+        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-[#162544] dark:bg-[#0B1220]">
+          <div className="flex items-center justify-between border-b px-5 py-4 dark:border-[#162544]">
+            <div>
+              <div className="text-lg font-black text-gray-900 dark:text-slate-100">Applicants</div>
+              <div className="text-sm text-gray-600 dark:text-slate-400">Review and verify volunteer applications</div>
+            </div>
           </div>
-        </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-gray-600 dark:bg-[#0E1626] dark:text-slate-400">
-              <tr>
-                <th className="px-5 py-3 text-left font-bold">Applicant</th>
-                <th className="px-5 py-3 text-left font-bold">Barangay</th>
-                <th className="px-5 py-3 text-left font-bold">Mobile</th>
-                <th className="px-5 py-3 text-left font-bold">Status</th>
-                <th className="px-5 py-3 text-right font-bold">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.length === 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-gray-600 dark:bg-[#0E1626] dark:text-slate-400">
                 <tr>
-                  <td className="px-5 py-6 text-gray-600 dark:text-slate-400" colSpan={5}>
-                    No applicants found.
-                  </td>
+                  <th className="px-5 py-3 text-left font-bold">Applicant</th>
+                  <th className="px-5 py-3 text-left font-bold">Barangay</th>
+                  <th className="px-5 py-3 text-left font-bold">Mobile</th>
+                  <th className="px-5 py-3 text-left font-bold">Status</th>
+                  <th className="px-5 py-3 text-right font-bold">Action</th>
                 </tr>
-              ) : (
-                items.map((applicant) => (
+              </thead>
+              <tbody>
+                {items.map((applicant) => (
                   <tr key={applicant._id} className="border-t dark:border-[#162544]">
                     <td className="px-5 py-3">
                       <div className="font-bold text-gray-900 dark:text-slate-100">{applicant.fullName}</div>
@@ -199,12 +196,12 @@ export default function LguApplicantsView(props: Props) {
                       </button>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
       <ApplicantDetailsModal
         open={open}

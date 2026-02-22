@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
+import { CheckCircle2 } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
+import EmptyState from "../../../components/ui/EmptyState";
 import type { DispatchTask } from "../models/tasks.types";
 import { useLguTasksCompleted } from "../hooks/useLguTasksCompleted";
 
@@ -154,9 +156,11 @@ export default function LguTasksCompletedView(props: Props) {
       </div>
 
       {rows.length === 0 ? (
-        <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4 text-gray-600 dark:bg-[#0B1220] dark:border-[#162544] dark:text-slate-300">
-          No completed tasks found for the selected filters.
-        </div>
+        <EmptyState
+          className="mt-4"
+          icon={CheckCircle2}
+          title="No completed tasks found for the selected filters."
+        />
       ) : (
         <div className="mt-4 overflow-hidden rounded-lg border border-gray-200 bg-white dark:bg-[#0B1220] dark:border-[#162544]">
           <table className="w-full text-left text-sm">

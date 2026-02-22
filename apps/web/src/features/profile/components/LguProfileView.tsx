@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { UserRound } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import InlineAlert from "../../../components/ui/InlineAlert";
+import EmptyState from "../../../components/ui/EmptyState";
 import type { ChangePasswordInput, ProfileUpdateInput } from "../models/profile.types";
 import { useLguProfile } from "../hooks/useLguProfile";
 
@@ -122,9 +124,7 @@ export default function LguProfileView(props: Props) {
       </div>
 
       {!profile ? (
-        <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4 text-gray-600 dark:bg-[#0B1220] dark:border-[#162544] dark:text-slate-300">
-          No profile loaded. Please login again.
-        </div>
+        <EmptyState className="mt-4" icon={UserRound} title="No profile loaded. Please login again." />
       ) : (
         <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
           <div className="rounded-xl border border-gray-200 bg-white p-5 dark:bg-[#0B1220] dark:border-[#162544]">

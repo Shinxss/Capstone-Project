@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
+import { Megaphone } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
+import EmptyState from "../../../components/ui/EmptyState";
 import type { Announcement, AnnouncementAudience, AnnouncementDraftInput } from "../models/announcements.types";
 import { useLguAnnouncements } from "../hooks/useLguAnnouncements";
 import { useConfirm } from "@/features/feedback/hooks/useConfirm";
@@ -153,9 +155,7 @@ export default function LguAnnouncementsView(props: Props) {
       </div>
 
       {rows.length === 0 ? (
-        <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4 text-gray-600 dark:bg-[#0B1220] dark:border-[#162544] dark:text-slate-300">
-          No announcements yet.
-        </div>
+        <EmptyState className="mt-4" icon={Megaphone} title="No announcements yet." />
       ) : (
         <div className="mt-4 overflow-hidden rounded-lg border border-gray-200 bg-white dark:bg-[#0B1220] dark:border-[#162544]">
           <table className="w-full text-left text-sm">
@@ -308,4 +308,3 @@ export default function LguAnnouncementsView(props: Props) {
     </>
   );
 }
-

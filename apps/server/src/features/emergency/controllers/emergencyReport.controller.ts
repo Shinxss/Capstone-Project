@@ -8,6 +8,8 @@ import {
   listPendingEmergencyApprovals,
   rejectEmergencyReport,
 } from "../services/emergencyReport.service";
+import { AUDIT_EVENT } from "../../audit/audit.constants";
+import { logAudit } from "../../audit/audit.service";
 import type {
   CreateEmergencyReportInput,
   RejectEmergencyReportInput,
@@ -102,6 +104,25 @@ export async function approveEmergencyReportController(req: MaybeAuthedRequest, 
     const updated = await approveEmergencyReport(String(req.params.id || "").trim(), req.user.id);
     if (!updated) return res.status(404).json({ message: "Emergency report not found" });
 
+    await logAudit(req, {
+      eventType: AUDIT_EVENT.EMERGENCY_REPORT_APPROVAL,
+      outcome: "SUCCESS",
+      actor: {
+        id: req.user.id,
+        role: String(req.user.role ?? ""),
+      },
+      target: {
+        type: "EMERGENCY_REPORT",
+        id: updated.incidentId,
+      },
+      metadata: {
+        decision: "APPROVED",
+        referenceNumber: updated.referenceNumber,
+        verificationStatus: updated.verificationStatus,
+        isVisibleOnMap: updated.isVisibleOnMap,
+      },
+    });
+
     return res.status(200).json(updated);
   } catch (error: any) {
     return res.status(500).json({ message: error?.message ?? "Failed to approve emergency report" });
@@ -116,6 +137,27 @@ export async function rejectEmergencyReportController(req: MaybeAuthedRequest, r
     const updated = await rejectEmergencyReport(String(req.params.id || "").trim(), req.user.id, body.reason);
 
     if (!updated) return res.status(404).json({ message: "Emergency report not found" });
+
+    await logAudit(req, {
+      eventType: AUDIT_EVENT.EMERGENCY_REPORT_APPROVAL,
+      outcome: "SUCCESS",
+      actor: {
+        id: req.user.id,
+        role: String(req.user.role ?? ""),
+      },
+      target: {
+        type: "EMERGENCY_REPORT",
+        id: updated.incidentId,
+      },
+      metadata: {
+        decision: "REJECTED",
+        reason: String(body.reason ?? "").trim(),
+        referenceNumber: updated.referenceNumber,
+        verificationStatus: updated.verificationStatus,
+        isVisibleOnMap: updated.isVisibleOnMap,
+      },
+    });
+
     return res.status(200).json(updated);
   } catch (error: any) {
     return res.status(500).json({ message: error?.message ?? "Failed to reject emergency report" });

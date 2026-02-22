@@ -6,6 +6,23 @@ export type DashboardStats = {
   open: number;
   acknowledged: number;
   resolved: number;
+  availableVolunteers: number;
+  totalVolunteers: number;
+  tasksInProgress: number;
+  pendingTasks: number;
+  responseRate: number;
+  respondedTasks: number;
+  dispatchOffers: number;
+};
+
+export type DashboardOperationalStats = {
+  availableVolunteers: number;
+  totalVolunteers: number;
+  tasksInProgress: number;
+  pendingTasks: number;
+  responseRate: number;
+  respondedTasks: number;
+  dispatchOffers: number;
 };
 
 export type DashboardEmergencyItem = {

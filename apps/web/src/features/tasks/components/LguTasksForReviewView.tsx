@@ -1,3 +1,5 @@
+import { ClipboardCheck } from "lucide-react";
+import EmptyState from "../../../components/ui/EmptyState";
 import { useLguTasksForReview } from "../hooks/useLguTasksForReview";
 
 type Props = ReturnType<typeof useLguTasksForReview> & {
@@ -72,7 +74,7 @@ export default function LguTasksForReviewView(props: Props) {
       ) : null}
 
       {rows.length === 0 ? (
-        <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4 text-gray-600 dark:border-[#162544] dark:bg-[#0B1220] dark:text-slate-300">No tasks for review.</div>
+        <EmptyState className="mt-4" icon={ClipboardCheck} title="No tasks for review." />
       ) : (
         <div className="mt-4 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-[#162544] dark:bg-[#0B1220]">
           <table className="w-full text-left text-sm">

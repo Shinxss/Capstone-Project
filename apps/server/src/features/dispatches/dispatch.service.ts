@@ -271,7 +271,14 @@ export async function completeDispatch(params: { dispatchId: string; volunteerUs
 
 export async function verifyDispatch(
   params: { dispatchId: string; verifierUserId: string }
-): Promise<{ txHash: string }> {
+): Promise<{
+  txHash: string;
+  dispatchId: string;
+  emergencyId: string;
+  volunteerId: string;
+  completedAt: string | null;
+  alreadyVerified?: boolean;
+}> {
   const { dispatchId, verifierUserId } = params;
 
   if (!Types.ObjectId.isValid(dispatchId)) {
@@ -284,7 +291,14 @@ export async function verifyDispatch(
   // Idempotent: if already verified, just return the stored txHash (if available).
   if (offer.status === "VERIFIED") {
     const existingTxHash = (offer as any).chainRecord?.txHash;
-    return { txHash: typeof existingTxHash === "string" ? existingTxHash : "already-verified" };
+    return {
+      txHash: typeof existingTxHash === "string" ? existingTxHash : "already-verified",
+      dispatchId: String(offer._id),
+      emergencyId: String(offer.emergencyId),
+      volunteerId: String(offer.volunteerId),
+      completedAt: offer.completedAt ? new Date(offer.completedAt).toISOString() : null,
+      alreadyVerified: true,
+    };
   }
 
   if (offer.status !== "DONE") {
@@ -339,7 +353,13 @@ export async function verifyDispatch(
     // ignore
   }
 
-  return { txHash: chain.txHash };
+  return {
+    txHash: chain.txHash,
+    dispatchId: String(offer._id),
+    emergencyId: String(offer.emergencyId),
+    volunteerId: String(offer.volunteerId),
+    completedAt: offer.completedAt ? new Date(offer.completedAt).toISOString() : null,
+  };
 }
 
 export async function listDispatchTasksForLgu(params: { statuses: DispatchStatus[] }) {

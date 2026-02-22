@@ -1,3 +1,5 @@
+import { History } from "lucide-react";
+import EmptyState from "../../../components/ui/EmptyState";
 import { useLguActivityLog } from "../hooks/useLguActivityLog";
 
 type Props = ReturnType<typeof useLguActivityLog> & {
@@ -167,9 +169,7 @@ export default function LguActivityLogView(props: Props) {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4 text-gray-600 dark:bg-[#0B1220] dark:border-[#162544] dark:text-slate-300">
-          No log entries match your filters.
-        </div>
+        <EmptyState className="mt-4" icon={History} title="No log entries match your filters." />
       ) : (
         <div className="mt-4 overflow-hidden rounded-lg border border-gray-200 bg-white dark:bg-[#0B1220] dark:border-[#162544]">
           <table className="w-full text-left text-sm">
@@ -228,4 +228,3 @@ export default function LguActivityLogView(props: Props) {
     </>
   );
 }
-

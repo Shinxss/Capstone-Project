@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import EmptyState from "../../../components/ui/EmptyState";
 import type { EmergencyType, LguEmergencyItem, LguEmergencyTypeFilter, useLguEmergencies } from "../hooks/useLguEmergencies";
 
 type Props = ReturnType<typeof useLguEmergencies> & {
@@ -379,7 +380,7 @@ export default function LguEmergenciesView(props: Props) {
 
       <div className="space-y-5">
         {visibleItems.length === 0 ? (
-          <div className="rounded-2xl border border-gray-200 bg-white p-8 text-sm text-gray-600 dark:border-[#162544] dark:bg-[#0B1220] dark:text-slate-300">No emergency reports found.</div>
+          <EmptyState icon={AlertTriangle} title="No emergency reports found." />
         ) : (
           visibleItems.map((item) =>
             item.isSOS ? (

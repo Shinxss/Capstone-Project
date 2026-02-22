@@ -1,4 +1,6 @@
+import { Clock3 } from "lucide-react";
 import { Link } from "react-router-dom";
+import EmptyState from "../../../components/ui/EmptyState";
 import { useLguTasksInProgress } from "../hooks/useLguTasksInProgress";
 
 type Props = ReturnType<typeof useLguTasksInProgress> & {
@@ -54,7 +56,7 @@ export default function LguTasksInProgressView(props: Props) {
       </div>
 
       {groups.length === 0 ? (
-        <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4 text-gray-600 dark:border-[#162544] dark:bg-[#0B1220] dark:text-slate-300">No emergencies in progress.</div>
+        <EmptyState className="mt-4" icon={Clock3} title="No emergencies in progress." />
       ) : null}
 
       <div className="mt-4 space-y-3">

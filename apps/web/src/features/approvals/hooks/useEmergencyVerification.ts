@@ -7,6 +7,7 @@ import {
   rejectEmergencyReport,
 } from "../services/approvalsApi";
 import { toastError, toastSuccess } from "@/services/feedback/toast.service";
+import { appendActivityLog } from "../../activityLog/services/activityLog.service";
 
 const rejectSchema = z.object({
   reason: z.string().trim().min(3, "Reason must be at least 3 characters"),
@@ -119,6 +120,17 @@ export function useEmergencyVerification() {
         setError(null);
         setVerifyingId(incidentId);
         await approveEmergencyReport(incidentId);
+        const approved = items.find((item) => String(item.incidentId) === String(incidentId));
+        appendActivityLog({
+          action: "Approved emergency report",
+          entityType: "emergency",
+          entityId: incidentId,
+          metadata: {
+            referenceNumber: approved?.referenceNumber,
+            emergencyType: approved?.type,
+            barangay: approved?.barangay,
+          },
+        });
         toastSuccess("Emergency report approved.");
         await refresh();
       } catch (e: any) {
@@ -129,7 +141,7 @@ export function useEmergencyVerification() {
         setVerifyingId(null);
       }
     },
-    [refresh]
+    [items, refresh]
   );
 
   const validateRejectReason = useCallback((reason: string) => {
@@ -147,6 +159,18 @@ export function useEmergencyVerification() {
         setError(null);
         setRejectingId(incidentId);
         await rejectEmergencyReport(incidentId, reason.trim());
+        const rejected = items.find((item) => String(item.incidentId) === String(incidentId));
+        appendActivityLog({
+          action: "Rejected emergency report",
+          entityType: "emergency",
+          entityId: incidentId,
+          metadata: {
+            reason: reason.trim(),
+            referenceNumber: rejected?.referenceNumber,
+            emergencyType: rejected?.type,
+            barangay: rejected?.barangay,
+          },
+        });
         toastSuccess("Emergency report rejected.");
         await refresh();
       } catch (e: any) {
@@ -157,7 +181,7 @@ export function useEmergencyVerification() {
         setRejectingId(null);
       }
     },
-    [refresh, validateRejectReason]
+    [items, refresh, validateRejectReason]
   );
 
   return {

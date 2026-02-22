@@ -3,7 +3,19 @@ import LguDashboardView from "../../features/lguDashboard/components/LguDashboar
 import { useLguDashboard } from "../../features/lguDashboard/hooks/useLguDashboard";
 
 export default function LguDashboard() {
-  const { loading, error, refetch, stats, pins, recent, hazardZones, hazardsLoading, hazardsError } =
+  const {
+    loading,
+    error,
+    refetch,
+    stats,
+    statsSyncing,
+    statsError,
+    pins,
+    recent,
+    hazardZones,
+    hazardsLoading,
+    hazardsError,
+  } =
     useLguDashboard();
 
   return (
@@ -13,6 +25,8 @@ export default function LguDashboard() {
         error={error}
         onRefresh={() => void refetch()}
         stats={stats}
+        statsSyncing={statsSyncing}
+        statsError={statsError}
         pins={pins}
         recent={recent}
         hazardZones={hazardZones}

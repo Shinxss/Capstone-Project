@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
+import { CircleX } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
+import EmptyState from "../../../components/ui/EmptyState";
 import InlineAlert from "../../../components/ui/InlineAlert";
 import type { DispatchTask } from "../models/tasks.types";
 import { useLguTasksCanceled } from "../hooks/useLguTasksCanceled";
@@ -134,9 +136,11 @@ export default function LguTasksCanceledView(props: Props) {
       </div>
 
       {rows.length === 0 ? (
-        <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4 text-gray-600 dark:bg-[#0B1220] dark:border-[#162544] dark:text-slate-300">
-          No canceled tasks found for the selected filters.
-        </div>
+        <EmptyState
+          className="mt-4"
+          icon={CircleX}
+          title="No canceled tasks found for the selected filters."
+        />
       ) : (
         <div className="mt-4 overflow-hidden rounded-lg border border-gray-200 bg-white dark:bg-[#0B1220] dark:border-[#162544]">
           <table className="w-full text-left text-sm">

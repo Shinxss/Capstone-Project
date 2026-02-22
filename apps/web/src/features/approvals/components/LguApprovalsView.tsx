@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
+import { ShieldCheck } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
+import EmptyState from "../../../components/ui/EmptyState";
 import { useLguApprovals } from "../hooks/useLguApprovals";
 import type { EmergencyApprovalItem } from "../models/approvals.types";
 
@@ -148,9 +150,7 @@ export default function LguApprovalsView(props: Props) {
       </div>
 
       {rows.length === 0 ? (
-        <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4 text-gray-600 dark:bg-[#0B1220] dark:border-[#162544] dark:text-slate-300">
-          No pending emergency reports.
-        </div>
+        <EmptyState className="mt-4" icon={ShieldCheck} title="No pending emergency reports." />
       ) : (
         <div className="mt-4 overflow-hidden rounded-lg border border-gray-200 bg-white dark:bg-[#0B1220] dark:border-[#162544]">
           <table className="w-full text-left text-sm">

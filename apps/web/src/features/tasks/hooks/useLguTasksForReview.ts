@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLguTasks } from "./useLguTasks";
 import { fetchTaskProofBlob, verifyTask } from "../services/tasksApi";
+import { appendActivityLog } from "../../activityLog/services/activityLog.service";
 
 export function useLguTasksForReview() {
   const { tasks, loading, error, refetch } = useLguTasks("DONE");
@@ -83,6 +84,18 @@ export function useLguTasksForReview() {
         setVerifyError(null);
         setVerifyingId(id);
         await verifyTask(id);
+        const task = tasks.find((row) => String(row.id) === String(id));
+        appendActivityLog({
+          action: "Verified completed dispatch task",
+          entityType: "dispatch",
+          entityId: id,
+          metadata: {
+            emergencyId: task?.emergency?.id,
+            volunteerId: task?.volunteer?.id,
+            volunteerName: task?.volunteer?.name,
+            completedAt: task?.completedAt,
+          },
+        });
         await refetch();
       } catch (e: any) {
         setVerifyError(e?.response?.data?.message || e?.message || "Failed to verify task");
@@ -90,7 +103,7 @@ export function useLguTasksForReview() {
         setVerifyingId(null);
       }
     },
-    [refetch]
+    [refetch, tasks]
   );
 
   return {

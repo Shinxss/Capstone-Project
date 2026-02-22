@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
+import EmptyState from "../../../components/ui/EmptyState";
 import type { LguNotification, NotificationType } from "../models/notifications.types";
 import { useLguNotifications } from "../hooks/useLguNotifications";
 
@@ -278,7 +279,7 @@ export default function LguNotificationsView(props: Props) {
                 className={[
                   "inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition",
                   active
-                    ? "bg-white text-gray-900 shadow-sm dark:bg-[#122036] dark:text-slate-100"
+                    ? "bg-red-600 text-white shadow-sm dark:bg-red-600 dark:text-white"
                     : "text-gray-600 hover:text-gray-900 dark:text-slate-400 dark:hover:text-slate-100",
                 ].join(" ")}
               >
@@ -287,7 +288,7 @@ export default function LguNotificationsView(props: Props) {
                   className={[
                     "inline-flex min-w-[20px] items-center justify-center rounded-full px-1.5 text-xs",
                     active
-                      ? "bg-red-600 text-white"
+                      ? "bg-white/20 text-white"
                       : "bg-gray-200 text-gray-700 dark:bg-[#1A2944] dark:text-slate-300",
                   ].join(" ")}
                 >
@@ -300,8 +301,8 @@ export default function LguNotificationsView(props: Props) {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="mx-6 mt-4 rounded-2xl border border-gray-200 bg-white p-5 text-sm text-gray-600 dark:border-[#162544] dark:bg-[#0B1220] dark:text-slate-300">
-          {emptyLabel}
+        <div className="mx-6">
+          <EmptyState className="mt-4" icon={BellRing} title={emptyLabel} />
         </div>
       ) : (
         <div className="mx-6 mt-4 space-y-2 pb-6">
