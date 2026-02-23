@@ -4,32 +4,37 @@ import path from "path";
 import mongoose from "mongoose";
 import { BarangayModel } from "../features/barangays/barangay.model";
 
-// ---- Helpers ----
-function pickName(props: any): string {
+function pickName(props: Record<string, unknown> | null | undefined): string {
   if (!props) return "Unknown";
 
-  // common keys in geojson files
   const candidates = [
-    "barangay", "Barangay", "BRGY", "brgy",
-    "name", "Name", "NAME",
-    "adm4_en", "ADM4_EN", "adm4", "ADM4",
-    "loc_name", "LOC_NAME",
+    "barangay",
+    "Barangay",
+    "BRGY",
+    "brgy",
+    "name",
+    "Name",
+    "NAME",
+    "adm4_en",
+    "ADM4_EN",
+    "adm4",
+    "ADM4",
+    "loc_name",
+    "LOC_NAME",
   ];
 
-  for (const k of candidates) {
-    const v = props[k];
-    if (typeof v === "string" && v.trim()) return v.trim();
+  for (const key of candidates) {
+    const value = props[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
   }
 
-  // fallback: pick first string property
-  for (const [k, v] of Object.entries(props)) {
-    if (typeof v === "string" && v.trim()) return v.trim();
+  for (const value of Object.values(props)) {
+    if (typeof value === "string" && value.trim()) return value.trim();
   }
 
   return "Unknown";
 }
 
-// Ensure polygon rings are closed (first == last)
 function closeRing(coords: number[][]) {
   if (!coords.length) return coords;
   const first = coords[0];
@@ -47,39 +52,38 @@ function normalizeGeometry(geom: any) {
   }
 
   if (geom.type === "MultiPolygon") {
-    const polys = geom.coordinates.map((poly: number[][][]) =>
-      poly.map((ring: number[][]) => closeRing(ring))
+    const polygons = geom.coordinates.map((polygon: number[][][]) =>
+      polygon.map((ring: number[][]) => closeRing(ring))
     );
-    return { type: "MultiPolygon" as const, coordinates: polys };
+    return { type: "MultiPolygon" as const, coordinates: polygons };
   }
 
   return null;
 }
 
 async function run() {
-  const mongoUri = process.env.MONGO_URI || "mongodb://localhost:27017/lifeline";
+  const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI || "mongodb://localhost:27017/lifeline";
   await mongoose.connect(mongoUri);
 
-  // ✅ edit this path if your file is elsewhere
   const geojsonPath =
     process.env.BARANGAY_GEOJSON_PATH ||
     path.join(process.cwd(), "src", "data", "dagupan-barangays.geojson");
 
   const raw = fs.readFileSync(geojsonPath, "utf8");
-  const fc = JSON.parse(raw);
+  const featureCollection = JSON.parse(raw);
 
-  if (!fc?.features?.length) throw new Error("GeoJSON has no features.");
+  if (!featureCollection?.features?.length) {
+    throw new Error("GeoJSON has no features.");
+  }
 
   let upserts = 0;
 
-  for (const f of fc.features) {
-    const geometry = normalizeGeometry(f.geometry);
+  for (const feature of featureCollection.features) {
+    const geometry = normalizeGeometry(feature.geometry);
     if (!geometry) continue;
 
-    const props = f.properties || {};
+    const props = (feature.properties ?? {}) as Record<string, unknown>;
     const name = pickName(props);
-
-    // You can hardcode these since file is Dagupan
     const city = props.city || props.CITY || "Dagupan City";
     const province = props.province || props.PROVINCE || "Pangasinan";
     const code = props.code || props.CODE || props.psgc || props.PSGC;
@@ -92,6 +96,7 @@ async function run() {
           city,
           province,
           code: typeof code === "string" ? code : undefined,
+          isActive: true,
           geometry,
           rawProperties: props,
         },
@@ -99,14 +104,14 @@ async function run() {
       { upsert: true }
     );
 
-    upserts++;
+    upserts += 1;
   }
 
-  console.log(`✅ Seed done. Upserted ${upserts} barangays.`);
+  console.log(`Dagupan barangay seed done. Upserted ${upserts} records.`);
   await mongoose.disconnect();
 }
 
-run().catch((e) => {
-  console.error("❌ Seed failed:", e);
+run().catch((error) => {
+  console.error("Dagupan barangay seed failed:", error);
   process.exit(1);
 });

@@ -1,0 +1,19 @@
+{
+  "model": "routing-risk",
+  "type": "regression",
+  "features": [
+    "flood_depth_5yr",
+    "rainfall_mm",
+    "is_raining",
+    "bridge",
+    "road_priority"
+  ],
+  "metrics": {
+    "mae": 0.12815440991192542
+  },
+  "encoding": {
+    "road_priority": "0=no_info, 1=low, 2=medium, 3=high",
+    "bridge": "0/1",
+    "is_raining": "0/1"
+  }
+}

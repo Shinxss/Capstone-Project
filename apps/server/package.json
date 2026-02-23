@@ -9,6 +9,7 @@
     "build": "tsc -p tsconfig.json",
     "seed:lgu": "tsx src/scripts/seedLgu.ts",
     "seed:system-admin": "tsx src/scripts/seedSystemAdmin.ts",
+    "seed:rbac": "tsx src/scripts/seedRbac.ts",
     "seed:barangays": "tsx src/scripts/seedDagupanBarangays.ts",
     "seed:barangays:sanfabian": "tsx src/scripts/seedSanFabianBarangays.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"

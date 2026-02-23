@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Animated, Pressable, Text } from "react-native";
+import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { Tabs, useRouter } from "expo-router";
 import { AlertTriangle } from "lucide-react-native";
+import { BlurView } from "expo-blur";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import BottomNav from "../../components/BottomNav";
 import AuthRequiredModal from "../../components/AuthRequiredModal";
@@ -13,6 +14,8 @@ import { useReportPill } from "../../features/report/hooks/useReportPill";
 export default function TabLayout() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarBottomPadding = Math.max(insets.bottom, 50);
+  const tabBarHeight = 64 + tabBarBottomPadding;
   const { signOut } = useAuth();
   const { canAccessTasks, blockReason, role } = useTasksAccess();
   const [showAuthRequired, setShowAuthRequired] = useState(false);
@@ -89,18 +92,23 @@ export default function TabLayout() {
       </Tabs>
 
       {reportPillVisible ? (
-        <Pressable
-          className="absolute left-0 right-0 top-0"
-          style={{ bottom: Math.max(90, 74 + insets.bottom) }}
-          onPress={hideReportPill}
-        />
+        <Animated.View
+          pointerEvents="auto"
+          style={[styles.blurOverlay, { bottom: tabBarHeight, opacity: reportPillAnim }]}
+        >
+          <BlurView intensity={72} tint="light" style={StyleSheet.absoluteFillObject} />
+          <View
+            pointerEvents="none"
+            style={[StyleSheet.absoluteFillObject, { backgroundColor: "rgba(255,255,255,0.70)" }]}
+          />
+          <Pressable style={StyleSheet.absoluteFillObject} onPress={hideReportPill} />
+        </Animated.View>
       ) : null}
 
       <Animated.View
         pointerEvents={reportPillVisible ? "auto" : "none"}
-        className="absolute left-0 right-0 items-center"
-        style={{
-          bottom: 72 + insets.bottom,
+        style={[styles.reportPillWrap, {
+          bottom: tabBarHeight + 24,
           opacity: reportPillAnim,
           transform: [
             {
@@ -110,14 +118,16 @@ export default function TabLayout() {
               }),
             },
           ],
-        }}
+        }]}
       >
         <Pressable
           onPress={onPressReportPill}
-          className="flex-row items-center rounded-full bg-red-500 px-5 py-3 shadow"
+          style={({ pressed }) => [styles.reportPill, pressed && styles.reportPillPressed]}
         >
-          <AlertTriangle size={18} className="text-white" />
-          <Text className="ml-2 text-base font-semibold text-white">Report Emergency</Text>
+          <AlertTriangle size={22} color="#FFFFFF" />
+          <Text style={styles.reportPillText}>
+            Report Emergency
+          </Text>
         </Pressable>
       </Animated.View>
 
@@ -131,3 +141,41 @@ export default function TabLayout() {
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  blurOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 20,
+  },
+  reportPillWrap: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    zIndex: 30,
+  },
+  reportPill: {
+    width: 286,
+    height: 72,
+    borderRadius: 999,
+    backgroundColor: "#DC2626",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 12,
+  },
+  reportPillPressed: {
+    opacity: 0.92,
+    transform: [{ scale: 0.98 }],
+  },
+  reportPillText: {
+    marginLeft: 10,
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "700",
+  },
+});

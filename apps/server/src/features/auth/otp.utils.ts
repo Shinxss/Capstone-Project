@@ -69,10 +69,16 @@ export function evaluateOtpResendRateLimit(input: RateLimitInput): RateLimitResu
 
 type UserLike = {
   _id: { toString(): string } | string;
+  username?: string;
   email?: string;
   firstName?: string;
   lastName?: string;
   role?: string;
+  adminTier?: string;
+  lguName?: string;
+  lguPosition?: string;
+  barangay?: string;
+  municipality?: string;
   volunteerStatus?: string;
   authProvider?: string;
   passwordHash?: string;
@@ -83,10 +89,16 @@ type UserLike = {
 export function toAuthUserPayload(user: UserLike) {
   return {
     id: typeof user._id === "string" ? user._id : user._id.toString(),
+    username: user.username ?? "",
     email: user.email ?? "",
     firstName: user.firstName ?? "",
     lastName: user.lastName ?? "",
     role: user.role ?? "",
+    adminTier: user.adminTier ?? undefined,
+    lguName: user.lguName ?? "",
+    lguPosition: user.lguPosition ?? "",
+    barangay: user.barangay ?? "",
+    municipality: user.municipality ?? "",
     volunteerStatus: user.volunteerStatus ?? "",
     authProvider: user.authProvider ?? "local",
     emailVerified: Boolean(user.emailVerified),

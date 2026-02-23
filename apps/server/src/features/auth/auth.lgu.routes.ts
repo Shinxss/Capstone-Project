@@ -12,6 +12,7 @@ import { sendOtpEmail } from "../../utils/mailer";
 import { resolveAccessTokenExpiresIn } from "./accessTokenExpiry";
 
 const INVALID_CREDENTIALS = "Invalid credentials";
+const ACCOUNT_SUSPENDED = "Account is suspended. Please contact your administrator.";
 
 export const lguAuthRouter = Router();
 
@@ -24,7 +25,26 @@ lguAuthRouter.post("/login", loginLimiter, validate(lguLoginSchema), async (req,
       role: { $in: ["LGU", "ADMIN"] },
     }).lean();
 
-    if (!user || !user.isActive || !user.passwordHash) {
+    if (!user) {
+      await logSecurityEvent(req, AUDIT_EVENT.AUTH_LOGIN_FAIL, "FAIL", {
+        username,
+      });
+      return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });
+    }
+
+    if (!user.isActive) {
+      await logSecurityEvent(req, AUDIT_EVENT.AUTH_LOGIN_FAIL, "FAIL", {
+        username,
+        accountStatus: "SUSPENDED",
+      });
+      return res.status(403).json({
+        success: false,
+        error: ACCOUNT_SUSPENDED,
+        code: "ACCOUNT_SUSPENDED",
+      });
+    }
+
+    if (!user.passwordHash) {
       await logSecurityEvent(req, AUDIT_EVENT.AUTH_LOGIN_FAIL, "FAIL", {
         username,
       });
@@ -81,6 +101,7 @@ lguAuthRouter.post("/login", loginLimiter, validate(lguLoginSchema), async (req,
             id: user._id.toString(),
             username: user.username,
             role: user.role,
+            adminTier: user.adminTier ?? "CDRRMO",
             firstName: user.firstName,
             lastName: user.lastName,
           },

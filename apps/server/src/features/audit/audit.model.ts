@@ -32,6 +32,7 @@ export type AuditLogDoc = {
     correlationId?: NullableString;
   };
   metadata: Record<string, unknown>;
+  scopeBarangay?: NullableString;
 };
 
 const AuditLogSchema = new Schema<AuditLogDoc>(
@@ -77,6 +78,7 @@ const AuditLogSchema = new Schema<AuditLogDoc>(
       correlationId: { type: String, default: "", index: true },
     },
     metadata: { type: Schema.Types.Mixed, default: {} },
+    scopeBarangay: { type: String, default: "", index: true },
   },
   {
     strict: "throw",
@@ -90,6 +92,7 @@ AuditLogSchema.index({ "actor.id": 1 });
 AuditLogSchema.index({ outcome: 1 });
 AuditLogSchema.index({ "request.correlationId": 1 });
 AuditLogSchema.index({ "target.type": 1, "target.id": 1 });
+AuditLogSchema.index({ scopeBarangay: 1, timestamp: -1 });
 
 AuditLogSchema.pre("updateOne", function appendOnlyUpdate() {
   throw new Error("Audit logs are append-only and cannot be modified.");

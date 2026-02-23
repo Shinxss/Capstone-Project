@@ -10,6 +10,7 @@ import { User } from "../users/user.model";
 import { DispatchOffer, DispatchStatus } from "./dispatch.model";
 import { recordTaskVerification } from "@lifeline/blockchain";
 import { sendDispatchOfferPush } from "../notifications/pushNotification.service";
+import { findBarangayByPoint } from "../barangays/barangay.service";
 
 const MAX_PROOF_BYTES = 3 * 1024 * 1024; // 3MB
 const ALLOWED_PROOF_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/heic"]);
@@ -81,9 +82,14 @@ export async function createDispatchOffers(input: CreateDispatchInput) {
     },
     notes: emergency.notes,
     reportedAt: emergency.reportedAt,
-    // emergency report currently doesn't store barangayName; keep null for now
-    barangayName: null,
+    barangayName: null as string | null,
   };
+
+  const [lng, lat] = emergency.location.coordinates ?? [];
+  if (Number.isFinite(lng) && Number.isFinite(lat)) {
+    const barangay = await findBarangayByPoint(Number(lng), Number(lat), { city: "Dagupan City" });
+    snapshot.barangayName = barangay?.name ? String(barangay.name) : null;
+  }
 
   const createdBy = new Types.ObjectId(input.createdByUserId);
 

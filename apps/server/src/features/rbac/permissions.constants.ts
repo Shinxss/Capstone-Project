@@ -1,0 +1,25 @@
+export const RBAC_PERMISSIONS = [
+  "users.view",
+  "users.manage_volunteers",
+  "users.manage_lgu_accounts",
+  "users.manage_admin_accounts",
+  "barangays.view",
+  "barangays.edit",
+  "masterdata.view",
+  "masterdata.edit",
+  "dispatch.view",
+  "dispatch.create",
+  "dispatch.reassign",
+  "tasks.verify",
+  "reports.view",
+  "reports.verify",
+  "reports.update",
+  "analytics.view",
+  "analytics.export",
+  "audit.view",
+  "audit.export",
+  "announcements.manage",
+  "settings.edit",
+] as const;
+
+export type RbacPermission = (typeof RBAC_PERMISSIONS)[number];

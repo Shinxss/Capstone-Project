@@ -3,6 +3,7 @@ import type { ProjectionType } from "mongoose";
 import type { Request } from "express";
 import { AUDIT_EVENT, AUDIT_EVENT_SEVERITY, AUDIT_OUTCOME, AUDIT_SEVERITY, type AuditEventType, type AuditOutcome, type AuditSeverity } from "./audit.constants";
 import { AuditLog, type AuditLogDoc } from "./audit.model";
+import { User } from "../users/user.model";
 
 type FilterQuery<T> = Partial<Record<keyof T, unknown>> & Record<string, unknown>;
 
@@ -53,6 +54,7 @@ type QueryAuditInput = {
   actorId?: string;
   targetType?: string;
   targetId?: string;
+  scopeBarangay?: string;
   q?: string;
   page?: number;
   limit?: number;
@@ -178,6 +180,23 @@ function resolveRequest(req?: Request) {
   };
 }
 
+async function resolveScopeBarangay(req: Request | undefined, payload: AuditPayload) {
+  const explicitScope = sanitizeString(payload.metadata?.scopeBarangay, 120);
+  if (explicitScope) return explicitScope;
+
+  const actor = resolveActor(req);
+  const actorId = sanitizeString(payload.actor?.id ?? actor.id, 120);
+  const actorRole = sanitizeString(payload.actor?.role ?? actor.role, 50).toUpperCase();
+
+  if (!actorId || actorRole !== "LGU") return undefined;
+
+  const user = await User.findById(actorId).select("role barangay").lean();
+  if (!user || user.role !== "LGU") return undefined;
+
+  const barangay = sanitizeString(user.barangay, 120);
+  return barangay || undefined;
+}
+
 export async function logAudit(req: Request | undefined, payload: AuditPayload) {
   try {
     const actorFromReq = resolveActor(req);
@@ -186,6 +205,7 @@ export async function logAudit(req: Request | undefined, payload: AuditPayload) 
 
     const actorEmail = payload.actor?.email ? maskEmail(payload.actor.email) : undefined;
     const action = sanitizeString(payload.action ?? payload.eventType, 120);
+    const scopeBarangay = await resolveScopeBarangay(req, payload);
 
     await AuditLog.create({
       eventId: randomUUID(),
@@ -215,6 +235,7 @@ export async function logAudit(req: Request | undefined, payload: AuditPayload) 
         correlationId: sanitizeString(payload.request?.correlationId ?? requestFromReq.correlationId, 100) || randomUUID(),
       },
       metadata: sanitizeAuditMetadata(payload.metadata),
+      scopeBarangay,
     });
   } catch {
     // Prevent audit failures from breaking primary request flow.
@@ -298,6 +319,7 @@ export async function queryAuditLogs(input: QueryAuditInput): Promise<{
   if (input.actorId) filter["actor.id"] = sanitizeString(input.actorId, 120);
   if (input.targetType) filter["target.type"] = sanitizeString(input.targetType, 120);
   if (input.targetId) filter["target.id"] = sanitizeString(input.targetId, 120);
+  if (input.scopeBarangay) filter.scopeBarangay = sanitizeString(input.scopeBarangay, 120);
 
   const q = sanitizeString(input.q, 100);
   if (q) {

@@ -1,13 +1,15 @@
 import React, { useMemo, useState } from "react";
-import { Pressable, SafeAreaView, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { EMERGENCY_TYPE_OPTIONS } from "../constants/emergencyTypes.constants";
 import { EmergencyTypeTile } from "../components/EmergencyTypeTile";
 import type { EmergencyType } from "../models/report.types";
 import { useReportDraft } from "../hooks/useReportDraft";
 
 export function ReportEmergencyTypeScreen() {
+  const insets = useSafeAreaInsets();
   const { draft, setType } = useReportDraft();
   const [selectedType, setSelectedType] = useState<EmergencyType | null>(draft.type ?? null);
 
@@ -22,15 +24,15 @@ export function ReportEmergencyTypeScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView edges={["top", "bottom"]} style={styles.screen}>
       <View className="flex-row items-center px-5 pb-2 pt-3">
         <Pressable
           onPress={() => router.back()}
-          className="h-10 w-10 items-center justify-center rounded-full border border-zinc-200"
+          className="h-10 w-10 items-center justify-center"
         >
           <Ionicons name="chevron-back" size={20} color="#111827" />
         </Pressable>
-        <Text className="ml-3 text-xl font-bold text-zinc-900">Report Emergency</Text>
+        <Text className="ml-4 text-2xl font-bold text-zinc-900">Report Emergency</Text>
       </View>
 
       <View className="px-5 pb-3">
@@ -61,17 +63,47 @@ export function ReportEmergencyTypeScreen() {
         </View>
       </ScrollView>
 
-      <View className="absolute bottom-0 left-0 right-0 border-t border-zinc-200 bg-white px-5 pb-6 pt-3">
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
         <Pressable
           onPress={onContinue}
           disabled={!canContinue}
-          className={`h-12 items-center justify-center rounded-2xl ${
-            canContinue ? "bg-red-500" : "bg-zinc-300"
-          }`}
+          style={[styles.continueBtn, !canContinue && styles.continueBtnDisabled]}
         >
-          <Text className="text-base font-semibold text-white">Continue</Text>
+          <Text style={styles.continueBtnText}>Continue</Text>
         </Pressable>
       </View>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: "#F3F4F6",
+  },
+  footer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 16,
+    backgroundColor: "transparent",
+  },
+  continueBtn: {
+    height: 60,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#EF4444",
+  },
+  continueBtnDisabled: {
+    backgroundColor: "#EC8585",
+  },
+  continueBtnText: {
+    color: "#FFFFFF",
+    fontSize: 33 / 2,
+    fontWeight: "600",
+  },
+});

@@ -94,6 +94,47 @@ pnpm build
 pnpm typecheck
 ```
 
+## Seeding Data
+
+- Seed system super admin (creates/updates `ADMIN` with `adminTier=SUPER`):
+
+```bash
+pnpm run seed:system-admin
+```
+
+- Seed RBAC role profiles (`SUPER_ADMIN`, `CDRRMO_ADMIN`, `LGU_ADMIN`):
+
+```bash
+pnpm run seed:rbac
+```
+
+- Seed LGU accounts:
+
+```bash
+pnpm run seed:lgu
+```
+
+- Seed Dagupan barangays:
+
+```bash
+pnpm run seed:barangays
+```
+
+### Seed Environment Notes
+
+- Mongo connection: seed scripts accept `MONGODB_URI` (preferred) and `MONGO_URI` (fallback).
+- `seed:system-admin` expects:
+  - `SYSTEM_ADMIN_USERNAME` (optional; defaults to `sysadmin`)
+  - `SYSTEM_ADMIN_EMAIL` (required)
+  - `SYSTEM_ADMIN_PASSWORD` (required)
+- `seed:lgu` supports:
+  - `SEED_LGU_DEFAULT_PASSWORD` (optional; defaults to `Lifeline@123`)
+  - `SEED_LGU_MUNICIPALITY` (optional; defaults to `Dagupan City`)
+  - `SEED_LGU_ACCOUNTS_JSON` (optional JSON array override for seeded LGU users)
+- `seed:rbac` supports:
+  - `SEED_RBAC_OVERWRITE` (`true` by default; set `false` to preserve existing permissions)
+- Barangay seeds optionally use `BARANGAY_GEOJSON_PATH` to override GeoJSON input file.
+
 ## Security Overview
 
 - JWT auth: Bearer token validation in `requireAuth` middleware

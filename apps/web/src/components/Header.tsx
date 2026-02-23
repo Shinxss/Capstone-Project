@@ -33,6 +33,8 @@ type HeaderProps = {
   userName?: string;
   userRole?: string;
   unreadNotifications?: number;
+  portalPathPrefix?: string;
+  loginPath?: string;
 
   sidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
@@ -67,6 +69,8 @@ export default function Header({
   userName = "John Doe",
   userRole = "Administrator",
   unreadNotifications = 0,
+  portalPathPrefix = "/lgu",
+  loginPath = "/lgu/login",
   sidebarCollapsed = false,
   onToggleSidebar,
 }: HeaderProps) {
@@ -172,8 +176,8 @@ export default function Header({
   const handleOpenNotificationsPage = useCallback(() => {
     setSelectedNotificationId(null);
     setNotificationsOpen(false);
-    navigate("/lgu/notifications");
-  }, [navigate]);
+    navigate(`${portalPathPrefix}/notifications`);
+  }, [navigate, portalPathPrefix]);
 
   useEffect(() => {
     if (!notificationsOpen) return;
@@ -217,7 +221,7 @@ export default function Header({
 
     clearLguSession(); // ✅ clears token + user
     setOpen(false);
-    navigate("/lgu/login", { replace: true });
+    navigate(loginPath, { replace: true });
   }
 
   return (
@@ -314,7 +318,7 @@ export default function Header({
                   label="Profile"
                   onClick={() => {
                     setOpen(false);
-                    navigate("/lgu/profile");
+                    navigate(`${portalPathPrefix}/profile`);
                   }}
                 />
 
@@ -323,7 +327,7 @@ export default function Header({
                   label="Settings"
                   onClick={() => {
                     setOpen(false);
-                    navigate("/lgu/settings");
+                    navigate(`${portalPathPrefix}/settings`);
                   }}
                 />
 

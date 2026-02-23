@@ -81,6 +81,24 @@ export function ensureHazardZonesLayers(map: Map) {
   }
   match.push("#eab308"); // fallback
 
+  // hazardType -> map sprite icon (left of zone name)
+  // Uses sprite images from the active map style, with marker fallback.
+  const iconNameByHazard: any[] = [
+    "match",
+    ["upcase", ["coalesce", ["get", "hazardType"], ""]],
+    "FLOODED",
+    "water-15",
+    "ROAD_CLOSED",
+    "roadblock-15",
+    "FIRE_RISK",
+    "fire-station-15",
+    "LANDSLIDE",
+    "landmark-15",
+    "UNSAFE",
+    "danger-15",
+    "marker-15",
+  ];
+
   // Fill
   if (!map.getLayer(FILL_ID)) {
     map.addLayer({
@@ -143,9 +161,14 @@ export function ensureHazardZonesLayers(map: Map) {
       source: SOURCE_ID,
       layout: {
         "symbol-placement": "point",
+        "icon-image": ["coalesce", ["image", iconNameByHazard], ["image", "marker-15"]] as any,
+        "icon-size": 1,
+        "icon-anchor": "left",
+        "icon-allow-overlap": false,
         "text-field": ["get", "name"],
         "text-size": 12,
-        "text-offset": [0, 0],
+        "text-anchor": "left",
+        "text-offset": [1.1, 0],
         "text-allow-overlap": false,
       },
       paint: {

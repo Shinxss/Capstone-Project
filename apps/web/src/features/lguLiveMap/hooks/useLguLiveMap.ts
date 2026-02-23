@@ -38,6 +38,32 @@ import { fetchDispatchVolunteers } from "../services/volunteers.service";
 
 type LngLat = [number, number];
 
+function toFiniteLngLat(value: unknown): LngLat | null {
+  if (!Array.isArray(value) || value.length < 2) return null;
+  const lng = typeof value[0] === "string" ? Number(value[0]) : value[0];
+  const lat = typeof value[1] === "string" ? Number(value[1]) : value[1];
+  if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null;
+  return [lng, lat];
+}
+
+function collectGeometryLngLats(node: unknown, out: LngLat[]) {
+  const pair = toFiniteLngLat(node);
+  if (pair) {
+    out.push(pair);
+    return;
+  }
+  if (!Array.isArray(node)) return;
+  node.forEach((item) => collectGeometryLngLats(item, out));
+}
+
+function getHazardGeometryPoints(geometry: unknown): LngLat[] {
+  if (!geometry || typeof geometry !== "object") return [];
+  const coordinates = (geometry as { coordinates?: unknown }).coordinates;
+  const points: LngLat[] = [];
+  collectGeometryLngLats(coordinates, points);
+  return points;
+}
+
 function isResolvedEmergencyStatus(raw?: string) {
   const up = String(raw ?? "").toUpperCase();
   return up === "RESOLVED" || up === "CANCELLED";
@@ -768,12 +794,45 @@ export function useLguLiveMap() {
     await setHazardZoneStatus(String(id), !current);
   };
 
+  const focusHazardZoneItem = useCallback(
+    (id: string) => {
+      const zone = (hazardZones ?? []).find((x: any) => String(x._id) === String(id));
+      if (!zone) return;
+
+      const points = getHazardGeometryPoints((zone as any).geometry);
+      if (points.length === 0) {
+        toastWarning("This hazard zone has no valid geometry to zoom to.");
+        return;
+      }
+
+      const map = mapRef.current;
+      if (!map || !mapReady) return;
+
+      setShowHazardZones(true);
+
+      const [firstPoint, ...restPoints] = points;
+      const bounds = restPoints.reduce(
+        (acc, point) => acc.extend(point),
+        new mapboxgl.LngLatBounds(firstPoint, firstPoint)
+      );
+
+      map.fitBounds(bounds, {
+        padding: { top: 96, right: 380, bottom: 96, left: 96 },
+        maxZoom: 16,
+        duration: 700,
+        essential: true,
+      });
+    },
+    [hazardZones, mapReady]
+  );
+
   const deleteHazardZoneItem = async (id: string) => {
     const ok = await confirm({
       title: "Are you sure you want to delete?",
       confirmText: "Delete",
       cancelText: "Cancel",
       variant: "destructive",
+      contentClassName: "bg-white dark:bg-[#0B1220]",
     });
     if (!ok) return;
 
@@ -857,6 +916,7 @@ export function useLguLiveMap() {
 
     // hazard zones list + per-zone controls (dropdown)
     hazardZones,
+    focusHazardZoneItem,
     toggleHazardZoneItem,
     deleteHazardZoneItem,
 

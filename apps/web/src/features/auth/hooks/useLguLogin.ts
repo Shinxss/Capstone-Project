@@ -42,6 +42,8 @@ type RequestError = {
     status?: number;
     data?: {
       error?: string;
+      message?: string;
+      code?: string;
     };
     headers?: Record<string, string | number | undefined>;
   };
@@ -49,7 +51,15 @@ type RequestError = {
 
 function getErrorMessage(error: unknown, fallback: string) {
   const parsed = error as RequestError;
-  return parsed.response?.data?.error || parsed.message || fallback;
+  return parsed.response?.data?.error || parsed.response?.data?.message || parsed.message || fallback;
+}
+
+function isSuspendedError(error: unknown) {
+  const parsed = error as RequestError;
+  const statusCode = Number(parsed.response?.status);
+  const code = parsed.response?.data?.code;
+  const message = getErrorMessage(error, "");
+  return statusCode === 403 && (code === "ACCOUNT_SUSPENDED" || /suspend|inactive|disabled/i.test(message));
 }
 
 export function useLguLogin() {
@@ -165,6 +175,11 @@ export function useLguLogin() {
         startCooldown(cooldown);
         setFailedAttempts(0);
         toastWarning(`Too many login attempts. Try again in ${formatCooldown(cooldown)}.`);
+      } else if (isSuspendedError(err)) {
+        setFailedAttempts(0);
+        const msg = getErrorMessage(err, "Account is suspended. Please contact your administrator.");
+        setError(msg);
+        toastWarning(msg);
       } else {
         const nextFailedAttempts = failedAttempts + 1;
         if (nextFailedAttempts >= MAX_FAILED_LOGIN_ATTEMPTS) {
@@ -220,7 +235,11 @@ export function useLguLogin() {
     } catch (err: unknown) {
       const msg = getErrorMessage(err, "OTP verification failed");
       setMfaError(msg);
-      toastError(msg);
+      if (isSuspendedError(err)) {
+        toastWarning(msg);
+      } else {
+        toastError(msg);
+      }
     } finally {
       setMfaLoading(false);
     }

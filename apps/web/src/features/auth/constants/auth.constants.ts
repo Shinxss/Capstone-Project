@@ -5,7 +5,7 @@ export const AUTH_STORAGE_KEYS = {
 
 export const AUTH_ROUTES = {
   lguAfterLogin: "/lgu/dashboard",
-  adminAfterLogin: "/lgu/dashboard", // ✅ change later when you build admin pages
+  adminAfterLogin: "/admin/dashboard",
 } as const;
 
 export const AUTH_ENDPOINTS = {
@@ -13,3 +13,4 @@ export const AUTH_ENDPOINTS = {
   adminMfaVerify: "/api/auth/admin/mfa/verify",
   logout: "/api/auth/logout",
 } as const;
+

@@ -5,6 +5,7 @@ export type StoredPortalUser = {
   username?: string;
   email?: string;
   role: string;
+  adminTier?: "SUPER" | "CDRRMO";
   firstName?: string;
   lastName?: string;
 

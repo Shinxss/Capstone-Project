@@ -18,6 +18,7 @@ export interface ConfirmOptions {
   confirmText?: string;
   cancelText?: string;
   variant?: "default" | "destructive";
+  contentClassName?: string;
 }
 
 type ConfirmFunction = (options: ConfirmOptions) => Promise<boolean>;
@@ -70,7 +71,7 @@ export function ConfirmDialogProvider({ children }: { children: ReactNode }) {
           }
         }}
       >
-        <AlertDialogContent>
+        <AlertDialogContent className={state?.contentClassName}>
           <AlertDialogHeader>
             <AlertDialogTitle>{state?.title}</AlertDialogTitle>
             {state?.description ? <AlertDialogDescription>{state.description}</AlertDialogDescription> : null}

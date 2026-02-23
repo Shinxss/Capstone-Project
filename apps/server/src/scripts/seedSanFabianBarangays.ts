@@ -4,31 +4,37 @@ import path from "path";
 import mongoose from "mongoose";
 import { BarangayModel } from "../features/barangays/barangay.model";
 
-// ---------- Helpers ----------
-function pickName(props: any): string {
+function pickName(props: Record<string, unknown> | null | undefined): string {
   if (!props) return "Unknown";
 
   const candidates = [
-    "barangay", "Barangay", "BRGY", "brgy",
-    "name", "Name", "NAME",
-    "adm4_en", "ADM4_EN", "adm4", "ADM4",
-    "loc_name", "LOC_NAME",
+    "BRGY_NAME",
+    "brgy_name",
+    "ADM4_EN",
+    "NAME_4",
+    "barangay",
+    "Barangay",
+    "BRGY",
+    "brgy",
+    "name",
+    "Name",
+    "NAME",
   ];
 
-  for (const k of candidates) {
-    const v = props[k];
-    if (typeof v === "string" && v.trim()) return v.trim();
+  for (const key of candidates) {
+    const value = props[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
   }
 
-  for (const [, v] of Object.entries(props)) {
-    if (typeof v === "string" && v.trim()) return v.trim();
+  for (const value of Object.values(props)) {
+    if (typeof value === "string" && value.trim()) return value.trim();
   }
 
   return "Unknown";
 }
 
 function closeRing(coords: number[][]) {
-  if (!coords?.length) return coords;
+  if (!coords.length) return coords;
   const first = coords[0];
   const last = coords[coords.length - 1];
   if (first[0] !== last[0] || first[1] !== last[1]) coords.push([...first]);
@@ -44,47 +50,45 @@ function normalizeGeometry(geom: any) {
   }
 
   if (geom.type === "MultiPolygon") {
-    const polys = geom.coordinates.map((poly: number[][][]) =>
-      poly.map((ring: number[][]) => closeRing(ring))
+    const polygons = geom.coordinates.map((polygon: number[][][]) =>
+      polygon.map((ring: number[][]) => closeRing(ring))
     );
-    return { type: "MultiPolygon" as const, coordinates: polys };
+    return { type: "MultiPolygon" as const, coordinates: polygons };
   }
 
   return null;
 }
 
 async function run() {
-  const mongoUri = process.env.MONGO_URI || "mongodb://localhost:27017/lifeline";
+  const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI || "mongodb://localhost:27017/lifeline";
   await mongoose.connect(mongoUri);
 
-  // ✅ Defaults for San Fabian
   const municipality = process.env.BARANGAY_CITY || "San Fabian";
   const province = process.env.BARANGAY_PROVINCE || "Pangasinan";
 
-  // ✅ File path (override if needed)
   const geojsonPath =
     process.env.BARANGAY_GEOJSON_PATH ||
     path.join(process.cwd(), "src", "data", "san_fabian_barangays.geojson");
 
   const raw = fs.readFileSync(geojsonPath, "utf8");
-  const fc = JSON.parse(raw);
+  const featureCollection = JSON.parse(raw);
 
-  if (!fc?.features?.length) throw new Error("GeoJSON has no features.");
+  if (!featureCollection?.features?.length) {
+    throw new Error("GeoJSON has no features.");
+  }
 
   let upserts = 0;
   let skipped = 0;
 
-  for (const f of fc.features) {
-    const geometry = normalizeGeometry(f.geometry);
+  for (const feature of featureCollection.features) {
+    const geometry = normalizeGeometry(feature.geometry);
     if (!geometry) {
-      skipped++;
+      skipped += 1;
       continue;
     }
 
-    const props = f.properties || {};
-    const name = props.BRGY_NAME || props.brgy_name || props.ADM4_EN || props.NAME_4;
-
-
+    const props = (feature.properties ?? {}) as Record<string, unknown>;
+    const name = pickName(props);
     const code = props.code || props.CODE || props.psgc || props.PSGC;
 
     await BarangayModel.updateOne(
@@ -95,6 +99,7 @@ async function run() {
           city: municipality,
           province,
           code: typeof code === "string" ? code : undefined,
+          isActive: true,
           geometry,
           rawProperties: props,
         },
@@ -102,14 +107,14 @@ async function run() {
       { upsert: true }
     );
 
-    upserts++;
+    upserts += 1;
   }
 
-  console.log(`✅ San Fabian seed done. Upserted ${upserts}, skipped ${skipped}.`);
+  console.log(`San Fabian barangay seed done. Upserted ${upserts}, skipped ${skipped}.`);
   await mongoose.disconnect();
 }
 
-run().catch((e) => {
-  console.error("❌ Seed failed:", e);
+run().catch((error) => {
+  console.error("San Fabian barangay seed failed:", error);
   process.exit(1);
 });

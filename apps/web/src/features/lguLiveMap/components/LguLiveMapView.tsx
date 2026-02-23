@@ -179,6 +179,7 @@ export default function LguLiveMapView(props: Props) {
 
     // hazard zones dropdown list
     hazardZones,
+    focusHazardZoneItem,
     toggleHazardZoneItem,
     deleteHazardZoneItem,
 
@@ -677,10 +678,21 @@ export default function LguLiveMapView(props: Props) {
                         return (
                           <div
                             key={id}
+                            onClick={() => focusHazardZoneItem(id)}
+                            onKeyDown={(event) => {
+                              if (event.target !== event.currentTarget) return;
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                focusHazardZoneItem(id);
+                              }
+                            }}
+                            role="button"
+                            tabIndex={0}
                             className={[
-                              "flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900/70 px-3 py-3",
+                              "flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900/70 px-3 py-3 cursor-pointer hover:bg-slate-800/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500/80",
                               isActive ? "opacity-100" : "opacity-60",
                             ].join(" ")}
+                            title="Zoom to hazard zone"
                           >
                             <div className="flex items-center gap-3 min-w-0">
                               <div
@@ -700,7 +712,10 @@ export default function LguLiveMapView(props: Props) {
                             <div className="flex items-center gap-2 shrink-0">
                               <button
                                 type="button"
-                                onClick={() => toggleHazardZoneItem(id)}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void toggleHazardZoneItem(id);
+                                }}
                                 className={[
                                   "h-9 w-9 rounded-lg border grid place-items-center",
                                   "border-slate-800 hover:bg-slate-800/60",
@@ -716,7 +731,10 @@ export default function LguLiveMapView(props: Props) {
 
                               <button
                                 type="button"
-                                onClick={() => deleteHazardZoneItem(id)}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void deleteHazardZoneItem(id);
+                                }}
                                 className="h-9 w-9 rounded-lg border border-slate-800 hover:bg-slate-800/60 grid place-items-center"
                                 aria-label="Delete hazard zone"
                                 title="Delete"

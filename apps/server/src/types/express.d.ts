@@ -8,6 +8,9 @@ declare global {
       auth?: VerifiedAccessTokenPayload;
       userId?: string;
       role?: string;
+      adminTier?: "SUPER" | "CDRRMO";
+      roleKey?: "SUPER_ADMIN" | "CDRRMO_ADMIN" | "LGU_ADMIN";
+      permissions?: string[];
       requestId?: string;
       correlationId?: string;
       clientContext?: {

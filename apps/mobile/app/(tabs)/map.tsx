@@ -10,15 +10,20 @@ import {
   Animated,
   Easing,
   ScrollView,
+  Image,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import MapboxGL, { Logger } from "@rnmapbox/maps";
 import * as Location from "expo-location";
 import { useMapStyle } from "../../features/map/hooks/useMapStyle";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Droplets, Construction, Flame, Mountain, ShieldAlert } from "lucide-react-native";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { api } from "../../lib/api";
 import { fetchEmergencyMapReports } from "../../features/emergency/services/emergencyApi";
+import {
+  optimizeRouteAI,
+} from "../../features/routing/services/routingApi";
 
 type EmergencyType = "SOS" | "Flood" | "Fire" | "Typhoon" | "Earthquake" | "Collapse";
 
@@ -43,8 +48,45 @@ type HazardZone = {
   };
 };
 
+type ApiErrorShape = {
+  message?: string;
+  response?: {
+    status?: number;
+    data?: {
+      message?: string;
+      error?: string;
+    };
+  };
+};
+
+type RouteFeature = {
+  type: "Feature";
+  properties: {
+    routeIndex?: number;
+    isPrimary?: boolean;
+    distance?: number;
+    duration?: number;
+    [key: string]: unknown;
+  };
+  geometry: {
+    type: "LineString";
+    coordinates: [number, number][];
+  };
+};
+
+type StandardRouteResult = {
+  feature: RouteFeature;
+  alternativeFeatures: RouteFeature[];
+  distance: number;
+  duration: number;
+  routeCount: number;
+  fitCoordinates: [number, number][];
+};
+
 const DAGUPAN: [number, number] = [120.3333, 16.0438];
 const TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? "";
+const ALT_ROUTE_FILL_WIDTH = 5;
+const ALT_ROUTE_STROKE_WIDTH = 2;
 
 if (TOKEN) {
   MapboxGL.setAccessToken(TOKEN);
@@ -81,17 +123,30 @@ const hazardColorForType = (raw?: string) => {
   return { fill: "#eab308", line: "#eab308" };
 };
 
-function normalizeEmergencyType(raw: string): EmergencyType {
-  const t = String(raw ?? "").toUpperCase();
-  if (t === "FLOOD") return "Flood";
-  if (t === "FIRE") return "Fire";
-  if (t === "EARTHQUAKE") return "Earthquake";
-  if (t === "SOS") return "SOS";
-  // keep the UI simple for now
-  return "SOS";
-}
+const HAZARD_LEGEND_ITEMS = [
+  { key: "FLOODED", label: "Flooded", color: hazardColorForType("FLOODED").fill, icon: Droplets },
+  { key: "ROAD_CLOSED", label: "Road closed", color: hazardColorForType("ROAD_CLOSED").fill, icon: Construction },
+  { key: "FIRE_RISK", label: "Fire risk", color: hazardColorForType("FIRE_RISK").fill, icon: Flame },
+  { key: "LANDSLIDE", label: "Landslide", color: hazardColorForType("LANDSLIDE").fill, icon: Mountain },
+  { key: "UNSAFE", label: "Unsafe", color: hazardColorForType("UNSAFE").fill, icon: ShieldAlert },
+] as const;
 
-// ✅ MaterialCommunityIcons mapping
+const MAP_TYPE_OPTIONS = [
+  { key: "streets", label: "Default", stylePath: "mapbox/streets-v12" },
+  { key: "satellite", label: "Satellite", stylePath: "mapbox/satellite-streets-v12" },
+  { key: "dark", label: "Dark", stylePath: "mapbox/dark-v11" },
+] as const;
+
+const EMERGENCY_LEGEND_ITEMS: EmergencyType[] = [
+  "SOS",
+  "Flood",
+  "Fire",
+  "Typhoon",
+  "Earthquake",
+  "Collapse",
+];
+
+// MaterialCommunityIcons mapping
 const mciForType = (type: EmergencyType) => {
   switch (type) {
     case "Fire":
@@ -121,8 +176,26 @@ function hexToRgba(hex: string, alpha: number) {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
+function parseApiError(error: unknown): { status?: number; message: string } {
+  const err = error as ApiErrorShape | undefined;
+  const status = err?.response?.status;
+  const apiMessage = err?.response?.data?.message ?? err?.response?.data?.error;
+  const message = String(apiMessage ?? err?.message ?? "Unknown error");
+  return { status, message };
+}
+
+function toRouteMetric(value: unknown, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function toRouteIndex(value: unknown): number | null {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+}
+
 /**
- * ✅ Big pulse wave (RN Animated version of your CSS)
+ * Big pulse wave (RN Animated version of your CSS)
  */
 function PulseMarker({ type }: { type: EmergencyType }) {
   const color = colorForType(type);
@@ -203,13 +276,24 @@ function PulseMarker({ type }: { type: EmergencyType }) {
 export default function MapTab() {
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState("");
-  const { key: styleKey, styleURL, next } = useMapStyle("streets");
+  const { key: styleKey, styleURL, setKey } = useMapStyle("streets");
 
   const [myLocation, setMyLocation] = useState<[number, number] | null>(null);
   const [route, setRoute] = useState<
-    { feature: any; distance: number; duration: number; profile: "driving" | "walking" } | null
+    {
+      feature: RouteFeature;
+      alternativeFeatures: RouteFeature[];
+      distance: number;
+      duration: number;
+      profile: "driving" | "walking";
+      source: "standard" | "ai";
+      aiScore?: number;
+      routingCost?: number;
+      routeCount?: number;
+    } | null
   >(null);
   const [routeLoading, setRouteLoading] = useState(false);
+  const [aiRouteLoading, setAiRouteLoading] = useState(false);
   const [routeMode, setRouteMode] = useState<"driving" | "walking">("driving");
   const [hazardZones, setHazardZones] = useState<HazardZone[]>([]);
   const [reports, setReports] = useState<EmergencyReport[]>([]);
@@ -270,7 +354,7 @@ export default function MapTab() {
     };
   }, []);
 
-  // ✅ Keep current location for routing (Direction button)
+  // Keep current location for routing (Direction button)
   useEffect(() => {
     let sub: Location.LocationSubscription | null = null;
 
@@ -361,14 +445,72 @@ export default function MapTab() {
 
   const cameraRef = useRef<MapboxGL.Camera>(null);
 
-  // ✅ draggable “Google Maps-ish” sheet
+  // draggable "Google Maps-ish" sheet
   const sheetRef = useRef<BottomSheet>(null);
-  const snapPoints = useMemo(() => ["22%", "45%"], []);
+  const snapPoints = useMemo(() => ["22%", "50%"], []);
+  const layersSheetRef = useRef<BottomSheet>(null);
+  const layersSnapPoints = useMemo(() => ["42%", "72%"], []);
   const [selected, setSelected] = useState<EmergencyReport | null>(null);
 
   const openSheet = (r: EmergencyReport) => {
+    layersSheetRef.current?.close();
     setSelected(r);
-    requestAnimationFrame(() => sheetRef.current?.snapToIndex(0));
+    requestAnimationFrame(() => sheetRef.current?.snapToIndex(1));
+  };
+
+  const openLayersSheet = () => {
+    sheetRef.current?.close();
+    requestAnimationFrame(() => layersSheetRef.current?.snapToIndex(1));
+  };
+
+  const onSelectStandardRoute = (routeIndex: number) => {
+    setRoute((current) => {
+      if (!current || current.source !== "standard") return current;
+
+      const allFeatures = [current.feature, ...current.alternativeFeatures];
+      const selectedFeature = allFeatures.find(
+        (feature) => toRouteIndex(feature.properties?.routeIndex) === routeIndex
+      );
+      if (!selectedFeature) return current;
+
+      const nextPrimary: RouteFeature = {
+        ...selectedFeature,
+        properties: {
+          ...selectedFeature.properties,
+          isPrimary: true,
+        },
+      };
+
+      const nextAlternatives: RouteFeature[] = allFeatures
+        .filter((feature) => toRouteIndex(feature.properties?.routeIndex) !== routeIndex)
+        .map((feature) => ({
+          ...feature,
+          properties: {
+            ...feature.properties,
+            isPrimary: false,
+          },
+        }));
+
+      return {
+        ...current,
+        feature: nextPrimary,
+        alternativeFeatures: nextAlternatives,
+        distance: toRouteMetric(nextPrimary.properties?.distance, current.distance),
+        duration: toRouteMetric(nextPrimary.properties?.duration, current.duration),
+      };
+    });
+  };
+
+  const onPressAlternativeRoute = (event: any) => {
+    const tappedFeature =
+      event?.features?.[0] ??
+      event?.nativeEvent?.payload?.features?.[0] ??
+      event?.nativeEvent?.payload;
+
+    const routeIndex = toRouteIndex(tappedFeature?.properties?.routeIndex);
+    if (routeIndex === null) return;
+
+    onSelectStandardRoute(routeIndex);
   };
 
 
@@ -376,26 +518,50 @@ export default function MapTab() {
     start: [number, number],
     end: [number, number],
     profile: "driving" | "walking"
-  ) => {
+  ): Promise<StandardRouteResult> => {
     if (!TOKEN) throw new Error("Missing Mapbox token");
 
     const url =
       `https://api.mapbox.com/directions/v5/mapbox/${profile}/` +
       `${start[0]},${start[1]};${end[0]},${end[1]}` +
-      `?geometries=geojson&overview=full&steps=false&access_token=${TOKEN}`;
+      `?alternatives=true&geometries=geojson&overview=full&steps=false&access_token=${TOKEN}`;
 
     const res = await fetch(url);
     if (!res.ok) throw new Error("Directions API failed");
     const json: any = await res.json();
 
-    const r0 = json?.routes?.[0];
-    const coords = r0?.geometry?.coordinates;
-    if (!coords || !Array.isArray(coords) || coords.length < 2) throw new Error("No route");
+    const routes = Array.isArray(json?.routes) ? json.routes : [];
+    const routeFeatures: RouteFeature[] = routes
+      .map((item: any, index: number) => {
+        const coords = item?.geometry?.coordinates;
+        if (!Array.isArray(coords) || coords.length < 2) return null;
+        return {
+          type: "Feature",
+          properties: {
+            routeIndex: index,
+            isPrimary: index === 0,
+            distance: Number(item?.distance ?? 0),
+            duration: Number(item?.duration ?? 0),
+          },
+          geometry: {
+            type: "LineString",
+            coordinates: coords as [number, number][],
+          },
+        } as RouteFeature;
+      })
+      .filter(Boolean);
+
+    const primary = routeFeatures[0];
+    const primaryRaw = routes[0];
+    if (!primary) throw new Error("No route");
 
     return {
-      feature: { type: "Feature", properties: {}, geometry: r0.geometry } as any,
-      distance: Number(r0.distance ?? 0), // meters
-      duration: Number(r0.duration ?? 0), // seconds
+      feature: primary,
+      alternativeFeatures: routeFeatures.slice(1),
+      distance: Number(primaryRaw?.distance ?? 0), // meters
+      duration: Number(primaryRaw?.duration ?? 0), // seconds
+      routeCount: routeFeatures.length,
+      fitCoordinates: routeFeatures.flatMap((feature) => feature.geometry.coordinates),
     };
   };
 
@@ -433,26 +599,54 @@ export default function MapTab() {
     }
   };
 
+  const resolveStartLocation = async (): Promise<[number, number] | null> => {
+    if (myLocation) return myLocation;
+
+    try {
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      if (!servicesEnabled) {
+        Alert.alert("Location needed", "Turn on location services to get directions.");
+        return null;
+      }
+
+      const permission = await Location.getForegroundPermissionsAsync();
+      let status = permission.status;
+
+      if (status !== "granted" && permission.canAskAgain) {
+        const requested = await Location.requestForegroundPermissionsAsync();
+        status = requested.status;
+      }
+
+      if (status !== "granted") {
+        Alert.alert("Location needed", "Allow location permission to get directions.");
+        return null;
+      }
+
+      const current = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      const coords: [number, number] = [current.coords.longitude, current.coords.latitude];
+      setMyLocation(coords);
+      return coords;
+    } catch {
+      Alert.alert("Location needed", "Unable to read your current location right now.");
+      return null;
+    }
+  };
+
   const onPressDirection = async (profile?: "driving" | "walking") => {
     if (!selected) return;
 
-    if (!TOKEN) {
-      Alert.alert("Missing Mapbox token", "EXPO_PUBLIC_MAPBOX_TOKEN is not set.");
-      return;
-    }
-
-    if (!myLocation) {
-      Alert.alert("Location needed", "Enable location to get directions.");
-      return;
-    }
+    const useProfile = profile ?? routeMode;
+    const startLocation = await resolveStartLocation();
+    if (!startLocation) return;
 
     setRouteLoading(true);
     try {
-      const useProfile = profile ?? routeMode;
-      const result = await fetchRouteFromMapbox(myLocation, [selected.lng, selected.lat], useProfile);
-      setRoute({ ...result, profile: useProfile });
+      const standard = await fetchRouteFromMapbox(startLocation, [selected.lng, selected.lat], useProfile);
+      setRoute({ ...standard, profile: useProfile, source: "standard" });
 
-      const coords = (result.feature?.geometry?.coordinates ?? []) as [number, number][];
+      const coords = standard.fitCoordinates;
       if (coords.length >= 2) fitRoute(coords);
     } catch {
       Alert.alert("Directions unavailable", "Unable to fetch route. Try again.");
@@ -461,9 +655,85 @@ export default function MapTab() {
     }
   };
 
-  const clearRoute = () => setRoute(null);
+  const onPressAiRouteOptimization = async (profile?: "driving" | "walking") => {
+    if (!selected) return;
 
-  // ✅ chips (replace old status pill)
+    const useProfile = profile ?? routeMode;
+    const startLocation = await resolveStartLocation();
+    if (!startLocation) return;
+
+    setAiRouteLoading(true);
+    try {
+      const optimized = await optimizeRouteAI({
+        start: { lng: startLocation[0], lat: startLocation[1] },
+        end: { lng: selected.lng, lat: selected.lat },
+        profile: useProfile,
+      });
+
+      setRoute({
+        feature: {
+          type: "Feature",
+          properties: {
+            chosenIndex: optimized.chosenIndex,
+            finalScore: optimized.chosen.finalScore,
+            routing_cost: optimized.chosen.routing_cost,
+          },
+          geometry: optimized.chosen.geometry,
+        } as RouteFeature,
+        alternativeFeatures: [],
+        distance: Number(optimized.chosen.distance ?? 0),
+        duration: Number(optimized.chosen.duration ?? 0),
+        profile: useProfile,
+        source: "ai",
+        aiScore: Number(optimized.chosen.finalScore ?? 0),
+        routingCost: Number(optimized.chosen.routing_cost ?? 0),
+        routeCount: Number(optimized.candidates?.length ?? 1),
+      });
+
+      const coords = (optimized.chosen.geometry?.coordinates ?? []) as [number, number][];
+      if (coords.length >= 2) fitRoute(coords);
+    } catch (error) {
+      const parsed = parseApiError(error);
+      console.error("[AI Route] optimize failed", {
+        status: parsed.status,
+        message: parsed.message,
+      });
+
+      const status = parsed.status;
+      if (status === 409) {
+        Alert.alert(
+          "No safe AI route",
+          parsed.message || "All available alternatives intersect a road-closed or hazardous segment."
+        );
+        return;
+      }
+
+      const prefix = status ? `AI route failed (${status})` : "AI route failed";
+      Alert.alert(prefix, `${parsed.message}\n\nUsing standard route fallback.`);
+      try {
+        const fallback = await fetchRouteFromMapbox(startLocation, [selected.lng, selected.lat], useProfile);
+        setRoute({ ...fallback, profile: useProfile, source: "standard" });
+
+        const coords = fallback.fitCoordinates;
+        if (coords.length >= 2) fitRoute(coords);
+      } catch (fallbackError) {
+        const fallbackParsed = parseApiError(fallbackError);
+        console.error("[AI Route] standard fallback failed", {
+          status: fallbackParsed.status,
+          message: fallbackParsed.message,
+        });
+        Alert.alert("Directions unavailable", "Unable to fetch route. Try again.");
+      }
+    } finally {
+      setAiRouteLoading(false);
+    }
+  };
+
+  const clearRoute = () => {
+    setRoute(null);
+  };
+
+  // chips (replace old status pill)
   const chips = useMemo(
     () => [
       { key: "home", label: "Set home", icon: "home" as const },
@@ -488,9 +758,9 @@ export default function MapTab() {
           attributionEnabled={false}
           compassEnabled={false}
           scaleBarEnabled={false}
-          onDidFinishLoadingStyle={() => console.log("[Mapbox] style loaded ✅", styleKey)}
+          onDidFinishLoadingStyle={() => console.log("[Mapbox] style loaded", styleKey)}
            onMapLoadingError={() => {
-            console.log("[Mapbox] map loading error ❌");
+            console.log("[Mapbox] map loading error");
            }}
         >
           <MapboxGL.Camera
@@ -520,6 +790,35 @@ export default function MapTab() {
           ) : null}
 
 
+          {route?.source === "standard" && route.alternativeFeatures.length ? (
+            <MapboxGL.ShapeSource
+              id="routeAlternativesSource"
+              shape={{ type: "FeatureCollection", features: route.alternativeFeatures } as any}
+              onPress={onPressAlternativeRoute}
+            >
+              <MapboxGL.LineLayer
+                id="routeAlternativesOutlineLine"
+                style={{
+                  lineColor: "#1D4ED8",
+                  lineOpacity: 1,
+                  lineWidth: ALT_ROUTE_FILL_WIDTH + ALT_ROUTE_STROKE_WIDTH * 2,
+                  lineCap: "round",
+                  lineJoin: "round",
+                } as any}
+              />
+              <MapboxGL.LineLayer
+                id="routeAlternativesLine"
+                style={{
+                  lineColor: "#98c4f5",
+                  lineOpacity: 0.8,
+                  lineWidth: ALT_ROUTE_FILL_WIDTH,
+                  lineCap: "round",
+                  lineJoin: "round",
+                } as any}
+              />
+            </MapboxGL.ShapeSource>
+          ) : null}
+
           {route ? (
             <MapboxGL.ShapeSource
               id="routeSource"
@@ -527,12 +826,13 @@ export default function MapTab() {
             >
               <MapboxGL.LineLayer
                 id="routeLine"
+                aboveLayerID="routeAlternativesLine"
                 style={{
-                  lineColor: "#3C83F6",
-                  lineWidth: 5,
+                  lineColor: "#1D4ED8",
+                  lineOpacity: 0.95,
+                  lineWidth: 7,
                   lineCap: "round",
                   lineJoin: "round",
-                  ...(route.profile === "walking" ? { lineDasharray: [1.5, 1.5] } : null),
                 } as any}
               />
             </MapboxGL.ShapeSource>
@@ -557,7 +857,7 @@ export default function MapTab() {
           ))}
         </MapboxGL.MapView>
 
-        {/* ✅ Google-Maps-like top UI */}
+        {/* Google-Maps-like top UI */}
         <View pointerEvents="box-none" style={styles.overlay}>
           <View style={[styles.topUi, { paddingTop: Math.max(10, insets.top + 8) }]}>
             {/* Search bar (white) */}
@@ -572,12 +872,7 @@ export default function MapTab() {
                 style={styles.searchInput}
               />
 
-              {/* ✅ Layers button INSIDE bar (moved position) */}
-              <Pressable onPress={next} style={styles.barIconBtn} hitSlop={10}>
-                <Feather name="layers" size={18} color="#444" />
-              </Pressable>
-
-              {/* ✅ Profile avatar */}
+              {/* Profile avatar */}
               <Pressable
                 onPress={() => console.log("profile")}
                 style={styles.avatar}
@@ -614,6 +909,12 @@ export default function MapTab() {
                 );
               })}
             </ScrollView>
+
+            <View style={styles.layerControlRow}>
+              <Pressable onPress={openLayersSheet} style={styles.layerControlBtn} hitSlop={10}>
+                <Feather name="layers" size={20} color="#0F172A" />
+              </Pressable>
+            </View>
           </View>
         </View>
 
@@ -689,7 +990,13 @@ export default function MapTab() {
                     <Pressable
                       onPress={() => {
                         setRouteMode("driving");
-                        if (route && selected && myLocation && !routeLoading) onPressDirection("driving");
+                        if (route && selected && !routeLoading && !aiRouteLoading) {
+                          if (route.source === "ai") {
+                            void onPressAiRouteOptimization("driving");
+                          } else {
+                            void onPressDirection("driving");
+                          }
+                        }
                       }}
                       style={[styles.modePill, routeMode === "driving" && styles.modePillActive]}
                     >
@@ -706,7 +1013,13 @@ export default function MapTab() {
                     <Pressable
                       onPress={() => {
                         setRouteMode("walking");
-                        if (route && selected && myLocation && !routeLoading) onPressDirection("walking");
+                        if (route && selected && !routeLoading && !aiRouteLoading) {
+                          if (route.source === "ai") {
+                            void onPressAiRouteOptimization("walking");
+                          } else {
+                            void onPressDirection("walking");
+                          }
+                        }
                       }}
                       style={[styles.modePill, routeMode === "walking" && styles.modePillActive]}
                     >
@@ -723,8 +1036,8 @@ export default function MapTab() {
 
                   <Pressable
                     onPress={() => onPressDirection()}
-                    disabled={routeLoading}
-                    style={[styles.actionBtn, routeLoading && { opacity: 0.7 }]}
+                    disabled={routeLoading || aiRouteLoading}
+                    style={[styles.actionBtn, (routeLoading || aiRouteLoading) && { opacity: 0.7 }]}
                   >
                     <Feather name="navigation" size={16} color="#111" />
                     <Text style={styles.actionBtnText}>
@@ -741,13 +1054,128 @@ export default function MapTab() {
                 </View>
               ) : null}
 
+              {selected ? (
+                <View style={styles.aiActionRow}>
+                  <Pressable
+                    onPress={() => onPressAiRouteOptimization()}
+                    disabled={routeLoading || aiRouteLoading}
+                    style={[styles.aiRouteBtn, (routeLoading || aiRouteLoading) && { opacity: 0.7 }]}
+                  >
+                    <MaterialCommunityIcons name="robot" size={16} color="#111" />
+                    <Text style={styles.aiRouteBtnText}>
+                      {aiRouteLoading ? "Optimizing..." : "AI Route Optimization"}
+                    </Text>
+                  </Pressable>
+                </View>
+              ) : null}
+
               {route && selected ? (
                 <View style={styles.routeMetaRow}>
                   <Text style={styles.routeMetaText}>
-                    {(route.profile === "walking" ? "Walking" : "Driving")} • {(route.distance / 1000).toFixed(1)} km • {Math.round(route.duration / 60)} min
+                    {(route.profile === "walking" ? "Walking" : "Driving")} | {(route.distance / 1000).toFixed(1)} km | {Math.round(route.duration / 60)} min
+                  </Text>
+                  <Text style={styles.routeMetaSubText}>
+                    {route.source === "ai"
+                      ? `AI optimized | score ${Number(route.aiScore ?? 0).toFixed(3)} | cost ${Number(route.routingCost ?? 0).toFixed(3)}`
+                      : `Standard route | ${route.routeCount ?? 1} option${(route.routeCount ?? 1) > 1 ? "s" : ""}${(route.routeCount ?? 1) > 1 ? " | tap light blue route to select" : ""}`}
                   </Text>
                 </View>
               ) : null}
+            </View>
+          </BottomSheetView>
+        </BottomSheet>
+
+        <BottomSheet
+          ref={layersSheetRef}
+          index={-1}
+          snapPoints={layersSnapPoints}
+          enablePanDownToClose
+          backgroundStyle={styles.layersSheetBg}
+          handleIndicatorStyle={styles.sheetHandle}
+        >
+          <BottomSheetView style={styles.layersSheetContent}>
+            <View style={styles.layersHeaderRow}>
+              <Text style={styles.layersTitle}>Map type</Text>
+              <Pressable onPress={() => layersSheetRef.current?.close()} style={styles.layersCloseBtn} hitSlop={10}>
+                <Feather name="x" size={18} color="#111827" />
+              </Pressable>
+            </View>
+
+            <View style={styles.mapTypeRow}>
+              {MAP_TYPE_OPTIONS.map((option) => {
+                const selectedType = styleKey === option.key;
+                const previewUri = TOKEN
+                  ? `https://api.mapbox.com/styles/v1/${option.stylePath}/static/${DAGUPAN[0]},${DAGUPAN[1]},12,0/180x180?access_token=${TOKEN}&logo=false&attribution=false`
+                  : null;
+                return (
+                  <Pressable
+                    key={option.key}
+                    onPress={() => setKey(option.key)}
+                    style={styles.mapTypeItem}
+                  >
+                    <View style={[styles.mapTypeThumb, selectedType && styles.mapTypeThumbActive]}>
+                      {previewUri ? (
+                        <Image source={{ uri: previewUri }} style={styles.mapTypeThumbImage} resizeMode="cover" />
+                      ) : (
+                        <View style={styles.mapTypeThumbFallback}>
+                          <Text style={styles.mapTypeThumbFallbackText}>{option.label}</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={[styles.mapTypeLabel, selectedType && styles.mapTypeLabelActive]}>
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <View style={styles.layersDivider} />
+
+            <Text style={styles.layersLegendTitle}>Map Legend</Text>
+
+            <View style={styles.layersLegendColumns}>
+              <View style={styles.layersLegendColumn}>
+                <Text style={styles.layersLegendSection}>Hazard zones</Text>
+                <View style={styles.layersLegendList}>
+                  {HAZARD_LEGEND_ITEMS.map((item) => {
+                    const HazardIcon = item.icon;
+                    return (
+                      <View key={item.key} style={styles.layersLegendRow}>
+                        <View
+                          style={[
+                            styles.layersHazardSwatch,
+                            {
+                              backgroundColor: item.color,
+                              borderColor: item.color,
+                            },
+                          ]}
+                        >
+                          <HazardIcon size={10} color="#FFFFFF" strokeWidth={2.3} />
+                        </View>
+                        <Text style={styles.layersLegendText}>{item.label}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+
+              <View style={styles.layersLegendColumn}>
+                <Text style={styles.layersLegendSection}>Emergencies</Text>
+                <View style={styles.layersLegendList}>
+                  {EMERGENCY_LEGEND_ITEMS.map((type) => {
+                    const color = colorForType(type);
+                    return (
+                      <View key={type} style={styles.layersLegendRow}>
+                        <View style={[styles.layersEmergencySwatch, { borderColor: color }]}>
+                          <MaterialCommunityIcons name={mciForType(type) as any} size={11} color={color} />
+                        </View>
+                        <Text style={styles.layersLegendText}>{type}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
             </View>
           </BottomSheetView>
         </BottomSheet>
@@ -766,12 +1194,12 @@ const styles = StyleSheet.create({
 
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "transparent" },
 
-  // ✅ top UI container
+  // top UI container
   topUi: {
     paddingHorizontal: 12,
   },
 
-  // ✅ White search bar
+  // White search bar
   searchBar: {
     height: 50,
     borderRadius: 50,
@@ -792,15 +1220,6 @@ const styles = StyleSheet.create({
     marginRight: 8,
     fontSize: 16,
     color: "#111",
-  },
-  barIconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 999,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.06)",
-    marginRight: 8,
   },
   avatar: {
     width: 38,
@@ -835,6 +1254,158 @@ const styles = StyleSheet.create({
   },
   chipText: { fontSize: 14, color: "#222", fontWeight: "600" },
   chipTextActive: { color: "#111" },
+  layerControlRow: {
+    marginTop: 8,
+    alignItems: "flex-end",
+  },
+  layerControlBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.95)",
+    borderWidth: 1,
+    borderColor: "rgba(15,23,42,0.12)",
+    elevation: 6,
+    shadowColor: "#000",
+    shadowOpacity: 0.16,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  layersSheetBg: {
+    backgroundColor: "#FFFFFF",
+  },
+  layersSheetContent: {
+    paddingHorizontal: 18,
+    paddingTop: 10,
+    paddingBottom: 22,
+  },
+  layersHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  layersTitle: {
+    fontSize: 19,
+    fontWeight: "600",
+    color: "#111827",
+  },
+  layersCloseBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(17,24,39,0.06)",
+  },
+  mapTypeRow: {
+    marginTop: 14,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  mapTypeItem: {
+    flex: 1,
+    alignItems: "center",
+  },
+  mapTypeThumb: {
+    width: 84,
+    height: 84,
+    borderRadius: 20,
+    borderWidth: 3,
+    borderColor: "transparent",
+    overflow: "hidden",
+    backgroundColor: "#E5E7EB",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mapTypeThumbActive: {
+    borderColor: "#0EA5E9",
+  },
+  mapTypeThumbImage: {
+    width: "100%",
+    height: "100%",
+  },
+  mapTypeThumbFallback: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+  },
+  mapTypeThumbFallbackText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#374151",
+    textAlign: "center",
+  },
+  mapTypeLabel: {
+    marginTop: 10,
+    fontSize: 14,
+    color: "#374151",
+    fontWeight: "600",
+  },
+  mapTypeLabelActive: {
+    color: "#0EA5E9",
+    fontWeight: "700",
+  },
+  layersDivider: {
+    height: 1,
+    backgroundColor: "rgba(15,23,42,0.12)",
+    marginTop: 18,
+    marginBottom: 16,
+  },
+  layersLegendTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#111827",
+  },
+  layersLegendColumns: {
+    marginTop: 17,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  layersLegendColumn: {
+    width: "48%",
+  },
+  layersLegendSection: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#475569",
+  },
+  layersLegendList: {
+    marginTop: 8,
+    gap: 8,
+  },
+  layersLegendRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  layersHazardSwatch: {
+    width: 16,
+    height: 16,
+    borderRadius: 4,
+    borderWidth: 1,
+    marginRight: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  layersEmergencySwatch: {
+    width: 18,
+    height: 18,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+    backgroundColor: "#FFFFFF",
+  },
+  layersLegendText: {
+    fontSize: 13,
+    color: "#111827",
+    fontWeight: "600",
+  },
 
   // marker
   markerWrap: {
@@ -932,8 +1503,26 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionBtnText: { fontSize: 14, fontWeight: "800", color: "#111" },
+  aiActionRow: { marginTop: 10 },
+  aiRouteBtn: {
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.12)",
+  },
+  aiRouteBtnText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#111",
+  },
   routeMetaRow: { marginTop: 10 },
   routeMetaText: { fontSize: 12, color: "#444", fontWeight: "700" },
+  routeMetaSubText: { marginTop: 4, fontSize: 12, color: "#111", fontWeight: "700" },
 
   // sheet
   sheetBg: { backgroundColor: "rgba(255,255,255,0.95)" },

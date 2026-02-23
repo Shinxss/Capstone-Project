@@ -11,7 +11,8 @@ export type BarangayDoc = {
   city: string;
   province: string;
   code?: string;
-  geometry: GeoJSONPolygon;
+  isActive: boolean;
+  geometry?: GeoJSONPolygon;
   rawProperties?: Record<string, any>;
 };
 
@@ -21,14 +22,15 @@ const BarangaySchema = new Schema<BarangayDoc>(
     city: { type: String, required: true },
     province: { type: String, required: true },
     code: { type: String },
+    isActive: { type: Boolean, default: true, index: true },
 
     geometry: {
       type: {
         type: String,
         enum: ["Polygon", "MultiPolygon"],
-        required: true,
+        required: false,
       },
-      coordinates: { type: Array, required: true },
+      coordinates: { type: Array, required: false },
     },
 
     rawProperties: { type: Schema.Types.Mixed },

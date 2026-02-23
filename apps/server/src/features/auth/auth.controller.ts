@@ -10,6 +10,8 @@ import { toAuthUserPayload } from "./otp.utils";
 import { TokenBlocklist } from "./TokenBlocklist.model";
 import { resolveAccessTokenExpiresIn } from "./accessTokenExpiry";
 
+const ACCOUNT_SUSPENDED = "Account is suspended. Please contact your administrator.";
+
 export async function login(req: Request, res: Response) {
   try {
     const { email, password } = req.body as { email?: string; password?: string };
@@ -23,10 +25,23 @@ export async function login(req: Request, res: Response) {
       return res.status(400).json({ message: "Email and password are required." });
     }
 
+    const actorEmail = email.toLowerCase().trim();
+    const existingAccount = await User.findOne({ email: actorEmail }).select("_id isActive").lean();
+    if (existingAccount && existingAccount.isActive === false) {
+      await logSecurityEvent(req, AUDIT_EVENT.AUTH_LOGIN_FAIL, "FAIL", {
+        actorEmail,
+        accountStatus: "SUSPENDED",
+      });
+      return res.status(403).json({
+        message: ACCOUNT_SUSPENDED,
+        code: "ACCOUNT_SUSPENDED",
+      });
+    }
+
     const user = await authenticateUser(email, password);
     if (!user) {
       await logSecurityEvent(req, AUDIT_EVENT.AUTH_LOGIN_FAIL, "FAIL", {
-        actorEmail: email,
+        actorEmail,
       });
       return res.status(401).json({ message: "Invalid credentials" });
     }
@@ -75,7 +90,13 @@ export async function adminMfaVerify(req: Request, res: Response) {
     const user = await User.findById(userId);
 
     if (!user) return res.status(404).json({ success: false, error: "User not found" });
-    if (!user.isActive) return res.status(403).json({ success: false, error: "Account is disabled" });
+    if (!user.isActive) {
+      return res.status(403).json({
+        success: false,
+        error: ACCOUNT_SUSPENDED,
+        code: "ACCOUNT_SUSPENDED",
+      });
+    }
     if (user.role !== "ADMIN") return res.status(403).json({ success: false, error: "Not allowed" });
 
     const token = signAccessToken(
@@ -109,6 +130,9 @@ export async function adminMfaVerify(req: Request, res: Response) {
           id: user._id.toString(),
           username: user.username,
           role: user.role,
+          firstName: user.firstName ?? "",
+          lastName: user.lastName ?? "",
+          adminTier: user.adminTier ?? "CDRRMO",
         },
       },
     });
@@ -127,7 +151,7 @@ export async function me(req: Request, res: Response) {
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
     const user = await User.findById(userId).select(
-      "firstName lastName email role authProvider passwordHash googleSub emailVerified volunteerStatus"
+      "username firstName lastName email role adminTier lguName lguPosition barangay municipality authProvider passwordHash googleSub emailVerified volunteerStatus"
     );
     if (!user) return res.status(404).json({ message: "User not found" });
 

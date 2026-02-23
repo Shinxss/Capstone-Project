@@ -8,13 +8,32 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useSafeAreaInsets,} from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import type { WeatherSeverity } from "../../weather/services/weatherApi";
+
+type AlertIconName = React.ComponentProps<typeof Ionicons>["name"];
+type AlertTheme = {
+  cardBackgroundColor: string;
+  cardBorderColor: string;
+  iconBackgroundColor: string;
+  iconColor: string;
+  headlineColor: string;
+  retryColor: string;
+};
 
 type Props = {
   displayName: string;
   holding: boolean;
+  alertTitle: string;
+  alertMessage: string;
+  alertSeverity: WeatherSeverity;
+  alertIconName: AlertIconName;
+  alertTheme: AlertTheme;
+  alertUpdatedAt?: string | null;
+  alertRetryEnabled?: boolean;
   onStartHold: () => void;
   onCancelHold: () => void;
+  onPressAlert?: () => void;
   onPressNotifications?: () => void;
   onPressViewAll?: () => void;
   onPressApplyVolunteer?: () => void;
@@ -23,8 +42,16 @@ type Props = {
 export function HomeView({
   displayName,
   holding,
+  alertTitle,
+  alertMessage,
+  alertSeverity,
+  alertIconName,
+  alertTheme,
+  alertUpdatedAt,
+  alertRetryEnabled,
   onStartHold,
   onCancelHold,
+  onPressAlert,
   onPressNotifications,
   onPressViewAll,
   onPressApplyVolunteer,
@@ -88,15 +115,36 @@ export function HomeView({
         </View>
 
         {/* Alert card */}
-        <View style={[styles.card, { marginTop: 60 }]}>
-          <View style={styles.cardIcon} />
+        <Pressable
+          onPress={onPressAlert}
+          disabled={!onPressAlert}
+          style={({ pressed }) => [
+            styles.card,
+            { marginTop: 60 },
+            {
+              backgroundColor: alertTheme.cardBackgroundColor,
+              borderColor: alertTheme.cardBorderColor,
+            },
+            pressed && onPressAlert ? styles.cardPressed : null,
+          ]}
+        >
+          <View style={[styles.cardIcon, { backgroundColor: alertTheme.iconBackgroundColor }]}>
+            <Ionicons
+              name={alertIconName}
+              size={24}
+              color={alertTheme.iconColor}
+            />
+          </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.cardTitle}>Alert</Text>
-            <Text style={styles.cardSub}>
-              Tropical Depression approaching. Expected rainfall: Heavy
+            <Text style={[styles.cardHeadline, { color: alertTheme.headlineColor }]}>
+              {alertTitle}
             </Text>
+            <Text style={styles.cardSub}>{alertMessage}</Text>
+            {alertUpdatedAt ? <Text style={styles.cardMeta}>Updated {alertUpdatedAt}</Text> : null}
+            {alertRetryEnabled ? <Text style={[styles.cardRetry, { color: alertTheme.retryColor }]}>Tap to retry</Text> : null}
           </View>
-        </View>
+        </Pressable>
         {/* Volunteer CTA */}
         <View style={styles.volunteer}>
           <View style={styles.volCircle1} />
@@ -223,9 +271,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E5E7EB",
   },
-  cardIcon: { width: 58, height: 58, borderRadius: 10, backgroundColor: "#D1D5DB" },
+  cardPressed: {
+    opacity: 0.92,
+  },
+  cardIcon: {
+    width: 58,
+    height: 58,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   cardTitle: { fontSize: 18, fontWeight: "700", color: "#111827" },
+  cardHeadline: { fontSize: 13, fontWeight: "700", marginTop: 2 },
   cardSub: { fontSize: 12, color: "#6B7280", marginTop: 2, lineHeight: 15 },
+  cardMeta: { fontSize: 11, color: "#9CA3AF", marginTop: 6 },
+  cardRetry: { fontSize: 11, marginTop: 4, fontWeight: "700" },
 
 
   volunteer: {

@@ -28,8 +28,8 @@ export interface EmergencyTypeOption {
   key: EmergencyType;
   label: string;
   icon: ReactNode;
-  iconBgClass: string;
-  iconColorClass: string;
+  iconBgColor: string;
+  iconColor: string;
 }
 
 export type ReportSubmitResult = {

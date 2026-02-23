@@ -11,6 +11,7 @@ import { toAuthUserPayload } from "./otp.utils";
 import { resolveAccessTokenExpiresIn } from "./accessTokenExpiry";
 
 const INVALID_CREDENTIALS = "Invalid credentials";
+const ACCOUNT_SUSPENDED = "Account is suspended. Please contact your administrator.";
 
 export const communityAuthRouter = Router();
 
@@ -67,7 +68,26 @@ communityAuthRouter.post("/login", loginLimiter, validate(communityLoginSchema),
       role: { $in: ["COMMUNITY", "VOLUNTEER"] },
     });
 
-    if (!user || !user.isActive || !user.emailVerified || !user.passwordHash) {
+    if (!user) {
+      await logSecurityEvent(req, AUDIT_EVENT.AUTH_LOGIN_FAIL, "FAIL", {
+        actorEmail: cleanEmail,
+      });
+      return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });
+    }
+
+    if (!user.isActive) {
+      await logSecurityEvent(req, AUDIT_EVENT.AUTH_LOGIN_FAIL, "FAIL", {
+        actorEmail: cleanEmail,
+        accountStatus: "SUSPENDED",
+      });
+      return res.status(403).json({
+        success: false,
+        error: ACCOUNT_SUSPENDED,
+        code: "ACCOUNT_SUSPENDED",
+      });
+    }
+
+    if (!user.emailVerified || !user.passwordHash) {
       await logSecurityEvent(req, AUDIT_EVENT.AUTH_LOGIN_FAIL, "FAIL", {
         actorEmail: cleanEmail,
       });

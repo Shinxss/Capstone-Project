@@ -1,6 +1,7 @@
 import { Schema, model, models } from "mongoose";
 
 export type UserRole = "ADMIN" | "LGU" | "VOLUNTEER" | "COMMUNITY";
+export type AdminTier = "SUPER" | "CDRRMO";
 export type VolunteerStatus = "NONE" | "PENDING" | "APPROVED";
 export type AuthProvider = "local" | "google" | "both";
 
@@ -17,6 +18,8 @@ export type UserDoc = {
   emailVerified: boolean;
 
   role: UserRole;
+  adminTier?: AdminTier;
+  permissions?: string[];
 
   lguName?: string;
   lguPosition?: string;
@@ -58,6 +61,12 @@ const UserSchema = new Schema<UserDoc>(
       enum: ["ADMIN", "LGU", "VOLUNTEER", "COMMUNITY"],
       index: true,
     },
+    adminTier: {
+      type: String,
+      enum: ["SUPER", "CDRRMO"],
+      index: true,
+    },
+    permissions: { type: [String], default: undefined },
 
     lguName: { type: String, default: "", trim: true, maxlength: 200 },
     lguPosition: { type: String, default: "", trim: true, maxlength: 200 },
@@ -80,6 +89,56 @@ const UserSchema = new Schema<UserDoc>(
     toObject: { transform: stripSensitive },
   }
 );
+
+type UserUpdateQuery = {
+  role?: unknown;
+  adminTier?: unknown;
+  $set?: Record<string, unknown>;
+  $setOnInsert?: Record<string, unknown>;
+  [key: string]: unknown;
+};
+
+function applyAdminTierDefaultsForDoc(doc: { role?: unknown; adminTier?: unknown }) {
+  if (doc.role === "ADMIN") {
+    if (!doc.adminTier) {
+      doc.adminTier = "CDRRMO";
+    }
+    return;
+  }
+
+  if (doc.role) {
+    doc.adminTier = undefined;
+  }
+}
+
+function applyAdminTierDefaultsForUpdate(update: UserUpdateQuery) {
+  const set = (update.$set ??= {});
+  const setOnInsert = (update.$setOnInsert ??= {});
+
+  const role = set.role ?? setOnInsert.role ?? update.role;
+  const adminTier = set.adminTier ?? setOnInsert.adminTier ?? update.adminTier;
+
+  if (role === "ADMIN" && !adminTier) {
+    setOnInsert.adminTier = "CDRRMO";
+  }
+
+  if (role && role !== "ADMIN") {
+    delete set.adminTier;
+    delete setOnInsert.adminTier;
+  }
+}
+
+UserSchema.pre("validate", function normalizeAdminTierForDocument() {
+  applyAdminTierDefaultsForDoc(this as unknown as { role?: unknown; adminTier?: unknown });
+});
+
+UserSchema.pre(["updateOne", "findOneAndUpdate", "updateMany"], function normalizeAdminTierForQuery() {
+  const update = this.getUpdate() as UserUpdateQuery | UserUpdateQuery[] | undefined;
+  if (!update || Array.isArray(update)) return;
+
+  applyAdminTierDefaultsForUpdate(update);
+  this.setUpdate(update);
+});
 
 UserSchema.index(
   { username: 1 },

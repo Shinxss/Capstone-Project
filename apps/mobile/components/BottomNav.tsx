@@ -27,6 +27,7 @@ export default function BottomNav(props: Props) {
   const { state, navigation } = props;
   const { onPressReportAction, onPressRegularTab } = props;
   const insets = useSafeAreaInsets();
+  const bottomPadding = Math.max(insets.bottom, 50);
 
   const goTo = (name: TabKey) => {
     onPressRegularTab();
@@ -44,7 +45,7 @@ export default function BottomNav(props: Props) {
   };
 
   return (
-    <View style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+    <View style={[styles.wrap, { paddingBottom: bottomPadding }]}>
       <View style={styles.row}>
         {/* Left tabs */}
         <TabButton

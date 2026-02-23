@@ -19,7 +19,14 @@ export type LoginSuccessData = {
     id: string;
     username?: string;
     role: UserRole;
+    firstName?: string;
+    lastName?: string;
+    adminTier?: "SUPER" | "CDRRMO";
+    email?: string;
     lguName?: string;
+    lguPosition?: string;
+    barangay?: string;
+    municipality?: string;
   };
 };
 
@@ -32,6 +39,9 @@ export type LoginMfaRequiredData = {
     id: string;
     username?: string;
     role: "ADMIN";
+    firstName?: string;
+    lastName?: string;
+    adminTier?: "SUPER" | "CDRRMO";
   };
 };
 
@@ -49,5 +59,8 @@ export type AdminMfaVerifyData = {
     id: string;
     username?: string;
     role: "ADMIN";
+    firstName?: string;
+    lastName?: string;
+    adminTier?: "SUPER" | "CDRRMO";
   };
 };

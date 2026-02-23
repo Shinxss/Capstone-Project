@@ -8,6 +8,7 @@ export async function findBarangayByPoint(
   if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null;
 
   const filter: any = {
+    isActive: true,
     geometry: {
       $geoIntersects: {
         $geometry: { type: "Point", coordinates: [lng, lat] },
