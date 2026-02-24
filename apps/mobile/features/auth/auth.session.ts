@@ -3,7 +3,7 @@ import { api, setApiAuthToken } from "../../lib/api";
 import { getSecure, removeSecure } from "../../lib/secureStore";
 import type { AuthUser } from "./auth.types";
 import { clearAuthState, loadAuthState, saveAuthState } from "./auth.storage";
-import { clearSession, setUserSession } from "./services/sessionStorage";
+import { clearSession, setGuestSession, setUserSession } from "./services/sessionStorage";
 
 const COMMUNITY_LOGIN_PATH = "/api/auth/community/login";
 const AUTH_ME_PATH = "/api/auth/me";
@@ -126,8 +126,10 @@ export async function bootstrapSession(): Promise<BootstrapSessionResult> {
   const stored = await loadAuthState();
 
   if (stored.mode === "guest") {
-    await cleanupToAnonymous();
-    return toAnonymousResult();
+    setApiAuthToken(null);
+    await setGuestSession();
+    await removeSecure(LEGACY_ACCESS_TOKEN_KEY);
+    return { mode: "guest", guestId: stored.guestId, user: null, token: null };
   }
 
   if (stored.mode !== "authed") {

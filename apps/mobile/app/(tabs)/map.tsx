@@ -15,15 +15,23 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import MapboxGL, { Logger } from "@rnmapbox/maps";
 import * as Location from "expo-location";
+import { useIsFocused } from "@react-navigation/native";
 import { useMapStyle } from "../../features/map/hooks/useMapStyle";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Droplets, Construction, Flame, Mountain, ShieldAlert } from "lucide-react-native";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { api } from "../../lib/api";
 import { fetchEmergencyMapReports } from "../../features/emergency/services/emergencyApi";
+import { useAuth } from "../../features/auth/AuthProvider";
 import {
   optimizeRouteAI,
+  type OptimizeRouteAIData,
 } from "../../features/routing/services/routingApi";
+import { useDevWeatherOverride } from "../../features/weather/hooks/useDevWeatherOverride";
+import { DevWeatherOverrideOverlay } from "../../features/weather/components/DevWeatherOverrideOverlay";
+import { useDevLocationOverride } from "../../features/location/hooks/useDevLocationOverride";
+import { DevLocationOverrideOverlay } from "../../features/location/components/DevLocationOverrideOverlay";
+import { getEffectiveLocation } from "../../features/location/utils/getEffectiveLocation";
 
 type EmergencyType = "SOS" | "Flood" | "Fire" | "Typhoon" | "Earthquake" | "Collapse";
 
@@ -275,8 +283,22 @@ function PulseMarker({ type }: { type: EmergencyType }) {
 
 export default function MapTab() {
   const insets = useSafeAreaInsets();
+  const isFocused = useIsFocused();
+  const { mode, user } = useAuth();
   const [query, setQuery] = useState("");
   const { key: styleKey, styleURL, setKey } = useMapStyle("streets");
+  const {
+    override: devWx,
+    patch: patchDevWx,
+    clear: clearDevWx,
+  } = useDevWeatherOverride();
+  const {
+    override: devLoc,
+    patch: patchDevLoc,
+    clear: clearDevLoc,
+  } = useDevLocationOverride();
+  const normalizedRole = useMemo(() => String(user?.role ?? "").trim().toUpperCase(), [user?.role]);
+  const canViewEmergencies = mode === "authed" && normalizedRole !== "COMMUNITY";
 
   const [myLocation, setMyLocation] = useState<[number, number] | null>(null);
   const [route, setRoute] = useState<
@@ -290,6 +312,7 @@ export default function MapTab() {
       aiScore?: number;
       routingCost?: number;
       routeCount?: number;
+      usedWeather?: OptimizeRouteAIData["usedWeather"] | null;
     } | null
   >(null);
   const [routeLoading, setRouteLoading] = useState(false);
@@ -297,6 +320,35 @@ export default function MapTab() {
   const [routeMode, setRouteMode] = useState<"driving" | "walking">("driving");
   const [hazardZones, setHazardZones] = useState<HazardZone[]>([]);
   const [reports, setReports] = useState<EmergencyReport[]>([]);
+  const devLocationEnabled = __DEV__ && devLoc.enabled;
+  const devWeatherEnabled = __DEV__ && devWx.enabled;
+  const effectiveDevLocation = useMemo(
+    () => ({
+      ...devLoc,
+      enabled: devLocationEnabled,
+    }),
+    [devLoc, devLocationEnabled]
+  );
+  const gpsLocation = useMemo(
+    () =>
+      myLocation
+        ? {
+            lng: myLocation[0],
+            lat: myLocation[1],
+          }
+        : null,
+    [myLocation]
+  );
+  const effectiveLocation = useMemo(
+    () => getEffectiveLocation(effectiveDevLocation, gpsLocation),
+    [effectiveDevLocation, gpsLocation]
+  );
+  const effectiveUserLocation = useMemo<[number, number] | null>(() => {
+    if (devLocationEnabled) {
+      return [effectiveLocation.lng, effectiveLocation.lat];
+    }
+    return myLocation;
+  }, [devLocationEnabled, effectiveLocation.lat, effectiveLocation.lng, myLocation]);
 
   useEffect(() => {
     let cancelled = false;
@@ -320,6 +372,11 @@ export default function MapTab() {
   }, []);
 
   useEffect(() => {
+    if (!canViewEmergencies) {
+      setReports([]);
+      return;
+    }
+
     let cancelled = false;
 
     const loadEmergencyReports = async () => {
@@ -352,7 +409,7 @@ export default function MapTab() {
       cancelled = true;
       clearInterval(timer);
     };
-  }, []);
+  }, [canViewEmergencies]);
 
   // Keep current location for routing (Direction button)
   useEffect(() => {
@@ -444,6 +501,32 @@ export default function MapTab() {
   );
 
   const cameraRef = useRef<MapboxGL.Camera>(null);
+  const hasCenteredOnGpsRef = useRef(false);
+
+  useEffect(() => {
+    if (!isFocused) return;
+    if (!devLocationEnabled) return;
+
+    cameraRef.current?.setCamera({
+      centerCoordinate: [effectiveLocation.lng, effectiveLocation.lat],
+      zoomLevel: 13,
+      animationDuration: 900,
+    });
+  }, [devLocationEnabled, effectiveLocation.lat, effectiveLocation.lng, isFocused]);
+
+  useEffect(() => {
+    if (!isFocused) return;
+    if (devLocationEnabled) return;
+    if (!myLocation) return;
+    if (hasCenteredOnGpsRef.current) return;
+
+    hasCenteredOnGpsRef.current = true;
+    cameraRef.current?.setCamera({
+      centerCoordinate: myLocation,
+      zoomLevel: 13,
+      animationDuration: 900,
+    });
+  }, [devLocationEnabled, isFocused, myLocation]);
 
   // draggable "Google Maps-ish" sheet
   const sheetRef = useRef<BottomSheet>(null);
@@ -452,7 +535,15 @@ export default function MapTab() {
   const layersSnapPoints = useMemo(() => ["42%", "72%"], []);
   const [selected, setSelected] = useState<EmergencyReport | null>(null);
 
+  useEffect(() => {
+    if (canViewEmergencies) return;
+    setSelected(null);
+    setRoute(null);
+    sheetRef.current?.close();
+  }, [canViewEmergencies]);
+
   const openSheet = (r: EmergencyReport) => {
+    if (!canViewEmergencies) return;
     layersSheetRef.current?.close();
     setSelected(r);
     requestAnimationFrame(() => sheetRef.current?.snapToIndex(1));
@@ -600,6 +691,11 @@ export default function MapTab() {
   };
 
   const resolveStartLocation = async (): Promise<[number, number] | null> => {
+    if (devLocationEnabled) {
+      const effective = getEffectiveLocation(effectiveDevLocation, gpsLocation);
+      return [effective.lng, effective.lat];
+    }
+
     if (myLocation) return myLocation;
 
     try {
@@ -627,7 +723,12 @@ export default function MapTab() {
       });
       const coords: [number, number] = [current.coords.longitude, current.coords.latitude];
       setMyLocation(coords);
-      return coords;
+
+      const effective = getEffectiveLocation(effectiveDevLocation, {
+        lng: coords[0],
+        lat: coords[1],
+      });
+      return [effective.lng, effective.lat];
     } catch {
       Alert.alert("Location needed", "Unable to read your current location right now.");
       return null;
@@ -644,7 +745,12 @@ export default function MapTab() {
     setRouteLoading(true);
     try {
       const standard = await fetchRouteFromMapbox(startLocation, [selected.lng, selected.lat], useProfile);
-      setRoute({ ...standard, profile: useProfile, source: "standard" });
+      setRoute({
+        ...standard,
+        profile: useProfile,
+        source: "standard",
+        usedWeather: null,
+      });
 
       const coords = standard.fitCoordinates;
       if (coords.length >= 2) fitRoute(coords);
@@ -668,6 +774,14 @@ export default function MapTab() {
         start: { lng: startLocation[0], lat: startLocation[1] },
         end: { lng: selected.lng, lat: selected.lat },
         profile: useProfile,
+        ...(devWeatherEnabled
+          ? {
+              weather: {
+                rainfall_mm: devWx.rainfall_mm,
+                is_raining: devWx.is_raining,
+              },
+            }
+          : {}),
       });
 
       setRoute({
@@ -688,6 +802,7 @@ export default function MapTab() {
         aiScore: Number(optimized.chosen.finalScore ?? 0),
         routingCost: Number(optimized.chosen.routing_cost ?? 0),
         routeCount: Number(optimized.candidates?.length ?? 1),
+        usedWeather: optimized.usedWeather ?? null,
       });
 
       const coords = (optimized.chosen.geometry?.coordinates ?? []) as [number, number][];
@@ -712,7 +827,12 @@ export default function MapTab() {
       Alert.alert(prefix, `${parsed.message}\n\nUsing standard route fallback.`);
       try {
         const fallback = await fetchRouteFromMapbox(startLocation, [selected.lng, selected.lat], useProfile);
-        setRoute({ ...fallback, profile: useProfile, source: "standard" });
+        setRoute({
+          ...fallback,
+          profile: useProfile,
+          source: "standard",
+          usedWeather: null,
+        });
 
         const coords = fallback.fitCoordinates;
         if (coords.length >= 2) fitRoute(coords);
@@ -838,23 +958,25 @@ export default function MapTab() {
             </MapboxGL.ShapeSource>
           ) : null}
 
-          {myLocation ? (
-            <MapboxGL.MarkerView coordinate={myLocation} anchor={{ x: 0.5, y: 0.5 }}>
+          {effectiveUserLocation ? (
+            <MapboxGL.MarkerView coordinate={effectiveUserLocation} anchor={{ x: 0.5, y: 0.5 }}>
               <View style={styles.meDot} />
             </MapboxGL.MarkerView>
           ) : null}
 
-          {filteredReports.map((r) => (
-            <MapboxGL.MarkerView
-              key={r.id}
-              coordinate={[r.lng, r.lat]}
-              anchor={{ x: 0.5, y: 0.5 }}
-            >
-              <Pressable onPress={() => openSheet(r)} style={{ padding: 2 }}>
-                <PulseMarker type={r.type} />
-              </Pressable>
-            </MapboxGL.MarkerView>
-          ))}
+          {canViewEmergencies
+            ? filteredReports.map((r) => (
+                <MapboxGL.MarkerView
+                  key={r.id}
+                  coordinate={[r.lng, r.lat]}
+                  anchor={{ x: 0.5, y: 0.5 }}
+                >
+                  <Pressable onPress={() => openSheet(r)} style={{ padding: 2 }}>
+                    <PulseMarker type={r.type} />
+                  </Pressable>
+                </MapboxGL.MarkerView>
+              ))
+            : null}
         </MapboxGL.MapView>
 
         {/* Google-Maps-like top UI */}
@@ -917,6 +1039,21 @@ export default function MapTab() {
             </View>
           </View>
         </View>
+
+        <DevWeatherOverrideOverlay
+          override={devWx}
+          onPatch={patchDevWx}
+          onClear={clearDevWx}
+          lastUsed={route?.usedWeather ?? null}
+          top={Math.max(110, insets.top + 86)}
+        />
+
+        <DevLocationOverrideOverlay
+          override={devLoc}
+          onPatch={patchDevLoc}
+          onClear={clearDevLoc}
+          top={Math.max(164, insets.top + 140)}
+        />
 
         {/* Bottom sheet */}
         <BottomSheet
@@ -1135,7 +1272,12 @@ export default function MapTab() {
             <Text style={styles.layersLegendTitle}>Map Legend</Text>
 
             <View style={styles.layersLegendColumns}>
-              <View style={styles.layersLegendColumn}>
+              <View
+                style={[
+                  styles.layersLegendColumn,
+                  !canViewEmergencies && styles.layersLegendColumnFull,
+                ]}
+              >
                 <Text style={styles.layersLegendSection}>Hazard zones</Text>
                 <View style={styles.layersLegendList}>
                   {HAZARD_LEGEND_ITEMS.map((item) => {
@@ -1160,22 +1302,24 @@ export default function MapTab() {
                 </View>
               </View>
 
-              <View style={styles.layersLegendColumn}>
-                <Text style={styles.layersLegendSection}>Emergencies</Text>
-                <View style={styles.layersLegendList}>
-                  {EMERGENCY_LEGEND_ITEMS.map((type) => {
-                    const color = colorForType(type);
-                    return (
-                      <View key={type} style={styles.layersLegendRow}>
-                        <View style={[styles.layersEmergencySwatch, { borderColor: color }]}>
-                          <MaterialCommunityIcons name={mciForType(type) as any} size={11} color={color} />
+              {canViewEmergencies ? (
+                <View style={styles.layersLegendColumn}>
+                  <Text style={styles.layersLegendSection}>Emergencies</Text>
+                  <View style={styles.layersLegendList}>
+                    {EMERGENCY_LEGEND_ITEMS.map((type) => {
+                      const color = colorForType(type);
+                      return (
+                        <View key={type} style={styles.layersLegendRow}>
+                          <View style={[styles.layersEmergencySwatch, { borderColor: color }]}>
+                            <MaterialCommunityIcons name={mciForType(type) as any} size={11} color={color} />
+                          </View>
+                          <Text style={styles.layersLegendText}>{type}</Text>
                         </View>
-                        <Text style={styles.layersLegendText}>{type}</Text>
-                      </View>
-                    );
-                  })}
+                      );
+                    })}
+                  </View>
                 </View>
-              </View>
+              ) : null}
             </View>
           </BottomSheetView>
         </BottomSheet>
@@ -1368,6 +1512,9 @@ const styles = StyleSheet.create({
   },
   layersLegendColumn: {
     width: "48%",
+  },
+  layersLegendColumnFull: {
+    width: "100%",
   },
   layersLegendSection: {
     fontSize: 14,

@@ -8,10 +8,12 @@ import {
   signInWithAccessToken as signInWithAccessTokenSession,
   signOut as signOutSession,
 } from "./auth.session";
-import { clearAuthState, saveAuthState } from "./auth.storage";
+import { saveAuthState } from "./auth.storage";
 import { setApiAuthToken } from "../../lib/api";
-import { clearSession, setUserSession } from "./services/sessionStorage";
+import { setGuestSession, setUserSession } from "./services/sessionStorage";
 import { subscribeUnauthorized } from "./auth.events";
+import { removeSecure } from "../../lib/secureStore";
+import { STORAGE_KEYS } from "../../constants/storageKeys";
 
 type AuthMode = "authed" | "guest" | "anonymous";
 
@@ -137,9 +139,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const continueAsGuest = useCallback(async () => {
     const nextGuestId = `guest_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
-    await clearAuthState();
+    await saveAuthState({ mode: "guest", guestId: nextGuestId });
+    await removeSecure(STORAGE_KEYS.accessToken).catch(() => undefined);
     setApiAuthToken(null);
-    await clearSession();
+    await setGuestSession();
     setMode("guest");
     setUser(null);
     setToken(null);

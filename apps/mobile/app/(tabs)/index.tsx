@@ -221,7 +221,7 @@ export default function HomeScreen() {
     retry: retryWeather,
   } = useWeatherSummary();
 
-  const { refresh: refreshActive } = useActiveDispatch({ pollMs: 8000 });
+  const { refresh: refreshActive } = useActiveDispatch({ pollMs: 8000, enabled: isVolunteer });
   const { pendingDispatch, refresh: refreshPending, clear: clearPending } = usePendingDispatch({
     pollMs: 8000,
     enabled: isVolunteer,

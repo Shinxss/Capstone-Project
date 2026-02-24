@@ -88,6 +88,16 @@ api.interceptors.response.use(
     const isAuthEndpoint = AUTH_ENDPOINT_EXCLUSIONS.some((path) => requestUrl.includes(path));
 
     if (status === 401 && !isAuthEndpoint && !unauthorizedHandlingInFlight) {
+      try {
+        const rawAuthState = await getSecure(STORAGE_KEYS.AUTH_STATE);
+        const authState = rawAuthState ? (JSON.parse(rawAuthState) as { mode?: string }) : null;
+        if (authState?.mode !== "authed") {
+          return Promise.reject(error);
+        }
+      } catch {
+        return Promise.reject(error);
+      }
+
       unauthorizedHandlingInFlight = true;
       try {
         await emitUnauthorized();

@@ -132,11 +132,10 @@ export function useLogin() {
 
     try {
       await continueAsGuest();
-      router.replace("/(tabs)");
     } catch (err) {
       setError(getErrorMessage(err, "Failed to enter guest mode"));
     }
-  }, [loading, googleLoading, clearGoogleError, continueAsGuest, router]);
+  }, [loading, googleLoading, clearGoogleError, continueAsGuest]);
 
   return {
     email,

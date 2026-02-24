@@ -81,10 +81,21 @@ function reporterNameFrom(report: EmergencyReport) {
 }
 
 function locationLabelFrom(report: EmergencyReport) {
-  const coords = report.location?.coordinates;
-  if (!coords || coords.length !== 2) return "Unknown location";
-  const [lng, lat] = coords;
-  return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  const barangay = String(report.barangayName || "").trim();
+  const city = String(report.barangayCity || "").trim();
+  const province = String(report.barangayProvince || "").trim();
+
+  if (barangay) {
+    return [
+      `Barangay ${barangay}`,
+      city || null,
+      province || null,
+    ]
+      .filter(Boolean)
+      .join(", ");
+  }
+
+  return "Unknown location";
 }
 
 function buildDispatchCountsByEmergency(tasks: DispatchTask[]): DispatchCountsByEmergency {
