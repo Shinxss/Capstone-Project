@@ -9,11 +9,32 @@
     "road_priority"
   ],
   "metrics": {
-    "mae": 0.12815440991192542
+    "mae": 0.02633934770218351
+  },
+  "training": {
+    "rows_used": 150000,
+    "max_rows_env": 150000,
+    "n_estimators": 60,
+    "max_depth": 10,
+    "min_samples_leaf": 3
   },
   "encoding": {
     "road_priority": "0=no_info, 1=low, 2=medium, 3=high",
     "bridge": "0/1",
     "is_raining": "0/1"
-  }
+  },
+  "risk_thresholds": {
+    "low_lt": 2.5,
+    "medium_le": 5.0
+  },
+  "speed_guidance_thresholds": {
+    "normal_lt": 2.5,
+    "caution_lt": 5.0,
+    "slow_lt": 7.0
+  },
+  "notes": [
+    "routing_cost is a soft risk score used to rank route alternatives.",
+    "Avoid hard-blocking solely based on rainfall; only hard-block with strong flood evidence (e.g., high flood depth + heavy rain).",
+    "If you have no flood-data coverage in an area, consider zeroing flood_depth_5yr (and optionally rainfall inputs) at inference time."
+  ]
 }

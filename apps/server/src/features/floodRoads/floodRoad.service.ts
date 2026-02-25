@@ -1,4 +1,14 @@
 import { FloodRoad, type GeoJSONLineString } from "./floodRoad.model";
+import {
+  FLOOD_HARD_BLOCK_DEPTH_M,
+  FLOOD_MIN_COVERAGE_POINTS,
+  FLOOD_NEAR_DISTANCE_M,
+  FLOOD_PASSABLE_DEPTH_MAX_M,
+  FLOOD_PASSABLE_RAIN_PENALTY_CAP_SEC,
+  FLOOD_PENALTY_CAP_SEC,
+  FLOOD_RAIN_SCALE_MM,
+  FLOOD_SAMPLE_POINTS,
+} from "../../constants/floodRouting.constants";
 
 export type LineStringGeometry = GeoJSONLineString;
 
@@ -7,23 +17,22 @@ export type RoutingWeatherInput = {
   is_raining: 0 | 1;
 };
 
+export type FloodCoverageStats = {
+  samplePointCount: number;
+  matchedPointCount: number;
+  hasCoverage: boolean;
+};
+
 export type FloodRouteStats = {
   depthForModel: number;
+  avgDepth: number;
   maxDepth: number;
   penaltySeconds: number;
   blockedByFlood: boolean;
   impassableRatio: number;
   hasImpassableSegments: boolean;
+  coverage: FloodCoverageStats;
 };
-
-const FLOOD_SAMPLE_POINTS = 16;
-const FLOOD_NEAR_DISTANCE_M = 20;
-const RAIN_VERY_HEAVY_MM = 25;
-const FLOOD_BLOCK_DEPTH_M = 1.8;
-const FLOOD_BLOCK_IMPASSABLE_RATIO = 0.6;
-const RAIN_SCALE_MM = 25;
-const FLOOD_PENALTY_CAP_SEC = 30 * 60;
-const PASSABLE_RAIN_PENALTY_CAP_SEC = 12 * 60;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -39,14 +48,16 @@ function toNonNegativeNumber(value: unknown): number | null {
   return parsed;
 }
 
-function getNoFloodStats(): FloodRouteStats {
+function getNoFloodStats(coverage: FloodCoverageStats): FloodRouteStats {
   return {
     depthForModel: 0,
+    avgDepth: 0,
     maxDepth: 0,
     penaltySeconds: 0,
     blockedByFlood: false,
     impassableRatio: 0,
     hasImpassableSegments: false,
+    coverage,
   };
 }
 
@@ -82,10 +93,9 @@ function sampleRoutePoints(
 
 type FloodRoadMatch = {
   csv_flood_depth_5yr?: number | null;
-  csv_passable?: number | null;
 } | null;
 
-async function findNearestFloodRoadByPoint(
+async function findNearbyFloodRoadByPoint(
   point: [number, number],
   cache: Map<string, FloodRoadMatch>
 ): Promise<FloodRoadMatch> {
@@ -107,104 +117,137 @@ async function findNearestFloodRoadByPoint(
     },
   };
 
-  const nearestAny = (await FloodRoad.findOne({
+  const nearestAny = (await FloodRoad.find({
     geometry: nearCondition,
   } as any)
-    .select("csv_flood_depth_5yr csv_passable")
-    .lean()) as FloodRoadMatch;
+    .select("csv_flood_depth_5yr")
+    .limit(5)
+    .lean()) as Array<{ csv_flood_depth_5yr?: number | null }>;
 
-  cache.set(pointKey, nearestAny ?? null);
-  return nearestAny ?? null;
+  if (!nearestAny.length) {
+    cache.set(pointKey, null);
+    return null;
+  }
+
+  let maxDepth: number | null = null;
+  for (const item of nearestAny) {
+    const depth = toNonNegativeNumber(item?.csv_flood_depth_5yr);
+    if (depth === null) continue;
+    if (maxDepth === null || depth > maxDepth) {
+      maxDepth = depth;
+    }
+  }
+
+  const normalizedMatch: FloodRoadMatch =
+    maxDepth === null
+      ? null
+      : {
+          csv_flood_depth_5yr: maxDepth,
+        };
+
+  cache.set(pointKey, normalizedMatch);
+  return normalizedMatch;
 }
 
 export async function computeFloodStatsForRoute(
   route: LineStringGeometry,
   weather: RoutingWeatherInput
 ): Promise<FloodRouteStats> {
-  const rainfallMm = toNonNegativeNumber(weather.rainfall_mm) ?? 0;
-  if (weather.is_raining !== 1 || rainfallMm <= 0) {
-    return getNoFloodStats();
-  }
-
   const samplePoints = sampleRoutePoints(route.coordinates, FLOOD_SAMPLE_POINTS);
   if (!samplePoints.length) {
-    return getNoFloodStats();
+    return getNoFloodStats({
+      samplePointCount: 0,
+      matchedPointCount: 0,
+      hasCoverage: false,
+    });
   }
 
   const lookupCache = new Map<string, FloodRoadMatch>();
   const nearestMatches = await Promise.all(
-    samplePoints.map((point) => findNearestFloodRoadByPoint(point, lookupCache))
+    samplePoints.map((point) => findNearbyFloodRoadByPoint(point, lookupCache))
   );
+  const matchedPointCount = nearestMatches.reduce((count, match) => (match ? count + 1 : count), 0);
+
+  const coverage: FloodCoverageStats = {
+    samplePointCount: samplePoints.length,
+    matchedPointCount,
+    hasCoverage: matchedPointCount >= FLOOD_MIN_COVERAGE_POINTS,
+  };
+
+  if (matchedPointCount <= 0) {
+    return getNoFloodStats(coverage);
+  }
 
   const matchedDepths: number[] = [];
-  let impassableCount = 0;
-  let lowCount = 0;
-  let medCount = 0;
-  let highCount = 0;
+  let cautionCount = 0;
+  let highRiskCount = 0;
+  let hardBlockCount = 0;
 
   for (const match of nearestMatches) {
-    if (Number(match?.csv_passable) === 0) {
-      impassableCount += 1;
-    }
-
     const depth = toNonNegativeNumber(match?.csv_flood_depth_5yr);
     if (depth !== null) {
       matchedDepths.push(depth);
-      if (depth >= 1.5) {
-        highCount += 1;
+      if (depth >= FLOOD_HARD_BLOCK_DEPTH_M) {
+        hardBlockCount += 1;
         continue;
       }
 
-      if (depth >= 0.5) {
-        medCount += 1;
+      if (depth > FLOOD_PASSABLE_DEPTH_MAX_M) {
+        highRiskCount += 1;
         continue;
       }
 
-      if (depth >= 0.1) {
-        lowCount += 1;
+      if (depth > 0) {
+        cautionCount += 1;
       }
     }
   }
 
-  const denominator = Math.max(samplePoints.length, 1);
+  const denominator = Math.max(matchedPointCount, 1);
   const maxDepth = matchedDepths.length ? Math.max(...matchedDepths) : 0;
   const avgDepth = matchedDepths.length
     ? matchedDepths.reduce((sum, depth) => sum + depth, 0) / matchedDepths.length
     : 0;
+  const impassableCount = highRiskCount + hardBlockCount;
   const impassableRatio = impassableCount / denominator;
   const hasImpassableSegments = impassableCount > 0;
-  const rainScale = clamp(rainfallMm / RAIN_SCALE_MM, 0, 1);
 
-  const lowRatio = lowCount / denominator;
-  const medRatio = medCount / denominator;
-  const highRatio = highCount / denominator;
+  const rainfallMm = toNonNegativeNumber(weather.rainfall_mm) ?? 0;
+  const hasActiveRain = weather.is_raining === 1;
+  const rainScale = hasActiveRain ? clamp(rainfallMm / FLOOD_RAIN_SCALE_MM, 0, 1) : 0;
 
-  const depthPenaltySeconds = clamp(
+  const lowRatio = cautionCount / denominator;
+  const medRatio = highRiskCount / denominator;
+  const highRatio = hardBlockCount / denominator;
+
+  const rawDepthPenaltySeconds = clamp(
     rainScale * (lowRatio * 5 * 60 + medRatio * 12 * 60 + highRatio * 20 * 60),
     0,
     FLOOD_PENALTY_CAP_SEC
   );
-  const passablePenaltySeconds = clamp(
-    impassableRatio * rainScale * PASSABLE_RAIN_PENALTY_CAP_SEC,
+  const rawPassablePenaltySeconds = clamp(
+    impassableRatio * rainScale * FLOOD_PASSABLE_RAIN_PENALTY_CAP_SEC,
     0,
-    PASSABLE_RAIN_PENALTY_CAP_SEC
+    FLOOD_PASSABLE_RAIN_PENALTY_CAP_SEC
   );
-  const penaltySeconds = clamp(
-    depthPenaltySeconds + passablePenaltySeconds,
-    0,
-    FLOOD_PENALTY_CAP_SEC
-  );
+  const penaltySeconds = coverage.hasCoverage
+    ? clamp(
+        rawDepthPenaltySeconds + rawPassablePenaltySeconds,
+        0,
+        FLOOD_PENALTY_CAP_SEC
+      )
+    : 0;
 
-  const blockedByFlood =
-    rainfallMm >= RAIN_VERY_HEAVY_MM &&
-    (maxDepth >= FLOOD_BLOCK_DEPTH_M || impassableRatio >= FLOOD_BLOCK_IMPASSABLE_RATIO);
+  const blockedByFlood = coverage.hasCoverage && hasActiveRain && hardBlockCount > 0;
 
   return {
-    depthForModel: clamp(avgDepth, 0, 3),
+    depthForModel: coverage.hasCoverage ? clamp(avgDepth, 0, 3) : 0,
+    avgDepth,
     maxDepth,
     penaltySeconds,
     blockedByFlood,
     impassableRatio,
     hasImpassableSegments,
+    coverage,
   };
 }

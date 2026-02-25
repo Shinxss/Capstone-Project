@@ -22,6 +22,7 @@ export const optimizeRouteSchema = z
     start: coordinateSchema,
     end: coordinateSchema,
     profile: z.enum(["driving", "walking"]).default("driving"),
+    mode: z.enum(["optimize", "evaluate"]).default("optimize"),
     weather: weatherSchema.optional(),
   })
   .strict();

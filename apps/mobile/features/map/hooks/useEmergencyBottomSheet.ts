@@ -3,6 +3,7 @@ import { Alert } from "react-native";
 import type { Emergency, RiskAssessment, RouteSummary, TravelMode } from "../models/map.types";
 import {
   getRouteAlternatives,
+  getRouteAlternativesWithEvaluation,
   optimizeRoute,
   type DirectionPoint,
   type RoutingContextWeather,
@@ -61,6 +62,7 @@ export function useEmergencyBottomSheet(
   const [travelMode, setTravelModeState] = useState<TravelMode>("drive");
   const [route, setRoute] = useState<RouteSummary | null>(null);
   const [routeAlternatives, setRouteAlternatives] = useState<RouteSummary[]>([]);
+  const [routeRiskByIndex, setRouteRiskByIndex] = useState<Record<number, RiskAssessment>>({});
   const [selectedRouteIndex, setSelectedRouteIndex] = useState(0);
   const [risk, setRisk] = useState<RiskAssessment | null>(null);
   const [loadingRoute, setLoadingRoute] = useState(false);
@@ -71,6 +73,7 @@ export function useEmergencyBottomSheet(
     setTravelModeState("drive");
     setRoute(null);
     setRouteAlternatives([]);
+    setRouteRiskByIndex({});
     setSelectedRouteIndex(0);
     setRisk(null);
     setLoadingRoute(false);
@@ -80,6 +83,7 @@ export function useEmergencyBottomSheet(
     setSheetMode("overview");
     setRoute(null);
     setRouteAlternatives([]);
+    setRouteRiskByIndex({});
     setSelectedRouteIndex(0);
     setRisk(null);
   }, []);
@@ -90,6 +94,7 @@ export function useEmergencyBottomSheet(
     setTravelModeState("drive");
     setRoute(null);
     setRouteAlternatives([]);
+    setRouteRiskByIndex({});
     setSelectedRouteIndex(0);
     setRisk(null);
   }, []);
@@ -103,25 +108,46 @@ export function useEmergencyBottomSheet(
 
       setLoadingRoute(true);
       try {
-        const nextRoutes = await getRouteAlternatives({
+        const evaluated = await getRouteAlternativesWithEvaluation({
           from: origin,
           to: {
             lat: selectedEmergency.location.lat,
             lng: selectedEmergency.location.lng,
           },
           mode,
+          contextWeather: getWeatherContext?.() ?? undefined,
         });
-        setRouteAlternatives(nextRoutes);
+        const primaryRoute = evaluated.routes[0] ?? null;
+        const primaryRisk = evaluated.riskByIndex[0] ?? null;
+        setRouteAlternatives(primaryRoute ? [primaryRoute] : []);
+        setRouteRiskByIndex(primaryRisk ? { 0: primaryRisk } : {});
         setSelectedRouteIndex(0);
-        setRoute(nextRoutes[0] ?? null);
-        setRisk(null);
+        setRoute(primaryRoute);
+        setRisk(primaryRisk);
       } catch {
-        Alert.alert("Directions unavailable", "Unable to fetch route. Try again.");
+        try {
+          const nextRoutes = await getRouteAlternatives({
+            from: origin,
+            to: {
+              lat: selectedEmergency.location.lat,
+              lng: selectedEmergency.location.lng,
+            },
+            mode,
+          });
+          const primaryRoute = nextRoutes[0] ?? null;
+          setRouteAlternatives(primaryRoute ? [primaryRoute] : []);
+          setRouteRiskByIndex({});
+          setSelectedRouteIndex(0);
+          setRoute(primaryRoute);
+          setRisk(null);
+        } catch {
+          Alert.alert("Directions unavailable", "Unable to fetch route. Try again.");
+        }
       } finally {
         setLoadingRoute(false);
       }
     },
-    [resolveOrigin, selectedEmergency]
+    [getWeatherContext, resolveOrigin, selectedEmergency]
   );
 
   const fetchRouteAction = useCallback(async () => {
@@ -156,8 +182,8 @@ export function useEmergencyBottomSheet(
       if (!nextRoute) return currentRoute;
       return nextRoute;
     });
-    setRisk(null);
-  }, [routeAlternatives]);
+    setRisk(routeRiskByIndex[index] ?? null);
+  }, [routeAlternatives, routeRiskByIndex]);
 
   const optimizeRouteAction = useCallback(async () => {
     if (!selectedEmergency) return;
@@ -179,6 +205,7 @@ export function useEmergencyBottomSheet(
 
       setRoute(optimized.route);
       setRouteAlternatives([optimized.route]);
+      setRouteRiskByIndex({ 0: optimized.risk });
       setSelectedRouteIndex(0);
       setRisk(optimized.risk);
     } catch (error) {
@@ -187,20 +214,38 @@ export function useEmergencyBottomSheet(
       Alert.alert(prefix, `${parsed.message}\n\nUsing standard route fallback.`);
 
       try {
-        const fallbackRoutes = await getRouteAlternatives({
+        const fallbackEvaluated = await getRouteAlternativesWithEvaluation({
           from: origin,
           to: {
             lat: selectedEmergency.location.lat,
             lng: selectedEmergency.location.lng,
           },
           mode: travelMode,
+          contextWeather: getWeatherContext?.() ?? undefined,
         });
-        setRouteAlternatives(fallbackRoutes);
+        setRouteAlternatives(fallbackEvaluated.routes);
+        setRouteRiskByIndex(fallbackEvaluated.riskByIndex);
         setSelectedRouteIndex(0);
-        setRoute(fallbackRoutes[0] ?? null);
-        setRisk(null);
+        setRoute(fallbackEvaluated.routes[0] ?? null);
+        setRisk(fallbackEvaluated.riskByIndex[0] ?? null);
       } catch {
-        Alert.alert("Directions unavailable", "Unable to fetch route. Try again.");
+        try {
+          const fallbackRoutes = await getRouteAlternatives({
+            from: origin,
+            to: {
+              lat: selectedEmergency.location.lat,
+              lng: selectedEmergency.location.lng,
+            },
+            mode: travelMode,
+          });
+          setRouteAlternatives(fallbackRoutes);
+          setRouteRiskByIndex({});
+          setSelectedRouteIndex(0);
+          setRoute(fallbackRoutes[0] ?? null);
+          setRisk(null);
+        } catch {
+          Alert.alert("Directions unavailable", "Unable to fetch route. Try again.");
+        }
       }
     } finally {
       setLoadingRoute(false);

@@ -9,7 +9,7 @@
     "road_priority"
   ],
   "metrics": {
-    "mae": 0.02633934770218351
+    "mae": 0.026339347702183484
   },
   "training": {
     "rows_used": 150000,

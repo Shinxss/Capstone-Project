@@ -168,9 +168,11 @@ export function EmergencyDirectionsSheet({
             {route.durationMin} min
           </Text>
 
-          {route.source === "ai" && risk ? (
+          {risk ? (
             <>
-              <Text className="mt-2 text-xs font-bold text-slate-900">AI optimized route</Text>
+              <Text className="mt-2 text-xs font-bold text-slate-900">
+                {route.source === "ai" ? "AI optimized route" : "Route evaluation"}
+              </Text>
               <Text className="mt-1 text-xs font-bold text-slate-900">
                 Rank score: {rankScoreText} | Routing cost: {risk.routingCost.toFixed(3)}
               </Text>
@@ -178,12 +180,6 @@ export function EmergencyDirectionsSheet({
               <Text className="mt-1 text-xs font-bold text-slate-900">
                 Current risk:{" "}
                 <Text style={{ color: riskColor(risk.riskLevel) }}>{riskLabel(risk.riskLevel)}</Text>
-              </Text>
-              <Text className="mt-1 text-xs font-bold text-slate-900">
-                Flood passable:{" "}
-                <Text style={{ color: passableColor(risk.floodPassable) }}>
-                  {passableText(risk.floodPassable)}
-                </Text>
               </Text>
               <Text className="mt-1 text-xs font-bold text-slate-900">
                 Route passable:{" "}

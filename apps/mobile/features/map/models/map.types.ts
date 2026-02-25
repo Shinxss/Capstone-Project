@@ -33,15 +33,21 @@ export type RouteSummary = {
 };
 
 export type RiskLevel = "LOW" | "MEDIUM" | "HIGH";
+export type FloodPassabilityBand =
+  | "PASSABLE"
+  | "USUALLY_NOT_PASSABLE"
+  | "HARD_BLOCKED";
 
 export type RiskAssessment = {
   finalScore: number;
   routingCost: number;
+  passabilityProbability?: number | null;
   comparedAgainst?: number;
   rank?: number;
   riskLevel: RiskLevel;
   legendText: string;
   justification: string;
+  floodPassabilityBand?: FloodPassabilityBand | null;
   floodPassable?: boolean | null;
   routePassable?: boolean | null;
   usedWeather?: OptimizeRouteAIData["usedWeather"] | null;

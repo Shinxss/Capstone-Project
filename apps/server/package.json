@@ -13,6 +13,7 @@
     "seed:barangays": "tsx src/scripts/seedDagupanBarangays.ts",
     "seed:barangays:sanfabian": "tsx src/scripts/seedSanFabianBarangays.ts",
     "seed:test-fire:sanfabian": "tsx src/scripts/seedTestFireReportSanFabian.ts",
+    "seed:test-flood:pin": "tsx src/scripts/seedTestFloodReportPinned.ts",
     "seed:floodroads": "tsx src/scripts/seedFloodRoads.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

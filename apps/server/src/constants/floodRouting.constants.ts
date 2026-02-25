@@ -1,0 +1,10 @@
+export const FLOOD_SAMPLE_POINTS = 16;
+export const FLOOD_NEAR_DISTANCE_M = 35;
+export const FLOOD_MIN_COVERAGE_POINTS = 3;
+
+export const FLOOD_PASSABLE_DEPTH_MAX_M = 0.5;
+export const FLOOD_HARD_BLOCK_DEPTH_M = 0.9;
+
+export const FLOOD_RAIN_SCALE_MM = 25;
+export const FLOOD_PENALTY_CAP_SEC = 30 * 60;
+export const FLOOD_PASSABLE_RAIN_PENALTY_CAP_SEC = 12 * 60;

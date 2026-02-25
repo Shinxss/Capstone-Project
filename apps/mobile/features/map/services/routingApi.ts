@@ -5,6 +5,7 @@ import {
   type RoutingProfile,
 } from "../../routing/services/routingApi";
 import type {
+  FloodPassabilityBand,
   RiskAssessment,
   RiskLevel,
   RouteSummary,
@@ -34,6 +35,11 @@ type OptimizeRouteInput = GetRouteInput & {
 type OptimizeRouteResult = {
   route: RouteSummary;
   risk: RiskAssessment;
+};
+
+type EvaluatedRouteAlternativesResult = {
+  routes: RouteSummary[];
+  riskByIndex: Record<number, RiskAssessment>;
 };
 
 type MapboxDirectionsRoute = {
@@ -97,6 +103,41 @@ function toFiniteScore(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER;
 }
 
+function toProbability(value: unknown): number | null {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return null;
+  if (parsed < 0) return 0;
+  if (parsed > 1) return 1;
+  return parsed;
+}
+
+function isFloodPassabilityBand(value: unknown): value is FloodPassabilityBand {
+  return (
+    value === "HARD_BLOCKED" || value === "PASSABLE" || value === "USUALLY_NOT_PASSABLE"
+  );
+}
+
+function toFloodPassabilityBand(
+  candidate: OptimizeRouteAIData["candidates"][number] | null
+): FloodPassabilityBand | null {
+  if (!candidate) return null;
+  if (isFloodPassabilityBand(candidate.passability_band)) return candidate.passability_band;
+  if (candidate.floodBlocked === true) return "HARD_BLOCKED";
+  if (candidate.floodHasImpassableSegments === true) return "USUALLY_NOT_PASSABLE";
+  if (candidate.floodHasImpassableSegments === false || candidate.floodBlocked === false) {
+    return "PASSABLE";
+  }
+  return null;
+}
+
+function defaultProbabilityFromBand(band: FloodPassabilityBand | null): number | null {
+  if (!band) return null;
+  if (band === "HARD_BLOCKED") return 0;
+  if (band === "PASSABLE") return 0.7;
+  if (band === "USUALLY_NOT_PASSABLE") return 0.3;
+  return null;
+}
+
 function buildRiskJustification(input: {
   level: RiskLevel;
   usedWeather?: OptimizeRouteAIData["usedWeather"] | null;
@@ -144,6 +185,89 @@ function buildRiskJustification(input: {
   }
 
   return `Why ${input.level.toLowerCase()} risk: ${reasons.slice(0, 2).join("; ")}.`;
+}
+
+function getScoringPool(candidates: OptimizeRouteAIData["candidates"]) {
+  const routable = candidates.filter((candidate) => !candidate.blocked);
+  return routable.length ? routable : candidates;
+}
+
+function getRankMeta(input: {
+  candidates: OptimizeRouteAIData["candidates"];
+  candidateIndex: number;
+}): { comparedAgainst: number; rank?: number } {
+  const scoringPool = getScoringPool(input.candidates);
+  const sorted = [...scoringPool].sort((a, b) => {
+    const byScore = toFiniteScore(a.finalScore) - toFiniteScore(b.finalScore);
+    if (byScore !== 0) return byScore;
+    return a.index - b.index;
+  });
+
+  const rankIndex = sorted.findIndex((candidate) => candidate.index === input.candidateIndex);
+  return {
+    comparedAgainst: scoringPool.length,
+    rank: rankIndex >= 0 ? rankIndex + 1 : undefined,
+  };
+}
+
+function buildRiskAssessmentForCandidate(input: {
+  optimized: OptimizeRouteAIData;
+  candidates: OptimizeRouteAIData["candidates"];
+  candidate: OptimizeRouteAIData["candidates"][number];
+}): RiskAssessment {
+  const rankMeta = getRankMeta({
+    candidates: input.candidates,
+    candidateIndex: input.candidate.index,
+  });
+
+  const usedWeather = input.optimized.usedWeather ?? null;
+  const floodPassabilityBand = toFloodPassabilityBand(input.candidate);
+  const passabilityProbability =
+    toProbability(
+      input.candidate.passability_probability ?? input.optimized.chosen.passability_probability
+    ) ?? defaultProbabilityFromBand(floodPassabilityBand);
+
+  const floodPassable =
+    typeof passabilityProbability === "number"
+      ? passabilityProbability >= 0.45
+      : floodPassabilityBand === "HARD_BLOCKED"
+        ? false
+        : floodPassabilityBand === "USUALLY_NOT_PASSABLE"
+          ? false
+          : floodPassabilityBand === "PASSABLE"
+            ? true
+            : null;
+
+  const routePassable =
+    typeof input.candidate.route_passable === "boolean"
+      ? input.candidate.route_passable
+      : typeof input.candidate.blocked === "boolean"
+        ? !input.candidate.blocked && floodPassable !== false
+        : floodPassable;
+
+  const routingCost = Number(
+    input.candidate.routing_cost ?? input.optimized.chosen.routing_cost ?? 0
+  );
+  const riskLevel = toRiskLevel(routingCost);
+
+  return {
+    finalScore: Number(input.candidate.finalScore ?? input.optimized.chosen.finalScore ?? 0),
+    routingCost,
+    passabilityProbability,
+    comparedAgainst: rankMeta.comparedAgainst,
+    rank: rankMeta.rank,
+    riskLevel,
+    legendText: riskLegend.join(" / "),
+    justification: buildRiskJustification({
+      level: riskLevel,
+      usedWeather,
+      chosenCandidate: input.candidate,
+    }),
+    floodPassabilityBand,
+    floodPassable,
+    routePassable,
+    usedWeather,
+  };
 }
 
 async function fetchDirectionsRoutes(input: GetRouteInput): Promise<MapboxDirectionsRoute[]> {
@@ -208,6 +332,56 @@ export async function getRouteAlternatives(input: GetRouteInput): Promise<RouteS
   return summaries;
 }
 
+export async function getRouteAlternativesWithEvaluation(
+  input: OptimizeRouteInput
+): Promise<EvaluatedRouteAlternativesResult> {
+  const profile = toTravelProfile(input.mode);
+  const optimized = await optimizeRouteAI({
+    start: input.from,
+    end: input.to,
+    profile,
+    mode: "evaluate",
+    ...(input.contextWeather ? { weather: input.contextWeather } : {}),
+  });
+
+  const candidates = Array.isArray(optimized.candidates)
+    ? [...optimized.candidates].sort((a, b) => a.index - b.index)
+    : [];
+
+  const routes: RouteSummary[] = [];
+  const riskByIndex: Record<number, RiskAssessment> = {};
+
+  for (const candidate of candidates) {
+    const coordinates = candidate.geometry?.coordinates ?? [];
+    if (!Array.isArray(coordinates) || coordinates.length < 2) continue;
+
+    const route = toRouteSummary({
+      source: "standard",
+      mode: input.mode,
+      distanceMeters: Number(candidate.distance ?? 0),
+      durationSeconds: Number(candidate.duration ?? 0),
+      coordinates,
+    });
+
+    const displayIndex = routes.length;
+    routes.push(route);
+    riskByIndex[displayIndex] = buildRiskAssessmentForCandidate({
+      optimized,
+      candidates,
+      candidate,
+    });
+  }
+
+  if (!routes.length) {
+    throw new Error("No valid route returned");
+  }
+
+  return {
+    routes,
+    riskByIndex,
+  };
+}
+
 export async function getRoute(input: GetRouteInput): Promise<RouteSummary> {
   const alternatives = await getRouteAlternatives(input);
   const route = alternatives[0];
@@ -225,36 +399,14 @@ export async function optimizeRoute(input: OptimizeRouteInput): Promise<Optimize
     start: input.from,
     end: input.to,
     profile,
+    mode: "optimize",
     ...(input.contextWeather ? { weather: input.contextWeather } : {}),
   });
 
   const coordinates = optimized.chosen.geometry?.coordinates ?? [];
   const candidates = Array.isArray(optimized.candidates) ? optimized.candidates : [];
-  const routable = candidates.filter((candidate) => !candidate.blocked);
-  const scoringPool = routable.length ? routable : candidates;
-  const comparedAgainst = scoringPool.length;
-  const sortedScoringPool = [...scoringPool].sort((a, b) => {
-    const byScore = toFiniteScore(a.finalScore) - toFiniteScore(b.finalScore);
-    if (byScore !== 0) return byScore;
-    return a.index - b.index;
-  });
-  const rankIndex = sortedScoringPool.findIndex(
-    (candidate) => candidate.index === optimized.chosenIndex
-  );
-  const rank = rankIndex >= 0 ? rankIndex + 1 : undefined;
-
   const chosenCandidate =
     candidates.find((candidate) => candidate.index === optimized.chosenIndex) ?? null;
-  const floodPassable =
-    typeof chosenCandidate?.floodHasImpassableSegments === "boolean"
-      ? !chosenCandidate.floodHasImpassableSegments
-      : typeof chosenCandidate?.floodBlocked === "boolean"
-        ? !chosenCandidate.floodBlocked
-        : null;
-  const routePassable =
-    typeof chosenCandidate?.blocked === "boolean"
-      ? !chosenCandidate.blocked && floodPassable !== false
-      : floodPassable;
 
   const route = toRouteSummary({
     source: "ai",
@@ -264,26 +416,31 @@ export async function optimizeRoute(input: OptimizeRouteInput): Promise<Optimize
     coordinates,
   });
 
-  const routingCost = Number(optimized.chosen.routing_cost ?? 0);
-  const riskLevel = toRiskLevel(routingCost);
-  const risk: RiskAssessment = {
-    finalScore: Number(optimized.chosen.finalScore ?? 0),
-    routingCost,
-    comparedAgainst,
-    rank,
-    riskLevel,
-    legendText: riskLegend.join(" / "),
-    justification: buildRiskJustification({
-      level: riskLevel,
-      usedWeather: optimized.usedWeather ?? null,
-      chosenCandidate,
-    }),
-    floodPassable,
-    routePassable,
-    usedWeather: optimized.usedWeather ?? null,
+  const fallbackCandidate: OptimizeRouteAIData["candidates"][number] = {
+    index: optimized.chosenIndex,
+    geometry: optimized.chosen.geometry,
+    distance: optimized.chosen.distance,
+    duration: optimized.chosen.duration,
+    routing_cost: optimized.chosen.routing_cost,
+    finalScore: optimized.chosen.finalScore,
+    passability_probability: optimized.chosen.passability_probability,
+    passability_band: optimized.chosen.passability_band,
+    route_passable: optimized.chosen.route_passable,
   };
+
+  const risk = buildRiskAssessmentForCandidate({
+    optimized,
+    candidates,
+    candidate: chosenCandidate ?? fallbackCandidate,
+  });
 
   return { route, risk };
 }
 
-export type { DirectionPoint, RoutingContextWeather, GetRouteInput, OptimizeRouteInput };
+export type {
+  DirectionPoint,
+  RoutingContextWeather,
+  GetRouteInput,
+  OptimizeRouteInput,
+  EvaluatedRouteAlternativesResult,
+};
