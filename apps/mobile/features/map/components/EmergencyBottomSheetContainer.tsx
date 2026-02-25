@@ -13,16 +13,20 @@ type EmergencyBottomSheetContainerProps = {
   controller: EmergencyBottomSheetController;
 };
 
+const minimizedSnapPoint = "15%";
+
 export function EmergencyBottomSheetContainer({
   controller,
 }: EmergencyBottomSheetContainerProps) {
   const sheetRef = useRef<BottomSheet>(null);
 
   const snapPoints = useMemo(
-    () =>
-      controller.sheetMode === "directions"
+    () => [
+      minimizedSnapPoint,
+      ...(controller.sheetMode === "directions"
         ? [...directionsSnapPoints]
-        : [...overviewSnapPoints],
+        : [...overviewSnapPoints]),
+    ],
     [controller.sheetMode]
   );
 
@@ -33,23 +37,34 @@ export function EmergencyBottomSheetContainer({
     }
 
     requestAnimationFrame(() => {
-      if (controller.sheetMode === "directions") {
-        sheetRef.current?.snapToIndex(1);
-      } else {
+      if (controller.isMinimized) {
         sheetRef.current?.snapToIndex(0);
+        return;
+      }
+
+      if (controller.sheetMode === "directions") {
+        sheetRef.current?.snapToIndex(2);
+      } else {
+        sheetRef.current?.snapToIndex(1);
       }
     });
-  }, [controller.selectedEmergency, controller.sheetMode, snapPoints]);
+  }, [controller.selectedEmergency, controller.sheetMode, controller.isMinimized, snapPoints]);
 
   return (
     <BottomSheet
       ref={sheetRef}
       index={-1}
       snapPoints={snapPoints}
-      enablePanDownToClose
+      enablePanDownToClose={false}
       onChange={(index) => {
-        if (index === -1) {
-          controller.closeSheet();
+        if (!controller.selectedEmergency) return;
+        if (index <= 0) {
+          controller.minimizeSheet();
+          return;
+        }
+
+        if (controller.isMinimized) {
+          controller.expandSheet();
         }
       }}
       backgroundStyle={styles.background}

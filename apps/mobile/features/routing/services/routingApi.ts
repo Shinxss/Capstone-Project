@@ -8,6 +8,7 @@ export type OptimizeRouteAIRequest = {
   end: { lng: number; lat: number };
   profile?: RoutingProfile;
   mode?: RoutingMode;
+  allowNonPassableFallback?: boolean;
   weather?: {
     rainfall_mm?: number;
     is_raining?: 0 | 1;

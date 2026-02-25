@@ -28,6 +28,7 @@ type UseEmergencyBottomSheetOptions = {
 export type EmergencyBottomSheetController = {
   selectedEmergency: Emergency | null;
   sheetMode: "overview" | "directions";
+  isMinimized: boolean;
   travelMode: TravelMode;
   route: RouteSummary | null;
   routeAlternatives: RouteSummary[];
@@ -35,6 +36,8 @@ export type EmergencyBottomSheetController = {
   risk: RiskAssessment | null;
   loadingRoute: boolean;
   openEmergency: (emergency: Emergency) => void;
+  minimizeSheet: () => void;
+  expandSheet: () => void;
   closeSheet: () => void;
   goToOverview: () => void;
   goToDirections: () => Promise<void>;
@@ -59,6 +62,7 @@ export function useEmergencyBottomSheet(
 
   const [selectedEmergency, setSelectedEmergency] = useState<Emergency | null>(null);
   const [sheetMode, setSheetMode] = useState<"overview" | "directions">("overview");
+  const [isMinimized, setIsMinimized] = useState(false);
   const [travelMode, setTravelModeState] = useState<TravelMode>("drive");
   const [route, setRoute] = useState<RouteSummary | null>(null);
   const [routeAlternatives, setRouteAlternatives] = useState<RouteSummary[]>([]);
@@ -70,6 +74,7 @@ export function useEmergencyBottomSheet(
   const closeSheet = useCallback(() => {
     setSelectedEmergency(null);
     setSheetMode("overview");
+    setIsMinimized(false);
     setTravelModeState("drive");
     setRoute(null);
     setRouteAlternatives([]);
@@ -81,6 +86,7 @@ export function useEmergencyBottomSheet(
 
   const goToOverview = useCallback(() => {
     setSheetMode("overview");
+    setIsMinimized(false);
     setRoute(null);
     setRouteAlternatives([]);
     setRouteRiskByIndex({});
@@ -91,12 +97,21 @@ export function useEmergencyBottomSheet(
   const openEmergency = useCallback((emergency: Emergency) => {
     setSelectedEmergency(emergency);
     setSheetMode("overview");
+    setIsMinimized(false);
     setTravelModeState("drive");
     setRoute(null);
     setRouteAlternatives([]);
     setRouteRiskByIndex({});
     setSelectedRouteIndex(0);
     setRisk(null);
+  }, []);
+
+  const minimizeSheet = useCallback(() => {
+    setIsMinimized((current) => (current ? current : true));
+  }, []);
+
+  const expandSheet = useCallback(() => {
+    setIsMinimized((current) => (current ? false : current));
   }, []);
 
   const fetchRouteByMode = useCallback(
@@ -157,6 +172,7 @@ export function useEmergencyBottomSheet(
   const goToDirections = useCallback(async () => {
     if (!selectedEmergency) return;
     setSheetMode("directions");
+    setIsMinimized(false);
     if (!route) {
       await fetchRouteByMode(travelMode);
     }
@@ -203,14 +219,66 @@ export function useEmergencyBottomSheet(
         contextWeather: getWeatherContext?.() ?? undefined,
       });
 
-      setRoute(optimized.route);
-      setRouteAlternatives([optimized.route]);
-      setRouteRiskByIndex({ 0: optimized.risk });
-      setSelectedRouteIndex(0);
-      setRisk(optimized.risk);
+      const applyOptimizedResult = (result: typeof optimized) => {
+        setRoute(result.route);
+        setRouteAlternatives([result.route]);
+        setRouteRiskByIndex({ 0: result.risk });
+        setSelectedRouteIndex(0);
+        setRisk(result.risk);
+      };
+
+      applyOptimizedResult(optimized);
     } catch (error) {
       const parsed = parseApiError(error);
       const prefix = parsed.status ? `AI route failed (${parsed.status})` : "AI route failed";
+      if (parsed.status === 409) {
+        Alert.alert(
+          "No passable route",
+          `${parsed.message}\n\nRecommend the safest nearby route even if currently not passable?`,
+          [
+            {
+              text: "Cancel",
+              style: "cancel",
+            },
+            {
+              text: "Recommend anyway",
+              onPress: () => {
+                void (async () => {
+                  setLoadingRoute(true);
+                  try {
+                    const fallbackOptimized = await optimizeRoute({
+                      from: origin,
+                      to: {
+                        lat: selectedEmergency.location.lat,
+                        lng: selectedEmergency.location.lng,
+                      },
+                      mode: travelMode,
+                      allowNonPassableFallback: true,
+                      contextWeather: getWeatherContext?.() ?? undefined,
+                    });
+
+                    setRoute(fallbackOptimized.route);
+                    setRouteAlternatives([fallbackOptimized.route]);
+                    setRouteRiskByIndex({ 0: fallbackOptimized.risk });
+                    setSelectedRouteIndex(0);
+                    setRisk(fallbackOptimized.risk);
+                  } catch (fallbackError) {
+                    const fallbackParsed = parseApiError(fallbackError);
+                    const fallbackPrefix = fallbackParsed.status
+                      ? `AI route failed (${fallbackParsed.status})`
+                      : "AI route failed";
+                    Alert.alert(fallbackPrefix, fallbackParsed.message);
+                  } finally {
+                    setLoadingRoute(false);
+                  }
+                })();
+              },
+            },
+          ]
+        );
+        return;
+      }
+
       Alert.alert(prefix, `${parsed.message}\n\nUsing standard route fallback.`);
 
       try {
@@ -255,6 +323,7 @@ export function useEmergencyBottomSheet(
   return {
     selectedEmergency,
     sheetMode,
+    isMinimized,
     travelMode,
     route,
     routeAlternatives,
@@ -262,6 +331,8 @@ export function useEmergencyBottomSheet(
     risk,
     loadingRoute,
     openEmergency,
+    minimizeSheet,
+    expandSheet,
     closeSheet,
     goToOverview,
     goToDirections,

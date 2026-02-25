@@ -579,7 +579,9 @@ export default function MapTab() {
   };
 
   const openLayersSheet = () => {
-    emergencySheet.closeSheet();
+    if (emergencySheet.selectedEmergency) {
+      emergencySheet.minimizeSheet();
+    }
     requestAnimationFrame(() => layersSheetRef.current?.snapToIndex(1));
   };
 
@@ -608,6 +610,11 @@ export default function MapTab() {
           attributionEnabled={false}
           compassEnabled={false}
           scaleBarEnabled={false}
+          onPress={() => {
+            if (emergencySheet.selectedEmergency) {
+              emergencySheet.minimizeSheet();
+            }
+          }}
           onDidFinishLoadingStyle={() => console.log("[Mapbox] style loaded", styleKey)}
            onMapLoadingError={() => {
             console.log("[Mapbox] map loading error");

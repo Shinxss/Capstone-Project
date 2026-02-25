@@ -422,6 +422,43 @@ function compareOptimizedCandidates(a: CandidateRoute, b: CandidateRoute): numbe
   return a.index - b.index;
 }
 
+function compareLowCostNearestCandidates(a: CandidateRoute, b: CandidateRoute): number {
+  const byCost =
+    toNonNegativeNumber(a.routing_cost ?? BLOCKED_ROUTE_SCORE) -
+    toNonNegativeNumber(b.routing_cost ?? BLOCKED_ROUTE_SCORE);
+  if (byCost !== 0) return byCost;
+
+  const byDuration =
+    toNonNegativeNumber(a.duration + a.hazardPenaltySeconds) -
+    toNonNegativeNumber(b.duration + b.hazardPenaltySeconds);
+  if (byDuration !== 0) return byDuration;
+
+  const byDistance = toNonNegativeNumber(a.distance) - toNonNegativeNumber(b.distance);
+  if (byDistance !== 0) return byDistance;
+
+  const byScore =
+    toNonNegativeNumber(a.finalScore ?? BLOCKED_ROUTE_SCORE) -
+    toNonNegativeNumber(b.finalScore ?? BLOCKED_ROUTE_SCORE);
+  if (byScore !== 0) return byScore;
+
+  return a.index - b.index;
+}
+
+function chooseNonPassableFallbackCandidate(
+  candidates: CandidateRoute[]
+): CandidateRoute | null {
+  if (!candidates.length) return null;
+
+  const nonBlocked = candidates.filter((candidate) => !candidate.blocked);
+  const nonPassable = nonBlocked.filter((candidate) => candidate.route_passable === false);
+  const pool = nonPassable.length ? nonPassable : nonBlocked;
+  if (!pool.length) return null;
+
+  return pool.reduce((best, current) =>
+    compareLowCostNearestCandidates(current, best) < 0 ? current : best
+  );
+}
+
 function chooseOptimizationCandidate(candidates: CandidateRoute[]): CandidateRoute | null {
   if (!candidates.length) return null;
 
@@ -770,10 +807,15 @@ async function evaluateRouteCandidate(
 
 async function scoreEvaluatedCandidates(
   candidates: CandidateRoute[],
-  options: { allowBlockedSelection?: boolean; selectionMode?: ScoreSelectionMode } = {}
+  options: {
+    allowBlockedSelection?: boolean;
+    selectionMode?: ScoreSelectionMode;
+    requirePassable?: boolean;
+  } = {}
 ): Promise<ScoredCandidates> {
   const allowBlockedSelection = Boolean(options.allowBlockedSelection);
   const selectionMode = options.selectionMode ?? "optimize";
+  const requirePassable = Boolean(options.requirePassable);
   const scorable = candidates.filter((candidate) => candidate.geometry.coordinates.length >= 2);
 
   if (!scorable.length) {
@@ -825,12 +867,19 @@ async function scoreEvaluatedCandidates(
       OPTIMIZE_PASSABILITY_SCORE_WEIGHT * passabilityPenalty;
   }
 
-  const choicePool = allowBlockedSelection
+  let choicePool = allowBlockedSelection
     ? scorable
     : scorable.filter((candidate) => !candidate.blocked);
 
   if (!choicePool.length) {
     return { candidates, chosen: null };
+  }
+
+  if (requirePassable) {
+    choicePool = choicePool.filter((candidate) => candidate.route_passable === true);
+    if (!choicePool.length) {
+      return { candidates, chosen: null };
+    }
   }
 
   const chosen =
@@ -1032,6 +1081,7 @@ async function buildRoadClosedExcludePoints(routes: MapboxRoute[]): Promise<Coor
 export async function optimizeRoute(payload: OptimizeRouteInput): Promise<OptimizedRouteResult> {
   const { weather, usedWeather } = await resolveRoutingWeather(payload);
   const mode = payload.mode ?? "optimize";
+  const allowNonPassableFallback = payload.allowNonPassableFallback === true;
 
   if (mode === "evaluate") {
     const evalRoutes = await getDirections(payload);
@@ -1064,6 +1114,7 @@ export async function optimizeRoute(payload: OptimizeRouteInput): Promise<Optimi
   const pass1Scored = await scoreEvaluatedCandidates(pass1Candidates, {
     allowBlockedSelection: false,
     selectionMode: "optimize",
+    requirePassable: true,
   });
   if (pass1Scored.chosen) {
     return buildOptimizedRouteResult(pass1Scored.candidates, pass1Scored.chosen, usedWeather);
@@ -1074,14 +1125,22 @@ export async function optimizeRoute(payload: OptimizeRouteInput): Promise<Optimi
     const pass1Relaxed = await scoreEvaluatedCandidates(pass1Candidates, {
       allowBlockedSelection: true,
       selectionMode: "optimize",
+      requirePassable: true,
     });
 
     if (pass1Relaxed.chosen) {
       return buildOptimizedRouteResult(pass1Relaxed.candidates, pass1Relaxed.chosen, usedWeather);
     }
 
+    if (allowNonPassableFallback) {
+      const fallback = chooseNonPassableFallbackCandidate(pass1Relaxed.candidates);
+      if (fallback) {
+        return buildOptimizedRouteResult(pass1Relaxed.candidates, fallback, usedWeather);
+      }
+    }
+
     throw createServiceError(
-      "No route geometry available after relaxed flood-block fallback.",
+      "No passable route found. Try a nearby destination or wait for safer conditions.",
       409
     );
   }
@@ -1095,12 +1154,20 @@ export async function optimizeRoute(payload: OptimizeRouteInput): Promise<Optimi
       const pass1Relaxed = await scoreEvaluatedCandidates(pass1Candidates, {
         allowBlockedSelection: true,
         selectionMode: "optimize",
+        requirePassable: true,
       });
       if (pass1Relaxed.chosen) {
         return buildOptimizedRouteResult(pass1Relaxed.candidates, pass1Relaxed.chosen, usedWeather);
       }
+
+      if (allowNonPassableFallback) {
+        const fallback = chooseNonPassableFallbackCandidate(pass1Relaxed.candidates);
+        if (fallback) {
+          return buildOptimizedRouteResult(pass1Relaxed.candidates, fallback, usedWeather);
+        }
+      }
       throw createServiceError(
-        "No route geometry available after relaxed flood-block fallback.",
+        "No passable route found. Try a nearby destination or wait for safer conditions.",
         409
       );
     }
@@ -1114,6 +1181,7 @@ export async function optimizeRoute(payload: OptimizeRouteInput): Promise<Optimi
   const pass2Scored = await scoreEvaluatedCandidates(pass2Candidates, {
     allowBlockedSelection: false,
     selectionMode: "optimize",
+    requirePassable: true,
   });
   if (pass2Scored.chosen) {
     return buildOptimizedRouteResult(pass2Scored.candidates, pass2Scored.chosen, usedWeather);
@@ -1122,6 +1190,7 @@ export async function optimizeRoute(payload: OptimizeRouteInput): Promise<Optimi
   const pass2Relaxed = await scoreEvaluatedCandidates(pass2Candidates, {
     allowBlockedSelection: true,
     selectionMode: "optimize",
+    requirePassable: true,
   });
   if (pass2Relaxed.chosen) {
     return buildOptimizedRouteResult(pass2Relaxed.candidates, pass2Relaxed.chosen, usedWeather);
@@ -1130,10 +1199,26 @@ export async function optimizeRoute(payload: OptimizeRouteInput): Promise<Optimi
   const pass1Relaxed = await scoreEvaluatedCandidates(pass1Candidates, {
     allowBlockedSelection: true,
     selectionMode: "optimize",
+    requirePassable: true,
   });
   if (pass1Relaxed.chosen) {
     return buildOptimizedRouteResult(pass1Relaxed.candidates, pass1Relaxed.chosen, usedWeather);
   }
 
-  throw createServiceError("No route geometry available after relaxed flood-block fallback.", 409);
+  if (allowNonPassableFallback) {
+    const pass2Fallback = chooseNonPassableFallbackCandidate(pass2Relaxed.candidates);
+    if (pass2Fallback) {
+      return buildOptimizedRouteResult(pass2Relaxed.candidates, pass2Fallback, usedWeather);
+    }
+
+    const pass1Fallback = chooseNonPassableFallbackCandidate(pass1Relaxed.candidates);
+    if (pass1Fallback) {
+      return buildOptimizedRouteResult(pass1Relaxed.candidates, pass1Fallback, usedWeather);
+    }
+  }
+
+  throw createServiceError(
+    "No passable route found. Try a nearby destination or wait for safer conditions.",
+    409
+  );
 }

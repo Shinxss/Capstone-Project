@@ -30,6 +30,7 @@ type GetRouteInput = {
 
 type OptimizeRouteInput = GetRouteInput & {
   contextWeather?: RoutingContextWeather;
+  allowNonPassableFallback?: boolean;
 };
 
 type OptimizeRouteResult = {
@@ -400,6 +401,7 @@ export async function optimizeRoute(input: OptimizeRouteInput): Promise<Optimize
     end: input.to,
     profile,
     mode: "optimize",
+    ...(input.allowNonPassableFallback ? { allowNonPassableFallback: true } : {}),
     ...(input.contextWeather ? { weather: input.contextWeather } : {}),
   });
 
