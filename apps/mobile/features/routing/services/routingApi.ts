@@ -30,6 +30,12 @@ export type OptimizeRouteAIData = {
     index: number;
     distance: number;
     duration: number;
+    blocked?: boolean;
+    floodMaxDepth?: number;
+    floodPenaltySeconds?: number;
+    floodBlocked?: boolean;
+    floodImpassableRatio?: number;
+    floodHasImpassableSegments?: boolean;
     routing_cost: number;
     finalScore: number;
   }>;

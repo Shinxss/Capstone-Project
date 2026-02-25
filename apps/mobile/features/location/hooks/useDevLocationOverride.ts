@@ -21,11 +21,9 @@ const DEFAULT_DEV_LOCATION_OVERRIDE: DevLocationOverride = {
   lng: DEV_LOCATION_DAGUPAN_PRESET.lng,
 };
 
-function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
+function sanitizeNumber(value: unknown, fallback: number): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
-  if (parsed < min) return min;
-  if (parsed > max) return max;
   return parsed;
 }
 
@@ -33,8 +31,8 @@ function sanitizeOverride(value: unknown): DevLocationOverride {
   const input = (value ?? {}) as DevLocationOverridePatch;
   return {
     enabled: input.enabled === true,
-    lat: clampNumber(input.lat, -90, 90, DEFAULT_DEV_LOCATION_OVERRIDE.lat),
-    lng: clampNumber(input.lng, -180, 180, DEFAULT_DEV_LOCATION_OVERRIDE.lng),
+    lat: sanitizeNumber(input.lat, DEFAULT_DEV_LOCATION_OVERRIDE.lat),
+    lng: sanitizeNumber(input.lng, DEFAULT_DEV_LOCATION_OVERRIDE.lng),
   };
 }
 

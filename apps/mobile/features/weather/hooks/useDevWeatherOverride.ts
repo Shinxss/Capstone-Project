@@ -19,7 +19,7 @@ const DEFAULT_DEV_WEATHER_OVERRIDE: DevWeatherOverride = {
 function sanitizeRainfall(value: unknown): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return DEFAULT_DEV_WEATHER_OVERRIDE.rainfall_mm;
-  return Math.max(0, parsed);
+  return parsed;
 }
 
 function sanitizeIsRaining(value: unknown): 0 | 1 {

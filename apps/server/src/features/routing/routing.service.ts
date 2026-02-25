@@ -6,6 +6,7 @@ import {
 } from "./routing.validation";
 import { predictRoutingRiskCosts, type RoutingRiskModelRow } from "./routingRiskModel";
 import { getWeatherSummary } from "../weather/weather.service";
+import { computeFloodStatsForRoute } from "../floodRoads/floodRoad.service";
 
 const MAPBOX_DIRECTIONS_BASE = "https://api.mapbox.com/directions/v5/mapbox";
 const BLOCKED_ROUTE_SCORE = Number.MAX_SAFE_INTEGER;
@@ -21,7 +22,6 @@ const SCORE_WEIGHTS = {
 } as const;
 
 const HAZARD_PENALTY_SECONDS: Record<string, number> = {
-  FLOODED: 10 * 60,
   LANDSLIDE: 15 * 60,
   FIRE_RISK: 12 * 60,
   UNSAFE: 6 * 60,
@@ -72,6 +72,11 @@ type CandidateRoute = {
   features: RoutingRiskModelRow;
   blocked: boolean;
   hazardPenaltySeconds: number;
+  floodMaxDepth?: number;
+  floodPenaltySeconds?: number;
+  floodBlocked?: boolean;
+  floodImpassableRatio?: number;
+  floodHasImpassableSegments?: boolean;
   routing_cost?: number;
   finalScore?: number;
 };
@@ -104,6 +109,11 @@ export type OptimizedRouteResult = {
     distance: number;
     duration: number;
     blocked: boolean;
+    floodMaxDepth?: number;
+    floodPenaltySeconds?: number;
+    floodBlocked?: boolean;
+    floodImpassableRatio?: number;
+    floodHasImpassableSegments?: boolean;
     routing_cost: number;
     finalScore: number;
   }>;
@@ -279,6 +289,10 @@ function buildDirectionsCoordinatesPath(start: Coordinates, end: Coordinates): s
   return `${start[0]},${start[1]};${end[0]},${end[1]}`;
 }
 
+function buildDirectionsMultiCoordinatesPath(points: Coordinates[]): string {
+  return points.map(([lng, lat]) => `${lng},${lat}`).join(";");
+}
+
 function toExcludeParam(excludePoints: Coordinates[]): string {
   return excludePoints
     .map(([lng, lat]) => `point(${roundCoordinate(lng)} ${roundCoordinate(lat)})`)
@@ -293,36 +307,212 @@ async function getDirections(
   if (!mapboxToken) {
     throw createServiceError("MAPBOX_TOKEN is not configured.", 500);
   }
+  const mapboxAccessToken: string = mapboxToken;
 
-  const url = new URL(
-    `${MAPBOX_DIRECTIONS_BASE}/${payload.profile}/${buildDirectionsCoordinatesPath(
-      [payload.start.lng, payload.start.lat],
-      [payload.end.lng, payload.end.lat]
-    )}`
-  );
+  const start: Coordinates = [payload.start.lng, payload.start.lat];
+  const end: Coordinates = [payload.end.lng, payload.end.lat];
 
-  url.searchParams.set("alternatives", "true");
-  url.searchParams.set("steps", "true");
-  url.searchParams.set("geometries", "geojson");
-  url.searchParams.set("overview", "full");
-  url.searchParams.set("access_token", mapboxToken);
+  async function fetchDirections(options: {
+    coords: Coordinates[];
+    exclude?: Coordinates[];
+    alternatives?: boolean;
+    continueStraight?: boolean;
+  }): Promise<MapboxRoute[]> {
+    const url = new URL(
+      `${MAPBOX_DIRECTIONS_BASE}/${payload.profile}/${buildDirectionsMultiCoordinatesPath(
+        options.coords
+      )}`
+    );
 
-  if (excludePoints.length) {
-    url.searchParams.set("exclude", toExcludeParam(excludePoints));
+    url.searchParams.set("alternatives", options.alternatives ? "true" : "false");
+    url.searchParams.set("steps", "true");
+    url.searchParams.set("geometries", "geojson");
+    url.searchParams.set("overview", "full");
+    url.searchParams.set("access_token", mapboxAccessToken);
+
+    if (typeof options.continueStraight === "boolean") {
+      url.searchParams.set(
+        "continue_straight",
+        options.continueStraight ? "true" : "false"
+      );
+    }
+
+    if (options.exclude?.length) {
+      url.searchParams.set("exclude", toExcludeParam(options.exclude));
+    }
+
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      throw createServiceError("Directions provider request failed.", 502);
+    }
+
+    const body = (await response.json()) as MapboxDirectionsResponse;
+    const routes = Array.isArray(body.routes) ? body.routes : [];
+    // Debug: confirm whether Mapbox is returning alternatives.
+    // IMPORTANT: never log access tokens.
+    const safeUrl = url.toString().replace(/access_token=[^&]+/i, "access_token=REDACTED");
+    console.log("[Mapbox] url:", safeUrl);
+    console.log("[Mapbox] routes returned:", routes.length);
+    return routes;
   }
 
-  const response = await fetch(url.toString());
-  if (!response.ok) {
-    throw createServiceError("Directions provider request failed.", 502);
+  function routeKey(route: MapboxRoute): string {
+    const d = Math.round(toNonNegativeNumber(route.distance));
+    const t = Math.round(toNonNegativeNumber(route.duration));
+    const coords = isLineStringGeometry(route.geometry) ? route.geometry.coordinates : [];
+    if (coords.length < 2) return `${d}-${t}`;
+    const mid = coords[Math.floor(coords.length / 2)] ?? coords[0];
+    return `${d}-${t}-${toPointKey(coords[0])}|${toPointKey(mid)}|${toPointKey(
+      coords[coords.length - 1]
+    )}`;
   }
 
-  const body = (await response.json()) as MapboxDirectionsResponse;
-  const routes = Array.isArray(body.routes) ? body.routes : [];
-  if (!routes.length) {
+  function sampleExcludePointsFromRoute(route: MapboxRoute): Coordinates[] {
+    const coords = isLineStringGeometry(route.geometry) ? route.geometry.coordinates : [];
+    if (coords.length < 6) return [];
+    const picks = [0.2, 0.4, 0.6, 0.8]
+      .map((p) => coords[Math.floor(coords.length * p)])
+      .filter(Boolean) as Coordinates[];
+
+    const out: Coordinates[] = [];
+    const seen = new Set<string>();
+    for (const pt of picks) {
+      const key = toPointKey(pt);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(pt);
+    }
+    return out;
+  }
+
+  function metersToDegLat(meters: number): number {
+    return meters / 111_320;
+  }
+
+  function metersToDegLng(meters: number, latDeg: number): number {
+    const latRad = (latDeg * Math.PI) / 180;
+    const denom = 111_320 * Math.cos(latRad);
+    if (!Number.isFinite(denom) || denom === 0) return 0;
+    return meters / denom;
+  }
+
+  function sampleDetourWaypoints(route: MapboxRoute): Coordinates[] {
+    const coords = isLineStringGeometry(route.geometry) ? route.geometry.coordinates : [];
+    if (coords.length < 4) return [];
+
+    const midIdx = Math.floor(coords.length / 2);
+    const prev = coords[Math.max(0, midIdx - 1)];
+    const mid = coords[midIdx];
+    const next = coords[Math.min(coords.length - 1, midIdx + 1)];
+    if (!prev || !mid || !next) return [];
+
+    // Approx direction vector
+    const dx = next[0] - prev[0];
+    const dy = next[1] - prev[1];
+    const mag = Math.hypot(dx, dy);
+    if (!Number.isFinite(mag) || mag === 0) return [];
+
+    // Perpendicular unit vector in lng/lat space
+    const ux = -dy / mag;
+    const uy = dx / mag;
+
+    // Small detours (meters)
+    const offsetsM = [350, 650];
+    const out: Coordinates[] = [];
+    const seen = new Set<string>();
+
+    for (const meters of offsetsM) {
+      const dLat = metersToDegLat(meters);
+      const dLng = metersToDegLng(meters, mid[1]);
+
+      const cand1: Coordinates = [mid[0] + ux * dLng, mid[1] + uy * dLat];
+      const cand2: Coordinates = [mid[0] - ux * dLng, mid[1] - uy * dLat];
+
+      for (const cand of [cand1, cand2]) {
+        const norm: Coordinates = [
+          roundCoordinate(clamp(cand[0], -180, 180)),
+          roundCoordinate(clamp(cand[1], -90, 90)),
+        ];
+        const key = toPointKey(norm);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(norm);
+      }
+    }
+
+    return out;
+  }
+
+  // 1) Standard call with alternatives=true
+  const first = await fetchDirections({
+    coords: [start, end],
+    exclude: excludePoints,
+    alternatives: true,
+  });
+  if (!first.length) {
     throw createServiceError("No routes returned by directions provider.", 404);
   }
 
-  return routes.slice(0, MAX_ROUTE_CANDIDATES);
+  const pool = new Map<string, MapboxRoute>();
+  for (const r of first) pool.set(routeKey(r), r);
+
+  if (pool.size >= 2) {
+    return Array.from(pool.values()).slice(0, MAX_ROUTE_CANDIDATES);
+  }
+
+  // 2) Retry: toggle continue_straight (sometimes changes start maneuver)
+  try {
+    const toggled = await fetchDirections({
+      coords: [start, end],
+      exclude: excludePoints,
+      alternatives: true,
+      continueStraight: false,
+    });
+    for (const r of toggled) pool.set(routeKey(r), r);
+  } catch {
+    // ignore
+  }
+  if (pool.size >= 2) {
+    return Array.from(pool.values()).slice(0, MAX_ROUTE_CANDIDATES);
+  }
+
+  // 3) Retry: add exclude points along the first route to force different paths
+  const excludeSamples = sampleExcludePointsFromRoute(first[0]);
+  for (const pt of excludeSamples) {
+    const combined = dedupeExcludePoints([...excludePoints, pt], MAX_EXCLUDE_POINTS);
+    try {
+      const more = await fetchDirections({
+        coords: [start, end],
+        exclude: combined,
+        alternatives: true,
+      });
+      for (const r of more) pool.set(routeKey(r), r);
+    } catch {
+      // ignore
+    }
+    if (pool.size >= MAX_ROUTE_CANDIDATES) break;
+  }
+  if (pool.size >= 2) {
+    return Array.from(pool.values()).slice(0, MAX_ROUTE_CANDIDATES);
+  }
+
+  // 4) Final fallback: force detours via a midpoint waypoint
+  const detours = sampleDetourWaypoints(first[0]);
+  for (const waypoint of detours) {
+    try {
+      const detourRoutes = await fetchDirections({
+        coords: [start, waypoint, end],
+        exclude: excludePoints,
+        alternatives: false,
+      });
+      for (const r of detourRoutes) pool.set(routeKey(r), r);
+    } catch {
+      // ignore
+    }
+    if (pool.size >= MAX_ROUTE_CANDIDATES) break;
+  }
+
+  return Array.from(pool.values()).slice(0, MAX_ROUTE_CANDIDATES);
 }
 
 function computeHazardPenaltySeconds(hazardTypes: Set<string>): number {
@@ -373,16 +563,24 @@ async function evaluateRouteCandidate(
   );
 
   const bridgeAndPriority = inferRouteBridgeAndPriority(steps);
+  const flood = await computeFloodStatsForRoute(route.geometry, weather);
+  const hazardPenaltySeconds = computeHazardPenaltySeconds(hazardTypes) + flood.penaltySeconds;
+  const blocked = hazardTypes.has(ROAD_HAZARD_TYPE) || flood.blockedByFlood;
 
   return {
     index,
     distance,
     duration,
     geometry: route.geometry,
-    blocked: hazardTypes.has(ROAD_HAZARD_TYPE),
-    hazardPenaltySeconds: computeHazardPenaltySeconds(hazardTypes),
+    blocked,
+    hazardPenaltySeconds,
+    floodMaxDepth: flood.maxDepth,
+    floodPenaltySeconds: flood.penaltySeconds,
+    floodBlocked: flood.blockedByFlood,
+    floodImpassableRatio: flood.impassableRatio,
+    floodHasImpassableSegments: flood.hasImpassableSegments,
     features: {
-      flood_depth_5yr: hazardTypes.has("FLOODED") ? 1 : 0,
+      flood_depth_5yr: flood.depthForModel,
       rainfall_mm: weather.rainfall_mm,
       is_raining: weather.is_raining,
       bridge: bridgeAndPriority.bridge,
@@ -392,27 +590,27 @@ async function evaluateRouteCandidate(
 }
 
 async function scoreEvaluatedCandidates(candidates: CandidateRoute[]): Promise<ScoredCandidates> {
-  const routable = candidates.filter(
-    (candidate) => !candidate.blocked && candidate.geometry.coordinates.length >= 2
-  );
+  const scorable = candidates.filter((candidate) => candidate.geometry.coordinates.length >= 2);
+  const routable = scorable.filter((candidate) => !candidate.blocked);
 
-  if (!routable.length) {
+  const targetsForScoring = routable.length ? routable : scorable;
+  if (!targetsForScoring.length) {
     return { candidates, chosen: null };
   }
 
   const modelCosts = await predictRoutingRiskCosts(
-    routable.map((candidate) => candidate.features)
+    targetsForScoring.map((candidate) => candidate.features)
   );
 
-  for (let i = 0; i < routable.length; i += 1) {
-    routable[i].routing_cost = toNonNegativeNumber(modelCosts[i] ?? 0);
+  for (let i = 0; i < targetsForScoring.length; i += 1) {
+    targetsForScoring[i].routing_cost = toNonNegativeNumber(modelCosts[i] ?? 0);
   }
 
-  const costValues = routable.map((candidate) => candidate.routing_cost ?? 0);
-  const durationValues = routable.map(
+  const costValues = targetsForScoring.map((candidate) => candidate.routing_cost ?? 0);
+  const durationValues = targetsForScoring.map(
     (candidate) => candidate.duration + candidate.hazardPenaltySeconds
   );
-  const distanceValues = routable.map((candidate) => candidate.distance);
+  const distanceValues = targetsForScoring.map((candidate) => candidate.distance);
 
   const costMin = Math.min(...costValues);
   const costMax = Math.max(...costValues);
@@ -421,8 +619,8 @@ async function scoreEvaluatedCandidates(candidates: CandidateRoute[]): Promise<S
   const distanceMin = Math.min(...distanceValues);
   const distanceMax = Math.max(...distanceValues);
 
-  for (let i = 0; i < routable.length; i += 1) {
-    const candidate = routable[i];
+  for (let i = 0; i < targetsForScoring.length; i += 1) {
+    const candidate = targetsForScoring[i];
     const effectiveDuration = candidate.duration + candidate.hazardPenaltySeconds;
 
     const normCost = normalizeValue(candidate.routing_cost ?? 0, costMin, costMax);
@@ -435,6 +633,10 @@ async function scoreEvaluatedCandidates(candidates: CandidateRoute[]): Promise<S
       SCORE_WEIGHTS.distanceM * normDistance;
   }
 
+  if (!routable.length) {
+    return { candidates, chosen: null };
+  }
+
   const chosen = routable.reduce((best, current) => {
     const bestScore = best.finalScore ?? BLOCKED_ROUTE_SCORE;
     const currentScore = current.finalScore ?? BLOCKED_ROUTE_SCORE;
@@ -442,6 +644,22 @@ async function scoreEvaluatedCandidates(candidates: CandidateRoute[]): Promise<S
   });
 
   return { candidates, chosen };
+}
+
+function chooseNearestCandidate(candidates: CandidateRoute[]): CandidateRoute | null {
+  const withGeometry = candidates.filter(
+    (candidate) => candidate.geometry.coordinates.length >= 2
+  );
+
+  if (!withGeometry.length) {
+    return null;
+  }
+
+  return withGeometry.reduce((best, current) => {
+    if (current.distance < best.distance) return current;
+    if (current.distance > best.distance) return best;
+    return current.duration < best.duration ? current : best;
+  });
 }
 
 function buildOptimizedRouteResult(
@@ -463,6 +681,11 @@ function buildOptimizedRouteResult(
       distance: candidate.distance,
       duration: candidate.duration,
       blocked: candidate.blocked,
+      floodMaxDepth: candidate.floodMaxDepth,
+      floodPenaltySeconds: candidate.floodPenaltySeconds,
+      floodBlocked: candidate.floodBlocked,
+      floodImpassableRatio: candidate.floodImpassableRatio,
+      floodHasImpassableSegments: candidate.floodHasImpassableSegments,
       routing_cost: toSerializableNumber(candidate.routing_cost ?? BLOCKED_ROUTE_SCORE),
       finalScore: toSerializableNumber(candidate.finalScore ?? BLOCKED_ROUTE_SCORE),
     })),
@@ -616,10 +839,14 @@ export async function optimizeRoute(payload: OptimizeRouteInput): Promise<Optimi
   if (pass1Scored.chosen) {
     return buildOptimizedRouteResult(pass1Scored.candidates, pass1Scored.chosen, usedWeather);
   }
+  const pass1Nearest = chooseNearestCandidate(pass1Scored.candidates);
 
   const excludePoints = await buildRoadClosedExcludePoints(pass1Routes);
   if (!excludePoints.length) {
-    throw createServiceError("No safe route available (all alternatives blocked).", 409);
+    if (pass1Nearest) {
+      return buildOptimizedRouteResult(pass1Scored.candidates, pass1Nearest, usedWeather);
+    }
+    throw createServiceError("No route geometry available to recommend.", 409);
   }
 
   let pass2Routes: MapboxRoute[];
@@ -628,7 +855,10 @@ export async function optimizeRoute(payload: OptimizeRouteInput): Promise<Optimi
   } catch (error) {
     const err = error as ServiceError;
     if (err.statusCode === 404) {
-      throw createServiceError("No safe route available (all alternatives blocked).", 409);
+      if (pass1Nearest) {
+        return buildOptimizedRouteResult(pass1Scored.candidates, pass1Nearest, usedWeather);
+      }
+      throw createServiceError("No route geometry available to recommend.", 409);
     }
     throw err;
   }
@@ -642,5 +872,14 @@ export async function optimizeRoute(payload: OptimizeRouteInput): Promise<Optimi
     return buildOptimizedRouteResult(pass2Scored.candidates, pass2Scored.chosen, usedWeather);
   }
 
-  throw createServiceError("No safe route available (all alternatives blocked).", 409);
+  const pass2Nearest = chooseNearestCandidate(pass2Scored.candidates);
+  if (pass2Nearest) {
+    return buildOptimizedRouteResult(pass2Scored.candidates, pass2Nearest, usedWeather);
+  }
+
+  if (pass1Nearest) {
+    return buildOptimizedRouteResult(pass1Scored.candidates, pass1Nearest, usedWeather);
+  }
+
+  throw createServiceError("No route geometry available to recommend.", 409);
 }

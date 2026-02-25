@@ -23,27 +23,14 @@ import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { api } from "../../lib/api";
 import { fetchEmergencyMapReports } from "../../features/emergency/services/emergencyApi";
 import { useAuth } from "../../features/auth/AuthProvider";
-import {
-  optimizeRouteAI,
-  type OptimizeRouteAIData,
-} from "../../features/routing/services/routingApi";
+import { EmergencyBottomSheetContainer } from "../../features/map/components/EmergencyBottomSheetContainer";
+import { useEmergencyBottomSheet } from "../../features/map/hooks/useEmergencyBottomSheet";
+import type { Emergency, EmergencyType } from "../../features/map/models/map.types";
 import { useDevWeatherOverride } from "../../features/weather/hooks/useDevWeatherOverride";
 import { DevWeatherOverrideOverlay } from "../../features/weather/components/DevWeatherOverrideOverlay";
 import { useDevLocationOverride } from "../../features/location/hooks/useDevLocationOverride";
 import { DevLocationOverrideOverlay } from "../../features/location/components/DevLocationOverrideOverlay";
 import { getEffectiveLocation } from "../../features/location/utils/getEffectiveLocation";
-
-type EmergencyType = "SOS" | "Flood" | "Fire" | "Typhoon" | "Earthquake" | "Collapse";
-
-type EmergencyReport = {
-  id: string;
-  type: EmergencyType;
-  title: string;
-  description?: string;
-  lng: number;
-  lat: number;
-  updated?: string;
-};
 
 type HazardZone = {
   _id: string;
@@ -56,45 +43,8 @@ type HazardZone = {
   };
 };
 
-type ApiErrorShape = {
-  message?: string;
-  response?: {
-    status?: number;
-    data?: {
-      message?: string;
-      error?: string;
-    };
-  };
-};
-
-type RouteFeature = {
-  type: "Feature";
-  properties: {
-    routeIndex?: number;
-    isPrimary?: boolean;
-    distance?: number;
-    duration?: number;
-    [key: string]: unknown;
-  };
-  geometry: {
-    type: "LineString";
-    coordinates: [number, number][];
-  };
-};
-
-type StandardRouteResult = {
-  feature: RouteFeature;
-  alternativeFeatures: RouteFeature[];
-  distance: number;
-  duration: number;
-  routeCount: number;
-  fitCoordinates: [number, number][];
-};
-
 const DAGUPAN: [number, number] = [120.3333, 16.0438];
 const TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? "";
-const ALT_ROUTE_FILL_WIDTH = 5;
-const ALT_ROUTE_STROKE_WIDTH = 2;
 
 if (TOKEN) {
   MapboxGL.setAccessToken(TOKEN);
@@ -182,24 +132,6 @@ function hexToRgba(hex: string, alpha: number) {
   const g = (num >> 8) & 255;
   const b = num & 255;
   return `rgba(${r},${g},${b},${alpha})`;
-}
-
-function parseApiError(error: unknown): { status?: number; message: string } {
-  const err = error as ApiErrorShape | undefined;
-  const status = err?.response?.status;
-  const apiMessage = err?.response?.data?.message ?? err?.response?.data?.error;
-  const message = String(apiMessage ?? err?.message ?? "Unknown error");
-  return { status, message };
-}
-
-function toRouteMetric(value: unknown, fallback: number): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
-}
-
-function toRouteIndex(value: unknown): number | null {
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
 }
 
 /**
@@ -301,25 +233,8 @@ export default function MapTab() {
   const canViewEmergencies = mode === "authed" && normalizedRole !== "COMMUNITY";
 
   const [myLocation, setMyLocation] = useState<[number, number] | null>(null);
-  const [route, setRoute] = useState<
-    {
-      feature: RouteFeature;
-      alternativeFeatures: RouteFeature[];
-      distance: number;
-      duration: number;
-      profile: "driving" | "walking";
-      source: "standard" | "ai";
-      aiScore?: number;
-      routingCost?: number;
-      routeCount?: number;
-      usedWeather?: OptimizeRouteAIData["usedWeather"] | null;
-    } | null
-  >(null);
-  const [routeLoading, setRouteLoading] = useState(false);
-  const [aiRouteLoading, setAiRouteLoading] = useState(false);
-  const [routeMode, setRouteMode] = useState<"driving" | "walking">("driving");
   const [hazardZones, setHazardZones] = useState<HazardZone[]>([]);
-  const [reports, setReports] = useState<EmergencyReport[]>([]);
+  const [reports, setReports] = useState<Emergency[]>([]);
   const devLocationEnabled = __DEV__ && devLoc.enabled;
   const devWeatherEnabled = __DEV__ && devWx.enabled;
   const effectiveDevLocation = useMemo(
@@ -390,9 +305,13 @@ export default function MapTab() {
             type: normalizeType(item.type),
             title: `${normalizeType(item.type)} Emergency`,
             description: item.description,
-            lng: item.location.coords.longitude,
-            lat: item.location.coords.latitude,
-            updated: item.createdAt ? new Date(item.createdAt).toLocaleString() : "just now",
+            images: [],
+            location: {
+              lng: item.location.coords.longitude,
+              lat: item.location.coords.latitude,
+              label: item.location.label,
+            },
+            updatedAt: item.createdAt ? new Date(item.createdAt).toLocaleString() : "just now",
           }))
         );
       } catch {
@@ -529,132 +448,8 @@ export default function MapTab() {
   }, [devLocationEnabled, isFocused, myLocation]);
 
   // draggable "Google Maps-ish" sheet
-  const sheetRef = useRef<BottomSheet>(null);
-  const snapPoints = useMemo(() => ["22%", "50%"], []);
   const layersSheetRef = useRef<BottomSheet>(null);
   const layersSnapPoints = useMemo(() => ["42%", "72%"], []);
-  const [selected, setSelected] = useState<EmergencyReport | null>(null);
-
-  useEffect(() => {
-    if (canViewEmergencies) return;
-    setSelected(null);
-    setRoute(null);
-    sheetRef.current?.close();
-  }, [canViewEmergencies]);
-
-  const openSheet = (r: EmergencyReport) => {
-    if (!canViewEmergencies) return;
-    layersSheetRef.current?.close();
-    setSelected(r);
-    requestAnimationFrame(() => sheetRef.current?.snapToIndex(1));
-  };
-
-  const openLayersSheet = () => {
-    sheetRef.current?.close();
-    requestAnimationFrame(() => layersSheetRef.current?.snapToIndex(1));
-  };
-
-  const onSelectStandardRoute = (routeIndex: number) => {
-    setRoute((current) => {
-      if (!current || current.source !== "standard") return current;
-
-      const allFeatures = [current.feature, ...current.alternativeFeatures];
-      const selectedFeature = allFeatures.find(
-        (feature) => toRouteIndex(feature.properties?.routeIndex) === routeIndex
-      );
-      if (!selectedFeature) return current;
-
-      const nextPrimary: RouteFeature = {
-        ...selectedFeature,
-        properties: {
-          ...selectedFeature.properties,
-          isPrimary: true,
-        },
-      };
-
-      const nextAlternatives: RouteFeature[] = allFeatures
-        .filter((feature) => toRouteIndex(feature.properties?.routeIndex) !== routeIndex)
-        .map((feature) => ({
-          ...feature,
-          properties: {
-            ...feature.properties,
-            isPrimary: false,
-          },
-        }));
-
-      return {
-        ...current,
-        feature: nextPrimary,
-        alternativeFeatures: nextAlternatives,
-        distance: toRouteMetric(nextPrimary.properties?.distance, current.distance),
-        duration: toRouteMetric(nextPrimary.properties?.duration, current.duration),
-      };
-    });
-  };
-
-  const onPressAlternativeRoute = (event: any) => {
-    const tappedFeature =
-      event?.features?.[0] ??
-      event?.nativeEvent?.payload?.features?.[0] ??
-      event?.nativeEvent?.payload;
-
-    const routeIndex = toRouteIndex(tappedFeature?.properties?.routeIndex);
-    if (routeIndex === null) return;
-
-    onSelectStandardRoute(routeIndex);
-  };
-
-
-  const fetchRouteFromMapbox = async (
-    start: [number, number],
-    end: [number, number],
-    profile: "driving" | "walking"
-  ): Promise<StandardRouteResult> => {
-    if (!TOKEN) throw new Error("Missing Mapbox token");
-
-    const url =
-      `https://api.mapbox.com/directions/v5/mapbox/${profile}/` +
-      `${start[0]},${start[1]};${end[0]},${end[1]}` +
-      `?alternatives=true&geometries=geojson&overview=full&steps=false&access_token=${TOKEN}`;
-
-    const res = await fetch(url);
-    if (!res.ok) throw new Error("Directions API failed");
-    const json: any = await res.json();
-
-    const routes = Array.isArray(json?.routes) ? json.routes : [];
-    const routeFeatures: RouteFeature[] = routes
-      .map((item: any, index: number) => {
-        const coords = item?.geometry?.coordinates;
-        if (!Array.isArray(coords) || coords.length < 2) return null;
-        return {
-          type: "Feature",
-          properties: {
-            routeIndex: index,
-            isPrimary: index === 0,
-            distance: Number(item?.distance ?? 0),
-            duration: Number(item?.duration ?? 0),
-          },
-          geometry: {
-            type: "LineString",
-            coordinates: coords as [number, number][],
-          },
-        } as RouteFeature;
-      })
-      .filter(Boolean);
-
-    const primary = routeFeatures[0];
-    const primaryRaw = routes[0];
-    if (!primary) throw new Error("No route");
-
-    return {
-      feature: primary,
-      alternativeFeatures: routeFeatures.slice(1),
-      distance: Number(primaryRaw?.distance ?? 0), // meters
-      duration: Number(primaryRaw?.duration ?? 0), // seconds
-      routeCount: routeFeatures.length,
-      fitCoordinates: routeFeatures.flatMap((feature) => feature.geometry.coordinates),
-    };
-  };
 
   const fitRoute = (coords: [number, number][]) => {
     try {
@@ -690,13 +485,21 @@ export default function MapTab() {
     }
   };
 
-  const resolveStartLocation = async (): Promise<[number, number] | null> => {
+  const resolveStartLocation = async (): Promise<{ lng: number; lat: number } | null> => {
     if (devLocationEnabled) {
       const effective = getEffectiveLocation(effectiveDevLocation, gpsLocation);
-      return [effective.lng, effective.lat];
+      return {
+        lng: effective.lng,
+        lat: effective.lat,
+      };
     }
 
-    if (myLocation) return myLocation;
+    if (myLocation) {
+      return {
+        lng: myLocation[0],
+        lat: myLocation[1],
+      };
+    }
 
     try {
       const servicesEnabled = await Location.hasServicesEnabledAsync();
@@ -728,129 +531,56 @@ export default function MapTab() {
         lng: coords[0],
         lat: coords[1],
       });
-      return [effective.lng, effective.lat];
+      return {
+        lng: effective.lng,
+        lat: effective.lat,
+      };
     } catch {
       Alert.alert("Location needed", "Unable to read your current location right now.");
       return null;
     }
   };
 
-  const onPressDirection = async (profile?: "driving" | "walking") => {
-    if (!selected) return;
+  const emergencySheet = useEmergencyBottomSheet({
+    resolveOrigin: resolveStartLocation,
+    getWeatherContext: () =>
+      devWeatherEnabled
+        ? {
+            rainfall_mm: devWx.rainfall_mm,
+            is_raining: devWx.is_raining,
+          }
+        : null,
+  });
+  const inactiveRouteAlternatives = useMemo(
+    () =>
+      emergencySheet.routeAlternatives.filter(
+        (_route, index) => index !== emergencySheet.selectedRouteIndex
+      ),
+    [emergencySheet.routeAlternatives, emergencySheet.selectedRouteIndex]
+  );
 
-    const useProfile = profile ?? routeMode;
-    const startLocation = await resolveStartLocation();
-    if (!startLocation) return;
+  useEffect(() => {
+    if (canViewEmergencies) return;
+    emergencySheet.closeSheet();
+  }, [canViewEmergencies, emergencySheet.closeSheet]);
 
-    setRouteLoading(true);
-    try {
-      const standard = await fetchRouteFromMapbox(startLocation, [selected.lng, selected.lat], useProfile);
-      setRoute({
-        ...standard,
-        profile: useProfile,
-        source: "standard",
-        usedWeather: null,
-      });
-
-      const coords = standard.fitCoordinates;
-      if (coords.length >= 2) fitRoute(coords);
-    } catch {
-      Alert.alert("Directions unavailable", "Unable to fetch route. Try again.");
-    } finally {
-      setRouteLoading(false);
+  useEffect(() => {
+    if (emergencySheet.sheetMode !== "directions") return;
+    const coords = emergencySheet.route?.geometry.coordinates ?? [];
+    if (coords.length >= 2) {
+      fitRoute(coords);
     }
+  }, [emergencySheet.route, emergencySheet.sheetMode]);
+
+  const openSheet = (emergency: Emergency) => {
+    if (!canViewEmergencies) return;
+    layersSheetRef.current?.close();
+    emergencySheet.openEmergency(emergency);
   };
 
-  const onPressAiRouteOptimization = async (profile?: "driving" | "walking") => {
-    if (!selected) return;
-
-    const useProfile = profile ?? routeMode;
-    const startLocation = await resolveStartLocation();
-    if (!startLocation) return;
-
-    setAiRouteLoading(true);
-    try {
-      const optimized = await optimizeRouteAI({
-        start: { lng: startLocation[0], lat: startLocation[1] },
-        end: { lng: selected.lng, lat: selected.lat },
-        profile: useProfile,
-        ...(devWeatherEnabled
-          ? {
-              weather: {
-                rainfall_mm: devWx.rainfall_mm,
-                is_raining: devWx.is_raining,
-              },
-            }
-          : {}),
-      });
-
-      setRoute({
-        feature: {
-          type: "Feature",
-          properties: {
-            chosenIndex: optimized.chosenIndex,
-            finalScore: optimized.chosen.finalScore,
-            routing_cost: optimized.chosen.routing_cost,
-          },
-          geometry: optimized.chosen.geometry,
-        } as RouteFeature,
-        alternativeFeatures: [],
-        distance: Number(optimized.chosen.distance ?? 0),
-        duration: Number(optimized.chosen.duration ?? 0),
-        profile: useProfile,
-        source: "ai",
-        aiScore: Number(optimized.chosen.finalScore ?? 0),
-        routingCost: Number(optimized.chosen.routing_cost ?? 0),
-        routeCount: Number(optimized.candidates?.length ?? 1),
-        usedWeather: optimized.usedWeather ?? null,
-      });
-
-      const coords = (optimized.chosen.geometry?.coordinates ?? []) as [number, number][];
-      if (coords.length >= 2) fitRoute(coords);
-    } catch (error) {
-      const parsed = parseApiError(error);
-      console.error("[AI Route] optimize failed", {
-        status: parsed.status,
-        message: parsed.message,
-      });
-
-      const status = parsed.status;
-      if (status === 409) {
-        Alert.alert(
-          "No safe AI route",
-          parsed.message || "All available alternatives intersect a road-closed or hazardous segment."
-        );
-        return;
-      }
-
-      const prefix = status ? `AI route failed (${status})` : "AI route failed";
-      Alert.alert(prefix, `${parsed.message}\n\nUsing standard route fallback.`);
-      try {
-        const fallback = await fetchRouteFromMapbox(startLocation, [selected.lng, selected.lat], useProfile);
-        setRoute({
-          ...fallback,
-          profile: useProfile,
-          source: "standard",
-          usedWeather: null,
-        });
-
-        const coords = fallback.fitCoordinates;
-        if (coords.length >= 2) fitRoute(coords);
-      } catch (fallbackError) {
-        const fallbackParsed = parseApiError(fallbackError);
-        console.error("[AI Route] standard fallback failed", {
-          status: fallbackParsed.status,
-          message: fallbackParsed.message,
-        });
-        Alert.alert("Directions unavailable", "Unable to fetch route. Try again.");
-      }
-    } finally {
-      setAiRouteLoading(false);
-    }
-  };
-
-  const clearRoute = () => {
-    setRoute(null);
+  const openLayersSheet = () => {
+    emergencySheet.closeSheet();
+    requestAnimationFrame(() => layersSheetRef.current?.snapToIndex(1));
   };
 
   // chips (replace old status pill)
@@ -909,53 +639,62 @@ export default function MapTab() {
             </MapboxGL.ShapeSource>
           ) : null}
 
+          {emergencySheet.route ? (
+            <>
+              {inactiveRouteAlternatives.length ? (
+                <MapboxGL.ShapeSource
+                  id="routeAlternativeSource"
+                  shape={
+                    {
+                      type: "FeatureCollection",
+                      features: inactiveRouteAlternatives.map((candidate, index) => ({
+                        type: "Feature",
+                        properties: { id: `alt-${index}` },
+                        geometry: candidate.geometry,
+                      })),
+                    } as any
+                  }
+                >
+                  <MapboxGL.LineLayer
+                    id="routeAlternativeLine"
+                    style={{
+                      lineColor: "#94A3B8",
+                      lineOpacity: 0.88,
+                      lineWidth: 5,
+                      lineCap: "round",
+                      lineJoin: "round",
+                    } as any}
+                  />
+                </MapboxGL.ShapeSource>
+              ) : null}
 
-          {route?.source === "standard" && route.alternativeFeatures.length ? (
-            <MapboxGL.ShapeSource
-              id="routeAlternativesSource"
-              shape={{ type: "FeatureCollection", features: route.alternativeFeatures } as any}
-              onPress={onPressAlternativeRoute}
-            >
-              <MapboxGL.LineLayer
-                id="routeAlternativesOutlineLine"
-                style={{
-                  lineColor: "#1D4ED8",
-                  lineOpacity: 1,
-                  lineWidth: ALT_ROUTE_FILL_WIDTH + ALT_ROUTE_STROKE_WIDTH * 2,
-                  lineCap: "round",
-                  lineJoin: "round",
-                } as any}
-              />
-              <MapboxGL.LineLayer
-                id="routeAlternativesLine"
-                style={{
-                  lineColor: "#98c4f5",
-                  lineOpacity: 0.8,
-                  lineWidth: ALT_ROUTE_FILL_WIDTH,
-                  lineCap: "round",
-                  lineJoin: "round",
-                } as any}
-              />
-            </MapboxGL.ShapeSource>
-          ) : null}
-
-          {route ? (
-            <MapboxGL.ShapeSource
-              id="routeSource"
-              shape={{ type: "FeatureCollection", features: [route.feature] } as any}
-            >
-              <MapboxGL.LineLayer
-                id="routeLine"
-                aboveLayerID="routeAlternativesLine"
-                style={{
-                  lineColor: "#1D4ED8",
-                  lineOpacity: 0.95,
-                  lineWidth: 7,
-                  lineCap: "round",
-                  lineJoin: "round",
-                } as any}
-              />
-            </MapboxGL.ShapeSource>
+              <MapboxGL.ShapeSource
+                id="routeSource"
+                shape={
+                  {
+                    type: "FeatureCollection",
+                    features: [
+                      {
+                        type: "Feature",
+                        properties: {},
+                        geometry: emergencySheet.route.geometry,
+                      },
+                    ],
+                  } as any
+                }
+              >
+                <MapboxGL.LineLayer
+                  id="routeLine"
+                  style={{
+                    lineColor: "#1D4ED8",
+                    lineOpacity: 0.95,
+                    lineWidth: 7,
+                    lineCap: "round",
+                    lineJoin: "round",
+                  } as any}
+                />
+              </MapboxGL.ShapeSource>
+            </>
           ) : null}
 
           {effectiveUserLocation ? (
@@ -968,7 +707,7 @@ export default function MapTab() {
             ? filteredReports.map((r) => (
                 <MapboxGL.MarkerView
                   key={r.id}
-                  coordinate={[r.lng, r.lat]}
+                  coordinate={[r.location.lng, r.location.lat]}
                   anchor={{ x: 0.5, y: 0.5 }}
                 >
                   <Pressable onPress={() => openSheet(r)} style={{ padding: 2 }}>
@@ -1044,7 +783,7 @@ export default function MapTab() {
           override={devWx}
           onPatch={patchDevWx}
           onClear={clearDevWx}
-          lastUsed={route?.usedWeather ?? null}
+          lastUsed={emergencySheet.risk?.usedWeather ?? null}
           top={Math.max(110, insets.top + 86)}
         />
 
@@ -1055,172 +794,7 @@ export default function MapTab() {
           top={Math.max(164, insets.top + 140)}
         />
 
-        {/* Bottom sheet */}
-        <BottomSheet
-          ref={sheetRef}
-          index={-1}
-          snapPoints={snapPoints}
-          enablePanDownToClose
-          backgroundStyle={styles.sheetBg}
-          handleIndicatorStyle={styles.sheetHandle}
-        >
-          <BottomSheetView style={styles.sheetContent}>
-            <View style={styles.sheetHeader}>
-              <View style={styles.sheetTitleRow}>
-                <View
-                  style={[
-                    styles.sheetIcon,
-                    {
-                      backgroundColor: selected
-                        ? hexToRgba(colorForType(selected.type), 0.15)
-                        : "rgba(0,0,0,0.06)",
-                    },
-                  ]}
-                >
-                  {selected ? (
-                    <MaterialCommunityIcons
-                      name={mciForType(selected.type) as any}
-                      size={18}
-                      color={colorForType(selected.type)}
-                    />
-                  ) : (
-                    <MaterialCommunityIcons name={"alert"} size={18} color={"#666"} />
-                  )}
-                </View>
-
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.sheetTitle} numberOfLines={1}>
-                    {selected?.title ?? "Select an emergency"}
-                  </Text>
-                  <Text style={styles.sheetSub} numberOfLines={2}>
-                    {selected?.description ?? "Tap a marker to see details."}
-                  </Text>
-                </View>
-
-                <Pressable onPress={() => sheetRef.current?.close()} style={styles.sheetClose}>
-                  <Feather name="x" size={18} color="#444" />
-                </Pressable>
-              </View>
-
-              {selected ? (
-                <View style={styles.sheetMetaRow}>
-                  <View
-                    style={[
-                      styles.badge,
-                      {
-                        borderColor: hexToRgba(colorForType(selected.type), 0.35),
-                        backgroundColor: hexToRgba(colorForType(selected.type), 0.12),
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.badgeText, { color: colorForType(selected.type) }]}>
-                      {selected.type}
-                    </Text>
-                  </View>
-                  <Text style={styles.updatedText}>Updated {selected.updated ?? "just now"}</Text>
-                </View>
-              ) : null}
-
-              {selected ? (
-                <View style={styles.actionsRow}>
-                  <View style={styles.modeToggle}>
-                    <Pressable
-                      onPress={() => {
-                        setRouteMode("driving");
-                        if (route && selected && !routeLoading && !aiRouteLoading) {
-                          if (route.source === "ai") {
-                            void onPressAiRouteOptimization("driving");
-                          } else {
-                            void onPressDirection("driving");
-                          }
-                        }
-                      }}
-                      style={[styles.modePill, routeMode === "driving" && styles.modePillActive]}
-                    >
-                      <MaterialCommunityIcons
-                        name="car"
-                        size={15}
-                        color={routeMode === "driving" ? "#111" : "#444"}
-                      />
-                      <Text style={[styles.modePillText, routeMode === "driving" && styles.modePillTextActive]}>
-                        Drive
-                      </Text>
-                    </Pressable>
-
-                    <Pressable
-                      onPress={() => {
-                        setRouteMode("walking");
-                        if (route && selected && !routeLoading && !aiRouteLoading) {
-                          if (route.source === "ai") {
-                            void onPressAiRouteOptimization("walking");
-                          } else {
-                            void onPressDirection("walking");
-                          }
-                        }
-                      }}
-                      style={[styles.modePill, routeMode === "walking" && styles.modePillActive]}
-                    >
-                      <MaterialCommunityIcons
-                        name="walk"
-                        size={15}
-                        color={routeMode === "walking" ? "#111" : "#444"}
-                      />
-                      <Text style={[styles.modePillText, routeMode === "walking" && styles.modePillTextActive]}>
-                        Walk
-                      </Text>
-                    </Pressable>
-                  </View>
-
-                  <Pressable
-                    onPress={() => onPressDirection()}
-                    disabled={routeLoading || aiRouteLoading}
-                    style={[styles.actionBtn, (routeLoading || aiRouteLoading) && { opacity: 0.7 }]}
-                  >
-                    <Feather name="navigation" size={16} color="#111" />
-                    <Text style={styles.actionBtnText}>
-                      {routeLoading ? "Loading..." : "Direction"}
-                    </Text>
-                  </Pressable>
-
-                  {route ? (
-                    <Pressable onPress={clearRoute} style={styles.actionBtnSecondary}>
-                      <Feather name="x-circle" size={16} color="#111" />
-                      <Text style={styles.actionBtnText}>Clear</Text>
-                    </Pressable>
-                  ) : null}
-                </View>
-              ) : null}
-
-              {selected ? (
-                <View style={styles.aiActionRow}>
-                  <Pressable
-                    onPress={() => onPressAiRouteOptimization()}
-                    disabled={routeLoading || aiRouteLoading}
-                    style={[styles.aiRouteBtn, (routeLoading || aiRouteLoading) && { opacity: 0.7 }]}
-                  >
-                    <MaterialCommunityIcons name="robot" size={16} color="#111" />
-                    <Text style={styles.aiRouteBtnText}>
-                      {aiRouteLoading ? "Optimizing..." : "AI Route Optimization"}
-                    </Text>
-                  </Pressable>
-                </View>
-              ) : null}
-
-              {route && selected ? (
-                <View style={styles.routeMetaRow}>
-                  <Text style={styles.routeMetaText}>
-                    {(route.profile === "walking" ? "Walking" : "Driving")} | {(route.distance / 1000).toFixed(1)} km | {Math.round(route.duration / 60)} min
-                  </Text>
-                  <Text style={styles.routeMetaSubText}>
-                    {route.source === "ai"
-                      ? `AI optimized | score ${Number(route.aiScore ?? 0).toFixed(3)} | cost ${Number(route.routingCost ?? 0).toFixed(3)}`
-                      : `Standard route | ${route.routeCount ?? 1} option${(route.routeCount ?? 1) > 1 ? "s" : ""}${(route.routeCount ?? 1) > 1 ? " | tap light blue route to select" : ""}`}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-          </BottomSheetView>
-        </BottomSheet>
+        <EmergencyBottomSheetContainer controller={emergencySheet} />
 
         <BottomSheet
           ref={layersSheetRef}
@@ -1670,6 +1244,11 @@ const styles = StyleSheet.create({
   routeMetaRow: { marginTop: 10 },
   routeMetaText: { fontSize: 12, color: "#444", fontWeight: "700" },
   routeMetaSubText: { marginTop: 4, fontSize: 12, color: "#111", fontWeight: "700" },
+  routeMetaMetricText: { marginTop: 4, fontSize: 12, color: "#0F172A", fontWeight: "800" },
+  routeRiskLegendText: { marginTop: 4, fontSize: 11, color: "#64748B", fontWeight: "600" },
+  routeRiskCurrentText: { marginTop: 2, fontSize: 12, color: "#111", fontWeight: "700" },
+  routeRiskCurrentValue: { fontSize: 12, fontWeight: "800" },
+  routeRiskReasonText: { marginTop: 4, fontSize: 11, color: "#334155", fontWeight: "600" },
 
   // sheet
   sheetBg: { backgroundColor: "rgba(255,255,255,0.95)" },

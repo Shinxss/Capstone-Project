@@ -29,7 +29,7 @@ export function DevWeatherOverrideOverlay({
 
   const applyRainfallInput = () => {
     const parsed = Number(rainfallInput);
-    onPatch({ rainfall_mm: Number.isFinite(parsed) ? parsed : 0 });
+    onPatch({ rainfall_mm: Number.isFinite(parsed) ? parsed : override.rainfall_mm });
   };
 
   return (
@@ -55,9 +55,7 @@ export function DevWeatherOverrideOverlay({
             <TextInput
               value={rainfallInput}
               onChangeText={setRainfallInput}
-              onBlur={applyRainfallInput}
-              onSubmitEditing={applyRainfallInput}
-              keyboardType="decimal-pad"
+              keyboardType="default"
               style={styles.input}
               placeholder="0"
               placeholderTextColor="#94A3B8"
@@ -95,6 +93,9 @@ export function DevWeatherOverrideOverlay({
           </View>
 
           <View style={styles.footerRow}>
+            <Pressable style={styles.saveBtn} onPress={applyRainfallInput}>
+              <Text style={styles.saveText}>Save</Text>
+            </Pressable>
             <Pressable style={styles.resetBtn} onPress={onClear}>
               <Text style={styles.resetText}>Reset</Text>
             </Pressable>
@@ -237,6 +238,22 @@ const styles = StyleSheet.create({
   footerRow: {
     flexDirection: "row",
     justifyContent: "flex-end",
+    gap: 8,
+  },
+  saveBtn: {
+    height: 30,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: "rgba(14,165,233,0.28)",
+    borderWidth: 1,
+    borderColor: "rgba(56,189,248,0.75)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  saveText: {
+    color: "#E0F2FE",
+    fontSize: 12,
+    fontWeight: "700",
   },
   resetBtn: {
     height: 30,

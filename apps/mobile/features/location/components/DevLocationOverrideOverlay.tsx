@@ -37,8 +37,8 @@ export function DevLocationOverrideOverlay({
     const nextLng = Number(lngInput);
 
     onPatch({
-      lat: Number.isFinite(nextLat) ? nextLat : DEV_LOCATION_DAGUPAN_PRESET.lat,
-      lng: Number.isFinite(nextLng) ? nextLng : DEV_LOCATION_DAGUPAN_PRESET.lng,
+      lat: Number.isFinite(nextLat) ? nextLat : override.lat,
+      lng: Number.isFinite(nextLng) ? nextLng : override.lng,
     });
   };
 
@@ -65,9 +65,7 @@ export function DevLocationOverrideOverlay({
             <TextInput
               value={latInput}
               onChangeText={setLatInput}
-              onBlur={applyCoordinates}
-              onSubmitEditing={applyCoordinates}
-              keyboardType="decimal-pad"
+              keyboardType="default"
               style={styles.input}
               placeholder={String(DEV_LOCATION_DAGUPAN_PRESET.lat)}
               placeholderTextColor="#94A3B8"
@@ -79,9 +77,7 @@ export function DevLocationOverrideOverlay({
             <TextInput
               value={lngInput}
               onChangeText={setLngInput}
-              onBlur={applyCoordinates}
-              onSubmitEditing={applyCoordinates}
-              keyboardType="decimal-pad"
+              keyboardType="default"
               style={styles.input}
               placeholder={String(DEV_LOCATION_DAGUPAN_PRESET.lng)}
               placeholderTextColor="#94A3B8"
@@ -103,6 +99,12 @@ export function DevLocationOverrideOverlay({
             </Pressable>
             <Pressable style={styles.resetBtn} onPress={onClear}>
               <Text style={styles.resetText}>Reset</Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.footerRow}>
+            <Pressable style={styles.saveBtn} onPress={applyCoordinates}>
+              <Text style={styles.saveText}>Save Coordinates</Text>
             </Pressable>
           </View>
         </View>
@@ -194,6 +196,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
   },
+  footerRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+  },
   presetBtn: {
     flex: 1,
     height: 32,
@@ -221,6 +227,21 @@ const styles = StyleSheet.create({
   },
   resetText: {
     color: "#F1F5F9",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  saveBtn: {
+    height: 32,
+    paddingHorizontal: 12,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(2,132,199,0.28)",
+    borderWidth: 1,
+    borderColor: "rgba(56,189,248,0.8)",
+  },
+  saveText: {
+    color: "#E0F2FE",
     fontSize: 12,
     fontWeight: "700",
   },
