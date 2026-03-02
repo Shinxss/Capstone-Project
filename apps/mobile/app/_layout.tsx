@@ -21,11 +21,20 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const inVolunteerFlow =
     segments[0] === "volunteer-apply-modal" ||
     segments[0] === "volunteer-application";
+  const inMyRequestsFlow =
+    segments[0] === "my-requests" ||
+    segments[0] === "my-request-tracking";
 
   useEffect(() => {
     if (!hydrated) return;
 
-    if ((mode === "authed" || mode === "guest") && !inTabsGroup && !inVolunteerFlow && !inReportFlow) {
+    if (
+      (mode === "authed" || mode === "guest") &&
+      !inTabsGroup &&
+      !inVolunteerFlow &&
+      !inReportFlow &&
+      !inMyRequestsFlow
+    ) {
       router.replace("/(tabs)");
       return;
     }
@@ -33,7 +42,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     if (mode === "anonymous" && !inAuthGroup) {
       router.replace("/(auth)/login");
     }
-  }, [hydrated, mode, inAuthGroup, inTabsGroup, inVolunteerFlow, inReportFlow, router]);
+  }, [hydrated, mode, inAuthGroup, inTabsGroup, inVolunteerFlow, inReportFlow, inMyRequestsFlow, router]);
 
   if (!hydrated) {
     return <SplashScreen />;
@@ -51,6 +60,8 @@ export default function RootLayout() {
             <Stack.Screen name="(auth)" />
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="report" />
+            <Stack.Screen name="my-requests" />
+            <Stack.Screen name="my-request-tracking" />
             <Stack.Screen
               name="volunteer-apply-modal"
               options={{ presentation: "transparentModal" }}

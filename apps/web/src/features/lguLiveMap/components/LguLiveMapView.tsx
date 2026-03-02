@@ -4,6 +4,7 @@ import type { MapEmergencyPin } from "../../emergency/components/EmergencyMap";
 
 import {
   Layers,
+  PanelRight,
   LocateFixed,
   RefreshCcw,
   Users,
@@ -31,6 +32,13 @@ import {
 } from "../../hazardZones/constants/hazardZones.constants";
 
 type Props = ReturnType<typeof import("../hooks/useLguLiveMap").useLguLiveMap>;
+type MapStyleOptionKey = "satellite-streets-v12" | "streets-v12" | "dark-v11";
+
+const MAP_STYLE_OPTIONS: Array<{ key: MapStyleOptionKey; label: string; stylePath: string }> = [
+  { key: "satellite-streets-v12", label: "Satellite + Streets", stylePath: "mapbox/satellite-streets-v12" },
+  { key: "streets-v12", label: "Streets", stylePath: "mapbox/streets-v12" },
+  { key: "dark-v11", label: "Dark", stylePath: "mapbox/dark-v11" },
+];
 
 function ToggleRow({
   icon,
@@ -144,9 +152,6 @@ export default function LguLiveMapView(props: Props) {
 
     // emergencies
     emergencyPins,
-    emergenciesLoading,
-    emergenciesError,
-    refetchEmergencies,
     onEmergencyPinClick,
     onMapClick,
 
@@ -176,6 +181,9 @@ export default function LguLiveMapView(props: Props) {
     hazardsCount,
     volunteersCount,
     emergenciesCount,
+    activeVolunteersCount,
+    sosCount,
+    liveIncidents,
 
     // hazard zones dropdown list
     hazardZones,
@@ -185,21 +193,26 @@ export default function LguLiveMapView(props: Props) {
 
     // hazard draw + save
     isDrawingHazard,
+    hazardPointCount,
     startDrawHazard,
     cancelDrawHazard,
+    undoHazardPoint,
     hazardDraft,
     draftForm,
     setDraftForm,
     saveHazardDraft,
 
-    // hazard fetch
-    hazardZonesLoading,
-    hazardZonesError,
-    refetchHazardZones,
   } = props;
 
   const [legendMinimized, setLegendMinimized] = useState(false);
   const [hazardsDropdownOpen, setHazardsDropdownOpen] = useState(true);
+  const [mapDetailsOpen, setMapDetailsOpen] = useState(false);
+  const mapPreviewToken = import.meta.env.VITE_MAPBOX_TOKEN as string | undefined;
+  const activeMapStyleOption =
+    MAP_STYLE_OPTIONS.find((opt) => opt.key === mapStyleKey) ?? MAP_STYLE_OPTIONS[0];
+  const layersPreviewUri = mapPreviewToken
+    ? `https://api.mapbox.com/styles/v1/${activeMapStyleOption.stylePath}/static/120.34,16.043,11,0/220x220?access_token=${mapPreviewToken}&logo=false&attribution=false`
+    : null;
 
   // ✅ IMPORTANT: keep maxBounds reference stable.
   // EmergencyMap recreates the Mapbox instance when maxBounds changes (dependency in its init effect).
@@ -243,6 +256,13 @@ export default function LguLiveMapView(props: Props) {
     if (status === "available") return "bg-emerald-500";
     if (status === "busy") return "bg-orange-500";
     return "bg-red-500";
+  };
+
+  const formatIncidentTime = (raw?: string) => {
+    if (!raw) return "Unknown time";
+    const dt = new Date(raw);
+    if (Number.isNaN(dt.getTime())) return "Unknown time";
+    return dt.toLocaleString();
   };
 
   if (loading) return <LoadingPanel />;
@@ -302,14 +322,14 @@ export default function LguLiveMapView(props: Props) {
         </button>
 
         <button
-          onClick={() => setLayersOpen(true)}
+          onClick={() => setLayersOpen((v) => !v)}
           className="pointer-events-auto h-10 w-10 rounded-md bg-white
                      border border-gray-200 shadow-sm hover:bg-gray-50
                      grid place-items-center dark:bg-[#0E1626] dark:border-[#162544] dark:text-slate-200 dark:hover:bg-[#122036]"
-          aria-label="Open layers panel"
-          title="Layers"
+          aria-label={layersOpen ? "Close side panel" : "Open side panel"}
+          title={layersOpen ? "Close side panel" : "Open side panel"}
         >
-          <Layers size={18} />
+          <PanelRight size={18} />
         </button>
       </div>
 
@@ -317,7 +337,7 @@ export default function LguLiveMapView(props: Props) {
       {isDrawingHazard ? (
         <div className="absolute top-16 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
           <div className="pointer-events-auto rounded-full bg-black/70 text-white text-xs font-bold px-4 py-2 border border-white/10 backdrop-blur">
-            Drawing hazard zone — click to add points, double click to finish.
+            {`Drawing hazard zone - click to add points, drag any point to adjust, right click a point to delete, double click to finish. (${hazardPointCount} points)`}
           </div>
         </div>
       ) : null}
@@ -387,6 +407,280 @@ export default function LguLiveMapView(props: Props) {
           <LocateFixed size={15} className="text-gray-900 dark:text-slate-100" />
         </button>
       </div>
+
+      {/* Google-style layers control + map details panel */}
+      <div className="absolute left-3 z-20 pointer-events-none" style={{ bottom: 24 }}>
+        <button
+          onClick={() => setMapDetailsOpen((v) => !v)}
+          className={[
+            "pointer-events-auto relative h-[96px] w-[96px] overflow-hidden rounded-2xl border-2 shadow-xl",
+            "transition-transform hover:scale-[1.01]",
+            mapDetailsOpen
+              ? "border-white ring-2 ring-white/80 dark:border-white dark:ring-white/70"
+              : "border-white/95 dark:border-white/60",
+          ].join(" ")}
+          aria-label={mapDetailsOpen ? "Close map details" : "Open map details"}
+          title={mapDetailsOpen ? "Close map details" : "Open map details"}
+        >
+          {layersPreviewUri ? (
+            <img
+              src={layersPreviewUri}
+              alt="Map layers preview"
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-br from-sky-200 via-blue-300 to-blue-500 dark:from-slate-500 dark:via-slate-600 dark:to-slate-800" />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/10 to-black/60" />
+          <div className="absolute left-2.5 bottom-2 inline-flex items-center gap-1.5 text-white drop-shadow-sm">
+            <Layers size={14} />
+            <span className="text-[18px] leading-none font-semibold tracking-tight">Layers</span>
+          </div>
+        </button>
+      </div>
+
+      {mapDetailsOpen ? (
+        <div className="absolute left-3 z-30 pointer-events-none" style={{ bottom: 128 }}>
+          <div className="pointer-events-auto w-[360px] max-w-[92vw] rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-[#162544] dark:bg-[#0B1220]">
+            <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between dark:border-[#162544]">
+              <div className="text-sm font-bold text-gray-900 dark:text-slate-100">Map details</div>
+              <button
+                onClick={() => setMapDetailsOpen(false)}
+                className="h-8 w-8 rounded-lg hover:bg-gray-100 grid place-items-center text-gray-700 dark:text-slate-300 dark:hover:bg-[#122036]"
+                aria-label="Close map details"
+                title="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-5 max-h-[72vh] overflow-y-auto">
+              <div className="space-y-3">
+                <div className="text-xs font-bold text-gray-500 uppercase tracking-wide dark:text-slate-500">Map type</div>
+                <div className="grid grid-cols-3 gap-2">
+                  {MAP_STYLE_OPTIONS.map((opt) => {
+                    const selectedType = mapStyleKey === opt.key;
+                    const previewUri = mapPreviewToken
+                      ? `https://api.mapbox.com/styles/v1/${opt.stylePath}/static/120.34,16.043,12,0/180x180?access_token=${mapPreviewToken}&logo=false&attribution=false`
+                      : null;
+
+                    return (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        onClick={() => setMapStyleKey(opt.key)}
+                        className="text-left"
+                      >
+                        <div
+                          className={[
+                            "overflow-hidden rounded-xl border bg-white dark:bg-[#0E1626] dark:border-[#162544]",
+                            selectedType
+                              ? "border-blue-500 ring-2 ring-blue-500/40"
+                              : "border-gray-200 hover:border-gray-300 dark:hover:border-[#2A416D]",
+                          ].join(" ")}
+                        >
+                          {previewUri ? (
+                            <img
+                              src={previewUri}
+                              alt={opt.label}
+                              className="h-[82px] w-full object-cover"
+                            />
+                          ) : (
+                            <div className="h-[82px] w-full grid place-items-center bg-gray-100 dark:bg-[#0B1220] text-xs font-bold text-gray-500 dark:text-slate-400">
+                              {opt.label}
+                            </div>
+                          )}
+                        </div>
+                        <div
+                          className={[
+                            "mt-1 text-[11px] font-bold",
+                            selectedType ? "text-blue-600 dark:text-blue-300" : "text-gray-700 dark:text-slate-300",
+                          ].join(" ")}
+                        >
+                          {opt.label}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="text-xs font-bold text-gray-500 uppercase tracking-wide dark:text-slate-500">Tools</div>
+
+                <button
+                  onClick={() => {
+                    setShowHazardZones(true);
+                    startDrawHazard();
+                  }}
+                  className="w-full rounded-xl border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 px-4 py-3 text-sm font-extrabold flex items-center justify-center gap-2 dark:border-red-500/35 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25"
+                >
+                  <Navigation2 size={16} />
+                  Add Hazard Zone (Draw Polygon)
+                </button>
+
+                {isDrawingHazard ? (
+                  <button
+                    onClick={undoHazardPoint}
+                    disabled={hazardPointCount === 0}
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 px-4 py-3 text-sm font-bold text-gray-800 disabled:opacity-50 disabled:cursor-not-allowed dark:border-[#162544] dark:bg-[#0E1626] dark:text-slate-200 dark:hover:bg-[#122036]"
+                  >
+                    Undo last point
+                  </button>
+                ) : null}
+
+                {isDrawingHazard ? (
+                  <button
+                    onClick={cancelDrawHazard}
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 px-4 py-3 text-sm font-bold text-gray-800 dark:border-[#162544] dark:bg-[#0E1626] dark:text-slate-200 dark:hover:bg-[#122036]"
+                  >
+                    Cancel drawing
+                  </button>
+                ) : null}
+
+                <div className="rounded-xl border border-gray-200 bg-white overflow-hidden dark:border-[#162544] dark:bg-[#0E1626]">
+                  <button
+                    type="button"
+                    onClick={() => setHazardsDropdownOpen((v) => !v)}
+                    className="w-full flex items-center justify-between px-4 py-3 text-gray-900 bg-gray-50 dark:bg-[#122036] dark:text-slate-100"
+                    aria-label={hazardsDropdownOpen ? "Collapse hazard zones" : "Expand hazard zones"}
+                  >
+                    <span className="text-sm font-extrabold">
+                      Hazard Zones ({hazardZones?.length ?? 0})
+                    </span>
+                    <ChevronDown
+                      size={18}
+                      className={["transition-transform", hazardsDropdownOpen ? "rotate-180" : "rotate-0"].join(
+                        " "
+                      )}
+                    />
+                  </button>
+
+                  {hazardsDropdownOpen ? (
+                    <div className="px-3 pb-3 space-y-2">
+                      {(hazardZones ?? []).length === 0 ? (
+                        <div className="text-xs text-gray-500 px-1 pb-2 dark:text-slate-400">No hazard zones yet.</div>
+                      ) : null}
+
+                      {(hazardZones ?? []).map((z: any) => {
+                        const id = String(z._id);
+                        const isActive = (z as any).isActive !== false;
+                        const ht = toHazardType(z.hazardType);
+                        const color = HAZARD_TYPE_COLOR[ht];
+
+                        return (
+                          <div
+                            key={id}
+                            onClick={() => focusHazardZoneItem(id)}
+                            onKeyDown={(event) => {
+                              if (event.target !== event.currentTarget) return;
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                focusHazardZoneItem(id);
+                              }
+                            }}
+                            role="button"
+                            tabIndex={0}
+                            className={[
+                              "flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 cursor-pointer hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 dark:border-[#22365D] dark:bg-[#0B1220] dark:hover:bg-[#122036] dark:focus-visible:ring-[#2A416D]",
+                              isActive ? "opacity-100" : "opacity-60",
+                            ].join(" ")}
+                            title="Zoom to hazard zone"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div
+                                className="h-10 w-10 rounded-xl grid place-items-center shrink-0"
+                                style={{ backgroundColor: color }}
+                              >
+                                {hazardIconFor(ht)}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-sm font-extrabold text-gray-900 truncate dark:text-slate-100">{z.name}</div>
+                                <div className="text-xs text-gray-600 truncate dark:text-slate-400">
+                                  {HAZARD_TYPE_LABEL[ht]} | {isActive ? "On" : "Off"}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void toggleHazardZoneItem(id);
+                                }}
+                                className="h-9 w-9 rounded-lg border border-gray-200 hover:bg-gray-100 grid place-items-center dark:border-[#22365D] dark:hover:bg-[#122036]"
+                                aria-label={isActive ? "Turn off hazard zone" : "Turn on hazard zone"}
+                                title={isActive ? "Turn off" : "Turn on"}
+                              >
+                                <Power
+                                  size={18}
+                                  className={isActive ? "text-emerald-600 dark:text-emerald-400" : "text-gray-400 dark:text-slate-500"}
+                                />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void deleteHazardZoneItem(id);
+                                }}
+                                className="h-9 w-9 rounded-lg border border-gray-200 hover:bg-gray-100 grid place-items-center dark:border-[#22365D] dark:hover:bg-[#122036]"
+                                aria-label="Delete hazard zone"
+                                title="Delete"
+                              >
+                                <Trash2 size={18} className="text-red-500 dark:text-red-400" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+
+                {hazardDraft ? (
+                  <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3 dark:border-[#162544] dark:bg-[#0E1626]">
+                    <div className="text-sm font-extrabold text-gray-900 dark:text-slate-100">Save hazard zone</div>
+
+                    <div>
+                      <div className="text-xs font-bold text-gray-500 mb-1 dark:text-slate-500">Name</div>
+                      <input
+                        value={draftForm.name}
+                        onChange={(e) => setDraftForm((s) => ({ ...s, name: e.target.value }))}
+                        className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:border-[#162544] dark:bg-[#0B1220] dark:text-slate-100 dark:placeholder:text-slate-500"
+                        placeholder="e.g., Flooded road segment"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="text-xs font-bold text-gray-500 mb-1 dark:text-slate-500">Hazard type</div>
+                      <select
+                        value={draftForm.hazardType}
+                        onChange={(e) => setDraftForm((s) => ({ ...s, hazardType: e.target.value as any }))}
+                        className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:border-[#162544] dark:bg-[#0B1220] dark:text-slate-100"
+                      >
+                        {HAZARD_TYPES.map((t) => (
+                          <option key={t} value={t}>
+                            {HAZARD_TYPE_LABEL[t]}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <button
+                      onClick={saveHazardDraft}
+                      className="w-full rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 px-4 py-3 text-sm font-extrabold"
+                    >
+                      Save
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* LEFT DETAILS PANEL (only opens on emergency pin click) */}
       <aside
@@ -543,7 +837,7 @@ export default function LguLiveMapView(props: Props) {
         onConfirm={confirmDispatchResponders}
       />
 
-      {/* RIGHT LAYERS PANEL (collapsible, for styles + toggles + draw hazards) */}
+      {/* RIGHT SIDE PANEL (collapsible, for layers + stats + incidents) */}
       <aside
         className={[
           "absolute right-0 top-0 h-full z-30 bg-white border-l border-gray-200 transition-all duration-200 overflow-hidden dark:bg-[#0B1220] dark:border-[#162544]",
@@ -553,7 +847,7 @@ export default function LguLiveMapView(props: Props) {
         {layersOpen ? (
           <div className="h-full flex flex-col">
             <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between dark:border-[#162544]">
-              <div className="text-sm font-bold text-gray-900 dark:text-slate-100">Layers & Map</div>
+              <div className="text-sm font-bold text-gray-900 dark:text-slate-100">Live map panel</div>
               <button
                 onClick={() => setLayersOpen(false)}
                 className="h-9 w-9 rounded-lg hover:bg-gray-100 grid place-items-center text-gray-700 dark:text-slate-300 dark:hover:bg-[#122036]"
@@ -565,31 +859,6 @@ export default function LguLiveMapView(props: Props) {
             </div>
 
             <div className="p-4 space-y-6 overflow-y-auto">
-              {/* MAP STYLE */}
-              <div className="space-y-3">
-                <div className="text-xs font-bold text-gray-500 uppercase tracking-wide dark:text-slate-500">Map style</div>
-                <div className="space-y-2">
-                  {[
-                    { key: "satellite-streets-v12", label: "Satellite + Streets" },
-                    { key: "streets-v12", label: "Streets" },
-                    { key: "dark-v11", label: "Dark" },
-                  ].map((opt) => (
-                    <label
-                      key={opt.key}
-                      className="flex items-center justify-between rounded-xl border border-gray-200 bg-white hover:bg-gray-50 px-4 py-3 cursor-pointer dark:border-[#162544] dark:bg-[#0E1626] dark:hover:bg-[#122036]"
-                    >
-                      <div className="text-sm font-bold text-gray-800 dark:text-slate-200">{opt.label}</div>
-                      <input
-                        type="radio"
-                        name="map-style"
-                        checked={mapStyleKey === (opt.key as any)}
-                        onChange={() => setMapStyleKey(opt.key as any)}
-                      />
-                    </label>
-                  ))}
-                </div>
-              </div>
-
               {/* LAYERS */}
               <div className="space-y-3">
                 <div className="text-xs font-bold text-gray-500 uppercase tracking-wide dark:text-slate-500">Layers</div>
@@ -619,225 +888,113 @@ export default function LguLiveMapView(props: Props) {
                 />
               </div>
 
-              {/* TOOLS */}
+              {/* STATS */}
               <div className="space-y-3">
-                <div className="text-xs font-bold text-gray-500 uppercase tracking-wide dark:text-slate-500">Tools</div>
-
-                <button
-                  onClick={() => {
-                    setShowHazardZones(true);
-                    startDrawHazard();
-                  }}
-                  className="w-full rounded-xl bg-black text-white hover:bg-black/90 px-4 py-3 text-sm font-extrabold flex items-center justify-center gap-2"
-                >
-                  <Navigation2 size={16} />
-                  Add Hazard Zone (Draw Polygon)
-                </button>
-
-                {isDrawingHazard ? (
-                  <button
-                    onClick={cancelDrawHazard}
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 px-4 py-3 text-sm font-bold text-gray-800 dark:border-[#162544] dark:bg-[#0E1626] dark:text-slate-200 dark:hover:bg-[#122036]"
-                  >
-                    Cancel drawing
-                  </button>
-                ) : null}
-
-                {/* Hazard Zones dropdown (per-zone show/hide + delete) */}
-                <div className="rounded-xl bg-slate-950/95 border border-slate-800 overflow-hidden">
-                  <button
-                    type="button"
-                    onClick={() => setHazardsDropdownOpen((v) => !v)}
-                    className="w-full flex items-center justify-between px-4 py-3 text-white"
-                    aria-label={hazardsDropdownOpen ? "Collapse hazard zones" : "Expand hazard zones"}
-                  >
-                    <span className="text-sm font-extrabold">
-                      Hazard Zones ({hazardZones?.length ?? 0})
-                    </span>
-                    <ChevronDown
-                      size={18}
-                      className={["transition-transform", hazardsDropdownOpen ? "rotate-180" : "rotate-0"].join(
-                        " "
-                      )}
-                    />
-                  </button>
-
-                  {hazardsDropdownOpen ? (
-                    <div className="px-3 pb-3 space-y-2">
-                      {(hazardZones ?? []).length === 0 ? (
-                        <div className="text-xs text-slate-300 px-1 pb-2">No hazard zones yet.</div>
-                      ) : null}
-
-                      {(hazardZones ?? []).map((z: any) => {
-                        const id = String(z._id);
-                        // older docs may not have isActive yet -> treat as true
-                        const isActive = (z as any).isActive !== false;
-                        const ht = toHazardType(z.hazardType);
-                        const color = HAZARD_TYPE_COLOR[ht];
-
-                        return (
-                          <div
-                            key={id}
-                            onClick={() => focusHazardZoneItem(id)}
-                            onKeyDown={(event) => {
-                              if (event.target !== event.currentTarget) return;
-                              if (event.key === "Enter" || event.key === " ") {
-                                event.preventDefault();
-                                focusHazardZoneItem(id);
-                              }
-                            }}
-                            role="button"
-                            tabIndex={0}
-                            className={[
-                              "flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900/70 px-3 py-3 cursor-pointer hover:bg-slate-800/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500/80",
-                              isActive ? "opacity-100" : "opacity-60",
-                            ].join(" ")}
-                            title="Zoom to hazard zone"
-                          >
-                            <div className="flex items-center gap-3 min-w-0">
-                              <div
-                                className="h-10 w-10 rounded-xl grid place-items-center shrink-0"
-                                style={{ backgroundColor: color }}
-                              >
-                                {hazardIconFor(ht)}
-                              </div>
-                              <div className="min-w-0">
-                                <div className="text-sm font-extrabold text-white truncate">{z.name}</div>
-                                <div className="text-xs text-slate-300 truncate">
-                                  {HAZARD_TYPE_LABEL[ht]} · {isActive ? "On" : "Off"}
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-2 shrink-0">
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  void toggleHazardZoneItem(id);
-                                }}
-                                className={[
-                                  "h-9 w-9 rounded-lg border grid place-items-center",
-                                  "border-slate-800 hover:bg-slate-800/60",
-                                ].join(" ")}
-                                aria-label={isActive ? "Turn off hazard zone" : "Turn on hazard zone"}
-                                title={isActive ? "Turn off" : "Turn on"}
-                              >
-                                <Power
-                                  size={18}
-                                  className={isActive ? "text-emerald-400" : "text-slate-500"}
-                                />
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  void deleteHazardZoneItem(id);
-                                }}
-                                className="h-9 w-9 rounded-lg border border-slate-800 hover:bg-slate-800/60 grid place-items-center"
-                                aria-label="Delete hazard zone"
-                                title="Delete"
-                              >
-                                <Trash2 size={18} className="text-red-400" />
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
+                <div className="text-xs font-bold text-gray-500 uppercase tracking-wide dark:text-slate-500">Stats</div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-xl border border-red-200 bg-red-50 p-3 dark:border-red-500/20 dark:bg-red-500/10">
+                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-red-700 dark:text-red-300">
+                      <AlertTriangle size={13} />
+                      Emergencies
                     </div>
-                  ) : null}
-                </div>
-
-                {/* Draft save form */}
-                {hazardDraft ? (
-                  <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3 dark:border-[#162544] dark:bg-[#0E1626]">
-                    <div className="text-sm font-extrabold text-gray-900 dark:text-slate-100">Save hazard zone</div>
-
-                    <div>
-                      <div className="text-xs font-bold text-gray-500 mb-1 dark:text-slate-500">Name</div>
-                      <input
-                        value={draftForm.name}
-                        onChange={(e) => setDraftForm((s) => ({ ...s, name: e.target.value }))}
-                        className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:border-[#162544] dark:bg-[#0B1220] dark:text-slate-100 dark:placeholder:text-slate-500"
-                        placeholder="e.g., Flooded road segment"
-                      />
-                    </div>
-
-                    <div>
-                      <div className="text-xs font-bold text-gray-500 mb-1 dark:text-slate-500">Hazard type</div>
-                      <select
-                        value={draftForm.hazardType}
-                        onChange={(e) =>
-                          setDraftForm((s) => ({ ...s, hazardType: e.target.value as any }))
-                        }
-                        className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:border-[#162544] dark:bg-[#0B1220] dark:text-slate-100"
-                      >
-                        {HAZARD_TYPES.map((t) => (
-                          <option key={t} value={t}>
-                            {HAZARD_TYPE_LABEL[t]}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <button
-                      onClick={saveHazardDraft}
-                      className="w-full rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 px-4 py-3 text-sm font-extrabold"
-                    >
-                      Save
-                    </button>
-
-                    <div className="text-xs text-gray-500 dark:text-slate-500">
-                      Polygon captured. Saving will store this in MongoDB.
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-[#162544] dark:bg-[#0E1626]">
-                  <div className="text-xs font-bold text-gray-500 dark:text-slate-500">Sync</div>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <button
-                      onClick={() => refetchEmergencies()}
-                      className="rounded-lg border border-gray-200 bg-white hover:bg-gray-50 px-3 py-2 text-xs font-bold text-gray-800 dark:border-[#162544] dark:bg-[#0B1220] dark:text-slate-200 dark:hover:bg-[#122036]"
-                      title="Refresh emergencies"
-                    >
-                      Refresh emergencies
-                    </button>
-                    <button
-                      onClick={() => refetchHazardZones()}
-                      className="rounded-lg border border-gray-200 bg-white hover:bg-gray-50 px-3 py-2 text-xs font-bold text-gray-800 dark:border-[#162544] dark:bg-[#0B1220] dark:text-slate-200 dark:hover:bg-[#122036]"
-                      title="Refresh hazard zones"
-                    >
-                      Refresh hazards
-                    </button>
+                    <div className="mt-1 text-lg font-black text-red-700 dark:text-red-200">{emergenciesCount}</div>
                   </div>
 
-                  {(emergenciesLoading || hazardZonesLoading) && (
-                    <div className="mt-2 text-xs text-gray-500 dark:text-slate-500">Loading...</div>
-                  )}
-                  {emergenciesError ? (
-                    <div className="mt-2 text-xs text-red-600">Emergencies: {String(emergenciesError)}</div>
-                  ) : null}
-                  {hazardZonesError ? (
-                    <div className="mt-2 text-xs text-red-600">Hazards: {String(hazardZonesError)}</div>
-                  ) : null}
+                  <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 dark:border-blue-500/20 dark:bg-blue-500/10">
+                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-blue-700 dark:text-blue-300">
+                      <Users size={13} />
+                      Active
+                    </div>
+                    <div className="mt-1 text-lg font-black text-blue-700 dark:text-blue-200">
+                      {activeVolunteersCount}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-500/20 dark:bg-amber-500/10">
+                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-700 dark:text-amber-300">
+                      <ShieldAlert size={13} />
+                      SOS
+                    </div>
+                    <div className="mt-1 text-lg font-black text-amber-700 dark:text-amber-200">{sosCount}</div>
+                  </div>
                 </div>
               </div>
 
-              {/* Quick info */}
-              <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-[#162544] dark:bg-[#0E1626]">
-                <div className="text-xs font-bold text-gray-500 uppercase tracking-wide dark:text-slate-500">Quick info</div>
-                <div className="mt-2 grid grid-cols-2 gap-3 text-sm">
-                  <div className="rounded-lg bg-gray-50 border border-gray-200 px-3 py-2 dark:border-[#162544] dark:bg-[#0B1220]">
-                    <div className="text-xs text-gray-500 dark:text-slate-500">Emergencies</div>
-                    <div className="font-extrabold text-gray-900 dark:text-slate-100">{emergenciesCount}</div>
+              {/* LIVE INCIDENTS */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-bold text-gray-500 uppercase tracking-wide dark:text-slate-500">
+                    Live incidents
                   </div>
-                  <div className="rounded-lg bg-gray-50 border border-gray-200 px-3 py-2 dark:border-[#162544] dark:bg-[#0B1220]">
-                    <div className="text-xs text-gray-500 dark:text-slate-500">Hazards</div>
-                    <div className="font-extrabold text-gray-900 dark:text-slate-100">{hazardsCount}</div>
-                  </div>
+                  <span className="text-[11px] font-bold text-gray-600 dark:text-slate-400">
+                    {liveIncidents.length} active
+                  </span>
                 </div>
+
+                {liveIncidents.length === 0 ? (
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-4 text-xs font-semibold text-gray-600 dark:border-[#162544] dark:bg-[#0E1626] dark:text-slate-400">
+                    No active incidents.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {liveIncidents.map((incident) => {
+                      const isSos = String(incident.emergencyType).toUpperCase() === "SOS";
+                      const status = String(incident.status || "unknown").toUpperCase();
+                      const statusClass =
+                        status === "ACTIVE"
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
+                          : status === "RESPONDING"
+                            ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
+                            : "bg-gray-100 text-gray-700 dark:bg-slate-500/20 dark:text-slate-300";
+
+                      return (
+                        <button
+                          key={incident.id}
+                          type="button"
+                          onClick={() => onEmergencyPinClick(incident.id)}
+                          className="w-full text-left rounded-xl border border-gray-200 bg-white hover:bg-gray-50 px-3 py-3 dark:border-[#162544] dark:bg-[#0E1626] dark:hover:bg-[#122036]"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={[
+                                    "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-black",
+                                    isSos
+                                      ? "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300"
+                                      : "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300",
+                                  ].join(" ")}
+                                >
+                                  {incident.emergencyType}
+                                </span>
+                                <span
+                                  className={[
+                                    "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold",
+                                    statusClass,
+                                  ].join(" ")}
+                                >
+                                  {status}
+                                </span>
+                              </div>
+
+                              <div className="mt-1 text-sm font-bold text-gray-900 dark:text-slate-100 truncate">
+                                {incident.barangayName || "Unknown barangay"}
+                              </div>
+
+                              <div className="text-[11px] text-gray-600 dark:text-slate-400 truncate">
+                                {incident.source || "Unknown source"}
+                              </div>
+                            </div>
+
+                            <div className="text-[11px] font-semibold text-gray-500 dark:text-slate-500 shrink-0">
+                              {formatIncidentTime(incident.reportedAt)}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -846,3 +1003,4 @@ export default function LguLiveMapView(props: Props) {
     </div>
   );
 }
+

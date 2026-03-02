@@ -17,11 +17,21 @@ export type ReportLocation = {
   label?: string;
 };
 
+export type ReportPhoto = {
+  localUri: string;
+  url?: string;
+  uploading?: boolean;
+  error?: string;
+  mimeType?: string;
+  fileName?: string;
+};
+
 export type ReportDraft = {
   type?: EmergencyType;
   location?: ReportLocation;
+  locationText?: string;
   description?: string;
-  photos?: string[];
+  photos?: ReportPhoto[];
 };
 
 export interface EmergencyTypeOption {

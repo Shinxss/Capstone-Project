@@ -133,12 +133,11 @@ export function useEmergencyBottomSheet(
           contextWeather: getWeatherContext?.() ?? undefined,
         });
         const primaryRoute = evaluated.routes[0] ?? null;
-        const primaryRisk = evaluated.riskByIndex[0] ?? null;
-        setRouteAlternatives(primaryRoute ? [primaryRoute] : []);
-        setRouteRiskByIndex(primaryRisk ? { 0: primaryRisk } : {});
+        setRouteAlternatives(evaluated.routes);
+        setRouteRiskByIndex(evaluated.riskByIndex);
         setSelectedRouteIndex(0);
         setRoute(primaryRoute);
-        setRisk(primaryRisk);
+        setRisk(evaluated.riskByIndex[0] ?? null);
       } catch {
         try {
           const nextRoutes = await getRouteAlternatives({
@@ -150,7 +149,7 @@ export function useEmergencyBottomSheet(
             mode,
           });
           const primaryRoute = nextRoutes[0] ?? null;
-          setRouteAlternatives(primaryRoute ? [primaryRoute] : []);
+          setRouteAlternatives(nextRoutes);
           setRouteRiskByIndex({});
           setSelectedRouteIndex(0);
           setRoute(primaryRoute);

@@ -20,6 +20,23 @@ export function useSubmitReport() {
       throw new Error(message);
     }
 
+    const photos = draft.photos ?? [];
+    const hasUploading = photos.some((photo) => Boolean(photo.uploading));
+    const hasMissingUrl = photos.some((photo) => !photo.url);
+    if (hasUploading || hasMissingUrl) {
+      const message = "Please wait for photo uploads to finish or remove failed photos.";
+      setError(message);
+      throw new Error(message);
+    }
+
+    const locationLabel = draft.locationText?.trim() || draft.location?.label?.trim();
+    const photoUrls = photos.map((photo) => photo.url).filter((url): url is string => Boolean(url));
+    if (photoUrls.length < 3) {
+      const message = "Please upload at least 3 proof images.";
+      setError(message);
+      throw new Error(message);
+    }
+
     setLoading(true);
     setError(null);
 
@@ -31,10 +48,10 @@ export function useSubmitReport() {
             latitude: draft.location.coords.latitude,
             longitude: draft.location.coords.longitude,
           },
-          label: draft.location.label,
+          label: locationLabel,
         },
         description: draft.description?.trim() ? draft.description.trim() : undefined,
-        photos: draft.photos ?? [],
+        photos: photoUrls,
       });
 
       setResult(response);

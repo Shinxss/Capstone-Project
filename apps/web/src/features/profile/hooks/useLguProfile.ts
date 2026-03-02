@@ -7,10 +7,24 @@ import { toastError, toastSuccess, toastWarning } from "@/services/feedback/toas
 const profileSchema = z.object({
   firstName: z.string().trim().min(1, "First name is required"),
   lastName: z.string().trim().min(1, "Last name is required"),
+  birthdate: z
+    .string()
+    .trim()
+    .optional()
+    .refine((v) => !v || /^\d{4}-\d{2}-\d{2}$/.test(v), "Birthdate must be YYYY-MM-DD"),
   email: z.string().trim().email("Email must be valid"),
-  barangay: z.string().trim().optional(),
-  municipality: z.string().trim().optional(),
-  position: z.string().trim().optional(),
+  contactNo: z
+    .string()
+    .trim()
+    .max(20, "Contact number must be 20 characters or less")
+    .optional()
+    .refine((v) => !v || /^[+0-9][0-9\s()-]{6,19}$/.test(v), "Contact number format is invalid"),
+  country: z.string().trim().max(100, "Country must be 100 characters or less").optional(),
+  municipality: z.string().trim().max(200, "City/State must be 200 characters or less").optional(),
+  barangay: z.string().trim().max(200, "Barangay must be 200 characters or less").optional(),
+  postalCode: z.string().trim().max(20, "Postal code must be 20 characters or less").optional(),
+  avatarUrl: z.string().trim().max(500, "Avatar URL must be 500 characters or less").optional(),
+  position: z.string().trim().max(200, "Position must be 200 characters or less").optional(),
 });
 
 const passwordSchema = z
@@ -26,6 +40,15 @@ const passwordSchema = z
 
 export type ProfileFormErrors = Partial<Record<keyof ProfileUpdateInput, string>>;
 export type PasswordFormErrors = Partial<Record<keyof ChangePasswordInput, string>>;
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (typeof error === "object" && error && "response" in error) {
+    const response = (error as { response?: { data?: { message?: string } } }).response;
+    if (response?.data?.message) return response.data.message;
+  }
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
+}
 
 export function useLguProfile() {
   const [profile, setProfile] = useState<LguProfile | null>(null);
@@ -46,8 +69,8 @@ export function useLguProfile() {
 
       const maybeUpdated = await refreshProfileToLocalStorage();
       setProfile(maybeUpdated);
-    } catch (e: any) {
-      setError(e?.response?.data?.message || e?.message || "Failed to load profile");
+    } catch (e: unknown) {
+      setError(getErrorMessage(e, "Failed to load profile"));
     } finally {
       setLoading(false);
     }
@@ -84,8 +107,8 @@ export function useLguProfile() {
         setProfile(updated);
         toastSuccess("Profile saved.");
         return { ok: true as const, errors: {} as ProfileFormErrors };
-      } catch (e: any) {
-        const message = e?.response?.data?.message || e?.message || "Failed to save profile";
+      } catch (e: unknown) {
+        const message = getErrorMessage(e, "Failed to save profile");
         setSaveError(message);
         toastError(message);
         return { ok: false as const, errors: {} as ProfileFormErrors };
@@ -124,8 +147,8 @@ export function useLguProfile() {
         setPasswordSuccess("Password updated.");
         toastSuccess("Password updated.");
         return { ok: true as const, errors: {} as PasswordFormErrors };
-      } catch (e: any) {
-        const message = e?.response?.data?.message || e?.message || "Failed to change password";
+      } catch (e: unknown) {
+        const message = getErrorMessage(e, "Failed to change password");
         setPasswordError(message);
         toastError(message);
         return { ok: false as const, errors: {} as PasswordFormErrors };
@@ -159,4 +182,3 @@ export function useLguProfile() {
     validatePassword,
   };
 }
-

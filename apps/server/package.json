@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "pnpm run test:dispatch-chain",
+    "test:dispatch-chain": "tsx --test src/features/dispatches/dispatch.chain.test.ts",
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
     "seed:lgu": "tsx src/scripts/seedLgu.ts",

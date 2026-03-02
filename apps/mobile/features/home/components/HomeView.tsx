@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import {
+  Animated,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -24,16 +25,23 @@ type AlertTheme = {
 type Props = {
   displayName: string;
   holding: boolean;
+  remainingSeconds: number;
   alertTitle: string;
   alertMessage: string;
   alertSeverity: WeatherSeverity;
   alertIconName: AlertIconName;
   alertTheme: AlertTheme;
-  alertUpdatedAt?: string | null;
   alertRetryEnabled?: boolean;
+  activeRequest?: {
+    id: string;
+    trackingLabel: string;
+    etaText: string;
+    lastUpdatedText: string;
+  };
   onStartHold: () => void;
   onCancelHold: () => void;
   onPressAlert?: () => void;
+  onPressTracking?: () => void;
   onPressNotifications?: () => void;
   onPressViewAll?: () => void;
   onPressApplyVolunteer?: () => void;
@@ -42,21 +50,72 @@ type Props = {
 export function HomeView({
   displayName,
   holding,
+  remainingSeconds,
   alertTitle,
   alertMessage,
   alertSeverity,
   alertIconName,
   alertTheme,
-  alertUpdatedAt,
   alertRetryEnabled,
+  activeRequest,
   onStartHold,
   onCancelHold,
   onPressAlert,
+  onPressTracking,
   onPressNotifications,
   onPressViewAll,
   onPressApplyVolunteer,
 }: Props) {
   const insets = useSafeAreaInsets();
+  const pulseScale = useRef(new Animated.Value(1)).current;
+  const pulseOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!holding) {
+      pulseScale.stopAnimation();
+      pulseOpacity.stopAnimation();
+      pulseScale.setValue(1);
+      pulseOpacity.setValue(0);
+      return;
+    }
+
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.parallel([
+          Animated.timing(pulseScale, {
+            toValue: 1.14,
+            duration: 700,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseOpacity, {
+            toValue: 0.45,
+            duration: 240,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.parallel([
+          Animated.timing(pulseScale, {
+            toValue: 1.05,
+            duration: 700,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseOpacity, {
+            toValue: 0.1,
+            duration: 700,
+            useNativeDriver: true,
+          }),
+        ]),
+      ])
+    );
+
+    pulseLoop.start();
+
+    return () => {
+      pulseLoop.stop();
+      pulseScale.stopAnimation();
+      pulseOpacity.stopAnimation();
+    };
+  }, [holding, pulseOpacity, pulseScale]);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -94,7 +153,18 @@ export function HomeView({
 
         {/* SOS */}
         <View style={styles.sosBlock}>
-          <View style={styles.sosOuter}>
+          <View style={[styles.sosOuter, holding && styles.sosOuterHolding]}>
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.sosPulse,
+                {
+                  opacity: pulseOpacity,
+                  transform: [{ scale: pulseScale }],
+                },
+              ]}
+            />
+
             <Pressable
               onPressIn={onStartHold}
               onPressOut={onCancelHold}
@@ -105,7 +175,9 @@ export function HomeView({
               </View>
 
               <Text style={styles.sosText}>SOS</Text>
-              <Text style={styles.sosHint}>Hold for 3s</Text>
+              <Text style={styles.sosHint}>
+                {holding ? `Keep holding... ${remainingSeconds}s` : "Hold for 3s"}
+              </Text>
             </Pressable>
           </View>
 
@@ -136,15 +208,39 @@ export function HomeView({
             />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.cardTitle}>Alert</Text>
             <Text style={[styles.cardHeadline, { color: alertTheme.headlineColor }]}>
               {alertTitle}
             </Text>
             <Text style={styles.cardSub}>{alertMessage}</Text>
-            {alertUpdatedAt ? <Text style={styles.cardMeta}>Updated {alertUpdatedAt}</Text> : null}
             {alertRetryEnabled ? <Text style={[styles.cardRetry, { color: alertTheme.retryColor }]}>Tap to retry</Text> : null}
           </View>
         </Pressable>
+
+        {activeRequest ? (
+          <Pressable
+            onPress={onPressTracking}
+            disabled={!onPressTracking}
+            style={({ pressed }) => [
+              styles.activeRequestCard,
+              pressed && onPressTracking ? styles.activeRequestCardPressed : null,
+            ]}
+          >
+            <Text style={styles.activeRequestTitle}>Active Emergency Request</Text>
+
+            <View style={styles.activeStatusPill}>
+              <Text style={styles.activeStatusPillText}>{activeRequest.trackingLabel}</Text>
+            </View>
+
+            <Text style={styles.activeEta}>{activeRequest.etaText}</Text>
+
+            <View style={styles.activeRequestButton}>
+              <Text style={styles.activeRequestButtonText}>View Tracking Details</Text>
+            </View>
+
+            <Text style={styles.activeLiveText}>LIVE • updated {activeRequest.lastUpdatedText}</Text>
+          </Pressable>
+        ) : null}
+
         {/* Volunteer CTA */}
         <View style={styles.volunteer}>
           <View style={styles.volCircle1} />
@@ -228,6 +324,15 @@ const styles = StyleSheet.create({
     backgroundColor: "#FEE2E2",
     alignItems: "center",
     justifyContent: "center",
+    position: "relative",
+  },
+  sosOuterHolding: { backgroundColor: "#FECACA" },
+  sosPulse: {
+    position: "absolute",
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: "#EF4444",
   },
   sosInner: {
     width: 190,
@@ -242,7 +347,11 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 8 },
   },
-  sosInnerHolding: { backgroundColor: "#DC2626", transform: [{ scale: 0.98 }] },
+  sosInnerHolding: {
+    backgroundColor: "#DC2626",
+    transform: [{ scale: 0.98 }],
+    shadowOpacity: 0.24,
+  },
   warnCircle: {
     width: 28,
     height: 28,
@@ -281,11 +390,67 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  cardTitle: { fontSize: 18, fontWeight: "700", color: "#111827" },
-  cardHeadline: { fontSize: 13, fontWeight: "700", marginTop: 2 },
+  cardHeadline: { fontSize: 16, fontWeight: "900", marginTop: 2 },
   cardSub: { fontSize: 12, color: "#6B7280", marginTop: 2, lineHeight: 15 },
-  cardMeta: { fontSize: 11, color: "#9CA3AF", marginTop: 6 },
   cardRetry: { fontSize: 11, marginTop: 4, fontWeight: "700" },
+
+  activeRequestCard: {
+    marginTop: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    backgroundColor: "#FEF2F2",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  activeRequestCardPressed: {
+    opacity: 0.9,
+  },
+  activeRequestTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#7F1D1D",
+  },
+  activeStatusPill: {
+    marginTop: 8,
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "#DC2626",
+  },
+  activeStatusPillText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  activeEta: {
+    marginTop: 10,
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#111827",
+  },
+  activeRequestButton: {
+    marginTop: 12,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#FCA5A5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  activeRequestButtonText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#B91C1C",
+  },
+  activeLiveText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: "#DC2626",
+    fontWeight: "700",
+  },
 
 
   volunteer: {

@@ -266,7 +266,7 @@ export default function Header({
         </div>
 
         {/* Right: icons + profile */}
-        <div className="min-w-[320px] flex items-center justify-end gap-4">
+        <div className="min-w-[320px] ml-6 flex items-center justify-end gap-4">
           <IconBtn onClick={toggle} ariaLabel="Toggle theme">
             {isDark ? <Sun size={18} /> : <Moon size={18} />}
           </IconBtn>
@@ -277,10 +277,6 @@ export default function Header({
           >
             <Bell size={18} />
           </IconBtn>
-          <IconBtn>
-            <Settings size={18} />
-          </IconBtn>
-
           <div className="h-8 w-px bg-gray-300 mx-1 dark:bg-[#162544]" />
 
           {/* User dropdown */}

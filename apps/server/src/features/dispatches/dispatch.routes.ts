@@ -7,6 +7,10 @@ import {
   getMyActive,
   getMyCurrent,
   getMyPending,
+  postReverify,
+  postRevoke,
+  postVerify,
+  patchLocation,
   patchComplete,
   patchRespond,
   patchVerify,
@@ -16,9 +20,13 @@ import {
 import {
   createDispatchOffersSchema,
   dispatchIdParamsSchema,
+  dispatchLocationUpdateSchema,
   listTasksQuerySchema,
   proofSchema,
+  reverifySchema,
+  revokeSchema,
   respondSchema,
+  verifySchema,
 } from "./dispatch.validation";
 
 const router = Router();
@@ -48,7 +56,20 @@ router.post("/:id/proof", requireAuth, requireRole("VOLUNTEER"), validate(dispat
 // Volunteer marks as done
 router.patch("/:id/complete", requireAuth, requireRole("VOLUNTEER"), validate(dispatchIdParamsSchema, "params"), patchComplete);
 
+// Volunteer pushes latest location for community-side live tracking
+router.patch(
+  "/:id/location",
+  requireAuth,
+  requireRole("VOLUNTEER"),
+  validate(dispatchIdParamsSchema, "params"),
+  validate(dispatchLocationUpdateSchema),
+  patchLocation
+);
+
 // LGU/Admin verifies a done task
+router.post("/:id/verify", requireAuth, requireRole("LGU", "ADMIN"), validate(dispatchIdParamsSchema, "params"), validate(verifySchema), postVerify);
 router.patch("/:id/verify", requireAuth, requireRole("LGU", "ADMIN"), validate(dispatchIdParamsSchema, "params"), patchVerify);
+router.post("/:id/revoke", requireAuth, requireRole("ADMIN"), validate(dispatchIdParamsSchema, "params"), validate(revokeSchema), postRevoke);
+router.post("/:id/reverify", requireAuth, requireRole("ADMIN"), validate(dispatchIdParamsSchema, "params"), validate(reverifySchema), postReverify);
 
 export default router;

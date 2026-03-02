@@ -10,6 +10,14 @@ type UploadProofBody = {
   fileName?: string;
 };
 
+type DispatchLocationBody = {
+  lng: number;
+  lat: number;
+  accuracy?: number;
+  heading?: number;
+  speed?: number;
+};
+
 export async function fetchMyPendingDispatch(): Promise<DispatchOffer | null> {
   try {
     const res = await api.get<ApiResponse<DispatchOffer | null>>("/api/dispatches/my/pending");
@@ -55,5 +63,13 @@ export async function uploadDispatchProof(dispatchId: string, body: UploadProofB
 
 export async function completeDispatch(dispatchId: string): Promise<DispatchOffer> {
   const res = await api.patch<ApiResponse<DispatchOffer>>(`/api/dispatches/${dispatchId}/complete`, {});
+  return res.data.data;
+}
+
+export async function updateDispatchLocation(
+  dispatchId: string,
+  body: DispatchLocationBody
+): Promise<DispatchOffer> {
+  const res = await api.patch<ApiResponse<DispatchOffer>>(`/api/dispatches/${dispatchId}/location`, body);
   return res.data.data;
 }

@@ -16,7 +16,24 @@ export const createEmergencyReportSchema = z
       label: z.string().trim().min(1).max(160).optional(),
     }),
     description: z.string().trim().max(1000).optional(),
-    photos: z.array(z.url()).max(5).optional(),
+    photos: z.array(z.string().trim().min(1).max(500)).min(3).max(5).optional(),
+  })
+  .strict()
+  .superRefine((data, ctx) => {
+    if (!data.isSos && (!Array.isArray(data.photos) || data.photos.length < 3)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["photos"],
+        message: "At least 3 proof images are required.",
+      });
+    }
+  });
+
+export const uploadEmergencyReportPhotoSchema = z
+  .object({
+    base64: z.string().trim().min(1).max(4_500_000),
+    mimeType: z.enum(["image/png", "image/jpeg", "image/heic"]).optional(),
+    fileName: z.string().trim().min(1).max(255).optional(),
   })
   .strict();
 
@@ -48,5 +65,13 @@ export const referenceNumberParamSchema = z
   })
   .strict();
 
+export const myEmergencyReportsQuerySchema = z
+  .object({
+    scope: z.enum(["active", "history"]).optional().default("active"),
+  })
+  .strict();
+
 export type CreateEmergencyReportInput = z.infer<typeof createEmergencyReportSchema>;
+export type UploadEmergencyReportPhotoInput = z.infer<typeof uploadEmergencyReportPhotoSchema>;
 export type RejectEmergencyReportInput = z.infer<typeof rejectEmergencyReportSchema>;
+export type MyEmergencyReportsQuery = z.infer<typeof myEmergencyReportsQuerySchema>;

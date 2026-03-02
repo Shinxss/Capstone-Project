@@ -6,7 +6,7 @@ export default function AdminProfile() {
   const vm = useLguProfile();
 
   return (
-    <AdminShell title="Profile" subtitle="Account profile details">
+    <AdminShell title="My Profile" subtitle="View and manage your profile details">
       <LguProfileView {...vm} loading={vm.loading} error={vm.error} onRefresh={vm.refresh} />
     </AdminShell>
   );

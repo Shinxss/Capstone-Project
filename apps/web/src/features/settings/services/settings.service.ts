@@ -1,4 +1,4 @@
-import type { LguSettings } from "../models/settings.types";
+import type { LguSettings, NotificationChannelPrefs } from "../models/settings.types";
 import { appendActivityLog } from "../../activityLog/services/activityLog.service";
 
 const STORAGE_KEY = "lifeline_lgu_settings_v1";
@@ -12,13 +12,30 @@ function safeJsonParse<T>(raw: string | null): T | null {
   }
 }
 
+function normalizeNotificationChannels(
+  rawValue: unknown,
+  fallback: NotificationChannelPrefs
+): NotificationChannelPrefs {
+  // Backward-compatible migration: legacy boolean means web toggle only.
+  if (typeof rawValue === "boolean") {
+    return { web: rawValue, email: fallback.email };
+  }
+  if (!rawValue || typeof rawValue !== "object") return fallback;
+
+  const candidate = rawValue as Partial<NotificationChannelPrefs>;
+  return {
+    web: typeof candidate.web === "boolean" ? candidate.web : fallback.web,
+    email: typeof candidate.email === "boolean" ? candidate.email : fallback.email,
+  };
+}
+
 export function defaultSettings(): LguSettings {
   return {
     notifications: {
-      emergencies: true,
-      taskUpdates: true,
-      verificationNeeded: true,
-      announcements: true,
+      emergencies: { web: true, email: false },
+      taskUpdates: { web: true, email: false },
+      verificationNeeded: { web: true, email: false },
+      announcements: { web: true, email: false },
     },
     ui: {
       defaultPageSize: 25,
@@ -35,10 +52,22 @@ export function loadSettings(): LguSettings {
 
   return {
     notifications: {
-      emergencies: raw.notifications?.emergencies ?? d.notifications.emergencies,
-      taskUpdates: raw.notifications?.taskUpdates ?? d.notifications.taskUpdates,
-      verificationNeeded: raw.notifications?.verificationNeeded ?? d.notifications.verificationNeeded,
-      announcements: raw.notifications?.announcements ?? d.notifications.announcements,
+      emergencies: normalizeNotificationChannels(
+        raw.notifications?.emergencies,
+        d.notifications.emergencies
+      ),
+      taskUpdates: normalizeNotificationChannels(
+        raw.notifications?.taskUpdates,
+        d.notifications.taskUpdates
+      ),
+      verificationNeeded: normalizeNotificationChannels(
+        raw.notifications?.verificationNeeded,
+        d.notifications.verificationNeeded
+      ),
+      announcements: normalizeNotificationChannels(
+        raw.notifications?.announcements,
+        d.notifications.announcements
+      ),
     },
     ui: {
       defaultPageSize:
@@ -63,4 +92,3 @@ export function saveSettings(next: Omit<LguSettings, "updatedAt">): LguSettings 
 
   return saved;
 }
-

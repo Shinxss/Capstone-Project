@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { Types } from "mongoose";
+import { z } from "zod";
 import { AUDIT_EVENT } from "../audit/audit.constants";
 import { logAudit, logSecurityEvent } from "../audit/audit.service";
 import { User } from "../users/user.model";
@@ -11,6 +12,28 @@ import { TokenBlocklist } from "./TokenBlocklist.model";
 import { resolveAccessTokenExpiresIn } from "./accessTokenExpiry";
 
 const ACCOUNT_SUSPENDED = "Account is suspended. Please contact your administrator.";
+const BIRTHDATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+const updateMeSchema = z
+  .object({
+    firstName: z.string().trim().min(1, "First name is required").max(100, "First name is too long"),
+    lastName: z.string().trim().min(1, "Last name is required").max(100, "Last name is too long"),
+    email: z.string().trim().email("Email must be valid"),
+    birthdate: z
+      .string()
+      .trim()
+      .max(10, "Birthdate must be YYYY-MM-DD")
+      .optional()
+      .refine((v) => v === undefined || v === "" || BIRTHDATE_REGEX.test(v), "Birthdate must be YYYY-MM-DD"),
+    contactNo: z.string().trim().max(20, "Contact number is too long").optional(),
+    lguPosition: z.string().trim().max(200, "LGU position is too long").optional(),
+    barangay: z.string().trim().max(200, "Barangay is too long").optional(),
+    municipality: z.string().trim().max(200, "City/State is too long").optional(),
+    country: z.string().trim().max(100, "Country is too long").optional(),
+    postalCode: z.string().trim().max(20, "Postal code is too long").optional(),
+    avatarUrl: z.string().trim().max(500, "Avatar URL is too long").optional(),
+  })
+  .strict();
 
 export async function login(req: Request, res: Response) {
   try {
@@ -151,7 +174,7 @@ export async function me(req: Request, res: Response) {
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
     const user = await User.findById(userId).select(
-      "username firstName lastName email role adminTier lguName lguPosition barangay municipality authProvider passwordHash googleSub emailVerified volunteerStatus"
+      "username firstName lastName email role adminTier lguName lguPosition barangay municipality birthdate contactNo country postalCode avatarUrl authProvider passwordHash googleSub emailVerified volunteerStatus"
     );
     if (!user) return res.status(404).json({ message: "User not found" });
 
@@ -160,6 +183,114 @@ export async function me(req: Request, res: Response) {
     });
   } catch {
     return res.status(500).json({ message: "Failed to fetch profile." });
+  }
+}
+
+export async function updateMe(req: Request, res: Response) {
+  try {
+    const userId = req.userId;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+    const parsed = updateMeSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten() });
+    }
+
+    const body = parsed.data;
+    const normalizedEmail = body.email.toLowerCase();
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user.isActive) {
+      return res.status(403).json({
+        message: ACCOUNT_SUSPENDED,
+        code: "ACCOUNT_SUSPENDED",
+      });
+    }
+
+    if ((user.email ?? "").toLowerCase() !== normalizedEmail) {
+      const emailTaken = await User.findOne({
+        _id: { $ne: user._id },
+        email: normalizedEmail,
+      })
+        .select("_id")
+        .lean();
+      if (emailTaken) return res.status(409).json({ message: "Email is already in use." });
+    }
+
+    const changedFields: string[] = [];
+
+    const nextFirstName = body.firstName;
+    if ((user.firstName ?? "") !== nextFirstName) changedFields.push("firstName");
+    user.firstName = nextFirstName;
+
+    const nextLastName = body.lastName;
+    if ((user.lastName ?? "") !== nextLastName) changedFields.push("lastName");
+    user.lastName = nextLastName;
+
+    if ((user.email ?? "").toLowerCase() !== normalizedEmail) changedFields.push("email");
+    user.email = normalizedEmail;
+
+    const nextBirthdate = body.birthdate ?? "";
+    if ((user.birthdate ?? "") !== nextBirthdate) changedFields.push("birthdate");
+    user.birthdate = nextBirthdate;
+
+    const nextContactNo = body.contactNo ?? "";
+    if ((user.contactNo ?? "") !== nextContactNo) changedFields.push("contactNo");
+    user.contactNo = nextContactNo;
+
+    const nextCountry = body.country ?? "";
+    if ((user.country ?? "") !== nextCountry) changedFields.push("country");
+    user.country = nextCountry;
+
+    const nextMunicipality = body.municipality ?? "";
+    if ((user.municipality ?? "") !== nextMunicipality) changedFields.push("municipality");
+    user.municipality = nextMunicipality;
+
+    const nextBarangay = body.barangay ?? "";
+    if ((user.barangay ?? "") !== nextBarangay) changedFields.push("barangay");
+    user.barangay = nextBarangay;
+
+    const nextPostalCode = body.postalCode ?? "";
+    if ((user.postalCode ?? "") !== nextPostalCode) changedFields.push("postalCode");
+    user.postalCode = nextPostalCode;
+
+    const nextLguPosition = body.lguPosition ?? "";
+    if ((user.lguPosition ?? "") !== nextLguPosition) changedFields.push("lguPosition");
+    user.lguPosition = nextLguPosition;
+
+    const nextAvatarUrl = body.avatarUrl ?? "";
+    if ((user.avatarUrl ?? "") !== nextAvatarUrl) changedFields.push("avatarUrl");
+    user.avatarUrl = nextAvatarUrl;
+
+    await user.save();
+
+    await logAudit(req, {
+      eventType: AUDIT_EVENT.USER_PROFILE_UPDATE,
+      outcome: "SUCCESS",
+      actor: {
+        id: user._id.toString(),
+        role: user.role,
+        email: user.email,
+      },
+      target: {
+        type: "USER",
+        id: user._id.toString(),
+      },
+      metadata: {
+        changedFields,
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      user: toAuthUserPayload(user),
+    });
+  } catch (e: unknown) {
+    if (typeof e === "object" && e && "code" in e && (e as { code?: unknown }).code === 11000) {
+      return res.status(409).json({ message: "Email is already in use." });
+    }
+    return res.status(500).json({ message: "Failed to update profile." });
   }
 }
 

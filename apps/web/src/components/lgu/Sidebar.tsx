@@ -12,12 +12,16 @@ import {
   FileText,
   User,
   Settings,
+  Menu,
   Bell,
   Megaphone,
   ClipboardCheck,
   ChevronDown,
   Activity,
   BadgeCheck,
+  Shield,
+  CircleHelp,
+  Lock,
   UserPlus,
   CircleDot,
   Clock4,
@@ -76,6 +80,15 @@ const navSections: NavSection[] = [
     title: "Account",
     items: [{ label: "Profile", to: "/lgu/profile", icon: User }],
   },
+];
+
+const moreMenuItems: SubItem[] = [
+  { label: "Settings", to: "/lgu/settings", icon: Settings },
+  { label: "Password & Security", to: "/lgu/profile", icon: Shield },
+  { label: "Activity Log", to: "/lgu/audit-log", icon: Activity },
+  { label: "Notification Settings", to: "/lgu/notification-settings", icon: Bell },
+  { label: "Help", to: "/lgu/help", icon: CircleHelp },
+  { label: "Privacy Policy", to: "/lgu/privacy", icon: Lock },
 ];
 
 function SidebarItem({
@@ -361,8 +374,41 @@ export default function Sidebar({
   collapsed?: boolean;
   unreadNotifications?: number;
 }) {
+  const location = useLocation();
   const w = collapsed ? "w-[78px]" : "w-[255px]";
   const { isDark } = useThemeMode();
+  const [moreOpen, setMoreOpen] = React.useState(false);
+  const moreRef = React.useRef<HTMLDivElement | null>(null);
+
+  const moreActive = React.useMemo(
+    () =>
+      moreMenuItems.some(
+        (item) => location.pathname === item.to || location.pathname.startsWith(`${item.to}/`)
+      ),
+    [location.pathname]
+  );
+
+  React.useEffect(() => {
+    setMoreOpen(false);
+  }, [location.pathname]);
+
+  React.useEffect(() => {
+    function onDown(e: MouseEvent) {
+      if (!moreOpen) return;
+      const t = e.target as Node;
+      if (moreRef.current && !moreRef.current.contains(t)) setMoreOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setMoreOpen(false);
+    }
+
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [moreOpen]);
 
   return (
     <aside
@@ -447,26 +493,80 @@ export default function Sidebar({
           <div className="h-px bg-gray-200 dark:bg-[#162544]" />
         </div>
 
-        <NavLink
-          to="/lgu/settings"
-          title={collapsed ? "Settings" : undefined}
-          className={({ isActive }) =>
-            [
-              "relative flex items-center rounded-md transition-colors",
+        <div ref={moreRef} className="relative">
+          <button
+            type="button"
+            title={collapsed ? "More" : undefined}
+            onClick={() => setMoreOpen((v) => !v)}
+            aria-haspopup="menu"
+            aria-expanded={moreOpen}
+            className={[
+              "relative flex w-full items-center rounded-md transition-colors",
               "py-2 text-sm font-medium",
               collapsed ? "justify-center px-2.5" : "gap-3 px-3",
-              isActive
-            ? "bg-gray-200 text-gray-900 dark:bg-[#0F1A2E] dark:text-slate-100"
-            : "text-gray-800 hover:bg-gray-100 dark:text-slate-200 dark:hover:bg-[#0E1A30] dark:text-slate-200 dark:hover:bg-[#0E1A30]",
-              isActive
+              moreActive || moreOpen
+                ? "bg-gray-200 text-gray-900 dark:bg-[#0F1A2E] dark:text-slate-100"
+                : "text-gray-800 hover:bg-gray-100 dark:text-slate-200 dark:hover:bg-[#0E1A30] dark:text-slate-200 dark:hover:bg-[#0E1A30]",
+              moreActive || moreOpen
                 ? "before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:rounded-r before:bg-blue-600 dark:before:bg-blue-500"
                 : "",
-            ].join(" ")
-          }
-        >
-          <Settings size={18} className="text-gray-900 dark:text-slate-200" />
-          {!collapsed && <span>Settings</span>}
-        </NavLink>
+            ].join(" ")}
+          >
+            <Menu size={18} className="text-gray-900 dark:text-slate-200" />
+            {!collapsed ? <span>More</span> : null}
+            {!collapsed ? (
+              <span className="ml-auto">
+                <ChevronDown
+                  size={16}
+                  className={["transition-transform", moreOpen ? "rotate-180" : "rotate-0"].join(" ")}
+                />
+              </span>
+            ) : null}
+          </button>
+
+          {moreOpen ? (
+            <div
+              role="menu"
+              className={[
+                "absolute bottom-full z-50 mb-2 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg dark:border-[#162544] dark:bg-[#0E1626]",
+                collapsed ? "left-0 w-64" : "left-0 right-0",
+              ].join(" ")}
+            >
+              <div className="border-b border-gray-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:border-[#162544] dark:text-slate-400">
+                More
+              </div>
+
+              <div className="space-y-1 p-2">
+                {moreMenuItems.map((item) => {
+                  const ItemIcon = item.icon;
+
+                  return (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      role="menuitem"
+                      onClick={() => setMoreOpen(false)}
+                      className={({ isActive }) =>
+                        [
+                          "relative flex items-center gap-2 rounded-md px-2 py-2 text-sm transition-colors",
+                          isActive
+                            ? "bg-gray-200 text-gray-900 dark:bg-[#0F1A2E] dark:text-slate-100"
+                            : "text-gray-800 hover:bg-gray-100 dark:text-slate-200 dark:hover:bg-[#0E1A30] dark:text-slate-200 dark:hover:bg-[#0E1A30]",
+                          isActive
+                            ? "before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:rounded-r before:bg-blue-600 dark:before:bg-blue-500"
+                            : "",
+                        ].join(" ")
+                      }
+                    >
+                      {ItemIcon ? <ItemIcon size={16} className="text-gray-900 dark:text-slate-200" /> : null}
+                      <span className="truncate">{item.label}</span>
+                    </NavLink>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+        </div>
       </div>
     </aside>
   );

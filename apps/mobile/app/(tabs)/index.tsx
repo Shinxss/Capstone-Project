@@ -3,6 +3,7 @@ import { Alert, Pressable, Text, View } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { HomeView } from "../../features/home/components/HomeView";
+import { SosConfirmationModal } from "../../features/home/components/SosConfirmationModal";
 import { useSession } from "../../features/auth/hooks/useSession";
 import { useSosHold } from "../../features/emergency/hooks/useSosHold";
 import { useSosReport } from "../../features/emergency/hooks/useSosReport";
@@ -13,6 +14,12 @@ import { respondToDispatch } from "../../features/dispatch/services/dispatchApi"
 import { setStoredActiveDispatch } from "../../features/dispatch/services/dispatchStorage";
 import { useWeatherSummary } from "../../features/weather/hooks/useWeatherSummary";
 import type { WeatherSeverity } from "../../features/weather/services/weatherApi";
+import { useMyActiveRequest } from "../../features/requests/hooks/useMyActiveRequest";
+import {
+  formatEtaText,
+  formatRelativeTime,
+  formatTrackingHeadline,
+} from "../../features/requests/utils/formatters";
 import { api } from "../../lib/api";
 
 type AlertIconName = React.ComponentProps<typeof Ionicons>["name"];
@@ -48,12 +55,12 @@ const WEATHER_THEMES = {
     retryColor: "#C2410C",
   },
   cloudy: {
-    cardBackgroundColor: "#F8FAFC",
-    cardBorderColor: "#CBD5E1",
-    iconBackgroundColor: "#E2E8F0",
-    iconColor: "#334155",
-    headlineColor: "#334155",
-    retryColor: "#334155",
+    cardBackgroundColor: "#E0F2FE",
+    cardBorderColor: "#7DD3FC",
+    iconBackgroundColor: "#BAE6FD",
+    iconColor: "#0369A1",
+    headlineColor: "#075985",
+    retryColor: "#0369A1",
   },
   fog: {
     cardBackgroundColor: "#F1F5F9",
@@ -120,13 +127,6 @@ const WEATHER_THEMES = {
     retryColor: "#334155",
   },
 } as const;
-
-function formatWeatherUpdatedTime(updatedAt?: string | null): string | null {
-  if (!updatedAt) return null;
-  const parsed = new Date(updatedAt);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-}
 
 function weatherVisualFromSummary(
   weatherCode: number | null,
@@ -210,9 +210,10 @@ function weatherVisualFromSummary(
 }
 
 export default function HomeScreen() {
-  const { displayName, session } = useSession();
-  const { sendSos } = useSosReport();
+  const { displayName, session, isUser } = useSession();
+  const { sendSos, sending: sosSending } = useSosReport();
   const isVolunteer = useMemo(() => session?.mode === "user" && String(session.user.role ?? "").toUpperCase() === "VOLUNTEER", [session]);
+  const { activeRequest: myActiveRequest } = useMyActiveRequest({ pollMs: 8000, enabled: isUser });
   const {
     summary: weatherSummary,
     loading: weatherLoading,
@@ -227,6 +228,7 @@ export default function HomeScreen() {
     enabled: isVolunteer,
   });
 
+  const [sosConfirmVisible, setSosConfirmVisible] = useState(false);
   const [dispatchBusy, setDispatchBusy] = useState(false);
   const [pushDebugBusy, setPushDebugBusy] = useState(false);
 
@@ -238,7 +240,6 @@ export default function HomeScreen() {
         severity: "NONE" as WeatherSeverity,
         iconName: "location-outline" as AlertIconName,
         theme: WEATHER_THEMES.info,
-        updatedAt: null,
         retryEnabled: true,
       };
     }
@@ -250,7 +251,6 @@ export default function HomeScreen() {
         severity: "NONE" as WeatherSeverity,
         iconName: "alert-circle-outline" as AlertIconName,
         theme: WEATHER_THEMES.error,
-        updatedAt: null,
         retryEnabled: true,
       };
     }
@@ -267,7 +267,6 @@ export default function HomeScreen() {
         severity: weatherSummary.severity,
         iconName: visual.iconName,
         theme: visual.theme,
-        updatedAt: formatWeatherUpdatedTime(weatherSummary.updatedAt),
         retryEnabled: false,
       };
     }
@@ -279,7 +278,6 @@ export default function HomeScreen() {
         severity: "NONE" as WeatherSeverity,
         iconName: "refresh-outline" as AlertIconName,
         theme: WEATHER_THEMES.loading,
-        updatedAt: null,
         retryEnabled: false,
       };
     }
@@ -290,18 +288,40 @@ export default function HomeScreen() {
       severity: "NONE" as WeatherSeverity,
       iconName: "alert-circle-outline" as AlertIconName,
       theme: WEATHER_THEMES.error,
-      updatedAt: null,
       retryEnabled: true,
     };
   }, [locationMessage, weatherErrorMessage, weatherSummary, weatherLoading]);
+
+  const homeActiveRequest = useMemo(() => {
+    if (!myActiveRequest) return undefined;
+    return {
+      id: myActiveRequest.id,
+      trackingLabel: formatTrackingHeadline(myActiveRequest.trackingStatus),
+      etaText: formatEtaText(myActiveRequest.etaSeconds ?? null, myActiveRequest.trackingStatus),
+      lastUpdatedText: formatRelativeTime(myActiveRequest.lastUpdatedAt ?? null),
+    };
+  }, [myActiveRequest]);
 
   const onPressWeatherCard = useCallback(() => {
     void retryWeather();
   }, [retryWeather]);
 
-  const onSosTriggered = useCallback(async () => {
+  const onPressTracking = useCallback(() => {
+    if (!homeActiveRequest?.id) return;
+    router.push({
+      pathname: "/my-request-tracking",
+      params: { id: homeActiveRequest.id },
+    });
+  }, [homeActiveRequest?.id]);
+
+  const onSosTriggered = useCallback(() => {
+    setSosConfirmVisible(true);
+  }, []);
+
+  const onConfirmSos = useCallback(async () => {
     try {
       const result = await sendSos();
+      setSosConfirmVisible(false);
       router.push({
         pathname: "/report/success",
         params: {
@@ -315,10 +335,25 @@ export default function HomeScreen() {
     }
   }, [sendSos]);
 
-  const { holding, startHold, cancelHold } = useSosHold({
+  const onCancelSosConfirm = useCallback(() => {
+    if (sosSending) return;
+    setSosConfirmVisible(false);
+  }, [sosSending]);
+
+  const { holding, remainingSeconds, startHold, cancelHold } = useSosHold({
     holdMs: 3000,
     onTriggered: onSosTriggered,
   });
+
+  const onStartSosHold = useCallback(() => {
+    if (sosSending || sosConfirmVisible) return;
+    startHold();
+  }, [sosSending, sosConfirmVisible, startHold]);
+
+  const onCancelSosHold = useCallback(() => {
+    if (sosSending || sosConfirmVisible) return;
+    cancelHold();
+  }, [sosSending, sosConfirmVisible, cancelHold]);
 
   const onAcceptDispatch = useCallback(async () => {
     if (!pendingDispatch) return;
@@ -405,19 +440,28 @@ export default function HomeScreen() {
       <HomeView
         displayName={displayName}
         holding={holding}
+        remainingSeconds={remainingSeconds}
         alertTitle={weatherCard.title}
         alertMessage={weatherCard.message}
         alertSeverity={weatherCard.severity}
         alertIconName={weatherCard.iconName}
         alertTheme={weatherCard.theme}
-        alertUpdatedAt={weatherCard.updatedAt}
         alertRetryEnabled={weatherCard.retryEnabled}
+        activeRequest={homeActiveRequest}
         onPressAlert={weatherCard.retryEnabled ? onPressWeatherCard : undefined}
-        onStartHold={startHold}
-        onCancelHold={cancelHold}
+        onPressTracking={homeActiveRequest ? onPressTracking : undefined}
+        onStartHold={onStartSosHold}
+        onCancelHold={onCancelSosHold}
         onPressNotifications={() => {}}
         onPressViewAll={() => {}}
         onPressApplyVolunteer={() => router.push("/volunteer-apply-modal")}
+      />
+
+      <SosConfirmationModal
+        visible={sosConfirmVisible}
+        busy={sosSending}
+        onConfirm={onConfirmSos}
+        onCancel={onCancelSosConfirm}
       />
 
       {isVolunteer && pendingDispatch?.status === "PENDING" ? (

@@ -4,7 +4,8 @@ const DRAFT_SOURCE_ID = "hazard-draft-src";
 const DRAFT_FILL_ID = "hazard-draft-fill";
 const DRAFT_LINE_ID = "hazard-draft-line";
 const DRAFT_OUTLINE_ID = "hazard-draft-outline";
-const DRAFT_POINTS_ID = "hazard-draft-points";
+export const HAZARD_DRAFT_POINTS_LAYER_ID = "hazard-draft-points";
+const DRAFT_POINTS_ID = HAZARD_DRAFT_POINTS_LAYER_ID;
 
 type LngLat = [number, number];
 
@@ -29,8 +30,8 @@ export function ensureHazardDraftLayers(map: Map) {
       source: DRAFT_SOURCE_ID,
       filter: ["==", ["get", "kind"], "draft-point"],
       paint: {
-        "circle-radius": 7,
-        "circle-color": "#60a5fa",
+        "circle-radius": ["case", ["==", ["get", "moving"], true], 8, 7],
+        "circle-color": ["case", ["==", ["get", "moving"], true], "#22c55e", "#60a5fa"],
         "circle-stroke-width": 2,
         "circle-stroke-color": "#ffffff",
       },
@@ -107,7 +108,12 @@ export function clearHazardDraft(map: Map) {
   src.setData(emptyFC() as any);
 }
 
-export function setHazardDraftData(map: Map, points: LngLat[], closed: boolean) {
+export function setHazardDraftData(
+  map: Map,
+  points: LngLat[],
+  closed: boolean,
+  movingPointIdx: number | null = null
+) {
   const src = map.getSource(DRAFT_SOURCE_ID) as GeoJSONSource | undefined;
   if (!src) return;
 
@@ -117,7 +123,7 @@ export function setHazardDraftData(map: Map, points: LngLat[], closed: boolean) 
   for (let i = 0; i < points.length; i++) {
     features.push({
       type: "Feature",
-      properties: { kind: "draft-point", idx: i },
+      properties: { kind: "draft-point", idx: i, moving: movingPointIdx === i },
       geometry: { type: "Point", coordinates: points[i] },
     });
   }

@@ -7,8 +7,11 @@ import {
   getMyCurrentDispatch,
   getMyPendingDispatch,
   listDispatchTasksForLgu,
+  reverifyDispatch,
+  revokeDispatchVerification,
   respondToDispatch,
   toDispatchDTO,
+  updateDispatchResponderLocation,
   verifyDispatch,
 } from "./dispatch.service";
 import type { DispatchStatus } from "./dispatch.model";
@@ -214,7 +217,7 @@ export async function getLguTasks(req: Request, res: Response) {
   }
 }
 
-export async function patchVerify(req: Request, res: Response) {
+export async function postVerify(req: Request, res: Response) {
   try {
     const { role, userId } = getAuth(req);
     if (role !== "LGU" && role !== "ADMIN") return res.status(403).json({ message: "Forbidden" });
@@ -240,7 +243,101 @@ export async function patchVerify(req: Request, res: Response) {
 
     emitNotificationsRefresh("dispatch_verified", ["LGU", "ADMIN"]);
 
-    return res.json({ success: true, txHash });
+    return res.json({ success: true, txHash, data: verification });
+  } catch (e: any) {
+    return res.status(400).json({ message: e?.message ?? "Failed" });
+  }
+}
+
+export async function patchLocation(req: Request, res: Response) {
+  try {
+    const { role, userId } = getAuth(req);
+    if (role !== "VOLUNTEER") return res.status(403).json({ message: "Forbidden" });
+
+    const updated = await updateDispatchResponderLocation({
+      dispatchId: String(req.params.id),
+      volunteerUserId: String(userId),
+      lng: Number(req.body?.lng),
+      lat: Number(req.body?.lat),
+      accuracy: req.body?.accuracy !== undefined ? Number(req.body?.accuracy) : undefined,
+      heading: req.body?.heading !== undefined ? Number(req.body?.heading) : undefined,
+      speed: req.body?.speed !== undefined ? Number(req.body?.speed) : undefined,
+    });
+
+    return res.json({ data: toDispatchDTO(updated) });
+  } catch (e: any) {
+    return res.status(400).json({ message: e?.message ?? "Failed" });
+  }
+}
+
+export async function patchVerify(req: Request, res: Response) {
+  return postVerify(req, res);
+}
+
+export async function postRevoke(req: Request, res: Response) {
+  try {
+    const { role, userId } = getAuth(req);
+    if (role !== "ADMIN") return res.status(403).json({ message: "Forbidden" });
+
+    const reason = String(req.body?.reason ?? "").trim();
+    const revoked = await revokeDispatchVerification({
+      dispatchId: String(req.params.id),
+      adminUserId: String(userId),
+      reason,
+    });
+
+    await logAudit(req, {
+      eventType: AUDIT_EVENT.DISPATCH_STATUS_CHANGE,
+      outcome: "SUCCESS",
+      actor: { id: userId, role },
+      target: { type: "DISPATCH", id: revoked.dispatchId },
+      metadata: {
+        verificationType: "task_revoke",
+        txHash: revoked.txHash,
+        reasonHash: revoked.reasonHash,
+        taskIdHash: revoked.taskIdHash,
+      },
+    });
+
+    emitNotificationsRefresh("dispatch_verified", ["LGU", "ADMIN"]);
+
+    return res.json({ success: true, txHash: revoked.txHash, data: revoked });
+  } catch (e: any) {
+    return res.status(400).json({ message: e?.message ?? "Failed" });
+  }
+}
+
+export async function postReverify(req: Request, res: Response) {
+  try {
+    const { role, userId } = getAuth(req);
+    if (role !== "ADMIN") return res.status(403).json({ message: "Forbidden" });
+
+    const reverified = await reverifyDispatch({
+      dispatchId: String(req.params.id),
+      adminUserId: String(userId),
+      overrides: {
+        completedAt: req.body?.completedAt ?? undefined,
+        proofUrls: Array.isArray(req.body?.proofUrls) ? req.body.proofUrls : undefined,
+        proofFileHashes: Array.isArray(req.body?.proofFileHashes) ? req.body.proofFileHashes : undefined,
+      },
+    });
+
+    await logAudit(req, {
+      eventType: AUDIT_EVENT.DISPATCH_STATUS_CHANGE,
+      outcome: "SUCCESS",
+      actor: { id: userId, role },
+      target: { type: "DISPATCH", id: reverified.dispatchId },
+      metadata: {
+        verificationType: "task_reverify",
+        txHash: reverified.txHash,
+        taskIdHash: reverified.taskIdHash,
+        payloadHash: reverified.payloadHash,
+      },
+    });
+
+    emitNotificationsRefresh("dispatch_verified", ["LGU", "ADMIN"]);
+
+    return res.json({ success: true, txHash: reverified.txHash, data: reverified });
   } catch (e: any) {
     return res.status(400).json({ message: e?.message ?? "Failed" });
   }

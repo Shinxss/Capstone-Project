@@ -6,7 +6,7 @@ export default function LguProfile() {
   const vm = useLguProfile();
 
   return (
-    <LguShell title="Profile" subtitle="LGU staff profile management">
+    <LguShell title="My Profile" subtitle="View and manage your profile details">
       <LguProfileView {...vm} loading={vm.loading} error={vm.error} onRefresh={vm.refresh} />
     </LguShell>
   );

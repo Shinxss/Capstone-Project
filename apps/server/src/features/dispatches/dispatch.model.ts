@@ -27,6 +27,24 @@ export type DispatchProof = {
   uploadedAt: Date;
   mimeType?: string;
   fileName?: string;
+  fileHash?: string;
+};
+
+export type DispatchBlockchainRecord = {
+  network: string;
+  contractAddress: string;
+  schemaVersion: string;
+  domain: string;
+  taskIdHash: string;
+  payloadHash: string;
+  verifiedTxHash: string;
+  verifiedAtBlockTime?: Date;
+  verifierAddress?: string;
+  revoked: boolean;
+  revokedReasonHash?: string;
+  revokedTxHash?: string;
+  revokedAtBlockTime?: Date;
+  reverifiedTxHash?: string;
 };
 
 export type DispatchOfferDoc = {
@@ -40,10 +58,21 @@ export type DispatchOfferDoc = {
   // Volunteer completion
   completedAt?: Date;
   proofs?: DispatchProof[];
+  proofFileHashes?: string[];
 
   // LGU verification
   verifiedAt?: Date;
   verifiedBy?: Types.ObjectId;
+
+  // Latest volunteer location for community-side live tracking
+  lastKnownLocation?: {
+    type: "Point";
+    coordinates: [number, number]; // [lng, lat]
+    accuracy?: number;
+    heading?: number;
+    speed?: number;
+  };
+  lastKnownLocationAt?: Date;
 
   // Blockchain audit trail (hash-only)
   chainRecord?: {
@@ -53,8 +82,11 @@ export type DispatchOfferDoc = {
     blockNumber?: number;
     taskIdHash: string;
     payloadHash: string;
+    recordHash?: string;
     recordedAt: Date;
+    revoked?: boolean;
   };
+  blockchain?: DispatchBlockchainRecord;
 
   emergencySnapshot: EmergencySnapshot;
 
@@ -85,13 +117,51 @@ const DispatchOfferSchema = new Schema<DispatchOfferDoc>(
           uploadedAt: { type: Date, required: true },
           mimeType: { type: String },
           fileName: { type: String },
+          fileHash: { type: String },
         },
       ],
+      default: [],
+    },
+    proofFileHashes: {
+      type: [String],
       default: [],
     },
 
     verifiedAt: { type: Date },
     verifiedBy: { type: Schema.Types.ObjectId, ref: "User" },
+
+    lastKnownLocation: {
+      type: {
+        type: String,
+        enum: ["Point"],
+        default: undefined,
+      },
+      coordinates: {
+        type: [Number],
+        default: undefined,
+        validate: {
+          validator: function (
+            this: { lastKnownLocation?: { type?: string } },
+            arr: number[] | undefined
+          ) {
+            const locationType = this?.lastKnownLocation?.type;
+
+            // Backward compatibility:
+            // Older docs may carry an empty coordinates array with no location type.
+            if (!locationType) {
+              return !arr || (Array.isArray(arr) && arr.length === 0);
+            }
+
+            return Array.isArray(arr) && arr.length === 2;
+          },
+          message: "lastKnownLocation.coordinates must be [lng, lat]",
+        },
+      },
+      accuracy: { type: Number },
+      heading: { type: Number },
+      speed: { type: Number },
+    },
+    lastKnownLocationAt: { type: Date },
 
     chainRecord: {
       network: { type: String },
@@ -100,7 +170,26 @@ const DispatchOfferSchema = new Schema<DispatchOfferDoc>(
       blockNumber: { type: Number },
       taskIdHash: { type: String },
       payloadHash: { type: String },
+      recordHash: { type: String },
       recordedAt: { type: Date },
+      revoked: { type: Boolean },
+    },
+
+    blockchain: {
+      network: { type: String },
+      contractAddress: { type: String },
+      schemaVersion: { type: String },
+      domain: { type: String },
+      taskIdHash: { type: String },
+      payloadHash: { type: String },
+      verifiedTxHash: { type: String },
+      verifiedAtBlockTime: { type: Date },
+      verifierAddress: { type: String },
+      revoked: { type: Boolean, default: false },
+      revokedReasonHash: { type: String },
+      revokedTxHash: { type: String },
+      revokedAtBlockTime: { type: Date },
+      reverifiedTxHash: { type: String },
     },
 
     emergencySnapshot: {
@@ -144,6 +233,8 @@ const DispatchOfferSchema = new Schema<DispatchOfferDoc>(
 
 DispatchOfferSchema.index({ volunteerId: 1, status: 1, updatedAt: -1 });
 DispatchOfferSchema.index({ emergencyId: 1, status: 1, updatedAt: -1 });
+DispatchOfferSchema.index({ "blockchain.taskIdHash": 1 });
+DispatchOfferSchema.index({ emergencyId: 1, status: 1, lastKnownLocationAt: -1 });
 
 export const DispatchOffer =
   models.DispatchOffer || model<DispatchOfferDoc>("DispatchOffer", DispatchOfferSchema);

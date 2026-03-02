@@ -139,7 +139,7 @@ export function EmergencyDirectionsSheet({
 
       {routeAlternatives.length > 1 ? (
         <View className="mt-3 flex-row gap-2">
-          {routeAlternatives.slice(0, 2).map((candidate, index) => {
+          {routeAlternatives.slice(0, 3).map((candidate, index) => {
             const isSelected = selectedRouteIndex === index;
             return (
               <Pressable

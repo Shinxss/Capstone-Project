@@ -1,7 +1,8 @@
 import React from "react";
-import { Alert, Pressable, SafeAreaView, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
-import * as Clipboard from "expo-clipboard";
+import { Ionicons } from "@expo/vector-icons";
 import { useReportDraft } from "../hooks/useReportDraft";
 
 type SearchParams = {
@@ -15,50 +16,43 @@ export function ReportEmergencySuccessScreen() {
   const { reset } = useReportDraft();
   const sosMode = String(isSos ?? "") === "1";
 
-  const onCopyReference = async () => {
-    const value = String(referenceNumber ?? "").trim();
-    if (!value) return;
-    await Clipboard.setStringAsync(value);
-    Alert.alert("Copied", "Reference number copied to clipboard.");
-  };
-
   const onBackHome = () => {
     reset();
     router.replace("/(tabs)");
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white px-5 py-5">
-      <Text className="text-sm font-medium text-zinc-500">Step 3 of 3</Text>
-      <Text className="mt-2 text-3xl font-extrabold text-zinc-900">
-        {sosMode ? "SOS Sent" : "Report Submitted"}
-      </Text>
-
-      <Text className="mt-2 text-sm text-zinc-600">
-        {sosMode ? "Your SOS has been sent to responders." : "Submitted for LGU verification."}
-      </Text>
-
-      <View className="mt-6 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-        <Text className="text-sm text-zinc-500">Incident ID</Text>
-        <Text className="mt-1 text-sm font-semibold text-zinc-800">{incidentId || "N/A"}</Text>
-
-        <Text className="mt-4 text-sm text-zinc-500">Reference Number</Text>
-        <Text className="mt-1 text-lg font-bold text-zinc-900">{referenceNumber || "N/A"}</Text>
-
-        <Pressable
-          onPress={onCopyReference}
-          disabled={!referenceNumber}
-          className={`mt-4 h-11 items-center justify-center rounded-xl ${
-            referenceNumber ? "bg-zinc-900" : "bg-zinc-300"
-          }`}
-        >
-          <Text className="text-base font-semibold text-white">Copy Reference</Text>
-        </Pressable>
-
-        <Text className="mt-3 text-xs text-zinc-500">Keep this reference for tracking.</Text>
+    <SafeAreaView edges={["bottom"]} style={styles.screen}>
+      <View style={styles.iconWrap}>
+        <View style={styles.iconCircle}>
+          <Ionicons name="checkmark-circle-outline" size={44} color="#16a34a" />
+        </View>
       </View>
 
-      <View className="mt-8 gap-3">
+      <Text allowFontScaling={false} style={styles.title}>
+        {sosMode ? "SOS Sent!" : "Report Submitted!"}
+      </Text>
+
+      <Text allowFontScaling={false} style={styles.message}>
+        {sosMode
+          ? "Your SOS has been received. Responders in your area have been alerted."
+          : "Your emergency report has been received. Responders in your area have been alerted."}
+      </Text>
+
+      <View style={styles.referenceCard}>
+        <Text allowFontScaling={false} style={styles.referenceLabel}>
+          Reference Number:
+        </Text>
+        <Text allowFontScaling={false} style={styles.referenceValue}>
+          {referenceNumber || "N/A"}
+        </Text>
+      </View>
+
+      <Text allowFontScaling={false} style={styles.helperText}>
+        Keep this reference number for tracking. You will receive updates about your report.
+      </Text>
+
+      <View style={styles.actions}>
         <Pressable
           onPress={() =>
             router.push({
@@ -66,15 +60,113 @@ export function ReportEmergencySuccessScreen() {
               params: incidentId ? { incidentId } : undefined,
             })
           }
-          className="h-12 items-center justify-center rounded-2xl border border-zinc-300"
+          style={styles.primaryBtn}
         >
-          <Text className="text-base font-semibold text-zinc-800">View on Map</Text>
+          <Text allowFontScaling={false} style={styles.primaryBtnText}>
+            View on Map
+          </Text>
         </Pressable>
 
-        <Pressable onPress={onBackHome} className="h-12 items-center justify-center rounded-2xl bg-red-500">
-          <Text className="text-base font-semibold text-white">Back to Home</Text>
+        <Pressable onPress={onBackHome} style={styles.secondaryBtn}>
+          <Text allowFontScaling={false} style={styles.secondaryBtnText}>
+            Back to Home
+          </Text>
         </Pressable>
       </View>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: "#f4f4f5",
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 22,
+  },
+  iconWrap: {
+    alignItems: "center",
+  },
+  iconCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#d1fae5",
+  },
+  title: {
+    marginTop: 24,
+    textAlign: "center",
+    fontSize: 42 / 2,
+    fontWeight: "600",
+    color: "#18181b",
+  },
+  message: {
+    marginTop: 10,
+    textAlign: "center",
+    fontSize: 17,
+    lineHeight: 25,
+    color: "#52525b",
+    paddingHorizontal: 30,
+  },
+  referenceCard: {
+    marginTop: 28,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#d4d4d8",
+    backgroundColor: "#f4f4f5",
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+  },
+  referenceLabel: {
+    fontSize: 17,
+    color: "#52525b",
+  },
+  referenceValue: {
+    marginTop: 12,
+    fontSize: 38 / 2,
+    fontWeight: "700",
+    color: "#18181b",
+  },
+  helperText: {
+    marginTop: 26,
+    textAlign: "center",
+    fontSize: 17,
+    lineHeight: 25,
+    color: "#52525b",
+    paddingHorizontal: 24,
+  },
+  actions: {
+    marginTop: 28,
+    gap: 14,
+  },
+  primaryBtn: {
+    height: 60,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#ef4444",
+  },
+  primaryBtnText: {
+    fontSize: 17,
+    fontWeight: "600",
+    color: "#ffffff",
+  },
+  secondaryBtn: {
+    height: 60,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#d4d4d8",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f4f4f5",
+  },
+  secondaryBtnText: {
+    fontSize: 17,
+    fontWeight: "600",
+    color: "#18181b",
+  },
+});
+

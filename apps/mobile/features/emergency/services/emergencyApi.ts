@@ -32,6 +32,12 @@ type CreateEmergencyReportPayload = {
   photos?: string[];
 };
 
+type UploadEmergencyReportPhotoPayload = {
+  base64: string;
+  mimeType?: string;
+  fileName?: string;
+};
+
 export async function createEmergencyReport(
   payload: CreateEmergencyReportPayload
 ): Promise<ReportSubmitResult> {
@@ -45,6 +51,18 @@ export async function createEmergencyReport(
   }
 
   return data;
+}
+
+export async function uploadEmergencyReportPhoto(
+  payload: UploadEmergencyReportPhotoPayload
+): Promise<{ url: string }> {
+  const res = await api.post<{ url?: string }>(`${EMERGENCY_REPORTS_BASE}/photos`, payload);
+  const url = String(res.data?.url ?? "").trim();
+  if (!url) {
+    throw new Error("Invalid photo upload response");
+  }
+
+  return { url };
 }
 
 export async function fetchEmergencyMapReports(): Promise<MapEmergencyReport[]> {

@@ -72,7 +72,7 @@ app.use(
   })
 );
 
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: process.env.JSON_BODY_LIMIT ?? "6mb" }));
 
 app.use(
   mongoSanitize({
@@ -111,6 +111,10 @@ app.use(doubleCsrfProtection);
 
 const uploadsDir = path.join(process.cwd(), "uploads");
 fs.mkdirSync(uploadsDir, { recursive: true });
+const dispatchProofsDir = path.join(uploadsDir, "dispatch-proofs");
+const emergencyReportPhotosDir = path.join(uploadsDir, "emergency-report-photos");
+fs.mkdirSync(dispatchProofsDir, { recursive: true });
+fs.mkdirSync(emergencyReportPhotosDir, { recursive: true });
 
 app.get(
   "/uploads/dispatch-proofs/:filename",
@@ -119,7 +123,43 @@ app.get(
   (req, res) => {
     try {
       const filename = String(req.params.filename || "");
-      const abs = path.join(uploadsDir, "dispatch-proofs", filename);
+      const abs = path.join(dispatchProofsDir, filename);
+      if (!fs.existsSync(abs)) return res.status(404).end();
+
+      const raw = fs.readFileSync(abs);
+      let plain: Buffer;
+      try {
+        plain = decryptBuffer(raw);
+      } catch {
+        plain = raw;
+      }
+
+      const ext = path.extname(filename).toLowerCase();
+      if (ext === ".png") res.type("png");
+      else if (ext === ".jpg" || ext === ".jpeg") res.type("jpeg");
+      else if (ext === ".heic") res.type("heic");
+      else res.type("application/octet-stream");
+
+      return res.send(plain);
+    } catch {
+      return res.status(500).end();
+    }
+  }
+);
+
+app.get(
+  "/uploads/emergency-report-photos/:filename",
+  requireAuth,
+  requireRole("LGU", "ADMIN"),
+  (req, res) => {
+    try {
+      const requested = String(req.params.filename || "");
+      const filename = path.basename(requested);
+      if (!filename || filename !== requested) {
+        return res.status(400).json({ message: "Invalid filename" });
+      }
+
+      const abs = path.join(emergencyReportPhotosDir, filename);
       if (!fs.existsSync(abs)) return res.status(404).end();
 
       const raw = fs.readFileSync(abs);

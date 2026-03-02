@@ -4,15 +4,21 @@ import {
   createEmergencyReport,
   getEmergencyReportById,
   getEmergencyReportByReference,
+  getMyActiveEmergencyReport,
+  getMyEmergencyRequestTracking,
   listMapEmergencyReports,
+  listMyEmergencyReports,
   listPendingEmergencyApprovals,
   rejectEmergencyReport,
 } from "../services/emergencyReport.service";
+import { uploadEmergencyReportPhoto } from "../services/emergencyReportUpload.service";
 import { AUDIT_EVENT } from "../../audit/audit.constants";
 import { logAudit } from "../../audit/audit.service";
 import type {
   CreateEmergencyReportInput,
+  MyEmergencyReportsQuery,
   RejectEmergencyReportInput,
+  UploadEmergencyReportPhotoInput,
 } from "../schemas/emergencyReport.schema";
 
 type MaybeAuthedRequest = Request & {
@@ -42,7 +48,29 @@ export async function postEmergencyReport(req: MaybeAuthedRequest, res: Response
       },
     });
   } catch (error: any) {
-    return res.status(500).json({ message: error?.message ?? "Failed to create emergency report" });
+    const message = String(error?.message ?? "Failed to create emergency report");
+    if (message === "Invalid photo URL" || message === "At least 3 proof images are required.") {
+      return res.status(400).json({ message });
+    }
+    return res.status(500).json({ message });
+  }
+}
+
+export async function postEmergencyReportPhoto(req: MaybeAuthedRequest, res: Response) {
+  try {
+    const input = req.body as UploadEmergencyReportPhotoInput;
+    const reporterUserId = req.user?.id;
+
+    const uploaded = await uploadEmergencyReportPhoto({
+      base64: input.base64,
+      mimeType: input.mimeType,
+      fileName: input.fileName,
+      reporterUserId,
+    });
+
+    return res.status(201).json({ url: uploaded.url });
+  } catch (error: any) {
+    return res.status(400).json({ message: error?.message ?? "Failed to upload emergency photo" });
   }
 }
 
@@ -80,6 +108,55 @@ export async function getEmergencyReportsMapFeed(_req: Request, res: Response) {
     return res.status(200).json({ data: items });
   } catch (error: any) {
     return res.status(500).json({ message: error?.message ?? "Failed to fetch map feed" });
+  }
+}
+
+export async function getMyActiveEmergencyReportController(req: MaybeAuthedRequest, res: Response) {
+  try {
+    if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+
+    const report = await getMyActiveEmergencyReport(String(req.user.id));
+    if (!report) {
+      return res.status(404).json({ message: "No active emergency request found" });
+    }
+
+    return res.status(200).json(report);
+  } catch (error: any) {
+    return res.status(500).json({ message: error?.message ?? "Failed to fetch active emergency request" });
+  }
+}
+
+export async function listMyEmergencyReportsController(req: MaybeAuthedRequest, res: Response) {
+  try {
+    if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+
+    const query = req.query as unknown as MyEmergencyReportsQuery;
+    const scope = query.scope ?? "active";
+    const items = await listMyEmergencyReports(String(req.user.id), scope);
+    return res.status(200).json(items);
+  } catch (error: any) {
+    return res.status(500).json({ message: error?.message ?? "Failed to fetch emergency requests" });
+  }
+}
+
+export async function getMyEmergencyTrackingController(req: MaybeAuthedRequest, res: Response) {
+  try {
+    if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+
+    const reportId = String(req.params.id ?? "").trim();
+    const tracking = await getMyEmergencyRequestTracking(reportId, String(req.user.id));
+
+    if (!tracking) {
+      return res.status(404).json({ message: "Emergency request not found" });
+    }
+
+    if (tracking === "FORBIDDEN") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    return res.status(200).json(tracking);
+  } catch (error: any) {
+    return res.status(500).json({ message: error?.message ?? "Failed to fetch emergency tracking details" });
   }
 }
 

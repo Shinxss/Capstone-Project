@@ -79,6 +79,11 @@ type UserLike = {
   lguPosition?: string;
   barangay?: string;
   municipality?: string;
+  birthdate?: string;
+  contactNo?: string;
+  country?: string;
+  postalCode?: string;
+  avatarUrl?: string;
   volunteerStatus?: string;
   authProvider?: string;
   passwordHash?: string;
@@ -99,6 +104,11 @@ export function toAuthUserPayload(user: UserLike) {
     lguPosition: user.lguPosition ?? "",
     barangay: user.barangay ?? "",
     municipality: user.municipality ?? "",
+    birthdate: user.birthdate ?? "",
+    contactNo: user.contactNo ?? "",
+    country: user.country ?? "",
+    postalCode: user.postalCode ?? "",
+    avatarUrl: user.avatarUrl ?? "",
     volunteerStatus: user.volunteerStatus ?? "",
     authProvider: user.authProvider ?? "local",
     emailVerified: Boolean(user.emailVerified),

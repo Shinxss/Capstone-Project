@@ -25,6 +25,11 @@ export type UserDoc = {
   lguPosition?: string;
   barangay?: string;
   municipality?: string;
+  birthdate?: string;
+  contactNo?: string;
+  country?: string;
+  postalCode?: string;
+  avatarUrl?: string;
 
   volunteerStatus: VolunteerStatus;
 
@@ -72,6 +77,11 @@ const UserSchema = new Schema<UserDoc>(
     lguPosition: { type: String, default: "", trim: true, maxlength: 200 },
     barangay: { type: String, default: "", trim: true, maxlength: 200 },
     municipality: { type: String, default: "", trim: true, maxlength: 200 },
+    birthdate: { type: String, default: "", trim: true, maxlength: 10 },
+    contactNo: { type: String, default: "", trim: true, maxlength: 20 },
+    country: { type: String, default: "", trim: true, maxlength: 100 },
+    postalCode: { type: String, default: "", trim: true, maxlength: 20 },
+    avatarUrl: { type: String, default: "", trim: true, maxlength: 500 },
 
     volunteerStatus: {
       type: String,

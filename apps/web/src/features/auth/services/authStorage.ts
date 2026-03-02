@@ -14,6 +14,11 @@ export type StoredPortalUser = {
   lguPosition?: string;
   barangay?: string;
   municipality?: string;
+  birthdate?: string;
+  contactNo?: string;
+  country?: string;
+  postalCode?: string;
+  avatarUrl?: string;
 };
 
 function emitAuthChanged() {

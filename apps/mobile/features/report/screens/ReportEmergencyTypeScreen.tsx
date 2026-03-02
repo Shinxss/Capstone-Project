@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { EMERGENCY_TYPE_OPTIONS } from "../constants/emergencyTypes.constants";
@@ -24,26 +23,9 @@ export function ReportEmergencyTypeScreen() {
   };
 
   return (
-    <SafeAreaView edges={["top", "bottom"]} style={styles.screen}>
-      <View className="flex-row items-center px-5 pb-2 pt-3">
-        <Pressable
-          onPress={() => router.back()}
-          className="h-10 w-10 items-center justify-center"
-        >
-          <Ionicons name="chevron-back" size={20} color="#111827" />
-        </Pressable>
-        <Text className="ml-4 text-2xl font-bold text-zinc-900">Report Emergency</Text>
-      </View>
-
-      <View className="px-5 pb-3">
-        <Text className="text-sm font-medium text-zinc-500">Step 1 of 3</Text>
-        <View className="mt-2 h-2 w-full overflow-hidden rounded-full bg-zinc-200">
-          <View className="h-full w-1/3 rounded-full bg-red-500" />
-        </View>
-      </View>
-
+    <SafeAreaView edges={["bottom"]} style={styles.screen}>
       <ScrollView
-        contentContainerClassName="px-5 pb-36"
+        contentContainerClassName="px-5 pb-36 pt-2"
         showsVerticalScrollIndicator={false}
       >
         <Text className="text-2xl font-extrabold text-zinc-900">What type of emergency?</Text>
@@ -63,7 +45,7 @@ export function ReportEmergencyTypeScreen() {
         </View>
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
+      <View style={[styles.footer, { bottom: Math.max(insets.bottom, 30) + 40 }]}>
         <Pressable
           onPress={onContinue}
           disabled={!canContinue}
@@ -87,8 +69,8 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 16,
+    paddingTop: 0,
+    paddingBottom: 0,
     backgroundColor: "transparent",
   },
   continueBtn: {

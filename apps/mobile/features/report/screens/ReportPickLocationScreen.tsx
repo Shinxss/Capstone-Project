@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import MapboxGL from "@rnmapbox/maps";
 import { router } from "expo-router";
 import { useReportDraft } from "../hooks/useReportDraft";
-import { getCurrentCoords } from "../../../shared/services/locationService";
+import { getCurrentCoords, reverseGeocodeCoords } from "../../../shared/services/locationService";
 
 const FALLBACK_CENTER: [number, number] = [120.9842, 14.5995];
 const TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? "";
@@ -19,7 +19,7 @@ function toLabel(latitude: number, longitude: number) {
 }
 
 export function ReportPickLocationScreen() {
-  const { draft, setLocation } = useReportDraft();
+  const { draft, setLocation, setLocationText } = useReportDraft();
   const [center, setCenter] = useState<[number, number]>(
     draft.location
       ? [draft.location.coords.longitude, draft.location.coords.latitude]
@@ -28,6 +28,10 @@ export function ReportPickLocationScreen() {
   const [picked, setPicked] = useState<[number, number] | null>(
     draft.location ? [draft.location.coords.longitude, draft.location.coords.latitude] : null
   );
+  const [pickedAddress, setPickedAddress] = useState<string | null>(
+    draft.locationText?.trim() || draft.location?.label?.trim() || null
+  );
+  const [resolvingAddress, setResolvingAddress] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -60,17 +64,46 @@ export function ReportPickLocationScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!picked) {
+      setPickedAddress(null);
+      return;
+    }
+
+    let active = true;
+    const [longitude, latitude] = picked;
+
+    const resolve = async () => {
+      setResolvingAddress(true);
+      const address = await reverseGeocodeCoords({ latitude, longitude });
+      if (!active) return;
+
+      setPickedAddress(address || toLabel(latitude, longitude));
+      setResolvingAddress(false);
+    };
+
+    void resolve();
+
+    return () => {
+      active = false;
+    };
+  }, [picked]);
+
   const markerCoordinate = useMemo(() => picked, [picked]);
 
   const onUseLocation = () => {
     if (!picked) return;
 
+    const [longitude, latitude] = picked;
+    const label = pickedAddress?.trim() || toLabel(latitude, longitude);
+
+    setLocationText(label);
     setLocation(
       {
-        latitude: picked[1],
-        longitude: picked[0],
+        latitude,
+        longitude,
       },
-      toLabel(picked[1], picked[0])
+      label
     );
 
     router.back();
@@ -92,6 +125,7 @@ export function ReportPickLocationScreen() {
             if (event.geometry.type !== "Point") return;
             const coordinates = event.geometry.coordinates;
             setPicked([coordinates[0], coordinates[1]]);
+            setCenter([coordinates[0], coordinates[1]]);
           }}
         >
           <MapboxGL.Camera centerCoordinate={center} zoomLevel={13} animationMode="flyTo" />
@@ -105,6 +139,23 @@ export function ReportPickLocationScreen() {
       </View>
 
       <View className="border-t border-zinc-800 bg-zinc-950 px-4 py-4">
+        <View className="mb-3 rounded-xl bg-zinc-900 px-3 py-3">
+          <Text className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+            Pinpoint Address
+          </Text>
+
+          {resolvingAddress ? (
+            <View className="mt-2 flex-row items-center gap-2">
+              <ActivityIndicator size="small" color="#f4f4f5" />
+              <Text className="text-sm text-zinc-300">Resolving exact address...</Text>
+            </View>
+          ) : (
+            <Text className="mt-2 text-sm text-zinc-200">
+              {pickedAddress || "Tap anywhere on the map to drop a pin."}
+            </Text>
+          )}
+        </View>
+
         <View className="flex-row items-center gap-2">
           <Pressable
             onPress={() => router.back()}

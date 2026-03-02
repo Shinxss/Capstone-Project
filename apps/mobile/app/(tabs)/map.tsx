@@ -23,6 +23,8 @@ import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { api } from "../../lib/api";
 import { fetchEmergencyMapReports } from "../../features/emergency/services/emergencyApi";
 import { useAuth } from "../../features/auth/AuthProvider";
+import { useActiveDispatch } from "../../features/dispatch/hooks/useActiveDispatch";
+import { updateDispatchLocation } from "../../features/dispatch/services/dispatchApi";
 import { EmergencyBottomSheetContainer } from "../../features/map/components/EmergencyBottomSheetContainer";
 import { useEmergencyBottomSheet } from "../../features/map/hooks/useEmergencyBottomSheet";
 import type { Emergency, EmergencyType } from "../../features/map/models/map.types";
@@ -43,7 +45,11 @@ type HazardZone = {
   };
 };
 
-const DAGUPAN: [number, number] = [120.3333, 16.0438];
+const DAGUPAN: [number, number] = [120.34, 16.043];
+const DAGUPAN_BOUNDS = {
+  sw: [120.25, 15.98] as [number, number],
+  ne: [120.43, 16.12] as [number, number],
+} as const;
 const TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? "";
 
 if (TOKEN) {
@@ -132,6 +138,12 @@ function hexToRgba(hex: string, alpha: number) {
   const g = (num >> 8) & 255;
   const b = num & 255;
   return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function clampToDagupan([lng, lat]: [number, number]): [number, number] {
+  const clampedLng = Math.min(DAGUPAN_BOUNDS.ne[0], Math.max(DAGUPAN_BOUNDS.sw[0], lng));
+  const clampedLat = Math.min(DAGUPAN_BOUNDS.ne[1], Math.max(DAGUPAN_BOUNDS.sw[1], lat));
+  return [clampedLng, clampedLat];
 }
 
 /**
@@ -230,7 +242,9 @@ export default function MapTab() {
     clear: clearDevLoc,
   } = useDevLocationOverride();
   const normalizedRole = useMemo(() => String(user?.role ?? "").trim().toUpperCase(), [user?.role]);
+  const isVolunteer = mode === "authed" && normalizedRole === "VOLUNTEER";
   const canViewEmergencies = mode === "authed" && normalizedRole !== "COMMUNITY";
+  const { activeDispatch } = useActiveDispatch({ pollMs: 10000, enabled: isVolunteer });
 
   const [myLocation, setMyLocation] = useState<[number, number] | null>(null);
   const [hazardZones, setHazardZones] = useState<HazardZone[]>([]);
@@ -420,32 +434,22 @@ export default function MapTab() {
   );
 
   const cameraRef = useRef<MapboxGL.Camera>(null);
-  const hasCenteredOnGpsRef = useRef(false);
+  const lastLocationUpdateAtRef = useRef(0);
 
   useEffect(() => {
-    if (!isFocused) return;
-    if (!devLocationEnabled) return;
-
-    cameraRef.current?.setCamera({
-      centerCoordinate: [effectiveLocation.lng, effectiveLocation.lat],
-      zoomLevel: 13,
-      animationDuration: 900,
-    });
-  }, [devLocationEnabled, effectiveLocation.lat, effectiveLocation.lng, isFocused]);
-
-  useEffect(() => {
-    if (!isFocused) return;
-    if (devLocationEnabled) return;
+    if (!isFocused || !isVolunteer) return;
+    if (!activeDispatch?.id) return;
     if (!myLocation) return;
-    if (hasCenteredOnGpsRef.current) return;
 
-    hasCenteredOnGpsRef.current = true;
-    cameraRef.current?.setCamera({
-      centerCoordinate: myLocation,
-      zoomLevel: 13,
-      animationDuration: 900,
-    });
-  }, [devLocationEnabled, isFocused, myLocation]);
+    const now = Date.now();
+    if (now - lastLocationUpdateAtRef.current < 7000) return;
+    lastLocationUpdateAtRef.current = now;
+
+    void updateDispatchLocation(activeDispatch.id, {
+      lng: myLocation[0],
+      lat: myLocation[1],
+    }).catch(() => undefined);
+  }, [activeDispatch?.id, isFocused, isVolunteer, myLocation]);
 
   // draggable "Google Maps-ish" sheet
   const layersSheetRef = useRef<BottomSheet>(null);
@@ -453,12 +457,14 @@ export default function MapTab() {
 
   const fitRoute = (coords: [number, number][]) => {
     try {
-      let minLng = coords[0][0];
-      let maxLng = coords[0][0];
-      let minLat = coords[0][1];
-      let maxLat = coords[0][1];
+      const boundedCoords = coords.map(clampToDagupan);
 
-      for (const [lng, lat] of coords) {
+      let minLng = boundedCoords[0][0];
+      let maxLng = boundedCoords[0][0];
+      let minLat = boundedCoords[0][1];
+      let maxLat = boundedCoords[0][1];
+
+      for (const [lng, lat] of boundedCoords) {
         if (lng < minLng) minLng = lng;
         if (lng > maxLng) maxLng = lng;
         if (lat < minLat) minLat = lat;
@@ -479,9 +485,15 @@ export default function MapTab() {
       });
     } catch {
       // fallback
-      const midLng = (coords[0][0] + coords[coords.length - 1][0]) / 2;
-      const midLat = (coords[0][1] + coords[coords.length - 1][1]) / 2;
-      cameraRef.current?.setCamera({ centerCoordinate: [midLng, midLat], zoomLevel: 13, animationDuration: 900 });
+      const [startLng, startLat] = clampToDagupan(coords[0]);
+      const [endLng, endLat] = clampToDagupan(coords[coords.length - 1]);
+      const midLng = (startLng + endLng) / 2;
+      const midLat = (startLat + endLat) / 2;
+      cameraRef.current?.setCamera({
+        centerCoordinate: [midLng, midLat],
+        zoomLevel: 13,
+        animationDuration: 900,
+      });
     }
   };
 
@@ -625,6 +637,7 @@ export default function MapTab() {
             centerCoordinate={camera.centerCoordinate}
             zoomLevel={camera.zoomLevel}
             animationDuration={camera.animationDuration}
+            maxBounds={DAGUPAN_BOUNDS}
           />
 
           {hazardZonesGeoJSON.features.length ? (

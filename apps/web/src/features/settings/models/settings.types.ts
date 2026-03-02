@@ -1,8 +1,13 @@
+export type NotificationChannelPrefs = {
+  web: boolean;
+  email: boolean;
+};
+
 export type NotificationPrefs = {
-  emergencies: boolean;
-  taskUpdates: boolean;
-  verificationNeeded: boolean;
-  announcements: boolean;
+  emergencies: NotificationChannelPrefs;
+  taskUpdates: NotificationChannelPrefs;
+  verificationNeeded: NotificationChannelPrefs;
+  announcements: NotificationChannelPrefs;
 };
 
 export type UiPrefs = {
@@ -14,4 +19,3 @@ export type LguSettings = {
   ui: UiPrefs;
   updatedAt: string; // ISO
 };
-

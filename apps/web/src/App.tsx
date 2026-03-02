@@ -19,6 +19,8 @@ import LguAnnouncements from "./pages/lgu/LguAnnouncements";
 import LguReports from "./pages/lgu/LguReports";
 import LguProfile from "./pages/lgu/LguProfile";
 import LguSettings from "./pages/lgu/LguSettings";
+import LguNotificationSettings from "./pages/lgu/LguNotificationSettings";
+import LguPrivacyPolicy from "./pages/lgu/LguPrivacyPolicy";
 
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminNotifications from "./pages/admin/AdminNotifications";
@@ -95,6 +97,9 @@ export default function App() {
 
           <Route path="/lgu/profile" element={<LguProfile />} />
           <Route path="/lgu/settings" element={<LguSettings />} />
+          <Route path="/lgu/notification-settings" element={<LguNotificationSettings />} />
+          <Route path="/lgu/help" element={<PlaceholderPage title="Help" subtitle="Guides and support resources" />} />
+          <Route path="/lgu/privacy" element={<LguPrivacyPolicy />} />
         </Route>
 
         <Route element={<RequireAdminAuth />}>

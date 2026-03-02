@@ -20,6 +20,7 @@ import {
 import {
   clearHazardDraft,
   ensureHazardDraftLayers,
+  HAZARD_DRAFT_POINTS_LAYER_ID,
   setHazardDraftData,
   setHazardDraftVisibility,
 } from "../../hazardZones/utils/hazardDraft.mapbox";
@@ -81,6 +82,9 @@ export function useLguLiveMap() {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const volunteerMarkersRef = useRef<mapboxgl.Marker[]>([]);
   const meMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const draggingDraftVertexIdxRef = useRef<number | null>(null);
+  const suppressNextMapClickRef = useRef(false);
+  const dragPanWasEnabledRef = useRef(false);
 
   const [mapReady, setMapReady] = useState(false);
 
@@ -103,6 +107,7 @@ export function useLguLiveMap() {
   // hazard draw + save form
   const [isDrawingHazard, setIsDrawingHazard] = useState(false);
   const pointsRef = useRef<LngLat[]>([]);
+  const [hazardPointCount, setHazardPointCount] = useState(0);
 
   const [hazardDraft, setHazardDraft] = useState<HazardDraft | null>(null);
   const [draftForm, setDraftForm] = useState<HazardDraftFormState>({
@@ -183,6 +188,31 @@ export function useLguLiveMap() {
       );
     });
   }, [volunteers, query]);
+
+  const activeVolunteersCount = useMemo(() => {
+    return volunteers.filter((v) => String(v.status ?? "").toLowerCase() !== "offline").length;
+  }, [volunteers]);
+
+  const sosCount = useMemo(() => {
+    return activeReports.filter((r) => normalizeEmergencyType(r.emergencyType) === "SOS").length;
+  }, [activeReports]);
+
+  const liveIncidents = useMemo(() => {
+    const sorted = [...activeReports].sort((a, b) => {
+      const ta = a?.reportedAt ? new Date(a.reportedAt).getTime() : 0;
+      const tb = b?.reportedAt ? new Date(b.reportedAt).getTime() : 0;
+      return tb - ta;
+    });
+
+    return sorted.slice(0, 12).map((r) => ({
+      id: String(r._id),
+      emergencyType: normalizeEmergencyType(r.emergencyType),
+      status: String(r.status ?? ""),
+      barangayName: (r as any).barangayName ?? null,
+      source: r.source ?? null,
+      reportedAt: r.reportedAt,
+    }));
+  }, [activeReports]);
 
   const emergencyPins: MapEmergencyPin[] = useMemo(() => {
     if (!showEmergencies) return [];
@@ -357,6 +387,13 @@ export function useLguLiveMap() {
     );
   };
 
+  const redrawDraftOpenPolygon = useCallback((map: mapboxgl.Map) => {
+    if (!map.isStyleLoaded()) return;
+    ensureHazardDraftLayers(map);
+    setHazardDraftData(map, pointsRef.current, false, draggingDraftVertexIdxRef.current);
+    setHazardPointCount(pointsRef.current.length);
+  }, []);
+
   // volunteer markers overlay
   useEffect(() => {
     const map = mapRef.current;
@@ -413,6 +450,9 @@ export function useLguLiveMap() {
       volunteerMarkersRef.current = [];
       meMarkerRef.current?.remove();
       meMarkerRef.current = null;
+      draggingDraftVertexIdxRef.current = null;
+      suppressNextMapClickRef.current = false;
+      dragPanWasEnabledRef.current = false;
     };
   }, []);
 
@@ -456,117 +496,231 @@ export function useLguLiveMap() {
   };
 }, [mapReady, activeHazardZones, showHazardZones]);
 
-  // ✅ Native polygon drawing (Mapbox GL v3 compatible)
+  // Native polygon drawing (Mapbox GL v3 compatible)
   useEffect(() => {
-  const map = mapRef.current;
-  if (!map || !mapReady) return;
-  if (!isDrawingHazard) return;
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+    if (!isDrawingHazard) return;
 
-  let active = true;
-  let attached = false;
+    let active = true;
+    let attached = false;
+    let onClickHandler: ((ev: mapboxgl.MapMouseEvent) => void) | null = null;
+    let onContextMenuHandler: ((ev: mapboxgl.MapMouseEvent) => void) | null = null;
+    let onDblClickHandler: ((ev: mapboxgl.MapMouseEvent) => void) | null = null;
+    let onMouseMoveHandler: ((ev: mapboxgl.MapMouseEvent) => void) | null = null;
+    let onMouseUpHandler: ((ev: mapboxgl.MapMouseEvent) => void) | null = null;
+    let onPointMouseDownHandler: ((ev: mapboxgl.MapMouseEvent & { features?: unknown[] }) => void) | null = null;
 
-  const canvas = map.getCanvas();
-  const prevCursor = canvas.style.cursor;
+    const canvas = map.getCanvas();
+    const prevCursor = canvas.style.cursor;
+    const setDrawCursor = () => {
+      canvas.style.cursor = draggingDraftVertexIdxRef.current !== null ? "grabbing" : "crosshair";
+    };
 
-  const attach = () => {
-    if (!active) return;
-    if (!map.isStyleLoaded()) return;
+    const getDraftPointIdx = (value: unknown): number | null => {
+      const idx = typeof value === "number" ? value : Number(value);
+      if (!Number.isInteger(idx) || idx < 0 || idx >= pointsRef.current.length) return null;
+      return idx;
+    };
 
-    // make sure draft layers exist (no silent fail)
-    ensureHazardDraftLayers(map);
-    setHazardDraftVisibility(map, true);
-    clearHazardDraft(map);
-    setHazardDraftData(map, pointsRef.current, false);
+    const removeDraftPoint = (idx: number) => {
+      if (idx < 0 || idx >= pointsRef.current.length) return;
+      pointsRef.current = pointsRef.current.filter((_, i) => i !== idx);
 
-    canvas.style.cursor = "crosshair";
-    try {
-      map.doubleClickZoom.disable();
-    } catch {
-      // ignore
-    }
+      const draggingIdx = draggingDraftVertexIdxRef.current;
+      if (draggingIdx !== null) {
+        if (draggingIdx === idx) draggingDraftVertexIdxRef.current = null;
+        else if (draggingIdx > idx) draggingDraftVertexIdxRef.current = draggingIdx - 1;
+      }
 
-    const onClick = (ev: mapboxgl.MapMouseEvent) => {
-      const p: [number, number] = [ev.lngLat.lng, ev.lngLat.lat];
-      pointsRef.current = [...pointsRef.current, p];
-      // ensure layers still exist (style switches)
+      redrawDraftOpenPolygon(map);
+      setDrawCursor();
+    };
+
+    const attach = () => {
+      if (!active) return;
+      if (!map.isStyleLoaded()) return;
+
+      // make sure draft layers exist (no silent fail)
       ensureHazardDraftLayers(map);
-      setHazardDraftData(map, pointsRef.current, false);
+      setHazardDraftVisibility(map, true);
+      clearHazardDraft(map);
+      redrawDraftOpenPolygon(map);
+
+      setDrawCursor();
+      try {
+        map.doubleClickZoom.disable();
+      } catch {
+        // ignore
+      }
+
+      const onClick = (ev: mapboxgl.MapMouseEvent) => {
+        if (suppressNextMapClickRef.current) {
+          suppressNextMapClickRef.current = false;
+          return;
+        }
+
+        const p: [number, number] = [ev.lngLat.lng, ev.lngLat.lat];
+        pointsRef.current = [...pointsRef.current, p];
+        redrawDraftOpenPolygon(map);
+      };
+
+      const onPointMouseDown = (ev: mapboxgl.MapMouseEvent & { features?: unknown[] }) => {
+        const rawIdx = (
+          ev.features?.[0] as { properties?: { idx?: unknown } } | undefined
+        )?.properties?.idx;
+        const idx = getDraftPointIdx(rawIdx);
+        if (idx === null) return;
+
+        ev.preventDefault();
+        ev.originalEvent.preventDefault();
+        ev.originalEvent.stopPropagation();
+
+        draggingDraftVertexIdxRef.current = idx;
+        dragPanWasEnabledRef.current = !!map.dragPan.isEnabled();
+        if (dragPanWasEnabledRef.current) map.dragPan.disable();
+        setDrawCursor();
+      };
+
+      const onMouseMove = (ev: mapboxgl.MapMouseEvent) => {
+        const idx = draggingDraftVertexIdxRef.current;
+        if (idx === null) return;
+        if (idx < 0 || idx >= pointsRef.current.length) return;
+
+        const next = [...pointsRef.current];
+        next[idx] = [ev.lngLat.lng, ev.lngLat.lat];
+        pointsRef.current = next;
+        redrawDraftOpenPolygon(map);
+      };
+
+      const onMouseUp = (_ev: mapboxgl.MapMouseEvent) => {
+        const idx = draggingDraftVertexIdxRef.current;
+        if (idx === null) return;
+
+        draggingDraftVertexIdxRef.current = null;
+        suppressNextMapClickRef.current = true;
+
+        if (dragPanWasEnabledRef.current) map.dragPan.enable();
+        dragPanWasEnabledRef.current = false;
+
+        redrawDraftOpenPolygon(map);
+        setDrawCursor();
+      };
+
+      const onContextMenu = (ev: mapboxgl.MapMouseEvent) => {
+        ev.preventDefault();
+        ev.originalEvent.preventDefault();
+        ev.originalEvent.stopPropagation();
+        if (draggingDraftVertexIdxRef.current !== null) return;
+
+        if (!map.getLayer(HAZARD_DRAFT_POINTS_LAYER_ID)) return;
+
+        const hits = map.queryRenderedFeatures(ev.point, {
+          layers: [HAZARD_DRAFT_POINTS_LAYER_ID],
+        });
+        const feature = hits[0];
+        const idx = getDraftPointIdx(feature?.properties?.idx);
+        if (idx === null) return;
+
+        removeDraftPoint(idx);
+      };
+
+      const onDblClick = (ev: mapboxgl.MapMouseEvent) => {
+        ev.preventDefault();
+
+        if (pointsRef.current.length < 3) return;
+
+        draggingDraftVertexIdxRef.current = null;
+        suppressNextMapClickRef.current = false;
+        if (dragPanWasEnabledRef.current) map.dragPan.enable();
+        dragPanWasEnabledRef.current = false;
+        setDrawCursor();
+
+        // finalize polygon draft
+        setHazardDraftData(map, pointsRef.current, true);
+
+        const ring = [...pointsRef.current, pointsRef.current[0]];
+        setHazardDraft({
+          geometry: { type: "Polygon", coordinates: [ring] },
+        });
+        setHazardPointCount(pointsRef.current.length);
+
+        setIsDrawingHazard(false);
+        setLayersOpen(true);
+      };
+
+      map.on("click", onClick);
+      map.on("contextmenu", onContextMenu);
+      map.on("mousedown", HAZARD_DRAFT_POINTS_LAYER_ID, onPointMouseDown);
+      map.on("mousemove", onMouseMove);
+      map.on("mouseup", onMouseUp);
+      map.on("dblclick", onDblClick);
+      attached = true;
+      onClickHandler = onClick;
+      onContextMenuHandler = onContextMenu;
+      onPointMouseDownHandler = onPointMouseDown;
+      onMouseMoveHandler = onMouseMove;
+      onMouseUpHandler = onMouseUp;
+      onDblClickHandler = onDblClick;
     };
 
-    const onDblClick = (ev: mapboxgl.MapMouseEvent) => {
-      ev.preventDefault();
-
-      if (pointsRef.current.length < 3) return;
-
-      // finalize polygon draft
-      setHazardDraftData(map, pointsRef.current, true);
-
-      const ring = [...pointsRef.current, pointsRef.current[0]];
-      setHazardDraft({
-        geometry: { type: "Polygon", coordinates: [ring] },
-      });
-
-      setIsDrawingHazard(false);
-      setLayersOpen(true);
-    };
-
-    map.on("click", onClick);
-    map.on("dblclick", onDblClick);
-    attached = true;
-
-    // cleanup handler refs stored on map instance (for cleanup)
-    (map as any).__hazDraftClick = onClick;
-    (map as any).__hazDraftDbl = onDblClick;
-  };
-
-  const idleCb = () => {
-    if (!active) return;
-    if (!map.isStyleLoaded()) return;
-    map.off("idle", idleCb);
-    attach();
-  };
-
-  if (!map.isStyleLoaded()) {
-    map.on("idle", idleCb);
-  } else {
-    attach();
-  }
-
-  return () => {
-    active = false;
-
-    try {
+    const idleCb = () => {
+      if (!active) return;
+      if (!map.isStyleLoaded()) return;
       map.off("idle", idleCb);
-    } catch {
-      // ignore
+      attach();
+    };
+
+    if (!map.isStyleLoaded()) {
+      map.on("idle", idleCb);
+    } else {
+      attach();
     }
 
-    if (attached) {
-      const onClick = (map as any).__hazDraftClick;
-      const onDbl = (map as any).__hazDraftDbl;
-      if (onClick) map.off("click", onClick);
-      if (onDbl) map.off("dblclick", onDbl);
-      (map as any).__hazDraftClick = null;
-      (map as any).__hazDraftDbl = null;
-    }
+    return () => {
+      active = false;
 
-    canvas.style.cursor = prevCursor;
-    try {
-      map.doubleClickZoom.enable();
-    } catch {
-      // ignore
-    }
-  };
-}, [mapReady, isDrawingHazard]);
+      try {
+        map.off("idle", idleCb);
+      } catch {
+        // ignore
+      }
+
+      if (attached) {
+        if (onClickHandler) map.off("click", onClickHandler);
+        if (onContextMenuHandler) map.off("contextmenu", onContextMenuHandler);
+        if (onPointMouseDownHandler) map.off("mousedown", HAZARD_DRAFT_POINTS_LAYER_ID, onPointMouseDownHandler);
+        if (onMouseMoveHandler) map.off("mousemove", onMouseMoveHandler);
+        if (onMouseUpHandler) map.off("mouseup", onMouseUpHandler);
+        if (onDblClickHandler) map.off("dblclick", onDblClickHandler);
+      }
+
+      draggingDraftVertexIdxRef.current = null;
+      suppressNextMapClickRef.current = false;
+      dragPanWasEnabledRef.current = false;
+
+      canvas.style.cursor = prevCursor;
+      try {
+        if (!map.dragPan.isEnabled()) map.dragPan.enable();
+        map.doubleClickZoom.enable();
+      } catch {
+        // ignore
+      }
+    };
+  }, [mapReady, isDrawingHazard, redrawDraftOpenPolygon]);
 
   const startDrawHazard = () => {
   const map = mapRef.current;
   if (!map) return;
 
   // reset
+  draggingDraftVertexIdxRef.current = null;
+  suppressNextMapClickRef.current = false;
+  dragPanWasEnabledRef.current = false;
   setHazardDraft(null);
   setDraftForm({ name: "", hazardType: HAZARD_TYPES[0] });
   pointsRef.current = [];
+  setHazardPointCount(0);
 
   const begin = () => {
     if (!map.isStyleLoaded()) return;
@@ -591,7 +745,11 @@ export function useLguLiveMap() {
   const cancelDrawHazard = () => {
   const map = mapRef.current;
 
+  draggingDraftVertexIdxRef.current = null;
+  suppressNextMapClickRef.current = false;
+  dragPanWasEnabledRef.current = false;
   pointsRef.current = [];
+  setHazardPointCount(0);
   setIsDrawingHazard(false);
   setHazardDraft(null);
 
@@ -602,6 +760,7 @@ export function useLguLiveMap() {
       clearHazardDraft(map);
       setHazardDraftVisibility(map, false);
       try {
+        if (!map.dragPan.isEnabled()) map.dragPan.enable();
         map.doubleClickZoom.enable();
       } catch {
         // ignore
@@ -612,6 +771,23 @@ export function useLguLiveMap() {
     else clear();
   }
 };
+
+  const undoHazardPoint = () => {
+    if (!isDrawingHazard) return;
+
+    const map = mapRef.current;
+    if (!map) return;
+    if (pointsRef.current.length === 0) return;
+
+    suppressNextMapClickRef.current = false;
+    pointsRef.current = pointsRef.current.slice(0, -1);
+    setHazardPointCount(pointsRef.current.length);
+    redrawDraftOpenPolygon(map);
+
+    const draggingIdx = draggingDraftVertexIdxRef.current;
+    if (draggingIdx === null) return;
+    if (draggingIdx >= pointsRef.current.length) draggingDraftVertexIdxRef.current = null;
+  };
 
 
   const saveHazardDraft = async () => {
@@ -636,7 +812,11 @@ export function useLguLiveMap() {
     }
 
     const map = mapRef.current;
+    draggingDraftVertexIdxRef.current = null;
+    suppressNextMapClickRef.current = false;
+    dragPanWasEnabledRef.current = false;
     pointsRef.current = [];
+    setHazardPointCount(0);
     setHazardDraft(null);
     setIsDrawingHazard(false);
 
@@ -912,7 +1092,10 @@ export function useLguLiveMap() {
     hazardsCount: hazardsActiveCount,
     hazardsTotalCount,
     volunteersCount: volunteers.length,
+    activeVolunteersCount,
     emergenciesCount: activeReports.length,
+    sosCount,
+    liveIncidents,
 
     // hazard zones list + per-zone controls (dropdown)
     hazardZones,
@@ -925,11 +1108,14 @@ export function useLguLiveMap() {
     refetchHazardZones,
 
     isDrawingHazard,
+    hazardPointCount,
     startDrawHazard,
     cancelDrawHazard,
+    undoHazardPoint,
     hazardDraft,
     draftForm,
     setDraftForm,
     saveHazardDraft,
   };
 }
+

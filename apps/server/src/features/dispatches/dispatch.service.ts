@@ -8,12 +8,27 @@ import { encryptBuffer } from "../../utils/aesGcm";
 import { EmergencyReport } from "../emergency/emergency.model";
 import { User } from "../users/user.model";
 import { DispatchOffer, DispatchStatus } from "./dispatch.model";
-import { recordTaskVerification } from "@lifeline/blockchain";
 import { sendDispatchOfferPush } from "../notifications/pushNotification.service";
 import { findBarangayByPoint } from "../barangays/barangay.service";
+import {
+  DISPATCH_CHAIN_DOMAIN,
+  DISPATCH_CHAIN_SCHEMA_VERSION,
+  buildDispatchVerificationPayload,
+  normalizeStringArray,
+  reverifyDispatchTaskOnChain,
+  revokeDispatchTaskOnChain,
+  verifyDispatchTaskOnChain,
+} from "../blockchain/taskLedger";
 
 const MAX_PROOF_BYTES = 3 * 1024 * 1024; // 3MB
 const ALLOWED_PROOF_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/heic"]);
+const PROOF_HASH_ALGO = "sha256";
+
+export type DispatchReverifyOverrides = {
+  completedAt?: string | null;
+  proofUrls?: string[];
+  proofFileHashes?: string[];
+};
 
 export type CreateDispatchInput = {
   emergencyId: string;
@@ -232,6 +247,7 @@ export async function addProofToDispatch(params: {
     mimeType: mimeType ? String(mimeType) : undefined,
     fileName: fileName ? String(fileName) : undefined,
   });
+  const proofFileHash = hashProofFileBytes(parsedProof.buffer);
   const dir = ensureUploadsDir();
   const filename = `${dispatchId}_${Date.now()}_${crypto.randomBytes(6).toString("hex")}.${parsedProof.ext}`;
   const abs = path.join(dir, filename);
@@ -247,7 +263,9 @@ export async function addProofToDispatch(params: {
     uploadedAt: new Date(),
     mimeType: parsedProof.mimeTypeDetected,
     fileName: normalizeProofFileName(fileName),
+    fileHash: proofFileHash,
   } as any);
+  (offer as any).proofFileHashes = extractProofFileHashes(offer);
   await offer.save();
 
   return offer;
@@ -275,6 +293,47 @@ export async function completeDispatch(params: { dispatchId: string; volunteerUs
   return offer;
 }
 
+export async function updateDispatchResponderLocation(params: {
+  dispatchId: string;
+  volunteerUserId: string;
+  lng: number;
+  lat: number;
+  accuracy?: number;
+  heading?: number;
+  speed?: number;
+}) {
+  const { dispatchId, volunteerUserId, lng, lat, accuracy, heading, speed } = params;
+  const normalizedLng = Number(lng);
+  const normalizedLat = Number(lat);
+
+  if (!Types.ObjectId.isValid(dispatchId)) {
+    throw new Error("Invalid dispatch id");
+  }
+  if (!Number.isFinite(normalizedLng) || !Number.isFinite(normalizedLat)) {
+    throw new Error("Invalid responder location coordinates");
+  }
+
+  const offer = await DispatchOffer.findById(dispatchId);
+  if (!offer) throw new Error("Dispatch offer not found");
+  if (String(offer.volunteerId) !== String(volunteerUserId)) throw new Error("Not allowed");
+
+  if (!["ACCEPTED", "DONE", "VERIFIED"].includes(String(offer.status))) {
+    throw new Error("Dispatch is not active");
+  }
+
+  offer.set("lastKnownLocation", {
+    type: "Point",
+    coordinates: [normalizedLng, normalizedLat],
+    ...(Number.isFinite(accuracy) ? { accuracy: Number(accuracy) } : {}),
+    ...(Number.isFinite(heading) ? { heading: Number(heading) } : {}),
+    ...(Number.isFinite(speed) ? { speed: Number(speed) } : {}),
+  });
+  offer.lastKnownLocationAt = new Date();
+  await offer.save();
+
+  return offer;
+}
+
 export async function verifyDispatch(
   params: { dispatchId: string; verifierUserId: string }
 ): Promise<{
@@ -283,6 +342,9 @@ export async function verifyDispatch(
   emergencyId: string;
   volunteerId: string;
   completedAt: string | null;
+  taskIdHash: string;
+  payloadHash: string;
+  revoked: boolean;
   alreadyVerified?: boolean;
 }> {
   const { dispatchId, verifierUserId } = params;
@@ -296,13 +358,25 @@ export async function verifyDispatch(
 
   // Idempotent: if already verified, just return the stored txHash (if available).
   if (offer.status === "VERIFIED") {
-    const existingTxHash = (offer as any).chainRecord?.txHash;
+    const existingTxHash =
+      String((offer as any).blockchain?.verifiedTxHash || "") ||
+      String((offer as any).chainRecord?.txHash || "");
+    const existingTaskIdHash =
+      String((offer as any).blockchain?.taskIdHash || "") ||
+      String((offer as any).chainRecord?.taskIdHash || "");
+    const existingPayloadHash =
+      String((offer as any).blockchain?.payloadHash || "") ||
+      String((offer as any).chainRecord?.payloadHash || "");
+    const revoked = Boolean((offer as any).blockchain?.revoked);
     return {
-      txHash: typeof existingTxHash === "string" ? existingTxHash : "already-verified",
+      txHash: existingTxHash || "already-verified",
       dispatchId: String(offer._id),
       emergencyId: String(offer.emergencyId),
       volunteerId: String(offer.volunteerId),
       completedAt: offer.completedAt ? new Date(offer.completedAt).toISOString() : null,
+      taskIdHash: existingTaskIdHash,
+      payloadHash: existingPayloadHash,
+      revoked,
       alreadyVerified: true,
     };
   }
@@ -314,26 +388,8 @@ export async function verifyDispatch(
 
   // Blockchain write (hash-only) BEFORE we mark VERIFIED in DB.
   // If chain write fails, we keep the task in DONE state so LGU can retry.
-  const proofUrls = Array.isArray((offer as any).proofs)
-    ? (offer as any).proofs.map((p: any) => String(p?.url || "")).filter(Boolean).sort()
-    : [];
-
-  const payload = {
-    dispatchId: String(offer._id),
-    emergencyId: String(offer.emergencyId),
-    volunteerId: String(offer.volunteerId),
-    completedAt: offer.completedAt ? new Date(offer.completedAt).toISOString() : null,
-    proofUrls,
-  };
-
-  const rpcUrl = mustEnv("SEPOLIA_RPC_URL");
-  const privateKey = mustEnv("SEPOLIA_PRIVATE_KEY");
-  const contractAddress = mustEnv("TASK_LEDGER_CONTRACT_ADDRESS").trim();
-
-  const chain = await recordTaskVerification({
-    rpcUrl,
-    privateKey,
-    contractAddress,
+  const payload = buildVerificationPayloadFromOffer(offer);
+  const chain = await verifyDispatchTaskOnChain({
     taskId: String(offer._id),
     payload,
   });
@@ -341,14 +397,29 @@ export async function verifyDispatch(
   offer.status = "VERIFIED";
   offer.verifiedAt = new Date();
   offer.verifiedBy = new Types.ObjectId(verifierUserId);
+  (offer as any).proofFileHashes = payload.proofFileHashes;
+  (offer as any).blockchain = {
+    network: chain.network,
+    contractAddress: chain.contractAddress,
+    schemaVersion: payload.schemaVersion,
+    domain: payload.domain,
+    taskIdHash: chain.taskIdHash,
+    payloadHash: chain.payloadHash,
+    verifiedTxHash: chain.txHash,
+    verifiedAtBlockTime: toDateFromBlockTimestamp(chain.blockTimestamp),
+    verifierAddress: chain.signerAddress || undefined,
+    revoked: false,
+  };
   (offer as any).chainRecord = {
-    network: "sepolia",
-    contractAddress,
+    network: chain.network,
+    contractAddress: chain.contractAddress,
     txHash: chain.txHash,
     blockNumber: chain.blockNumber,
     taskIdHash: chain.taskIdHash,
     payloadHash: chain.payloadHash,
-    recordedAt: new Date(),
+    recordHash: chain.payloadHash,
+    recordedAt: toDateFromBlockTimestamp(chain.blockTimestamp) ?? new Date(),
+    revoked: false,
   };
   await offer.save();
 
@@ -365,6 +436,138 @@ export async function verifyDispatch(
     emergencyId: String(offer.emergencyId),
     volunteerId: String(offer.volunteerId),
     completedAt: offer.completedAt ? new Date(offer.completedAt).toISOString() : null,
+    taskIdHash: chain.taskIdHash,
+    payloadHash: chain.payloadHash,
+    revoked: false,
+  };
+}
+
+export async function revokeDispatchVerification(params: {
+  dispatchId: string;
+  adminUserId: string;
+  reason: string;
+}) {
+  const { dispatchId, reason } = params;
+
+  if (!Types.ObjectId.isValid(dispatchId)) {
+    throw new Error("Invalid dispatch id");
+  }
+
+  const normalizedReason = String(reason || "").trim();
+  if (!normalizedReason) {
+    throw new Error("reason is required");
+  }
+
+  const offer = await DispatchOffer.findById(dispatchId);
+  if (!offer) throw new Error("Dispatch offer not found");
+
+  const existingVerifiedTxHash = String((offer as any).blockchain?.verifiedTxHash || (offer as any).chainRecord?.txHash || "").trim();
+  if (!existingVerifiedTxHash) {
+    throw new Error("Task is not verified on-chain");
+  }
+
+  const chain = await revokeDispatchTaskOnChain({
+    taskId: String(offer._id),
+    reason: normalizedReason,
+  });
+
+  const existingBlockchain = ((offer as any).blockchain ?? {}) as any;
+  (offer as any).blockchain = {
+    network: chain.network,
+    contractAddress: chain.contractAddress,
+    schemaVersion: String(existingBlockchain.schemaVersion || DISPATCH_CHAIN_SCHEMA_VERSION),
+    domain: String(existingBlockchain.domain || DISPATCH_CHAIN_DOMAIN),
+    taskIdHash: chain.taskIdHash,
+    payloadHash: String(existingBlockchain.payloadHash || (offer as any).chainRecord?.payloadHash || ""),
+    verifiedTxHash: String(existingBlockchain.verifiedTxHash || (offer as any).chainRecord?.txHash || ""),
+    verifiedAtBlockTime: existingBlockchain.verifiedAtBlockTime,
+    verifierAddress: existingBlockchain.verifierAddress,
+    revoked: true,
+    revokedReasonHash: chain.reasonHash,
+    revokedTxHash: chain.txHash,
+    revokedAtBlockTime: toDateFromBlockTimestamp(chain.blockTimestamp),
+    reverifiedTxHash: existingBlockchain.reverifiedTxHash,
+  };
+  (offer as any).chainRecord = {
+    ...(offer as any).chainRecord,
+    revoked: true,
+  };
+  await offer.save();
+
+  return {
+    txHash: chain.txHash,
+    dispatchId: String(offer._id),
+    taskIdHash: chain.taskIdHash,
+    reasonHash: chain.reasonHash,
+    revoked: true,
+  };
+}
+
+export async function reverifyDispatch(params: {
+  dispatchId: string;
+  adminUserId: string;
+  overrides?: DispatchReverifyOverrides;
+}) {
+  const { dispatchId, adminUserId, overrides } = params;
+
+  if (!Types.ObjectId.isValid(dispatchId)) {
+    throw new Error("Invalid dispatch id");
+  }
+
+  const offer = await DispatchOffer.findById(dispatchId);
+  if (!offer) throw new Error("Dispatch offer not found");
+
+  const existingVerifiedTxHash = String((offer as any).blockchain?.verifiedTxHash || (offer as any).chainRecord?.txHash || "").trim();
+  if (!existingVerifiedTxHash) {
+    throw new Error("Task is not verified on-chain");
+  }
+
+  const payload = buildVerificationPayloadFromOffer(offer, overrides);
+  const chain = await reverifyDispatchTaskOnChain({
+    taskId: String(offer._id),
+    payload,
+  });
+
+  offer.status = "VERIFIED";
+  offer.verifiedAt = new Date();
+  offer.verifiedBy = new Types.ObjectId(adminUserId);
+  (offer as any).proofFileHashes = payload.proofFileHashes;
+
+  const existingBlockchain = ((offer as any).blockchain ?? {}) as any;
+  (offer as any).blockchain = {
+    network: chain.network,
+    contractAddress: chain.contractAddress,
+    schemaVersion: payload.schemaVersion,
+    domain: payload.domain,
+    taskIdHash: chain.taskIdHash,
+    payloadHash: chain.payloadHash,
+    verifiedTxHash: String(existingBlockchain.verifiedTxHash || (offer as any).chainRecord?.txHash || chain.txHash),
+    verifiedAtBlockTime: existingBlockchain.verifiedAtBlockTime ?? toDateFromBlockTimestamp(chain.blockTimestamp),
+    verifierAddress: existingBlockchain.verifierAddress || chain.signerAddress || undefined,
+    revoked: false,
+    reverifiedTxHash: chain.txHash,
+  };
+
+  (offer as any).chainRecord = {
+    ...(offer as any).chainRecord,
+    network: chain.network,
+    contractAddress: chain.contractAddress,
+    txHash: chain.txHash,
+    blockNumber: chain.blockNumber,
+    taskIdHash: chain.taskIdHash,
+    payloadHash: chain.payloadHash,
+    recordHash: chain.payloadHash,
+    recordedAt: toDateFromBlockTimestamp(chain.blockTimestamp) ?? new Date(),
+    revoked: false,
+  };
+  await offer.save();
+
+  return {
+    txHash: chain.txHash,
+    dispatchId: String(offer._id),
+    taskIdHash: chain.taskIdHash,
+    payloadHash: chain.payloadHash,
+    revoked: false,
   };
 }
 
@@ -393,14 +596,51 @@ export function toDispatchDTO(doc: any) {
       }
     : null;
 
+  const chainRecordRaw = doc.chainRecord ?? null;
+  const blockchainRaw = doc.blockchain ?? null;
+  const chainRecord = chainRecordRaw
+    ? {
+        ...chainRecordRaw,
+        recordHash:
+          chainRecordRaw.recordHash ??
+          chainRecordRaw.payloadHash ??
+          blockchainRaw?.payloadHash ??
+          null,
+      }
+    : null;
+
+  const lastKnownLocationRaw = doc.lastKnownLocation;
+  const lastKnownCoords = Array.isArray(lastKnownLocationRaw?.coordinates)
+    ? lastKnownLocationRaw.coordinates
+    : null;
+  const lastKnownLocation =
+    lastKnownCoords && lastKnownCoords.length === 2
+      ? {
+          lng: Number(lastKnownCoords[0]),
+          lat: Number(lastKnownCoords[1]),
+          ...(Number.isFinite(lastKnownLocationRaw?.accuracy)
+            ? { accuracy: Number(lastKnownLocationRaw.accuracy) }
+            : {}),
+          ...(Number.isFinite(lastKnownLocationRaw?.heading)
+            ? { heading: Number(lastKnownLocationRaw.heading) }
+            : {}),
+          ...(Number.isFinite(lastKnownLocationRaw?.speed)
+            ? { speed: Number(lastKnownLocationRaw.speed) }
+            : {}),
+          at: doc.lastKnownLocationAt ?? null,
+        }
+      : null;
+
   return {
     id: String(doc._id),
     status: doc.status,
     respondedAt: doc.respondedAt ?? null,
     completedAt: doc.completedAt ?? null,
     verifiedAt: doc.verifiedAt ?? null,
-    chainRecord: doc.chainRecord ?? null,
+    chainRecord,
+    blockchain: blockchainRaw,
     proofs: Array.isArray(doc.proofs) ? doc.proofs : [],
+    proofFileHashes: extractProofFileHashes(doc),
     volunteer,
     emergency: {
       id: String(snap?.id ?? doc.emergencyId),
@@ -413,6 +653,7 @@ export function toDispatchDTO(doc: any) {
       reportedAt: snap?.reportedAt,
       barangayName: snap?.barangayName ?? null,
     },
+    lastKnownLocation,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
   };
@@ -428,6 +669,70 @@ function normalizeProofFileName(fileName?: string) {
   const cleaned = String(fileName ?? "").trim();
   if (!cleaned) return undefined;
   return cleaned.slice(0, 255);
+}
+
+export function hashProofFileBytes(buffer: Buffer) {
+  const digest = crypto.createHash(PROOF_HASH_ALGO).update(buffer).digest("hex").toLowerCase();
+  return `0x${digest}`;
+}
+
+function extractProofUrls(offer: any) {
+  const values = Array.isArray(offer?.proofs)
+    ? offer.proofs.map((p: any) => String(p?.url || ""))
+    : [];
+  return normalizeStringArray(values);
+}
+
+export function extractProofFileHashes(offer: any) {
+  const fromTopLevel = normalizeStringArray(
+    Array.isArray(offer?.proofFileHashes) ? offer.proofFileHashes.map((value: any) => String(value || "")) : []
+  );
+  if (fromTopLevel.length > 0) return fromTopLevel;
+
+  const fromProofEntries = normalizeStringArray(
+    Array.isArray(offer?.proofs) ? offer.proofs.map((p: any) => String(p?.fileHash || "")) : []
+  );
+  return fromProofEntries;
+}
+
+export function buildVerificationPayloadFromOffer(offer: any, overrides?: DispatchReverifyOverrides) {
+  const completedAt =
+    overrides && Object.prototype.hasOwnProperty.call(overrides, "completedAt")
+      ? normalizeCompletedAt(overrides.completedAt)
+      : offer.completedAt
+      ? new Date(offer.completedAt).toISOString()
+      : null;
+
+  const proofUrls = overrides?.proofUrls ? normalizeStringArray(overrides.proofUrls) : extractProofUrls(offer);
+  const proofFileHashes = overrides?.proofFileHashes
+    ? normalizeStringArray(overrides.proofFileHashes)
+    : extractProofFileHashes(offer);
+
+  return buildDispatchVerificationPayload({
+    taskId: String(offer._id),
+    dispatchId: String(offer._id),
+    emergencyId: String(offer.emergencyId),
+    volunteerId: String(offer.volunteerId),
+    completedAt,
+    proofUrls,
+    proofFileHashes,
+  });
+}
+
+function normalizeCompletedAt(value: string | null | undefined) {
+  if (value === null) return null;
+  const normalized = String(value ?? "").trim();
+  if (!normalized) return null;
+  const d = new Date(normalized);
+  if (Number.isNaN(d.getTime())) {
+    throw new Error("Invalid completedAt");
+  }
+  return d.toISOString();
+}
+
+function toDateFromBlockTimestamp(timestamp: number | null) {
+  if (typeof timestamp !== "number" || !Number.isFinite(timestamp)) return undefined;
+  return new Date(timestamp * 1000);
 }
 
 function parseAndValidateProof(input: { base64: string; mimeType?: string; fileName?: string }) {
@@ -512,10 +817,4 @@ function isHeic(buffer: Buffer) {
   if (buffer.toString("ascii", 4, 8) !== "ftyp") return false;
   const brand = buffer.toString("ascii", 8, 12);
   return ["heic", "heix", "hevc", "hevx", "mif1", "msf1"].includes(brand);
-}
-
-function mustEnv(key: string) {
-  const v = process.env[key];
-  if (!v) throw new Error(`Missing env var: ${key}`);
-  return v;
 }

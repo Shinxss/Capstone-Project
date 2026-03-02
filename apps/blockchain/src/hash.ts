@@ -1,5 +1,14 @@
+import { keccak256, toUtf8Bytes } from "ethers";
+
+export const TASK_PAYLOAD_SCHEMA_VERSION = "1";
+export const TASK_PAYLOAD_DOMAIN = "LIFELINE_TASK_V1";
+
 export function canonicalStringify(value: unknown): string {
   return JSON.stringify(canonicalize(value));
+}
+
+export function canonicalHash(value: unknown): string {
+  return keccak256(toUtf8Bytes(canonicalStringify(value)));
 }
 
 function canonicalize(value: unknown): unknown {

@@ -56,7 +56,7 @@ type MapboxDirectionsResponse = {
   routes?: MapboxDirectionsRoute[];
 };
 
-const MAX_STANDARD_RECOMMENDATIONS = 2;
+const MAX_STANDARD_RECOMMENDATIONS = 3;
 
 function toTravelProfile(mode: TravelMode): RoutingProfile {
   return mode === "walk" ? travelProfiles.walk : travelProfiles.drive;

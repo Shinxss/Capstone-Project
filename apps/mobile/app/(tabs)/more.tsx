@@ -157,6 +157,10 @@ export default function MoreScreen() {
     Alert.alert(title, "This page is not available yet.");
   }, []);
 
+  const onPressMyRequests = useCallback(() => {
+    router.push("/my-requests");
+  }, [router]);
+
   const onPressProfileSettings = useCallback(() => {
     const actions: {
       text: string;
@@ -230,6 +234,14 @@ export default function MoreScreen() {
             icon="person-outline"
             onPress={onPressProfileSettings}
           />
+          {isUser ? (
+            <MoreRow
+              title="My Requests"
+              subtitle="Track your requested help"
+              icon="time-outline"
+              onPress={onPressMyRequests}
+            />
+          ) : null}
           <MoreRow
             title="Notifications"
             subtitle="Push notifications and alerts"
