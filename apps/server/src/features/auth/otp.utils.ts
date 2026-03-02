@@ -85,6 +85,12 @@ type UserLike = {
   postalCode?: string;
   avatarUrl?: string;
   volunteerStatus?: string;
+  onDuty?: boolean;
+  notificationPrefs?: {
+    communityRequestUpdates?: boolean;
+    volunteerAssignments?: boolean;
+    marketing?: boolean;
+  };
   authProvider?: string;
   passwordHash?: string;
   googleSub?: string;
@@ -110,6 +116,12 @@ export function toAuthUserPayload(user: UserLike) {
     postalCode: user.postalCode ?? "",
     avatarUrl: user.avatarUrl ?? "",
     volunteerStatus: user.volunteerStatus ?? "",
+    onDuty: Boolean(user.onDuty ?? true),
+    notificationPrefs: {
+      communityRequestUpdates: Boolean(user.notificationPrefs?.communityRequestUpdates ?? true),
+      volunteerAssignments: Boolean(user.notificationPrefs?.volunteerAssignments ?? true),
+      marketing: Boolean(user.notificationPrefs?.marketing ?? false),
+    },
     authProvider: user.authProvider ?? "local",
     emailVerified: Boolean(user.emailVerified),
     passwordSet: Boolean(user.passwordHash),

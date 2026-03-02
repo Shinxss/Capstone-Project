@@ -365,11 +365,21 @@ export default function HomeScreen() {
       await refreshActive();
       router.push("/(tabs)/map");
     } catch (e: any) {
-      Alert.alert("Failed", e?.response?.data?.message ?? e?.message ?? "Unable to accept dispatch.");
+      const message = String(e?.response?.data?.message ?? e?.message ?? "").trim();
+      const normalized = message.toLowerCase();
+      const isStalePendingState = normalized.includes("not pending");
+
+      if (isStalePendingState) {
+        clearPending();
+        await Promise.allSettled([refreshPending(), refreshActive()]);
+        return;
+      }
+
+      Alert.alert("Failed", message || "Unable to accept dispatch.");
     } finally {
       setDispatchBusy(false);
     }
-  }, [pendingDispatch, refreshActive, clearPending]);
+  }, [pendingDispatch, refreshActive, clearPending, refreshPending]);
 
   const onDeclineDispatch = useCallback(async () => {
     if (!pendingDispatch) return;
@@ -379,11 +389,21 @@ export default function HomeScreen() {
       clearPending();
       await refreshPending();
     } catch (e: any) {
-      Alert.alert("Failed", e?.response?.data?.message ?? e?.message ?? "Unable to decline dispatch.");
+      const message = String(e?.response?.data?.message ?? e?.message ?? "").trim();
+      const normalized = message.toLowerCase();
+      const isStalePendingState = normalized.includes("not pending");
+
+      if (isStalePendingState) {
+        clearPending();
+        await Promise.allSettled([refreshPending(), refreshActive()]);
+        return;
+      }
+
+      Alert.alert("Failed", message || "Unable to decline dispatch.");
     } finally {
       setDispatchBusy(false);
     }
-  }, [pendingDispatch, refreshPending, clearPending]);
+  }, [pendingDispatch, refreshPending, clearPending, refreshActive]);
 
   const onDebugCheckToken = useCallback(async () => {
     try {

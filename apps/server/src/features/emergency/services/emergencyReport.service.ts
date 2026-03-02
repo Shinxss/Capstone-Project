@@ -731,7 +731,30 @@ export async function getMyEmergencyRequestTracking(
     return "FORBIDDEN";
   }
 
-  const offers = await DispatchOffer.find({ emergencyId: report._id })
+  return buildEmergencyRequestTrackingDto(report);
+}
+
+export async function getEmergencyRequestTrackingSnapshot(
+  reportId: string
+): Promise<MyRequestTrackingDTO | null> {
+  if (!Types.ObjectId.isValid(reportId)) return null;
+
+  const report = await EmergencyReportModel.findById(reportId)
+    .select("_id reportedBy referenceNumber emergencyType status createdAt updatedAt location notes")
+    .lean();
+
+  if (!report) return null;
+
+  return buildEmergencyRequestTrackingDto(report);
+}
+
+async function buildEmergencyRequestTrackingDto(report: any): Promise<MyRequestTrackingDTO> {
+  const reportId = String(report?._id ?? "").trim();
+  if (!reportId) {
+    throw new Error("Invalid report payload");
+  }
+
+  const offers = await DispatchOffer.find({ emergencyId: reportId })
     .sort({ updatedAt: -1, _id: -1 })
     .select("status updatedAt volunteerId lastKnownLocation lastKnownLocationAt")
     .populate({ path: "volunteerId", select: "firstName lastName contactNo" })
@@ -771,7 +794,7 @@ export async function getMyEmergencyRequestTracking(
 
   return {
     request: {
-      id: String(report._id),
+      id: reportId,
       referenceNumber: String(report.referenceNumber ?? ""),
       type: fromDbEmergencyType(report.emergencyType),
       createdAt: toIsoString(report.createdAt),

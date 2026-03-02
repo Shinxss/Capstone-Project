@@ -10,6 +10,7 @@ import auditRoutes from "./audit/audit.routes";
 import emergencyReportRoutes from "./emergency/routes/emergencyReport.routes";
 import lguEmergencyApprovalRoutes from "./emergency/routes/lguEmergencyApproval.routes";
 import notificationsRoutes from "./notifications/notifications.routes";
+import pushRoutes from "./push/push.routes";
 import adminRoutes from "./admin/admin.routes";
 import announcementsRoutes from "./announcements/announcements.routes";
 import routingRiskRoutes from "./routingRisk/routingRisk.routes";
@@ -29,6 +30,7 @@ router.use("/audit", auditRoutes); // Audit Logs
 router.use("/emergency/reports", emergencyReportRoutes);
 router.use("/lgu/approvals/emergency-reports", lguEmergencyApprovalRoutes);
 router.use("/notifications", notificationsRoutes);
+router.use("/push", pushRoutes);
 router.use("/admin", adminRoutes);
 router.use("/announcements", announcementsRoutes);
 router.use("/routing-risk", routingRiskRoutes);

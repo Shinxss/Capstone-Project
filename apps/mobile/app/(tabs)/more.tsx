@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Pressable,
@@ -15,6 +15,10 @@ import { useAuth } from "../../features/auth/AuthProvider";
 import { useSession } from "../../features/auth/hooks/useSession";
 import { useGoogleLogin } from "../../features/auth/hooks/useGoogleLogin";
 import { linkGoogleAccount } from "../../features/auth/services/authApi";
+import {
+  fetchPushPreferences,
+  updatePushPreferences,
+} from "../../features/notifications/services/pushRegistrationApi";
 
 type RowIconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -80,7 +84,9 @@ export default function MoreScreen() {
   const { signOut } = useAuth();
   const { displayName, isUser, session, updateUser } = useSession();
 
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [communityUpdatesEnabled, setCommunityUpdatesEnabled] = useState(true);
+  const [volunteerAssignmentsEnabled, setVolunteerAssignmentsEnabled] = useState(true);
+  const [updatingPrefs, setUpdatingPrefs] = useState(false);
   const [darkModeEnabled, setDarkModeEnabled] = useState(false);
 
   const user = session?.mode === "user" ? session.user : null;
@@ -88,6 +94,16 @@ export default function MoreScreen() {
     Boolean(user?.passwordSet) || user?.authProvider === "local" || user?.authProvider === "both";
   const isGoogleLinked =
     Boolean(user?.googleLinked) || user?.authProvider === "google" || user?.authProvider === "both";
+  const userRole = useMemo(
+    () => String(user?.role ?? "").trim().toUpperCase(),
+    [user?.role]
+  );
+  const volunteerStatus = useMemo(
+    () => String(user?.volunteerStatus ?? "").trim().toUpperCase(),
+    [user?.volunteerStatus]
+  );
+  const canShowVolunteerAssignmentsToggle =
+    isUser && (userRole === "VOLUNTEER" || volunteerStatus === "APPROVED");
 
   const {
     start: startGoogleLink,
@@ -204,6 +220,68 @@ export default function MoreScreen() {
 
   const accountName = isUser ? displayName : "Guest User";
 
+  useEffect(() => {
+    if (!isUser) return;
+
+    let alive = true;
+    void (async () => {
+      try {
+        const prefs = await fetchPushPreferences();
+        if (!alive) return;
+        setCommunityUpdatesEnabled(
+          Boolean(prefs.notificationPrefs?.communityRequestUpdates ?? true)
+        );
+        setVolunteerAssignmentsEnabled(
+          Boolean(prefs.notificationPrefs?.volunteerAssignments ?? true)
+        );
+      } catch {
+        // keep defaults
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [isUser]);
+
+  const onToggleCommunityUpdates = useCallback(
+    async (nextValue: boolean) => {
+      if (!isUser || updatingPrefs) return;
+      setCommunityUpdatesEnabled(nextValue);
+      setUpdatingPrefs(true);
+      try {
+        const updated = await updatePushPreferences({ communityRequestUpdates: nextValue });
+        setCommunityUpdatesEnabled(
+          Boolean(updated.notificationPrefs?.communityRequestUpdates ?? nextValue)
+        );
+      } catch {
+        setCommunityUpdatesEnabled((prev) => !prev);
+      } finally {
+        setUpdatingPrefs(false);
+      }
+    },
+    [isUser, updatingPrefs]
+  );
+
+  const onToggleVolunteerAssignments = useCallback(
+    async (nextValue: boolean) => {
+      if (!isUser || updatingPrefs) return;
+      setVolunteerAssignmentsEnabled(nextValue);
+      setUpdatingPrefs(true);
+      try {
+        const updated = await updatePushPreferences({ volunteerAssignments: nextValue });
+        setVolunteerAssignmentsEnabled(
+          Boolean(updated.notificationPrefs?.volunteerAssignments ?? nextValue)
+        );
+      } catch {
+        setVolunteerAssignmentsEnabled((prev) => !prev);
+      } finally {
+        setUpdatingPrefs(false);
+      }
+    },
+    [isUser, updatingPrefs]
+  );
+
   return (
     <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
@@ -243,19 +321,37 @@ export default function MoreScreen() {
             />
           ) : null}
           <MoreRow
-            title="Notifications"
-            subtitle="Push notifications and alerts"
+            title="Request Updates"
+            subtitle="Status alerts for your emergency requests"
             icon="notifications-outline"
             showChevron={false}
             right={
               <Switch
-                value={notificationsEnabled}
-                onValueChange={setNotificationsEnabled}
+                value={communityUpdatesEnabled}
+                onValueChange={onToggleCommunityUpdates}
                 trackColor={{ false: "#D9D9D9", true: "#EF4444" }}
                 thumbColor="#FFFFFF"
+                disabled={!isUser || updatingPrefs}
               />
             }
           />
+          {canShowVolunteerAssignmentsToggle ? (
+            <MoreRow
+              title="Volunteer Assignments"
+              subtitle="Alerts when a new dispatch is assigned"
+              icon="clipboard-outline"
+              showChevron={false}
+              right={
+                <Switch
+                  value={volunteerAssignmentsEnabled}
+                  onValueChange={onToggleVolunteerAssignments}
+                  trackColor={{ false: "#D9D9D9", true: "#EF4444" }}
+                  thumbColor="#FFFFFF"
+                  disabled={!isUser || updatingPrefs}
+                />
+              }
+            />
+          ) : null}
           <MoreRow
             title="Dark Mode"
             subtitle="Toggle dark theme"

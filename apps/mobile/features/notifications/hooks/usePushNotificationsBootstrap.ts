@@ -5,7 +5,11 @@ import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../auth/AuthProvider";
-import { registerPushToken } from "../services/pushRegistrationApi";
+import { showInAppNotification } from "../components/InAppNotificationHost";
+import {
+  registerPushToken,
+  unregisterPushToken,
+} from "../services/pushRegistrationApi";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -78,26 +82,81 @@ export function usePushNotificationsBootstrap() {
   const router = useRouter();
   const { hydrated, mode, user } = useAuth();
   const registeredUserIdRef = useRef<string | null>(null);
+  const registeredTokenRef = useRef<string | null>(null);
+
+  const resolveNotificationTarget = (data: Record<string, unknown>) => {
+    const kind = String(data?.type ?? "").trim().toUpperCase();
+
+    if (kind === "REQUEST_UPDATE") {
+      const requestId = String(data?.requestId ?? "").trim();
+      if (!requestId) return null;
+      return {
+        pathname: "/my-request-tracking",
+        params: { id: requestId },
+      };
+    }
+
+    if (kind === "DISPATCH_OFFER") {
+      return {
+        pathname: "/(tabs)/alert",
+      };
+    }
+
+    if (kind === "DISPATCH_OFFER".toLowerCase()) {
+      return {
+        pathname: "/(tabs)/alert",
+      };
+    }
+
+    return null;
+  };
+
+  const routeFromNotificationData = (data: Record<string, unknown>) => {
+    const target = resolveNotificationTarget(data);
+    if (!target) return;
+    router.push({
+      pathname: target.pathname as never,
+      params: target.params as never,
+    });
+  };
 
   useEffect(() => {
-    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data as Record<string, unknown>;
-      const kind = String(data?.type ?? "").toLowerCase();
-      if (kind === "dispatch_offer") {
-        router.push("/(tabs)/map");
-      }
+      routeFromNotificationData(data);
+    });
+
+    const foregroundSubscription = Notifications.addNotificationReceivedListener((notification) => {
+      const data = notification.request.content.data as Record<string, unknown>;
+      const target = resolveNotificationTarget(data);
+      const title = String(notification.request.content.title ?? "Lifeline update").trim();
+      const body = String(notification.request.content.body ?? "").trim();
+      if (!title && !body) return;
+
+      showInAppNotification({
+        title: title || "Lifeline update",
+        body,
+        target: target ?? undefined,
+        tone: "info",
+      });
     });
 
     return () => {
-      subscription.remove();
+      responseSubscription.remove();
+      foregroundSubscription.remove();
     };
   }, [router]);
 
   useEffect(() => {
-    if (!hydrated || mode !== "authed" || !user?.id) {
-      if (mode !== "authed") {
-        registeredUserIdRef.current = null;
+    if (!hydrated) return;
+
+    if (mode !== "authed" || !user?.id) {
+      const activeToken = registeredTokenRef.current;
+      if (activeToken) {
+        void unregisterPushToken(activeToken).catch(() => undefined);
       }
+      registeredUserIdRef.current = null;
+      registeredTokenRef.current = null;
       return;
     }
 
@@ -118,6 +177,7 @@ export function usePushNotificationsBootstrap() {
 
         if (!cancelled) {
           registeredUserIdRef.current = user.id;
+          registeredTokenRef.current = expoPushToken;
           if (timer) {
             clearInterval(timer);
             timer = null;

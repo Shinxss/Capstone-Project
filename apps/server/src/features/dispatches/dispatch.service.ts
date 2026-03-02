@@ -9,7 +9,13 @@ import { EmergencyReport } from "../emergency/emergency.model";
 import { User } from "../users/user.model";
 import { DispatchOffer, DispatchStatus } from "./dispatch.model";
 import { sendDispatchOfferPush } from "../notifications/pushNotification.service";
+import {
+  emitRequestTrackingUpdate,
+  emitUserNotification,
+  syncVolunteerBusyState,
+} from "../../realtime/notificationsSocket";
 import { findBarangayByPoint } from "../barangays/barangay.service";
+import { notifyRequestTrackingUpdated } from "../emergency/services/requestRealtime.service";
 import {
   DISPATCH_CHAIN_DOMAIN,
   DISPATCH_CHAIN_SCHEMA_VERSION,
@@ -128,10 +134,20 @@ export async function createDispatchOffers(input: CreateDispatchInput) {
   }
 
   try {
+    const dispatchByVolunteerId = created.reduce<Record<string, string>>((acc, item: any) => {
+      const volunteerId = String(item?.volunteerId ?? "").trim();
+      const dispatchId = String(item?._id ?? "").trim();
+      if (Types.ObjectId.isValid(volunteerId) && Types.ObjectId.isValid(dispatchId)) {
+        acc[volunteerId] = dispatchId;
+      }
+      return acc;
+    }, {});
+
     const pushResult = await sendDispatchOfferPush({
       volunteerUserIds: dispatchableVolunteerIds,
       emergencyId,
       emergencyType: String(emergency.emergencyType || "Emergency"),
+      dispatchByVolunteerId,
     });
     console.info("[push] dispatch send result", {
       emergencyId,
@@ -146,6 +162,29 @@ export async function createDispatchOffers(input: CreateDispatchInput) {
       message: error?.message,
     });
   }
+
+  await Promise.allSettled(
+    created.map(async (offer: any) => {
+      const volunteerUserId = String(offer?.volunteerId ?? "").trim();
+      const dispatchId = String(offer?._id ?? "").trim();
+      if (!Types.ObjectId.isValid(volunteerUserId) || !Types.ObjectId.isValid(dispatchId)) return;
+
+      emitUserNotification(volunteerUserId, "notify:dispatch_offer", {
+        type: "DISPATCH_OFFER",
+        dispatchId,
+        requestId: emergencyId,
+        screen: "task-details",
+        title: "New dispatch assignment",
+        body: "You have a new emergency assignment. Tap to respond.",
+      });
+
+      await syncVolunteerBusyState(volunteerUserId);
+    })
+  );
+
+  await notifyRequestTrackingUpdated(emergencyId, "dispatch_assigned", {
+    stepOverride: "Assigned",
+  }).catch(() => undefined);
 
   return created;
 }
@@ -216,7 +255,13 @@ export async function respondToDispatch(params: {
       },
       { $set: { status: "CANCELLED", respondedAt: new Date() } }
     );
+
+    await notifyRequestTrackingUpdated(String(offer.emergencyId), "responder_en_route", {
+      stepOverride: "En Route",
+    }).catch(() => undefined);
   }
+
+  await syncVolunteerBusyState(String(offer.volunteerId)).catch(() => undefined);
 
   return offer;
 }
@@ -290,6 +335,11 @@ export async function completeDispatch(params: { dispatchId: string; volunteerUs
   offer.completedAt = new Date();
   await offer.save();
 
+  await syncVolunteerBusyState(String(offer.volunteerId)).catch(() => undefined);
+  await notifyRequestTrackingUpdated(String(offer.emergencyId), "responder_arrived", {
+    stepOverride: "Arrived",
+  }).catch(() => undefined);
+
   return offer;
 }
 
@@ -330,6 +380,8 @@ export async function updateDispatchResponderLocation(params: {
   });
   offer.lastKnownLocationAt = new Date();
   await offer.save();
+
+  await emitRequestTrackingUpdate(String(offer.emergencyId), "responder_location").catch(() => undefined);
 
   return offer;
 }
@@ -429,6 +481,11 @@ export async function verifyDispatch(
   } catch {
     // ignore
   }
+
+  await syncVolunteerBusyState(String(offer.volunteerId)).catch(() => undefined);
+  await notifyRequestTrackingUpdated(String(offer.emergencyId), "request_resolved", {
+    stepOverride: "Resolved",
+  }).catch(() => undefined);
 
   return {
     txHash: chain.txHash,

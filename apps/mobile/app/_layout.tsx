@@ -3,7 +3,9 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as WebBrowser from "expo-web-browser";
 import { AuthProvider, useAuth } from "../features/auth/AuthProvider";
+import { InAppNotificationHost } from "../features/notifications/components/InAppNotificationHost";
 import { usePushNotificationsBootstrap } from "../features/notifications/hooks/usePushNotificationsBootstrap";
+import { useRealtimeBootstrap } from "../features/realtime/hooks/useRealtimeBootstrap";
 import SplashScreen from "../screens/SplashScreen";
 import "../global.css";
 
@@ -14,6 +16,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const segments = useSegments();
   const { hydrated, mode } = useAuth();
   usePushNotificationsBootstrap();
+  useRealtimeBootstrap();
 
   const inAuthGroup = segments[0] === "(auth)";
   const inTabsGroup = segments[0] === "(tabs)";
@@ -56,20 +59,23 @@ export default function RootLayout() {
     <AuthProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <AuthGate>
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="(auth)" />
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="report" />
-            <Stack.Screen name="my-requests" />
-            <Stack.Screen name="my-request-tracking" />
-            <Stack.Screen
-              name="volunteer-apply-modal"
-              options={{ presentation: "transparentModal" }}
-            />
-            <Stack.Screen name="volunteer-application" />
-            <Stack.Screen name="modal" />
-            <Stack.Screen name="set-password" />
-          </Stack>
+          <>
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="(auth)" />
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="report" />
+              <Stack.Screen name="my-requests" />
+              <Stack.Screen name="my-request-tracking" />
+              <Stack.Screen
+                name="volunteer-apply-modal"
+                options={{ presentation: "transparentModal" }}
+              />
+              <Stack.Screen name="volunteer-application" />
+              <Stack.Screen name="modal" />
+              <Stack.Screen name="set-password" />
+            </Stack>
+            <InAppNotificationHost />
+          </>
         </AuthGate>
       </GestureHandlerRootView>
     </AuthProvider>

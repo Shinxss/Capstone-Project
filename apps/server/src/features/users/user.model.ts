@@ -32,6 +32,12 @@ export type UserDoc = {
   avatarUrl?: string;
 
   volunteerStatus: VolunteerStatus;
+  onDuty?: boolean;
+  notificationPrefs?: {
+    communityRequestUpdates: boolean;
+    volunteerAssignments: boolean;
+    marketing?: boolean;
+  };
 
   isActive: boolean;
 
@@ -88,6 +94,18 @@ const UserSchema = new Schema<UserDoc>(
       enum: ["NONE", "PENDING", "APPROVED"],
       default: "NONE",
       index: true,
+    },
+
+    onDuty: {
+      type: Boolean,
+      default: true,
+      index: true,
+    },
+
+    notificationPrefs: {
+      communityRequestUpdates: { type: Boolean, default: true },
+      volunteerAssignments: { type: Boolean, default: true },
+      marketing: { type: Boolean, default: false },
     },
 
     isActive: { type: Boolean, default: true },

@@ -15,7 +15,7 @@ import { useIsFocused } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useSession } from "../../auth/hooks/useSession";
-import { useMyRequestTracking } from "../hooks/useMyRequestTracking";
+import { useRequestLiveTracking } from "../hooks/useRequestLiveTracking";
 import { formatEtaText, formatTrackingHeadline } from "../utils/formatters";
 
 const TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? "";
@@ -80,7 +80,7 @@ export function MyRequestTrackingScreen() {
   const isFocused = useIsFocused();
   const cameraRef = useRef<MapboxGL.Camera>(null);
 
-  const { data, loading, error, refresh, lastUpdatedAgoText } = useMyRequestTracking(requestId, {
+  const { data, loading, error, refresh, lastUpdatedAgoText } = useRequestLiveTracking(requestId, {
     pollMs: 6000,
     enabled: isUser && isFocused && Boolean(requestId),
   });

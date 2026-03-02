@@ -36,6 +36,8 @@ import type {
 import { colorForVolunteerStatus } from "../utils/lguLiveMap.colors";
 import { createDispatchOffers } from "../services/dispatch.service";
 import { fetchDispatchVolunteers } from "../services/volunteers.service";
+import { getLguToken } from "../../auth/services/authStorage";
+import { createLivePresenceSocket } from "../services/livePresence.socket";
 
 type LngLat = [number, number];
 
@@ -68,6 +70,98 @@ function getHazardGeometryPoints(geometry: unknown): LngLat[] {
 function isResolvedEmergencyStatus(raw?: string) {
   const up = String(raw ?? "").toUpperCase();
   return up === "RESOLVED" || up === "CANCELLED";
+}
+
+function toVolunteerStatusFromPresence(raw?: string): Volunteer["status"] {
+  const status = String(raw ?? "").trim().toUpperCase();
+  if (status === "BUSY") return "busy";
+  if (status === "ONLINE") return "available";
+  return "offline";
+}
+
+function escapeHtml(value: unknown) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function ensureVolunteerPinStyles() {
+  const styleId = "ll-live-map-volunteer-pin-styles";
+  if (document.getElementById(styleId)) return;
+
+  const style = document.createElement("style");
+  style.id = styleId;
+  style.innerHTML = `
+    .ll-vol-pin-wrap {
+      position: relative;
+      width: 68px;
+      height: 68px;
+      --ll-vol-color: #22c55e;
+      pointer-events: auto;
+    }
+
+    .ll-vol-pin-core {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      transform: translate(-50%, -50%);
+      border: 3px solid rgba(255, 255, 255, 0.97);
+      background: rgba(255, 255, 255, 0.98);
+      box-shadow: 0 0 0 2px var(--ll-vol-color), 0 8px 18px rgba(0, 0, 0, 0.24);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2;
+    }
+
+    .ll-vol-pin-center {
+      width: 16px;
+      height: 16px;
+      color: var(--ll-vol-color);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .ll-vol-pin-icon {
+      width: 16px;
+      height: 16px;
+      display: block;
+    }
+
+    .ll-vol-pin-chip {
+      position: absolute;
+      left: 50%;
+      top: -10px;
+      transform: translateX(-50%);
+      border-radius: 999px;
+      padding: 2px 7px;
+      background: rgba(15, 23, 42, 0.9);
+      color: #ffffff;
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+      box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2);
+      z-index: 3;
+    }
+
+    .ll-vol-pin-wrap[data-status="busy"] .ll-vol-pin-chip {
+      background: rgba(234, 88, 12, 0.92);
+    }
+
+    .ll-vol-pin-wrap[data-status="available"] .ll-vol-pin-chip {
+      background: rgba(22, 163, 74, 0.92);
+    }
+  `;
+
+  document.head.appendChild(style);
 }
 
 export function useLguLiveMap() {
@@ -168,6 +262,158 @@ export function useLguLiveMap() {
   useEffect(() => {
     refetchVolunteers();
   }, [refetchVolunteers]);
+
+  useEffect(() => {
+    const token = getLguToken();
+    if (!token) return;
+
+    const socket = createLivePresenceSocket(token);
+
+    const mergePresence = (
+      volunteerIdRaw: unknown,
+      patch: Partial<Volunteer>,
+      options?: { remove?: boolean }
+    ) => {
+      const volunteerId = String(volunteerIdRaw ?? "").trim();
+      if (!volunteerId) return;
+
+      setVolunteers((prev) => {
+        if (options?.remove) {
+          return prev.map((volunteer) =>
+            volunteer.id === volunteerId ? { ...volunteer, status: "offline" } : volunteer
+          );
+        }
+
+        const index = prev.findIndex((volunteer) => volunteer.id === volunteerId);
+        if (index === -1) {
+          return [
+            ...prev,
+            {
+              id: volunteerId,
+              name: "Volunteer",
+              skill: "General Volunteer",
+              status: patch.status ?? "available",
+              ...patch,
+            },
+          ];
+        }
+
+        const next = [...prev];
+        next[index] = { ...next[index], ...patch };
+        return next;
+      });
+    };
+
+    const onSnapshot = (payload: {
+      volunteers?: Array<{
+        volunteerId?: string;
+        status?: string;
+        lastLocation?: { lng?: number; lat?: number };
+      }>;
+    }) => {
+      const byId = new Map<
+        string,
+        {
+          volunteerId?: string;
+          status?: string;
+          lastLocation?: { lng?: number; lat?: number };
+        }
+      >();
+
+      (payload?.volunteers ?? []).forEach((entry) => {
+        const volunteerId = String(entry?.volunteerId ?? "").trim();
+        if (!volunteerId) return;
+        byId.set(volunteerId, entry);
+      });
+
+      setVolunteers((prev) =>
+        prev.map((volunteer) => {
+          const matched = byId.get(volunteer.id);
+          if (!matched) return { ...volunteer, status: "offline" };
+
+          const lng = Number(matched.lastLocation?.lng);
+          const lat = Number(matched.lastLocation?.lat);
+
+          return {
+            ...volunteer,
+            status: toVolunteerStatusFromPresence(matched.status),
+            ...(Number.isFinite(lng) && Number.isFinite(lat) ? { lng, lat } : {}),
+          };
+        })
+      );
+    };
+
+    const onPresenceChanged = (payload: {
+      volunteer?: {
+        volunteerId?: string;
+        status?: string;
+        lastLocation?: { lng?: number; lat?: number };
+      };
+    }) => {
+      const volunteerId = String(payload?.volunteer?.volunteerId ?? "").trim();
+      const status = String(payload?.volunteer?.status ?? "").trim().toUpperCase();
+      if (!volunteerId) return;
+
+      if (status === "OFFLINE") {
+        mergePresence(volunteerId, {}, { remove: true });
+        return;
+      }
+
+      const lng = Number(payload?.volunteer?.lastLocation?.lng);
+      const lat = Number(payload?.volunteer?.lastLocation?.lat);
+
+      mergePresence(volunteerId, {
+        status: toVolunteerStatusFromPresence(status),
+        ...(Number.isFinite(lng) && Number.isFinite(lat) ? { lng, lat } : {}),
+      });
+    };
+
+    const onLocationUpdate = (payload: {
+      volunteer?: {
+        volunteerId?: string;
+        status?: string;
+        location?: { lng?: number; lat?: number };
+      };
+    }) => {
+      const volunteerId = String(payload?.volunteer?.volunteerId ?? "").trim();
+      if (!volunteerId) return;
+
+      const lng = Number(payload?.volunteer?.location?.lng);
+      const lat = Number(payload?.volunteer?.location?.lat);
+      if (!Number.isFinite(lng) || !Number.isFinite(lat)) return;
+
+      mergePresence(volunteerId, {
+        status: toVolunteerStatusFromPresence(payload?.volunteer?.status),
+        lng,
+        lat,
+      });
+    };
+
+    const subscribe = () => {
+      socket.emit("volunteers:subscribe", {
+        lng: DAGUPAN_CENTER[0],
+        lat: DAGUPAN_CENTER[1],
+        radiusKm: 20,
+      });
+    };
+
+    socket.on("volunteers:snapshot", onSnapshot);
+    socket.on("volunteers:presence_changed", onPresenceChanged);
+    socket.on("volunteers:location_update", onLocationUpdate);
+    socket.on("connect", subscribe);
+
+    socket.connect();
+    if (socket.connected) subscribe();
+
+    return () => {
+      socket.emit("volunteers:unsubscribe");
+      socket.off("volunteers:snapshot", onSnapshot);
+      socket.off("volunteers:presence_changed", onPresenceChanged);
+      socket.off("volunteers:location_update", onLocationUpdate);
+      socket.off("connect", subscribe);
+      socket.disconnect();
+    };
+  }, []);
 
   // Per-emergency responder assignment (volunteer ids)
   const [assignmentsByEmergency, setAssignmentsByEmergency] = useState<Record<string, string[]>>({});
@@ -398,6 +644,7 @@ export function useLguLiveMap() {
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapReady) return;
+    ensureVolunteerPinStyles();
 
     volunteerMarkersRef.current.forEach((m) => m.remove());
     volunteerMarkersRef.current = [];
@@ -407,34 +654,54 @@ export function useLguLiveMap() {
     filteredVolunteers.forEach((v) => {
       // Skip map marker if volunteer has no coordinates yet
       if (!Number.isFinite(v.lng) || !Number.isFinite(v.lat)) return;
+      if (String(v.status ?? "").toLowerCase() === "offline") return;
+
       const el = document.createElement("div");
       const color = colorForVolunteerStatus(v.status);
+      const statusText = String(v.status ?? "").toLowerCase() === "busy" ? "BUSY" : "ONLINE";
+      const volunteerAddress = [v.barangayName, v.municipality].filter(Boolean).join(", ");
+      const displayAddress = volunteerAddress || "Address unavailable";
+      const popupName = escapeHtml(v.name);
+      const popupAddress = escapeHtml(displayAddress);
+      const popupSkill = escapeHtml(v.skill || "General Volunteer");
+      const popupStatus = escapeHtml(v.status.toUpperCase());
 
-      el.style.width = "12px";
-      el.style.height = "12px";
-      el.style.borderRadius = "999px";
-      el.style.background = color;
-      el.style.border = "2px solid rgba(255,255,255,0.95)";
-      el.style.boxShadow = "0 10px 18px rgba(0,0,0,0.2)";
+      el.className = "ll-vol-pin-wrap";
+      el.dataset.status = String(v.status ?? "").toLowerCase();
+      el.style.setProperty("--ll-vol-color", color);
       el.style.cursor = "pointer";
-
-      el.addEventListener("click", (ev) => ev.stopPropagation());
+      el.innerHTML = `
+        <div class="ll-vol-pin-chip">${statusText}</div>
+        <div class="ll-vol-pin-core">
+          <span class="ll-vol-pin-center" aria-hidden="true">
+            <svg class="ll-vol-pin-icon" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="2"></circle>
+              <path d="M5 19c1.2-3 3.8-4.5 7-4.5s5.8 1.5 7 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+            </svg>
+          </span>
+        </div>
+      `;
 
       const popup = new mapboxgl.Popup({ offset: 14, closeButton: false }).setHTML(`
         <div style="font-family: ui-sans-serif; min-width: 220px;">
-          <div style="font-weight: 800; color: #111827; font-size: 14px;">${v.name}</div>
-          <div style="margin-top: 6px; color: #6b7280; font-size: 12px;">Skill: ${v.skill}</div>
+          <div style="font-weight: 800; color: #111827; font-size: 14px;">${popupName}</div>
+          <div style="margin-top: 6px; color: #6b7280; font-size: 12px;">Address: ${popupAddress}</div>
+          <div style="margin-top: 4px; color: #6b7280; font-size: 12px;">Skill: ${popupSkill}</div>
           <div style="margin-top: 10px; display:inline-flex; gap:8px; align-items:center;">
             <span style="display:inline-block;width:8px;height:8px;border-radius:999px;background:${color};"></span>
-            <span style="font-size:12px;color:#374151;font-weight:700;">${v.status.toUpperCase()}</span>
+            <span style="font-size:12px;color:#374151;font-weight:700;">${popupStatus}</span>
           </div>
         </div>
       `);
 
-      const marker = new mapboxgl.Marker({ element: el })
+      const marker = new mapboxgl.Marker({ element: el, anchor: "center" })
         .setLngLat([v.lng as number, v.lat as number])
         .setPopup(popup)
         .addTo(map);
+      el.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        marker.togglePopup();
+      });
       volunteerMarkersRef.current.push(marker);
     });
 

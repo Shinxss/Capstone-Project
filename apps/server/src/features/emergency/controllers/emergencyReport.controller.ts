@@ -11,6 +11,7 @@ import {
   listPendingEmergencyApprovals,
   rejectEmergencyReport,
 } from "../services/emergencyReport.service";
+import { notifyRequestTrackingUpdated } from "../services/requestRealtime.service";
 import { uploadEmergencyReportPhoto } from "../services/emergencyReportUpload.service";
 import { AUDIT_EVENT } from "../../audit/audit.constants";
 import { logAudit } from "../../audit/audit.service";
@@ -34,6 +35,13 @@ export async function postEmergencyReport(req: MaybeAuthedRequest, res: Response
     const reporterUserId = req.user?.id;
 
     const report = await createEmergencyReport(input, reporterUserId);
+    await notifyRequestTrackingUpdated(
+      report.incidentId,
+      report.isSos ? "request_submitted" : "verification_started",
+      {
+        stepOverride: report.isSos ? "Submitted" : "Verification",
+      }
+    ).catch(() => undefined);
 
     return res.status(201).json({
       incidentId: report.incidentId,

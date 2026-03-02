@@ -33,6 +33,8 @@ import { DevWeatherOverrideOverlay } from "../../features/weather/components/Dev
 import { useDevLocationOverride } from "../../features/location/hooks/useDevLocationOverride";
 import { DevLocationOverrideOverlay } from "../../features/location/components/DevLocationOverrideOverlay";
 import { getEffectiveLocation } from "../../features/location/utils/getEffectiveLocation";
+import { useVolunteerMapFeed } from "../../features/realtime/hooks/useVolunteerMapFeed";
+import { connectRealtime } from "../../features/realtime/socketClient";
 
 type HazardZone = {
   _id: string;
@@ -228,7 +230,7 @@ function PulseMarker({ type }: { type: EmergencyType }) {
 export default function MapTab() {
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
-  const { mode, user } = useAuth();
+  const { mode, user, token } = useAuth();
   const [query, setQuery] = useState("");
   const { key: styleKey, styleURL, setKey } = useMapStyle("streets");
   const {
@@ -278,6 +280,22 @@ export default function MapTab() {
     }
     return myLocation;
   }, [devLocationEnabled, effectiveLocation.lat, effectiveLocation.lng, myLocation]);
+  const mapFeedCenter = effectiveUserLocation ?? DAGUPAN;
+  const { volunteers: volunteerFeed } = useVolunteerMapFeed({
+    lng: mapFeedCenter[0],
+    lat: mapFeedCenter[1],
+    radiusKm: 5,
+    enabled: isFocused && mode === "authed",
+  });
+  const volunteerMarkers = useMemo(
+    () =>
+      volunteerFeed.filter(
+        (entry) =>
+          entry.location &&
+          String(entry.volunteerId ?? "") !== String(user?.id ?? "")
+      ),
+    [volunteerFeed, user?.id]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -435,6 +453,7 @@ export default function MapTab() {
 
   const cameraRef = useRef<MapboxGL.Camera>(null);
   const lastLocationUpdateAtRef = useRef(0);
+  const lastSocketLocationUpdateAtRef = useRef(0);
 
   useEffect(() => {
     if (!isFocused || !isVolunteer) return;
@@ -450,6 +469,39 @@ export default function MapTab() {
       lat: myLocation[1],
     }).catch(() => undefined);
   }, [activeDispatch?.id, isFocused, isVolunteer, myLocation]);
+
+  useEffect(() => {
+    if (!isFocused || !isVolunteer || !token) return;
+    const socket = connectRealtime(token);
+    if (!socket) return;
+
+    const sendHeartbeat = () => {
+      socket.emit("volunteer:heartbeat", { onDuty: true });
+    };
+
+    sendHeartbeat();
+    const timer = setInterval(sendHeartbeat, 15_000);
+
+    return () => {
+      clearInterval(timer);
+    };
+  }, [isFocused, isVolunteer, token]);
+
+  useEffect(() => {
+    if (!isFocused || !isVolunteer || !token || !myLocation) return;
+
+    const now = Date.now();
+    if (now - lastSocketLocationUpdateAtRef.current < 4000) return;
+    lastSocketLocationUpdateAtRef.current = now;
+
+    const socket = connectRealtime(token);
+    if (!socket) return;
+
+    socket.emit("volunteer:location_update", {
+      lng: myLocation[0],
+      lat: myLocation[1],
+    });
+  }, [isFocused, isVolunteer, myLocation, token]);
 
   // draggable "Google Maps-ish" sheet
   const layersSheetRef = useRef<BottomSheet>(null);
@@ -722,6 +774,38 @@ export default function MapTab() {
               <View style={styles.meDot} />
             </MapboxGL.MarkerView>
           ) : null}
+
+          {volunteerMarkers.map((volunteer) => (
+            <MapboxGL.MarkerView
+              key={`volunteer-${volunteer.volunteerId}`}
+              coordinate={[
+                volunteer.location!.lng,
+                volunteer.location!.lat,
+              ]}
+              anchor={{ x: 0.5, y: 1 }}
+            >
+              <View style={styles.volunteerMarkerWrap}>
+                <View
+                  style={[
+                    styles.volunteerPin,
+                    volunteer.status === "BUSY" ? styles.volunteerPinBusy : null,
+                  ]}
+                >
+                  <Feather name="activity" size={12} color="#FFFFFF" />
+                </View>
+                <View
+                  style={[
+                    styles.volunteerLabel,
+                    volunteer.status === "BUSY" ? styles.volunteerLabelBusy : null,
+                  ]}
+                >
+                  <Text style={styles.volunteerLabelText}>
+                    {volunteer.status === "BUSY" ? "Busy" : "Online"}
+                  </Text>
+                </View>
+              </View>
+            </MapboxGL.MarkerView>
+          ))}
 
           {canViewEmergencies
             ? filteredReports.map((r) => (
@@ -1195,6 +1279,38 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
     elevation: 6,
+  },
+  volunteerMarkerWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  volunteerPin: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#16A34A",
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  volunteerPinBusy: {
+    backgroundColor: "#1D4ED8",
+  },
+  volunteerLabel: {
+    marginTop: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 999,
+    backgroundColor: "rgba(22,163,74,0.95)",
+  },
+  volunteerLabelBusy: {
+    backgroundColor: "rgba(29,78,216,0.95)",
+  },
+  volunteerLabelText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "700",
   },
 
   actionsRow: { marginTop: 12, flexDirection: "row", alignItems: "center", gap: 10 },
