@@ -23,13 +23,13 @@ export function ReportEmergencyTypeScreen() {
   };
 
   return (
-    <SafeAreaView edges={["bottom"]} style={styles.screen}>
+    <SafeAreaView edges={["bottom"]} style={styles.screen} className="bg-lgu-lightBg dark:bg-lgu-darkBg">
       <ScrollView
         contentContainerClassName="px-5 pb-36 pt-2"
         showsVerticalScrollIndicator={false}
       >
-        <Text className="text-2xl font-extrabold text-zinc-900">What type of emergency?</Text>
-        <Text className="mt-1 text-sm text-zinc-500">
+        <Text className="text-2xl font-extrabold text-slate-900 dark:text-slate-100">What type of emergency?</Text>
+        <Text className="mt-1 text-sm text-slate-600 dark:text-slate-300">
           Select the category that best describes the situation
         </Text>
 
@@ -49,9 +49,13 @@ export function ReportEmergencyTypeScreen() {
         <Pressable
           onPress={onContinue}
           disabled={!canContinue}
-          style={[styles.continueBtn, !canContinue && styles.continueBtnDisabled]}
+          style={({ pressed }) => [
+            styles.continueButton,
+            canContinue ? styles.continueButtonEnabled : styles.continueButtonDisabled,
+            pressed && canContinue ? styles.continueButtonPressed : null,
+          ]}
         >
-          <Text style={styles.continueBtnText}>Continue</Text>
+          <Text className="text-[16.5px] font-semibold text-white">Continue</Text>
         </Pressable>
       </View>
     </SafeAreaView>
@@ -61,7 +65,6 @@ export function ReportEmergencyTypeScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#F3F4F6",
   },
   footer: {
     position: "absolute",
@@ -73,19 +76,19 @@ const styles = StyleSheet.create({
     paddingBottom: 0,
     backgroundColor: "transparent",
   },
-  continueBtn: {
+  continueButton: {
     height: 60,
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#EF4444",
   },
-  continueBtnDisabled: {
-    backgroundColor: "#EC8585",
+  continueButtonEnabled: {
+    backgroundColor: "#ef4444",
   },
-  continueBtnText: {
-    color: "#FFFFFF",
-    fontSize: 33 / 2,
-    fontWeight: "600",
+  continueButtonPressed: {
+    backgroundColor: "#dc2626",
+  },
+  continueButtonDisabled: {
+    backgroundColor: "#fca5a5",
   },
 });

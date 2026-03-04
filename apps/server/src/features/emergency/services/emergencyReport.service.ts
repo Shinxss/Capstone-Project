@@ -4,7 +4,7 @@ import {
   type EmergencyReportDocument,
   type IEmergencyReport,
 } from "../models/EmergencyReport.model";
-import type { CreateEmergencyReportInput } from "../schemas/emergencyReport.schema";
+import type { CreateEmergencyReportInput, MyRequestStatusTab } from "../schemas/emergencyReport.schema";
 import {
   MAX_REFERENCE_ATTEMPTS,
   generateReferenceNumberCandidate,
@@ -73,9 +73,22 @@ export type PendingApprovalItem = {
 
 const MAPBOX_DIRECTIONS_BASE = "https://api.mapbox.com/directions/v5/mapbox";
 const TRACKING_TIMELINE_STEPS = ["Submitted", "Assigned", "En Route", "Arrived", "Resolved"] as const;
+const MY_REQUEST_LIST_LABELS = [
+  "Submitted",
+  "Verification",
+  "Assigned",
+  "En Route",
+  "Arrived",
+  "Review",
+  "Resolved",
+  "Cancelled",
+] as const;
 
 type TrackingTimelineStep = (typeof TRACKING_TIMELINE_STEPS)[number];
 export type TrackingLabel = TrackingTimelineStep | "Cancelled";
+export type MyRequestListTrackingLabel = (typeof MY_REQUEST_LIST_LABELS)[number];
+type MappedMyRequestStatusTab = Exclude<MyRequestStatusTab, "all" | "review">;
+type LegacyScope = "active" | "history";
 
 type LocationPoint = {
   lng: number;
@@ -94,9 +107,18 @@ export type MyRequestSummary = {
   status: IEmergencyReport["status"];
   createdAt: string;
   location: LocationPoint;
-  trackingStatus: TrackingLabel;
+  locationText: string;
+  trackingLabel: MyRequestListTrackingLabel;
+  trackingStatus: MyRequestListTrackingLabel;
   etaSeconds?: number | null;
   lastUpdatedAt?: string | null;
+};
+
+export type MyRequestCountSummary = {
+  assigned: number;
+  en_route: number;
+  arrived: number;
+  resolved: number;
 };
 
 export type MyRequestTrackingDTO = {
@@ -252,6 +274,78 @@ function deriveTrackingLabel(
   return "Submitted";
 }
 
+const MY_REQUEST_TRACKING_LABEL_BY_TAB: Record<MappedMyRequestStatusTab, MyRequestListTrackingLabel> = {
+  submitted: "Submitted",
+  verification: "Verification",
+  assigned: "Assigned",
+  en_route: "En Route",
+  arrived: "Arrived",
+  resolved: "Resolved",
+  cancelled: "Cancelled",
+};
+
+function deriveMyRequestStatusTab(report: any, offers: any[]): MappedMyRequestStatusTab {
+  const emergencyStatus = String(report?.status ?? "").trim().toUpperCase();
+  const verificationStatus = String(report?.verification?.status ?? "").trim().toLowerCase();
+
+  if (emergencyStatus === "CANCELLED" || verificationStatus === "rejected") {
+    return "cancelled";
+  }
+  if (emergencyStatus === "RESOLVED" || hasOfferStatus(offers, "VERIFIED")) {
+    return "resolved";
+  }
+  if (hasOfferStatus(offers, "DONE")) {
+    return "arrived";
+  }
+  if (hasOfferStatus(offers, "ACCEPTED")) {
+    return "en_route";
+  }
+  if (offers.length > 0) {
+    return "assigned";
+  }
+  if (!Boolean(report?.isSos) && (verificationStatus === "pending" || verificationStatus === "approved")) {
+    return "verification";
+  }
+  return "submitted";
+}
+
+function toMyRequestTrackingLabel(
+  tab: MappedMyRequestStatusTab,
+  requestedTab?: MyRequestStatusTab
+): MyRequestListTrackingLabel {
+  if (requestedTab === "review" && tab === "resolved") {
+    return "Review";
+  }
+  return MY_REQUEST_TRACKING_LABEL_BY_TAB[tab];
+}
+
+function matchesMyRequestFilter(
+  tab: MappedMyRequestStatusTab,
+  options?: { tab?: MyRequestStatusTab; scope?: LegacyScope }
+) {
+  if (options?.tab) {
+    if (options.tab === "all") return true;
+    if (options.tab === "review") return tab === "resolved";
+    return tab === options.tab;
+  }
+
+  if (options?.scope === "active") {
+    return tab !== "resolved" && tab !== "cancelled";
+  }
+  if (options?.scope === "history") {
+    return tab === "resolved" || tab === "cancelled";
+  }
+
+  return true;
+}
+
+function toLocationText(report: any, location: LocationPoint | null) {
+  const label = String(report?.locationLabel ?? "").trim();
+  if (label) return label;
+  if (!location) return "Location unavailable";
+  return `${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}`;
+}
+
 function toTimelineActiveStepIndex(
   label: TrackingLabel,
   emergencyStatusRaw: unknown,
@@ -324,17 +418,25 @@ async function fetchResponderEtaAndRoute(
 async function buildMyRequestSummaryFromReport(
   report: any,
   offers: any[],
-  options?: { includeEta?: boolean }
+  options?: {
+    includeEta?: boolean;
+    requestedTab?: MyRequestStatusTab;
+    mappedTab?: MappedMyRequestStatusTab;
+  }
 ): Promise<MyRequestSummary> {
   const includeEta = options?.includeEta === true;
-  const location = toPointCoordinates(report?.location?.coordinates) ?? { lng: 0, lat: 0 };
-  const label = deriveTrackingLabel(report?.status, offers);
+  const mappedTab = options?.mappedTab ?? deriveMyRequestStatusTab(report, offers);
+  const location = toPointCoordinates(report?.location?.coordinates);
+  const safeLocation = location ?? { lng: 0, lat: 0 };
+  const label = toMyRequestTrackingLabel(mappedTab, options?.requestedTab);
   const relevantOffer = pickRelevantOffer(offers);
   const responderOffer = pickResponderOffer(offers);
   const locationOffer = pickRelevantOffer(offers) ?? responderOffer;
   const responderLocation = toPointCoordinates(locationOffer?.lastKnownLocation?.coordinates);
   const etaPayload =
-    includeEta && responderLocation ? await fetchResponderEtaAndRoute(responderLocation, location) : null;
+    includeEta && mappedTab === "en_route" && responderLocation
+      ? await fetchResponderEtaAndRoute(responderLocation, safeLocation)
+      : null;
 
   const lastUpdatedAt =
     relevantOffer?.lastKnownLocationAt ??
@@ -349,9 +451,11 @@ async function buildMyRequestSummaryFromReport(
     type: fromDbEmergencyType(report?.emergencyType ?? "OTHER"),
     status: (String(report?.status ?? "OPEN").toUpperCase() as IEmergencyReport["status"]),
     createdAt: toIsoString(report?.createdAt),
-    location,
+    location: safeLocation,
+    locationText: toLocationText(report, location),
+    trackingLabel: label,
     trackingStatus: label,
-    etaSeconds: includeEta ? (etaPayload?.etaSeconds ?? null) : null,
+    etaSeconds: includeEta && mappedTab === "en_route" ? (etaPayload?.etaSeconds ?? null) : null,
     lastUpdatedAt: toIsoString(lastUpdatedAt),
   };
 }
@@ -380,6 +484,22 @@ export async function createEmergencyReport(
   if (!input.isSos && sanitizedPhotos.length < 3) {
     throw new Error("At least 3 proof images are required.");
   }
+
+  let locationLabel = String(input.location.label ?? "").trim() || undefined;
+  if (input.isSos && !locationLabel) {
+    const lng = Number(input.location.coords.longitude);
+    const lat = Number(input.location.coords.latitude);
+    if (Number.isFinite(lng) && Number.isFinite(lat)) {
+      const found = await findBarangayByPoint(lng, lat, {
+        city: "Dagupan City",
+        province: "Pangasinan",
+      });
+      if (found) {
+        locationLabel = [found.name, found.city, found.province].filter(Boolean).join(", ") || undefined;
+      }
+    }
+  }
+
   let report: EmergencyReportDocument | null = null;
   let lastError: unknown;
 
@@ -404,7 +524,7 @@ export async function createEmergencyReport(
           type: "Point",
           coordinates: [input.location.coords.longitude, input.location.coords.latitude],
         },
-        locationLabel: input.location.label,
+        locationLabel,
         notes: input.description,
         photos: sanitizedPhotos,
         ...(reporterUserId ? { reportedBy: reporterUserId } : {}),
@@ -657,7 +777,7 @@ export async function getMyActiveEmergencyReport(reporterUserId: string): Promis
     status: { $nin: ["RESOLVED", "CANCELLED"] },
   })
     .sort({ createdAt: -1 })
-    .select("_id referenceNumber emergencyType status createdAt updatedAt location")
+    .select("_id referenceNumber emergencyType status isSos verification createdAt updatedAt location locationLabel")
     .lean();
 
   if (!report) return null;
@@ -670,23 +790,36 @@ export async function getMyActiveEmergencyReport(reporterUserId: string): Promis
   return buildMyRequestSummaryFromReport(report, offers, { includeEta: true });
 }
 
+function normalizeMyRequestListOptions(
+  options?: { tab?: MyRequestStatusTab; scope?: LegacyScope } | LegacyScope
+): { tab?: MyRequestStatusTab; scope?: LegacyScope } {
+  if (!options) return {};
+  if (typeof options === "string") {
+    return { scope: options };
+  }
+  return options;
+}
+
 export async function listMyEmergencyReports(
   reporterUserId: string,
-  scope: "active" | "history" = "active"
+  options?: { tab?: MyRequestStatusTab; scope?: LegacyScope } | LegacyScope
 ): Promise<MyRequestSummary[]> {
   if (!Types.ObjectId.isValid(reporterUserId)) return [];
+  const normalizedOptions = normalizeMyRequestListOptions(options);
 
-  const statusQuery =
-    scope === "history"
-      ? { $in: ["RESOLVED", "CANCELLED"] }
-      : { $nin: ["RESOLVED", "CANCELLED"] };
-
-  const reports = await EmergencyReportModel.find({
+  const reportQuery: Record<string, unknown> = {
     reportedBy: new Types.ObjectId(reporterUserId),
-    status: statusQuery,
-  })
+  };
+
+  if (normalizedOptions.tab === "cancelled") {
+    reportQuery.status = "CANCELLED";
+  } else if (normalizedOptions.tab === "resolved" || normalizedOptions.tab === "review") {
+    reportQuery.status = "RESOLVED";
+  }
+
+  const reports = await EmergencyReportModel.find(reportQuery)
     .sort({ createdAt: -1, _id: -1 })
-    .select("_id referenceNumber emergencyType status createdAt updatedAt location")
+    .select("_id referenceNumber emergencyType status isSos verification createdAt updatedAt location locationLabel")
     .lean();
 
   if (!reports.length) return [];
@@ -706,13 +839,75 @@ export async function listMyEmergencyReports(
     offersByEmergencyId.get(key)!.push(offer);
   }
 
-  return Promise.all(
-    reports.map((report) =>
-      buildMyRequestSummaryFromReport(report, offersByEmergencyId.get(String(report._id)) ?? [], {
-        includeEta: false,
-      })
-    )
+  const summaries = await Promise.all(
+    reports.map(async (report) => {
+      const reportOffers = offersByEmergencyId.get(String(report._id)) ?? [];
+      const mappedTab = deriveMyRequestStatusTab(report, reportOffers);
+      if (!matchesMyRequestFilter(mappedTab, normalizedOptions)) {
+        return null;
+      }
+
+      return buildMyRequestSummaryFromReport(report, reportOffers, {
+        includeEta: true,
+        requestedTab: normalizedOptions.tab,
+        mappedTab,
+      });
+    })
   );
+
+  return summaries.filter((item): item is MyRequestSummary => item !== null);
+}
+
+export async function getMyEmergencyReportCounts(
+  reporterUserId: string
+): Promise<MyRequestCountSummary> {
+  const empty: MyRequestCountSummary = {
+    assigned: 0,
+    en_route: 0,
+    arrived: 0,
+    resolved: 0,
+  };
+
+  if (!Types.ObjectId.isValid(reporterUserId)) return empty;
+
+  const reports = await EmergencyReportModel.find({
+    reportedBy: new Types.ObjectId(reporterUserId),
+  })
+    .sort({ createdAt: -1, _id: -1 })
+    .select("_id status isSos verification")
+    .lean();
+
+  if (!reports.length) return empty;
+
+  const emergencyIds = reports.map((report) => report._id);
+  const offers = await DispatchOffer.find({ emergencyId: { $in: emergencyIds } })
+    .sort({ updatedAt: -1, _id: -1 })
+    .select("emergencyId status")
+    .lean();
+
+  const offersByEmergencyId = new Map<string, any[]>();
+  for (const offer of offers) {
+    const key = String(offer.emergencyId ?? "");
+    if (!offersByEmergencyId.has(key)) {
+      offersByEmergencyId.set(key, []);
+    }
+    offersByEmergencyId.get(key)!.push(offer);
+  }
+
+  const counts: MyRequestCountSummary = { ...empty };
+  for (const report of reports) {
+    const mappedTab = deriveMyRequestStatusTab(
+      report,
+      offersByEmergencyId.get(String(report._id)) ?? []
+    );
+
+    if (mappedTab === "assigned") counts.assigned += 1;
+    if (mappedTab === "en_route") counts.en_route += 1;
+    if (mappedTab === "arrived") counts.arrived += 1;
+    if (mappedTab === "resolved") counts.resolved += 1;
+  }
+
+  return counts;
 }
 
 export async function getMyEmergencyRequestTracking(

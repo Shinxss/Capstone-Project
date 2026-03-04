@@ -65,9 +65,22 @@ export const referenceNumberParamSchema = z
   })
   .strict();
 
+export const MY_REQUEST_STATUS_TABS = [
+  "all",
+  "submitted",
+  "verification",
+  "assigned",
+  "en_route",
+  "arrived",
+  "review",
+  "resolved",
+  "cancelled",
+] as const;
+
 export const myEmergencyReportsQuerySchema = z
   .object({
-    scope: z.enum(["active", "history"]).optional().default("active"),
+    tab: z.enum(MY_REQUEST_STATUS_TABS).optional(),
+    scope: z.enum(["active", "history"]).optional(),
   })
   .strict();
 
@@ -75,3 +88,4 @@ export type CreateEmergencyReportInput = z.infer<typeof createEmergencyReportSch
 export type UploadEmergencyReportPhotoInput = z.infer<typeof uploadEmergencyReportPhotoSchema>;
 export type RejectEmergencyReportInput = z.infer<typeof rejectEmergencyReportSchema>;
 export type MyEmergencyReportsQuery = z.infer<typeof myEmergencyReportsQuerySchema>;
+export type MyRequestStatusTab = (typeof MY_REQUEST_STATUS_TABS)[number];

@@ -628,10 +628,13 @@ export async function reverifyDispatch(params: {
   };
 }
 
-export async function listDispatchTasksForLgu(params: { statuses: DispatchStatus[] }) {
+export async function listDispatchTasksForLgu(params: { statuses: DispatchStatus[]; emergencyId?: string }) {
   const statuses = (params.statuses ?? []).filter(Boolean);
   const query: any = {};
   if (statuses.length) query.status = { $in: statuses };
+  if (params.emergencyId && Types.ObjectId.isValid(params.emergencyId)) {
+    query.emergencyId = new Types.ObjectId(params.emergencyId);
+  }
 
   return DispatchOffer.find(query)
     .populate({ path: "volunteerId", select: "firstName lastName email" })

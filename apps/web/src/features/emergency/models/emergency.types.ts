@@ -11,6 +11,11 @@ export type Reporter = {
   username?: string;
   email?: string;
   role?: string;
+  contactNo?: string;
+  barangay?: string;
+  municipality?: string;
+  country?: string;
+  postalCode?: string;
 };
 
 export type EmergencyReport = {
@@ -24,10 +29,11 @@ export type EmergencyReport = {
   reportedAt?: string;
   createdAt?: string;
   updatedAt?: string;
-
-  // ✅ add these
   barangayName?: string | null;
   barangayCity?: string | null;
   barangayProvince?: string | null;
+  photos?: string[];
+  locationLabel?: string;
+  referenceNumber?: string;
+  reporterIsGuest?: boolean;
 };
-

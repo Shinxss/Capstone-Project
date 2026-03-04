@@ -5,6 +5,7 @@ import {
   getEmergencyReportById,
   getEmergencyReportByReference,
   getMyActiveEmergencyReport,
+  getMyEmergencyReportCounts,
   getMyEmergencyRequestTracking,
   listMapEmergencyReports,
   listMyEmergencyReports,
@@ -139,11 +140,24 @@ export async function listMyEmergencyReportsController(req: MaybeAuthedRequest, 
     if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
 
     const query = req.query as unknown as MyEmergencyReportsQuery;
-    const scope = query.scope ?? "active";
-    const items = await listMyEmergencyReports(String(req.user.id), scope);
+    const items = await listMyEmergencyReports(String(req.user.id), {
+      tab: query.tab,
+      scope: query.scope,
+    });
     return res.status(200).json(items);
   } catch (error: any) {
     return res.status(500).json({ message: error?.message ?? "Failed to fetch emergency requests" });
+  }
+}
+
+export async function getMyEmergencyReportCountsController(req: MaybeAuthedRequest, res: Response) {
+  try {
+    if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+
+    const counts = await getMyEmergencyReportCounts(String(req.user.id));
+    return res.status(200).json(counts);
+  } catch (error: any) {
+    return res.status(500).json({ message: error?.message ?? "Failed to fetch emergency request counts" });
   }
 }
 

@@ -8,9 +8,23 @@ type CreateSosInput = {
   lng: number;
   accuracy?: number;
   notes?: string;
+  locationLabel?: string;
 };
 
 export async function createSosReport(input: CreateSosInput) {
+  let locationLabel = String(input.locationLabel ?? "").trim() || undefined;
+
+  // Backfill a readable label for SOS reports when the client does not send one.
+  if (!locationLabel) {
+    const barangay = await findBarangayByPoint(input.lng, input.lat, {
+      city: "Dagupan City",
+      province: "Pangasinan",
+    });
+    if (barangay) {
+      locationLabel = [barangay.name, barangay.city, barangay.province].filter(Boolean).join(", ") || undefined;
+    }
+  }
+
   const doc = await EmergencyReport.create({
     emergencyType: "SOS",
     source: "SOS_BUTTON",
@@ -20,6 +34,7 @@ export async function createSosReport(input: CreateSosInput) {
       coordinates: [input.lng, input.lat],
       accuracy: input.accuracy,
     },
+    locationLabel,
     notes: input.notes,
     reportedBy: input.reportedBy,
     reportedAt: new Date(),
@@ -33,7 +48,7 @@ export async function listReports({ limit = 200 }: { limit?: number }) {
   const docs = await EmergencyReport.find({})
     .sort({ createdAt: -1 })
     .limit(limit)
-    .populate("reportedBy", "firstName lastName role username email lguName municipality barangay")
+    .populate("reportedBy", "firstName lastName role username email lguName municipality barangay contactNo")
     .lean();
 
   // small in-request cache (prevents repeat lookups for same coords)

@@ -22,7 +22,11 @@
     "deploy:sepolia": "hardhat run scripts/deploy.ts --network sepolia",
     "verify:sepolia": "hardhat verify --network sepolia",
     "export:abi": "ts-node scripts/export-abi.ts",
-    "build:sdk": "pnpm run export:abi && tsc -p tsconfig.build.json && cpx src/abi/*.json dist/abi"
+    "build:sdk": "pnpm run export:abi && tsc -p tsconfig.build.json && cpx src/abi/*.json dist/abi",
+    "demo:onlyowner": "hardhat run scripts/demo_onlyowner.ts --network sepolia",
+    "demo:normal": "hardhat run scripts/demo_normal.ts --network sepolia",
+    "demo:attack": "hardhat run scripts/demo_attack.ts --network sepolia",
+    "demo:edge": "hardhat run scripts/demo_edge.ts --network sepolia"
   },
   "keywords": [],
   "author": "",

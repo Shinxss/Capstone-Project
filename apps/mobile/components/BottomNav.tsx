@@ -1,13 +1,15 @@
 import React from "react";
-import { View, Text, Pressable, StyleSheet, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Siren } from "lucide-react-native";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTheme } from "../features/theme/useTheme";
 
-const ACTIVE = "#2563EB"; // blue
-const INACTIVE = "#94A3B8"; // gray
-const RED = "#EF4444";
+const ACTIVE = "#2563EB";
+const INACTIVE_LIGHT = "#94A3B8";
+const INACTIVE_DARK = "#94A3B8";
+const RED = "#DC2626";
 
 type Props = BottomTabBarProps & {
   onPressReportAction: () => void;
@@ -16,7 +18,7 @@ type Props = BottomTabBarProps & {
 
 type TabKey = "index" | "map" | "alert" | "more";
 
-const TABS: { name: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+const TABS: Array<{ name: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
   { name: "index", label: "Home", icon: "home-outline" },
   { name: "map", label: "Map", icon: "map-outline" },
   { name: "alert", label: "Tasks", icon: "clipboard-outline" },
@@ -24,8 +26,8 @@ const TABS: { name: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap 
 ];
 
 export default function BottomNav(props: Props) {
-  const { state, navigation } = props;
-  const { onPressReportAction, onPressRegularTab } = props;
+  const { state, navigation, onPressReportAction, onPressRegularTab } = props;
+  const { isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const bottomPadding = Math.max(insets.bottom, 50);
 
@@ -36,7 +38,9 @@ export default function BottomNav(props: Props) {
     if (!route) return;
 
     const event = navigation.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
-    if (!event.defaultPrevented) navigation.navigate(name);
+    if (!event.defaultPrevented) {
+      navigation.navigate(name);
+    }
   };
 
   const isFocused = (name: TabKey) => {
@@ -45,43 +49,59 @@ export default function BottomNav(props: Props) {
   };
 
   return (
-    <View style={[styles.wrap, { paddingBottom: bottomPadding }]}>
+    <View
+      style={[
+        styles.wrap,
+        {
+          paddingBottom: bottomPadding,
+          backgroundColor: isDark ? "#0B1220" : "#FFFFFF",
+          borderTopColor: isDark ? "#162544" : "#E5E7EB",
+        },
+      ]}
+    >
       <View style={styles.row}>
-        {/* Left tabs */}
         <TabButton
           label={TABS[0].label}
           icon={TABS[0].icon}
           focused={isFocused("index")}
+          isDark={isDark}
           onPress={() => goTo("index")}
         />
+
         <TabButton
           label={TABS[1].label}
           icon={TABS[1].icon}
           focused={isFocused("map")}
+          isDark={isDark}
           onPress={() => goTo("map")}
         />
 
-        {/* Center big + */}
         <View style={styles.centerSlot}>
           <Pressable
             onPress={onPressReportAction}
-            style={({ pressed }) => [styles.fab, pressed && { opacity: 0.9 }]}
+            style={({ pressed }) => [
+              styles.fab,
+              { borderColor: isDark ? "#0B1220" : "#FFFFFF" },
+              pressed && { opacity: 0.9 },
+            ]}
           >
-            <Siren size={27} color="#fff" strokeWidth={1.8} />
+            <Siren size={27} color="#FFFFFF" strokeWidth={1.8} />
           </Pressable>
         </View>
 
-        {/* Right tabs */}
         <TabButton
           label={TABS[2].label}
           icon={TABS[2].icon}
           focused={isFocused("alert")}
+          isDark={isDark}
           onPress={() => goTo("alert")}
         />
+
         <TabButton
           label={TABS[3].label}
           icon={TABS[3].icon}
           focused={isFocused("more")}
+          isDark={isDark}
           onPress={() => goTo("more")}
         />
       </View>
@@ -93,14 +113,16 @@ function TabButton({
   label,
   icon,
   focused,
+  isDark,
   onPress,
 }: {
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
   focused: boolean;
+  isDark: boolean;
   onPress: () => void;
 }) {
-  const color = focused ? ACTIVE : INACTIVE;
+  const color = focused ? ACTIVE : isDark ? INACTIVE_DARK : INACTIVE_LIGHT;
 
   return (
     <Pressable onPress={onPress} style={styles.tab}>
@@ -112,9 +134,7 @@ function TabButton({
 
 const styles = StyleSheet.create({
   wrap: {
-    backgroundColor: "#fff",
     borderTopWidth: 1,
-    borderTopColor: "#E5E7EB",
   },
   row: {
     height: 64,
@@ -146,12 +166,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 7,
-    borderColor: "#fff",
-    marginTop: -34, // ✅ makes it float up like your image
+    borderColor: "#FFFFFF",
+    marginTop: -34,
     ...Platform.select({
       android: { elevation: 8 },
       ios: {
-        shadowColor: "#000",
+        shadowColor: "#000000",
         shadowOpacity: 0.2,
         shadowRadius: 10,
         shadowOffset: { width: 0, height: 6 },

@@ -7,6 +7,7 @@ export type SosCreateRequest = {
   lng: number;
   accuracy?: number;
   notes?: string;
+  locationLabel?: string;
 };
 
 export type EmergencyReport = {

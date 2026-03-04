@@ -4,6 +4,7 @@ import {
   DEV_LOCATION_DAGUPAN_PRESET,
   type DevLocationOverride,
 } from "../hooks/useDevLocationOverride";
+import DraggableOverlay from "../../../src/components/DraggableOverlay";
 
 type DevLocationOverrideOverlayProps = {
   override: DevLocationOverride;
@@ -43,81 +44,80 @@ export function DevLocationOverrideOverlay({
   };
 
   return (
-    <View pointerEvents="box-none" style={[styles.container, { top }]}>
-      <Pressable
-        onPress={() => setExpanded((current) => !current)}
-        style={[styles.bubble, override.enabled && styles.bubbleEnabled]}
-      >
-        <Text style={styles.bubbleText}>GPS</Text>
-      </Pressable>
+    <DraggableOverlay initialTop={top} initialRight={12} zIndex={40}>
+      <View pointerEvents="box-none" style={styles.container}>
+        <Pressable
+          onPress={() => setExpanded((current) => !current)}
+          style={[styles.bubble, override.enabled && styles.bubbleEnabled]}
+        >
+          <Text style={styles.bubbleText}>GPS</Text>
+        </Pressable>
 
-      {expanded ? (
-        <View style={styles.card}>
-          <View style={styles.row}>
-            <Text style={styles.title}>DEV Location</Text>
-            <Pressable style={styles.toggleBtn} onPress={() => onPatch({ enabled: !override.enabled })}>
-              <Text style={styles.toggleBtnText}>{override.enabled ? "ON" : "OFF"}</Text>
-            </Pressable>
-          </View>
+        {expanded ? (
+          <View style={styles.card}>
+            <View style={styles.row}>
+              <Text style={styles.title}>DEV Location</Text>
+              <Pressable style={styles.toggleBtn} onPress={() => onPatch({ enabled: !override.enabled })}>
+                <Text style={styles.toggleBtnText}>{override.enabled ? "ON" : "OFF"}</Text>
+              </Pressable>
+            </View>
 
-          <View style={styles.field}>
-            <Text style={styles.label}>lat</Text>
-            <TextInput
-              value={latInput}
-              onChangeText={setLatInput}
-              keyboardType="default"
-              style={styles.input}
-              placeholder={String(DEV_LOCATION_DAGUPAN_PRESET.lat)}
-              placeholderTextColor="#94A3B8"
-            />
-          </View>
+            <View style={styles.field}>
+              <Text style={styles.label}>lat</Text>
+              <TextInput
+                value={latInput}
+                onChangeText={setLatInput}
+                keyboardType="default"
+                style={styles.input}
+                placeholder={String(DEV_LOCATION_DAGUPAN_PRESET.lat)}
+                placeholderTextColor="#94A3B8"
+              />
+            </View>
 
-          <View style={styles.field}>
-            <Text style={styles.label}>lng</Text>
-            <TextInput
-              value={lngInput}
-              onChangeText={setLngInput}
-              keyboardType="default"
-              style={styles.input}
-              placeholder={String(DEV_LOCATION_DAGUPAN_PRESET.lng)}
-              placeholderTextColor="#94A3B8"
-            />
-          </View>
+            <View style={styles.field}>
+              <Text style={styles.label}>lng</Text>
+              <TextInput
+                value={lngInput}
+                onChangeText={setLngInput}
+                keyboardType="default"
+                style={styles.input}
+                placeholder={String(DEV_LOCATION_DAGUPAN_PRESET.lng)}
+                placeholderTextColor="#94A3B8"
+              />
+            </View>
 
-          <View style={styles.presetsRow}>
-            <Pressable
-              style={styles.presetBtn}
-              onPress={() =>
-                onPatch({
-                  enabled: true,
-                  lat: DEV_LOCATION_DAGUPAN_PRESET.lat,
-                  lng: DEV_LOCATION_DAGUPAN_PRESET.lng,
-                })
-              }
-            >
-              <Text style={styles.presetText}>Dagupan</Text>
-            </Pressable>
-            <Pressable style={styles.resetBtn} onPress={onClear}>
-              <Text style={styles.resetText}>Reset</Text>
-            </Pressable>
-          </View>
+            <View style={styles.presetsRow}>
+              <Pressable
+                style={styles.presetBtn}
+                onPress={() =>
+                  onPatch({
+                    enabled: true,
+                    lat: DEV_LOCATION_DAGUPAN_PRESET.lat,
+                    lng: DEV_LOCATION_DAGUPAN_PRESET.lng,
+                  })
+                }
+              >
+                <Text style={styles.presetText}>Dagupan</Text>
+              </Pressable>
+              <Pressable style={styles.resetBtn} onPress={onClear}>
+                <Text style={styles.resetText}>Reset</Text>
+              </Pressable>
+            </View>
 
-          <View style={styles.footerRow}>
-            <Pressable style={styles.saveBtn} onPress={applyCoordinates}>
-              <Text style={styles.saveText}>Save Coordinates</Text>
-            </Pressable>
+            <View style={styles.footerRow}>
+              <Pressable style={styles.saveBtn} onPress={applyCoordinates}>
+                <Text style={styles.saveText}>Save Coordinates</Text>
+              </Pressable>
+            </View>
           </View>
-        </View>
-      ) : null}
-    </View>
+        ) : null}
+      </View>
+    </DraggableOverlay>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    position: "absolute",
-    right: 12,
-    zIndex: 40,
     alignItems: "flex-end",
   },
   bubble: {

@@ -2,7 +2,10 @@ import React, { useEffect } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as WebBrowser from "expo-web-browser";
+import { StatusBar } from "expo-status-bar";
 import { AuthProvider, useAuth } from "../features/auth/AuthProvider";
+import { ThemeProvider } from "../features/theme/ThemeProvider";
+import { useTheme } from "../features/theme/useTheme";
 import { InAppNotificationHost } from "../features/notifications/components/InAppNotificationHost";
 import { usePushNotificationsBootstrap } from "../features/notifications/hooks/usePushNotificationsBootstrap";
 import { useRealtimeBootstrap } from "../features/realtime/hooks/useRealtimeBootstrap";
@@ -54,10 +57,13 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-export default function RootLayout() {
+function RootLayoutInner() {
+  const { isDark } = useTheme();
+
   return (
     <AuthProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
+        <StatusBar style={isDark ? "light" : "dark"} />
         <AuthGate>
           <>
             <Stack screenOptions={{ headerShown: false }}>
@@ -79,5 +85,13 @@ export default function RootLayout() {
         </AuthGate>
       </GestureHandlerRootView>
     </AuthProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <ThemeProvider>
+      <RootLayoutInner />
+    </ThemeProvider>
   );
 }

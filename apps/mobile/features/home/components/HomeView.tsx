@@ -11,6 +11,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { WeatherSeverity } from "../../weather/services/weatherApi";
+import { useTheme } from "../../theme/useTheme";
 
 type AlertIconName = React.ComponentProps<typeof Ionicons>["name"];
 type AlertTheme = {
@@ -21,6 +22,72 @@ type AlertTheme = {
   headlineColor: string;
   retryColor: string;
 };
+
+function withOpacity(hexColor: string, alpha: number): string {
+  const clamped = Math.max(0, Math.min(1, alpha));
+  const normalized = hexColor.trim();
+  const raw = normalized.startsWith("#") ? normalized.slice(1) : normalized;
+
+  if (!/^[0-9A-Fa-f]{6}$/.test(raw)) return normalized;
+
+  const alphaHex = Math.round(clamped * 255)
+    .toString(16)
+    .padStart(2, "0");
+
+  return `#${raw}${alphaHex}`;
+}
+
+function normalizeHexColor(value: string): string | null {
+  const normalized = value.trim();
+  const raw = normalized.startsWith("#") ? normalized.slice(1) : normalized;
+
+  if (/^[0-9A-Fa-f]{6}$/.test(raw)) return `#${raw.toUpperCase()}`;
+  if (/^[0-9A-Fa-f]{3}$/.test(raw)) {
+    const expanded = raw
+      .split("")
+      .map((char) => `${char}${char}`)
+      .join("")
+      .toUpperCase();
+    return `#${expanded}`;
+  }
+
+  return null;
+}
+
+function mixHexColors(base: string, target: string, ratio: number): string | null {
+  const safeRatio = Math.max(0, Math.min(1, ratio));
+  const baseHex = normalizeHexColor(base);
+  const targetHex = normalizeHexColor(target);
+  if (!baseHex || !targetHex) return null;
+
+  const baseNum = parseInt(baseHex.slice(1), 16);
+  const targetNum = parseInt(targetHex.slice(1), 16);
+
+  const br = (baseNum >> 16) & 0xff;
+  const bg = (baseNum >> 8) & 0xff;
+  const bb = baseNum & 0xff;
+
+  const tr = (targetNum >> 16) & 0xff;
+  const tg = (targetNum >> 8) & 0xff;
+  const tb = targetNum & 0xff;
+
+  const r = Math.round(br + (tr - br) * safeRatio);
+  const g = Math.round(bg + (tg - bg) * safeRatio);
+  const b = Math.round(bb + (tb - bb) * safeRatio);
+
+  return `#${[r, g, b]
+    .map((channel) => channel.toString(16).padStart(2, "0"))
+    .join("")
+    .toUpperCase()}`;
+}
+
+function tintHex(color: string, amount: number): string | null {
+  return mixHexColors(color, "#FFFFFF", amount);
+}
+
+function shadeHex(color: string, amount: number): string | null {
+  return mixHexColors(color, "#000000", amount);
+}
 
 type Props = {
   displayName: string;
@@ -67,6 +134,18 @@ export function HomeView({
   onPressApplyVolunteer,
 }: Props) {
   const insets = useSafeAreaInsets();
+  const { isDark } = useTheme();
+  const weatherCardBackground = withOpacity(alertTheme.cardBackgroundColor, 0.1);
+  const weatherBaseColor = alertTheme.headlineColor;
+  const weatherTitleColor = isDark
+    ? (tintHex(weatherBaseColor, 0.55) ?? alertTheme.headlineColor)
+    : (shadeHex(weatherBaseColor, 0.2) ?? alertTheme.headlineColor);
+  const weatherTextColor = isDark
+    ? (tintHex(weatherBaseColor, 0.35) ?? alertTheme.headlineColor)
+    : (shadeHex(weatherBaseColor, 0.08) ?? alertTheme.headlineColor);
+  const weatherRetryColor = isDark
+    ? (tintHex(alertTheme.retryColor, 0.55) ?? alertTheme.retryColor)
+    : (shadeHex(alertTheme.retryColor, 0.16) ?? alertTheme.retryColor);
   const pulseScale = useRef(new Animated.Value(1)).current;
   const pulseOpacity = useRef(new Animated.Value(0)).current;
 
@@ -118,7 +197,10 @@ export function HomeView({
   }, [holding, pulseOpacity, pulseScale]);
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView
+      style={[styles.safe, isDark ? styles.safeDark : styles.safeLight]}
+      className="bg-lgu-lightBg dark:bg-lgu-darkBg"
+    >
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
@@ -129,31 +211,46 @@ export function HomeView({
         {/* Top bar */}
         <View style={styles.topRow}>
           <View style={styles.profile}>
-            <View style={styles.avatar}>
-              <Ionicons name="person" size={16} color="#111827" />
+            <View
+              style={[
+                styles.avatar,
+                {
+                  borderColor: isDark ? "#2563EB" : "#EF4444",
+                  backgroundColor: isDark ? "#0E1626" : "#FFFFFF",
+                },
+              ]}
+            >
+              <Ionicons name="person" size={16} color={isDark ? "#E2E8F0" : "#111827"} />
             </View>
             <View>
-              <Text style={styles.hello}>Hi, {displayName}</Text>
-              <Text style={styles.sub}>How are you today</Text>
+              <Text style={[styles.hello, isDark ? styles.helloDark : null]}>Hi, {displayName}</Text>
+              <Text style={[styles.sub, isDark ? styles.subDark : null]}>How are you today</Text>
             </View>
           </View>
 
-          <Pressable style={styles.bellBtn} onPress={onPressNotifications}>
-            <Ionicons name="notifications-outline" size={25} color="#111827" />
+          <Pressable style={[styles.bellBtn, isDark ? styles.bellBtnDark : null]} onPress={onPressNotifications}>
+            <Ionicons name="notifications-outline" size={25} color={isDark ? "#E2E8F0" : "#111827"} />
           </Pressable>
         </View>
 
         {/* Heading */}
         <View style={styles.headerBlock}>
-          <Text style={styles.h1}>Emergency help{"\n"}needed?</Text>
-          <Text style={styles.h2}>
+          <Text style={[styles.h1, isDark ? styles.h1Dark : null]}>Emergency help{"\n"}needed?</Text>
+          <Text style={[styles.h2, isDark ? styles.h2Dark : null]}>
             Press the button below and help{"\n"}reach you shortly.
           </Text>
         </View>
 
         {/* SOS */}
         <View style={styles.sosBlock}>
-          <View style={[styles.sosOuter, holding && styles.sosOuterHolding]}>
+          <View
+            style={[
+              styles.sosOuter,
+              isDark ? styles.sosOuterDark : null,
+              holding && styles.sosOuterHolding,
+              holding && isDark ? styles.sosOuterHoldingDark : null,
+            ]}
+          >
             <Animated.View
               pointerEvents="none"
               style={[
@@ -168,7 +265,13 @@ export function HomeView({
             <Pressable
               onPressIn={onStartHold}
               onPressOut={onCancelHold}
-              style={[styles.sosInner, holding && styles.sosInnerHolding]}
+              style={[
+                styles.sosInner,
+                isDark ? styles.sosInnerShadow : null,
+                isDark ? styles.sosInnerDark : null,
+                holding && styles.sosInnerHolding,
+                holding && isDark ? styles.sosInnerHoldingDark : null,
+              ]}
             >
               <View style={styles.warnCircle}>
                 <Ionicons name="warning" size={18} color="#fff" />
@@ -181,7 +284,7 @@ export function HomeView({
             </Pressable>
           </View>
 
-          <Text style={styles.locationNote}>
+          <Text style={[styles.locationNote, isDark ? styles.locationNoteDark : null]}>
             Your location will be shared with emergency responders
           </Text>
         </View>
@@ -194,7 +297,7 @@ export function HomeView({
             styles.card,
             { marginTop: 60 },
             {
-              backgroundColor: alertTheme.cardBackgroundColor,
+              backgroundColor: weatherCardBackground,
               borderColor: alertTheme.cardBorderColor,
             },
             pressed && onPressAlert ? styles.cardPressed : null,
@@ -208,11 +311,11 @@ export function HomeView({
             />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.cardHeadline, { color: alertTheme.headlineColor }]}>
+            <Text style={[styles.cardHeadline, { color: weatherTitleColor }]}>
               {alertTitle}
             </Text>
-            <Text style={styles.cardSub}>{alertMessage}</Text>
-            {alertRetryEnabled ? <Text style={[styles.cardRetry, { color: alertTheme.retryColor }]}>Tap to retry</Text> : null}
+            <Text style={[styles.cardSub, { color: weatherTextColor }]}>{alertMessage}</Text>
+            {alertRetryEnabled ? <Text style={[styles.cardRetry, { color: weatherRetryColor }]}>Tap to retry</Text> : null}
           </View>
         </Pressable>
 
@@ -267,7 +370,9 @@ export function HomeView({
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#F3F4F6" },
+  safe: { flex: 1 },
+  safeLight: { backgroundColor: "#F6F7F9" },
+  safeDark: { backgroundColor: "#060C18" },
   container: { paddingHorizontal: 16, paddingTop: 60 },
 
   topRow: {
@@ -287,7 +392,9 @@ const styles = StyleSheet.create({
     borderColor: "#EF4444",
   },
   hello: { fontSize: 18, color: "#111827", fontWeight: "700" },
+  helloDark: { color: "#F1F5F9" },
   sub: { fontSize: 13, color: "#6B7280", marginTop: 1 },
+  subDark: { color: "#94A3B8" },
   bellBtn: {
     width: 40,
     height: 40,
@@ -299,6 +406,10 @@ const styles = StyleSheet.create({
     marginRight: 6,
     borderColor: "#E5E7EB",
   },
+  bellBtnDark: {
+    backgroundColor: "#0E1626",
+    borderColor: "#162544",
+  },
 
   headerBlock: { marginTop: 60, alignItems: "center" },
   h1: {
@@ -308,12 +419,18 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 38,
   },
+  h1Dark: {
+    color: "#E2E8F0",
+  },
   h2: {
     fontSize: 15,
     color: "#9CA3AF",
     textAlign: "center",
     marginTop: 40,
     lineHeight: 16,
+  },
+  h2Dark: {
+    color: "#94A3B8",
   },
 
   sosBlock: { marginTop: 22, alignItems: "center" },
@@ -326,7 +443,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     position: "relative",
   },
+  sosOuterDark: {
+    backgroundColor: "#111827",
+    borderWidth: 1.5,
+    borderColor: "#162544",
+  },
   sosOuterHolding: { backgroundColor: "#FECACA" },
+  sosOuterHoldingDark: {
+    backgroundColor: "#1B2A45",
+    borderColor: "#1E3A8A",
+  },
   sosPulse: {
     position: "absolute",
     width: 220,
@@ -341,16 +467,25 @@ const styles = StyleSheet.create({
     backgroundColor: "#EF4444",
     alignItems: "center",
     justifyContent: "center",
+  },
+  sosInnerShadow: {
     elevation: 10,
     shadowColor: "#000",
     shadowOpacity: 0.15,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 8 },
   },
+  sosInnerDark: {
+    borderWidth: 3,
+    borderColor: "#991B1B",
+  },
   sosInnerHolding: {
     backgroundColor: "#DC2626",
     transform: [{ scale: 0.98 }],
     shadowOpacity: 0.24,
+  },
+  sosInnerHoldingDark: {
+    borderColor: "#7F1D1D",
   },
   warnCircle: {
     width: 28,
@@ -369,6 +504,9 @@ const styles = StyleSheet.create({
     color: "#9CA3AF",
     textAlign: "center",
     lineHeight: 20,
+  },
+  locationNoteDark: {
+    color: "#94A3B8",
   },
 
   card: {

@@ -1,6 +1,6 @@
 import React from "react";
-import { MyRequestsScreen } from "../features/requests/screens/MyRequestsScreen";
+import { Redirect } from "expo-router";
 
 export default function MyRequestsRoute() {
-  return <MyRequestsScreen />;
+  return <Redirect href="/my-requests/history" />;
 }

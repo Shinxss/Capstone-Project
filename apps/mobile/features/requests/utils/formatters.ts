@@ -35,11 +35,17 @@ export function formatEtaText(
   if (trackingLabel === "Submitted" || trackingLabel === "Assigned") {
     return "Waiting for responder...";
   }
+  if (trackingLabel === "Verification") {
+    return "Request under verification.";
+  }
   if (trackingLabel === "En Route") {
     return "ETA: calculating...";
   }
   if (trackingLabel === "Arrived") {
     return "Responder has arrived.";
+  }
+  if (trackingLabel === "Review") {
+    return "Ready for your feedback.";
   }
   if (trackingLabel === "Resolved") {
     return "Request resolved.";
@@ -53,9 +59,11 @@ export function formatEtaText(
 
 export function formatTrackingHeadline(label: TrackingLabel): string {
   if (label === "Submitted") return "Request Submitted";
+  if (label === "Verification") return "Under Verification";
   if (label === "Assigned") return "Responder Assigned";
   if (label === "En Route") return "Responder En Route";
   if (label === "Arrived") return "Responder Arrived";
+  if (label === "Review") return "Pending Your Review";
   if (label === "Resolved") return "Request Resolved";
   return "Request Cancelled";
 }

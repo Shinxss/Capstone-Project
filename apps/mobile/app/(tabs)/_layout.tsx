@@ -10,10 +10,12 @@ import { TASKS_GUARD_MODE } from "../../features/auth/constants/accessControl";
 import { useTasksAccess } from "../../features/auth/hooks/useTasksAccess";
 import { useAuth } from "../../features/auth/AuthProvider";
 import { useReportPill } from "../../features/report/hooks/useReportPill";
+import { useTheme } from "../../features/theme/useTheme";
 
 export default function TabLayout() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { isDark } = useTheme();
   const tabBarBottomPadding = Math.max(insets.bottom, 50);
   const tabBarHeight = 64 + tabBarBottomPadding;
   const { signOut } = useAuth();
@@ -96,10 +98,13 @@ export default function TabLayout() {
           pointerEvents="auto"
           style={[styles.blurOverlay, { bottom: tabBarHeight, opacity: reportPillAnim }]}
         >
-          <BlurView intensity={72} tint="light" style={StyleSheet.absoluteFillObject} />
+          <BlurView intensity={72} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFillObject} />
           <View
             pointerEvents="none"
-            style={[StyleSheet.absoluteFillObject, { backgroundColor: "rgba(255,255,255,0.70)" }]}
+            style={[
+              StyleSheet.absoluteFillObject,
+              { backgroundColor: isDark ? "rgba(6,12,24,0.66)" : "rgba(255,255,255,0.70)" },
+            ]}
           />
           <Pressable style={StyleSheet.absoluteFillObject} onPress={hideReportPill} />
         </Animated.View>

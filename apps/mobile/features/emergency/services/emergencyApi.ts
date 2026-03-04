@@ -5,6 +5,8 @@ import type { EmergencyType, ReportLocation, ReportSubmitResult } from "../../re
 const EMERGENCY_REPORTS_BASE = "/api/emergency/reports";
 
 export async function createSosReport(payload: SosCreateRequest): Promise<ReportSubmitResult> {
+  const locationLabel = String(payload.locationLabel ?? "").trim();
+
   const res = await api.post(EMERGENCY_REPORTS_BASE, {
     isSos: true,
     type: "other",
@@ -13,6 +15,7 @@ export async function createSosReport(payload: SosCreateRequest): Promise<Report
         latitude: payload.lat,
         longitude: payload.lng,
       },
+      ...(locationLabel ? { label: locationLabel.slice(0, 160) } : {}),
     },
     description: payload.notes,
   });

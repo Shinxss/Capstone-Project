@@ -31,6 +31,15 @@ export type TaskEmergency = {
   barangayName?: string | null;
 };
 
+export type TaskLastKnownLocation = {
+  lng: number;
+  lat: number;
+  accuracy?: number;
+  heading?: number;
+  speed?: number;
+  at?: string | null;
+};
+
 export type DispatchTask = {
   id: string;
   status: string;
@@ -41,6 +50,7 @@ export type DispatchTask = {
   proofs?: TaskProof[];
   volunteer?: TaskVolunteer | null;
   emergency: TaskEmergency;
+  lastKnownLocation?: TaskLastKnownLocation | null;
   createdAt?: string;
   updatedAt?: string;
 };

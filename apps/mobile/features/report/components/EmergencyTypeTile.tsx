@@ -24,7 +24,7 @@ export function EmergencyTypeTile({ option, selected, onPress }: Props) {
       onPress={onPress}
       style={({ pressed }) => [
         styles.tile,
-        selected && styles.tileSelected,
+        selected ? styles.tileSelected : styles.tileDefault,
         pressed && styles.tilePressed,
       ]}
     >
@@ -39,7 +39,7 @@ export function EmergencyTypeTile({ option, selected, onPress }: Props) {
       </View>
 
       <Text
-        style={styles.label}
+        style={[styles.label, selected ? styles.labelSelected : styles.labelDefault]}
         numberOfLines={1}
         adjustsFontSizeToFit
         minimumFontScale={0.72}
@@ -55,20 +55,32 @@ const styles = StyleSheet.create({
     width: "31.4%",
     height: 132,
     marginBottom: 14,
-    borderRadius: 10,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#D6D6D6",
-    backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 8,
+    shadowColor: "#0f172a",
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  tileDefault: {
+    backgroundColor: "#ffffff",
+    borderColor: "#dbe1ea",
   },
   tileSelected: {
-    borderColor: "#EF4444",
-    backgroundColor: "#FFF6F6",
+    backgroundColor: "#fff1f2",
+    borderColor: "#ef4444",
+    shadowColor: "#ef4444",
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
   },
   tilePressed: {
-    opacity: 0.9,
+    transform: [{ scale: 0.985 }],
   },
   iconWrap: {
     width: 52,
@@ -82,9 +94,15 @@ const styles = StyleSheet.create({
     width: "100%",
     paddingHorizontal: 2,
     textAlign: "center",
-    color: "#121212",
     fontSize: 15,
     lineHeight: 18,
     fontWeight: "500",
+  },
+  labelDefault: {
+    color: "#0f172a",
+  },
+  labelSelected: {
+    color: "#0f172a",
+    fontWeight: "600",
   },
 });

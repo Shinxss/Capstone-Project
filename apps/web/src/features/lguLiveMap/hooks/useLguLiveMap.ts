@@ -8,6 +8,7 @@ import { appendActivityLog } from "../../activityLog/services/activityLog.servic
 import type { MapEmergencyPin } from "../../emergency/components/EmergencyMap";
 import { normalizeEmergencyType } from "../../emergency/constants/emergency.constants";
 import { useLguEmergencies } from "../../emergency/hooks/useLguEmergencies";
+import type { DispatchTask } from "../../tasks/models/tasks.types";
 
 import { useHazardZones } from "../../hazardZones/hooks/useHazardZones";
 import { HAZARD_TYPES } from "../../hazardZones/constants/hazardZones.constants";
@@ -34,7 +35,7 @@ import type {
   Volunteer,
 } from "../models/lguLiveMap.types";
 import { colorForVolunteerStatus } from "../utils/lguLiveMap.colors";
-import { createDispatchOffers } from "../services/dispatch.service";
+import { createDispatchOffers, fetchDispatchTasks } from "../services/dispatch.service";
 import { fetchDispatchVolunteers } from "../services/volunteers.service";
 import { getLguToken } from "../../auth/services/authStorage";
 import { createLivePresenceSocket } from "../services/livePresence.socket";
@@ -197,6 +198,9 @@ export function useLguLiveMap() {
   // left details panel
   const [selectedEmergencyId, setSelectedEmergencyId] = useState<string | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [selectedEmergencyTasks, setSelectedEmergencyTasks] = useState<DispatchTask[]>([]);
+  const [tasksLoading, setTasksLoading] = useState(false);
+  const [tasksError, setTasksError] = useState<string | null>(null);
 
   // hazard draw + save form
   const [isDrawingHazard, setIsDrawingHazard] = useState(false);
@@ -496,6 +500,41 @@ export function useLguLiveMap() {
     };
   }, [selectedEmergency]);
 
+  useEffect(() => {
+    if (!detailsOpen || !selectedEmergencyId) {
+      setSelectedEmergencyTasks([]);
+      setTasksLoading(false);
+      setTasksError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setSelectedEmergencyTasks([]);
+    setTasksLoading(true);
+    setTasksError(null);
+
+    fetchDispatchTasks({
+      emergencyId: selectedEmergencyId,
+    })
+      .then((tasks) => {
+        if (cancelled) return;
+        setSelectedEmergencyTasks(Array.isArray(tasks) ? tasks : []);
+      })
+      .catch((err: any) => {
+        if (cancelled) return;
+        setSelectedEmergencyTasks([]);
+        setTasksError(err?.response?.data?.message ?? err?.message ?? "Failed to load dispatch tasks");
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setTasksLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [detailsOpen, selectedEmergencyId]);
+
   // If the selected emergency becomes RESOLVED/CANCELLED, hide it (and close details).
   useEffect(() => {
     if (!selectedEmergencyId) return;
@@ -513,6 +552,8 @@ export function useLguLiveMap() {
     setDispatchModalOpen(false);
     setDispatchSelection([]);
     setTrackOpen(false);
+    setSelectedEmergencyTasks([]);
+    setTasksError(null);
   }, [selectedEmergencyId]);
 
   const assignedResponderIds = useMemo(() => {
@@ -547,6 +588,7 @@ export function useLguLiveMap() {
     // open details
     setSelectedEmergencyId(String(found._id));
     setDetailsOpen(true);
+    setLayersOpen(false);
   }, [focusEmergencyId, activeReports]);
 
   // ✅ Fly to the focused emergency once the map is ready (separate effect)
@@ -596,6 +638,11 @@ export function useLguLiveMap() {
   const flyTo = (lng: number, lat: number, zoom = 14) => {
     mapRef.current?.flyTo({ center: [lng, lat], zoom, essential: true });
   };
+
+  const zoomToSelectedEmergency = useCallback(() => {
+    if (!selectedEmergencyDetails) return;
+    flyTo(selectedEmergencyDetails.lng, selectedEmergencyDetails.lat, 15);
+  }, [selectedEmergencyDetails]);
 
   const centerDagupan = () => {
     mapRef.current?.flyTo({ center: DAGUPAN_CENTER, zoom: 12.6, essential: true });
@@ -1103,6 +1150,7 @@ export function useLguLiveMap() {
   const onEmergencyPinClick = useCallback((pin: MapEmergencyPin) => {
     setSelectedEmergencyId(pin.id);
     setDetailsOpen(true);
+    setLayersOpen(false);
     flyTo(pin.lng, pin.lat, 15);
   }, []);
 
@@ -1110,6 +1158,9 @@ export function useLguLiveMap() {
   const cleanupDetails = useCallback(() => {
     setDetailsOpen(false);
     setSelectedEmergencyId(null);
+    setSelectedEmergencyTasks([]);
+    setTasksLoading(false);
+    setTasksError(null);
     setDispatchModalOpen(false);
     setDispatchSelection([]);
     setTrackOpen(false);
@@ -1198,6 +1249,16 @@ export function useLguLiveMap() {
         volunteerCount: chosen.length,
       },
     });
+
+    try {
+      const refreshedTasks = await fetchDispatchTasks({
+        emergencyId: selectedEmergencyId,
+      });
+      setSelectedEmergencyTasks(Array.isArray(refreshedTasks) ? refreshedTasks : []);
+      setTasksError(null);
+    } catch {
+      // Keep fallback assignment view if this refresh fails.
+    }
 
     setAssignmentsByEmergency((prev) => {
       const existing = prev[selectedEmergencyId] ?? [];
@@ -1334,10 +1395,15 @@ export function useLguLiveMap() {
     onEmergencyPinClick,
     onMapClick,
 
+    selectedEmergency,
     selectedEmergencyDetails,
+    selectedEmergencyTasks,
+    tasksLoading,
+    tasksError,
     detailsOpen,
     setDetailsOpen,
     cleanupDetails,
+    zoomToSelectedEmergency,
 
     // responders dispatch + tracking (live map only)
     volunteers,

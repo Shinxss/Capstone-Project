@@ -9,7 +9,7 @@ export async function postSos(req: AuthedRequest, res: Response) {
   try {
     if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
 
-    const { lat, lng, accuracy, notes } = req.body ?? {};
+    const { lat, lng, accuracy, notes, locationLabel } = req.body ?? {};
 
     if (typeof lat !== "number" || typeof lng !== "number") {
       return res.status(400).json({ message: "lat and lng are required numbers" });
@@ -25,6 +25,7 @@ export async function postSos(req: AuthedRequest, res: Response) {
       lng,
       accuracy: typeof accuracy === "number" ? accuracy : undefined,
       notes: typeof notes === "string" ? notes : undefined,
+      locationLabel: typeof locationLabel === "string" ? locationLabel : undefined,
     });
 
     emitNotificationsRefresh("emergency_reported", ["LGU", "ADMIN"]);

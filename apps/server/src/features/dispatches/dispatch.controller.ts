@@ -206,11 +206,12 @@ export async function getLguTasks(req: Request, res: Response) {
     if (role !== "LGU" && role !== "ADMIN") return res.status(403).json({ message: "Forbidden" });
 
     const raw = String((req.query as any).status ?? "").trim();
+    const emergencyId = String((req.query as any).emergencyId ?? "").trim();
     const statuses: DispatchStatus[] = raw
       ? (raw.split(",").map((s) => s.trim().toUpperCase()) as any)
       : ["ACCEPTED"];
 
-    const docs = await listDispatchTasksForLgu({ statuses });
+    const docs = await listDispatchTasksForLgu({ statuses, emergencyId: emergencyId || undefined });
     return res.json({ data: docs.map(toDispatchDTO), count: docs.length });
   } catch (e: any) {
     return res.status(400).json({ message: e?.message ?? "Failed" });

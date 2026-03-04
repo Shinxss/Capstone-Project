@@ -35,6 +35,7 @@ import { DevLocationOverrideOverlay } from "../../features/location/components/D
 import { getEffectiveLocation } from "../../features/location/utils/getEffectiveLocation";
 import { useVolunteerMapFeed } from "../../features/realtime/hooks/useVolunteerMapFeed";
 import { connectRealtime } from "../../features/realtime/socketClient";
+import { useTheme } from "../../features/theme/useTheme";
 
 type HazardZone = {
   _id: string;
@@ -229,6 +230,7 @@ function PulseMarker({ type }: { type: EmergencyType }) {
 
 export default function MapTab() {
   const insets = useSafeAreaInsets();
+  const { isDark } = useTheme();
   const isFocused = useIsFocused();
   const { mode, user, token } = useAuth();
   const [query, setQuery] = useState("");
@@ -664,8 +666,12 @@ export default function MapTab() {
   const [activeChip, setActiveChip] = useState<string>("home");
 
   return (
-    <SafeAreaView style={styles.safe} edges={["left", "right"]}>
-      <StatusBar style="dark" translucent backgroundColor="transparent" />
+    <SafeAreaView
+      style={[styles.safe, isDark ? styles.safeDark : styles.safeLight]}
+      className="bg-lgu-lightBg dark:bg-lgu-darkBg"
+      edges={["left", "right"]}
+    >
+      <StatusBar style={isDark ? "light" : "dark"} translucent backgroundColor="transparent" />
       <View style={styles.root}>
         <MapboxGL.MapView
           style={styles.map}
@@ -825,29 +831,26 @@ export default function MapTab() {
         {/* Google-Maps-like top UI */}
         <View pointerEvents="box-none" style={styles.overlay}>
           <View style={[styles.topUi, { paddingTop: Math.max(10, insets.top + 8) }]}>
-            {/* Search bar (white) */}
-            <View style={styles.searchBar}>
-              <Feather name="search" size={18} color="#777" />
+            <View style={[styles.searchBar, isDark ? styles.searchBarDark : null]}>
+              <Feather name="search" size={18} color={isDark ? "#94A3B8" : "#777"} />
 
               <TextInput
                 value={query}
                 onChangeText={setQuery}
                 placeholder="Search here"
-                placeholderTextColor="#8a8a8a"
-                style={styles.searchInput}
+                placeholderTextColor={isDark ? "#64748B" : "#8A8A8A"}
+                style={[styles.searchInput, isDark ? styles.searchInputDark : null]}
               />
 
-              {/* Profile avatar */}
               <Pressable
                 onPress={() => console.log("profile")}
-                style={styles.avatar}
+                style={[styles.avatar, isDark ? styles.avatarDark : null]}
                 hitSlop={10}
               >
-                <Feather name="user" size={16} color="#111" />
+                <Feather name="user" size={16} color={isDark ? "#E2E8F0" : "#111"} />
               </Pressable>
             </View>
 
-            {/* Chips row */}
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -859,15 +862,27 @@ export default function MapTab() {
                   <Pressable
                     key={c.key}
                     onPress={() => setActiveChip(c.key)}
-                    style={[styles.chip, active && styles.chipActive]}
+                    style={[
+                      styles.chip,
+                      isDark ? styles.chipDark : null,
+                      active && styles.chipActive,
+                      active && isDark ? styles.chipActiveDark : null,
+                    ]}
                   >
                     <Feather
                       name={c.icon}
                       size={16}
-                      color={active ? "#111" : "#444"}
+                      color={isDark ? (active ? "#E2E8F0" : "#94A3B8") : active ? "#111" : "#444"}
                       style={{ marginRight: 8 }}
                     />
-                    <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                    <Text
+                      style={[
+                        styles.chipText,
+                        isDark ? styles.chipTextDark : null,
+                        active && styles.chipTextActive,
+                        active && isDark ? styles.chipTextActiveDark : null,
+                      ]}
+                    >
                       {c.label}
                     </Text>
                   </Pressable>
@@ -876,8 +891,12 @@ export default function MapTab() {
             </ScrollView>
 
             <View style={styles.layerControlRow}>
-              <Pressable onPress={openLayersSheet} style={styles.layerControlBtn} hitSlop={10}>
-                <Feather name="layers" size={20} color="#0F172A" />
+              <Pressable
+                onPress={openLayersSheet}
+                style={[styles.layerControlBtn, isDark ? styles.layerControlBtnDark : null]}
+                hitSlop={10}
+              >
+                <Feather name="layers" size={20} color={isDark ? "#E2E8F0" : "#0F172A"} />
               </Pressable>
             </View>
           </View>
@@ -905,14 +924,14 @@ export default function MapTab() {
           index={-1}
           snapPoints={layersSnapPoints}
           enablePanDownToClose
-          backgroundStyle={styles.layersSheetBg}
+          backgroundStyle={isDark ? styles.layersSheetBgDark : styles.layersSheetBg}
           handleIndicatorStyle={styles.sheetHandle}
         >
           <BottomSheetView style={styles.layersSheetContent}>
             <View style={styles.layersHeaderRow}>
-              <Text style={styles.layersTitle}>Map type</Text>
+              <Text style={[styles.layersTitle, isDark ? styles.layersTitleDark : null]}>Map type</Text>
               <Pressable onPress={() => layersSheetRef.current?.close()} style={styles.layersCloseBtn} hitSlop={10}>
-                <Feather name="x" size={18} color="#111827" />
+                <Feather name="x" size={18} color={isDark ? "#E2E8F0" : "#111827"} />
               </Pressable>
             </View>
 
@@ -937,7 +956,13 @@ export default function MapTab() {
                         </View>
                       )}
                     </View>
-                    <Text style={[styles.mapTypeLabel, selectedType && styles.mapTypeLabelActive]}>
+                    <Text
+                      style={[
+                        styles.mapTypeLabel,
+                        isDark ? styles.mapTypeLabelDark : null,
+                        selectedType && styles.mapTypeLabelActive,
+                      ]}
+                    >
                       {option.label}
                     </Text>
                   </Pressable>
@@ -945,9 +970,9 @@ export default function MapTab() {
               })}
             </View>
 
-            <View style={styles.layersDivider} />
+            <View style={[styles.layersDivider, isDark ? styles.layersDividerDark : null]} />
 
-            <Text style={styles.layersLegendTitle}>Map Legend</Text>
+            <Text style={[styles.layersLegendTitle, isDark ? styles.layersLegendTitleDark : null]}>Map Legend</Text>
 
             <View style={styles.layersLegendColumns}>
               <View
@@ -956,7 +981,7 @@ export default function MapTab() {
                   !canViewEmergencies && styles.layersLegendColumnFull,
                 ]}
               >
-                <Text style={styles.layersLegendSection}>Hazard zones</Text>
+                <Text style={[styles.layersLegendSection, isDark ? styles.layersLegendSectionDark : null]}>Hazard zones</Text>
                 <View style={styles.layersLegendList}>
                   {HAZARD_LEGEND_ITEMS.map((item) => {
                     const HazardIcon = item.icon;
@@ -973,7 +998,7 @@ export default function MapTab() {
                         >
                           <HazardIcon size={10} color="#FFFFFF" strokeWidth={2.3} />
                         </View>
-                        <Text style={styles.layersLegendText}>{item.label}</Text>
+                        <Text style={[styles.layersLegendText, isDark ? styles.layersLegendTextDark : null]}>{item.label}</Text>
                       </View>
                     );
                   })}
@@ -982,7 +1007,7 @@ export default function MapTab() {
 
               {canViewEmergencies ? (
                 <View style={styles.layersLegendColumn}>
-                  <Text style={styles.layersLegendSection}>Emergencies</Text>
+                  <Text style={[styles.layersLegendSection, isDark ? styles.layersLegendSectionDark : null]}>Emergencies</Text>
                   <View style={styles.layersLegendList}>
                     {EMERGENCY_LEGEND_ITEMS.map((type) => {
                       const color = colorForType(type);
@@ -991,7 +1016,7 @@ export default function MapTab() {
                           <View style={[styles.layersEmergencySwatch, { borderColor: color }]}>
                             <MaterialCommunityIcons name={mciForType(type) as any} size={11} color={color} />
                           </View>
-                          <Text style={styles.layersLegendText}>{type}</Text>
+                          <Text style={[styles.layersLegendText, isDark ? styles.layersLegendTextDark : null]}>{type}</Text>
                         </View>
                       );
                     })}
@@ -1010,7 +1035,9 @@ const PULSE_SIZE = 120;
 const PIN_SIZE = 34;
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#F3F4F6" },
+  safe: { flex: 1 },
+  safeLight: { backgroundColor: "#F6F7F9" },
+  safeDark: { backgroundColor: "#060C18" },
   root: { flex: 1, position: "relative" },
   map: { flex: 1 },
 
@@ -1036,12 +1063,20 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
   },
+  searchBarDark: {
+    backgroundColor: "#0E1626",
+    borderWidth: 1,
+    borderColor: "#162544",
+  },
   searchInput: {
     flex: 1,
     marginLeft: 10,
     marginRight: 8,
     fontSize: 16,
     color: "#111",
+  },
+  searchInputDark: {
+    color: "#E2E8F0",
   },
   avatar: {
     width: 38,
@@ -1050,6 +1085,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#111",
+  },
+  avatarDark: {
+    backgroundColor: "#162544",
   },
 
   // chips
@@ -1071,11 +1109,21 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
   },
+  chipDark: {
+    backgroundColor: "rgba(14,22,38,0.95)",
+    borderWidth: 1,
+    borderColor: "#162544",
+  },
   chipActive: {
     backgroundColor: "#FFFFFF",
   },
+  chipActiveDark: {
+    backgroundColor: "#0F1A2E",
+  },
   chipText: { fontSize: 14, color: "#222", fontWeight: "600" },
+  chipTextDark: { color: "#94A3B8" },
   chipTextActive: { color: "#111" },
+  chipTextActiveDark: { color: "#E2E8F0" },
   layerControlRow: {
     marginTop: 8,
     alignItems: "flex-end",
@@ -1095,8 +1143,15 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
   },
+  layerControlBtnDark: {
+    backgroundColor: "rgba(14,22,38,0.95)",
+    borderColor: "#162544",
+  },
   layersSheetBg: {
     backgroundColor: "#FFFFFF",
+  },
+  layersSheetBgDark: {
+    backgroundColor: "#0B1220",
   },
   layersSheetContent: {
     paddingHorizontal: 18,
@@ -1112,6 +1167,9 @@ const styles = StyleSheet.create({
     fontSize: 19,
     fontWeight: "600",
     color: "#111827",
+  },
+  layersTitleDark: {
+    color: "#E2E8F0",
   },
   layersCloseBtn: {
     width: 34,
@@ -1167,6 +1225,9 @@ const styles = StyleSheet.create({
     color: "#374151",
     fontWeight: "600",
   },
+  mapTypeLabelDark: {
+    color: "#94A3B8",
+  },
   mapTypeLabelActive: {
     color: "#0EA5E9",
     fontWeight: "700",
@@ -1177,10 +1238,16 @@ const styles = StyleSheet.create({
     marginTop: 18,
     marginBottom: 16,
   },
+  layersDividerDark: {
+    backgroundColor: "#162544",
+  },
   layersLegendTitle: {
     fontSize: 18,
     fontWeight: "600",
     color: "#111827",
+  },
+  layersLegendTitleDark: {
+    color: "#E2E8F0",
   },
   layersLegendColumns: {
     marginTop: 17,
@@ -1198,6 +1265,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
     color: "#475569",
+  },
+  layersLegendSectionDark: {
+    color: "#94A3B8",
   },
   layersLegendList: {
     marginTop: 8,
@@ -1230,6 +1300,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#111827",
     fontWeight: "600",
+  },
+  layersLegendTextDark: {
+    color: "#CBD5E1",
   },
 
   // marker

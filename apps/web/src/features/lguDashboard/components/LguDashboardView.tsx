@@ -186,7 +186,7 @@ export default function LguDashboardView({
       [
         [DAGUPAN_BOUNDS.minLng, DAGUPAN_BOUNDS.minLat],
         [DAGUPAN_BOUNDS.maxLng, DAGUPAN_BOUNDS.maxLat],
-      ] as const,
+      ] as [[number, number], [number, number]],
     []
   );
 

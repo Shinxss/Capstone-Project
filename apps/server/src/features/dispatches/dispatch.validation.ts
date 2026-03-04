@@ -30,6 +30,7 @@ export const proofSchema = z
 export const listTasksQuerySchema = z
   .object({
     status: z.string().optional(),
+    emergencyId: objectId.optional(),
   })
   .strict();
 

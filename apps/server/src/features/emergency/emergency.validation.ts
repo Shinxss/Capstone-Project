@@ -6,6 +6,7 @@ export const sosSchema = z
     lat: z.number().min(-90).max(90),
     lng: z.number().min(-180).max(180),
     accuracy: z.number().optional(),
+    locationLabel: z.string().trim().min(1).max(160).optional(),
   })
   .strict();
 

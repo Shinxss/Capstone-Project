@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import EmergencyMap from "../../emergency/components/EmergencyMap";
 import type { MapEmergencyPin } from "../../emergency/components/EmergencyMap";
 
@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 
 import DispatchRespondersModal from "./DispatchRespondersModal";
+import LguEmergencyDetailsPanel from "./LguEmergencyDetailsPanel";
 
 import {
   HAZARD_TYPE_COLOR,
@@ -155,8 +156,12 @@ export default function LguLiveMapView(props: Props) {
     onEmergencyPinClick,
     onMapClick,
 
-    // left details
+    // left details panel
+    selectedEmergency,
     selectedEmergencyDetails,
+    selectedEmergencyTasks,
+    tasksLoading,
+    tasksError,
     detailsOpen,
     cleanupDetails,
 
@@ -168,10 +173,7 @@ export default function LguLiveMapView(props: Props) {
     dispatchSelection,
     toggleDispatchResponder,
     confirmDispatchResponders,
-    trackOpen,
-    toggleTrackPanel,
     assignedResponders,
-    centerOnResponder,
 
     // style selector
     mapStyleKey,
@@ -243,20 +245,16 @@ export default function LguLiveMapView(props: Props) {
     }
   };
 
-
   const effectiveDetailsWidth = useMemo(() => {
-    // Only show panel when there is a selected emergency AND the panel is open.
-    if (detailsOpen && selectedEmergencyDetails) return "w-[360px]";
+    if (detailsOpen && selectedEmergencyDetails) return "w-[420px] max-w-[92vw]";
     return "w-0";
   }, [detailsOpen, selectedEmergencyDetails]);
 
   const mapPins: MapEmergencyPin[] = useMemo(() => emergencyPins, [emergencyPins]);
-
-  const volunteerDotClass = (status: string) => {
-    if (status === "available") return "bg-emerald-500";
-    if (status === "busy") return "bg-orange-500";
-    return "bg-red-500";
-  };
+  const emergencyPinById = useMemo(
+    () => new Map(mapPins.map((pin) => [pin.id, pin])),
+    [mapPins]
+  );
 
   const formatIncidentTime = (raw?: string) => {
     if (!raw) return "Unknown time";
@@ -264,6 +262,11 @@ export default function LguLiveMapView(props: Props) {
     if (Number.isNaN(dt.getTime())) return "Unknown time";
     return dt.toLocaleString();
   };
+
+  useEffect(() => {
+    if (!detailsOpen) return;
+    setLegendMinimized(true);
+  }, [detailsOpen]);
 
   if (loading) return <LoadingPanel />;
   if (error) return <ErrorPanel error={error} onRetry={onRefresh} />;
@@ -682,149 +685,23 @@ export default function LguLiveMapView(props: Props) {
         </div>
       ) : null}
 
-      {/* LEFT DETAILS PANEL (only opens on emergency pin click) */}
       <aside
         className={[
           "absolute left-0 top-0 h-full z-30 bg-white border-r border-gray-200 transition-all duration-200 overflow-hidden dark:bg-[#0B1220] dark:border-[#162544]",
           effectiveDetailsWidth,
         ].join(" ")}
       >
-        {detailsOpen && selectedEmergencyDetails ? (
-          <div className="h-full flex flex-col">
-            <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between dark:border-[#162544]">
-              <div className="text-sm font-bold text-gray-900 dark:text-slate-100">Emergency Details</div>
-              <button
-                onClick={cleanupDetails}
-                className="h-9 w-9 rounded-lg hover:bg-gray-100 grid place-items-center text-gray-700 dark:text-slate-300 dark:hover:bg-[#122036]"
-                aria-label="Close details"
-                title="Close"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="p-4 overflow-y-auto">
-              <div className="space-y-4">
-                  <div className="rounded-xl border border-gray-200 p-4 dark:border-[#162544]">
-                    <div className="text-xs text-gray-500 dark:text-slate-500">Type</div>
-                    <div className="text-base font-extrabold text-gray-900 dark:text-slate-100">
-                      {selectedEmergencyDetails.emergencyType}
-                    </div>
-
-                    <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <div className="text-xs text-gray-500 dark:text-slate-500">Status</div>
-                        <div className="font-bold text-gray-900 dark:text-slate-100">{selectedEmergencyDetails.status}</div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-gray-500 dark:text-slate-500">Source</div>
-                        <div className="font-bold text-gray-900 dark:text-slate-100">
-                          {selectedEmergencyDetails.source ?? "—"}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-3">
-                      <div className="text-xs text-gray-500 dark:text-slate-500">Barangay</div>
-                      <div className="font-bold text-gray-900 dark:text-slate-100">
-                        {selectedEmergencyDetails.barangayName ?? "—"}
-                      </div>
-                    </div>
-
-                    <div className="mt-3">
-                      <div className="text-xs text-gray-500 dark:text-slate-500">Reported At</div>
-                      <div className="font-bold text-gray-900 dark:text-slate-100">
-                        {selectedEmergencyDetails.reportedAt
-                          ? new Date(selectedEmergencyDetails.reportedAt).toLocaleString()
-                          : "—"}
-                      </div>
-                    </div>
-
-                    <div className="mt-3">
-                      <div className="text-xs text-gray-500 dark:text-slate-500">Notes</div>
-                      <div className="text-sm text-gray-800 whitespace-pre-wrap dark:text-slate-300">
-                        {selectedEmergencyDetails.notes ?? "—"}
-                      </div>
-                    </div>
-
-                    <div className="mt-3 text-xs text-gray-500 dark:text-slate-500">
-                      {selectedEmergencyDetails.lng.toFixed(6)}, {selectedEmergencyDetails.lat.toFixed(6)}
-                    </div>
-                  </div>
-
-                  {/* ACTIONS */}
-                  <div className="grid gap-2">
-                    <button
-                      type="button"
-                      onClick={openDispatchResponders}
-                      className="w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-extrabold text-white hover:bg-blue-500 flex items-center justify-center gap-2"
-                    >
-                      <Users size={16} />
-                      Dispatch Responders
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={toggleTrackPanel}
-                      className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-extrabold text-gray-900 hover:bg-gray-50 flex items-center justify-center gap-2 dark:border-[#22365D] dark:bg-[#0E1626] dark:text-slate-100 dark:hover:bg-[#122036]"
-                    >
-                      <Navigation2 size={16} />
-                      {trackOpen ? "Hide Tracking" : "Track Responders"}
-                    </button>
-                  </div>
-
-                  {/* TRACKING */}
-                  {trackOpen ? (
-                    <div className="rounded-xl border border-gray-200 p-4 dark:border-[#162544]">
-                      <div className="flex items-center justify-between">
-                        <div className="text-sm font-extrabold text-gray-900 dark:text-slate-100">Responders</div>
-                        <div className="text-xs font-bold text-gray-600 dark:text-slate-400">{assignedResponders.length}</div>
-                      </div>
-
-                      {assignedResponders.length === 0 ? (
-                        <div className="mt-2 text-sm text-gray-700 dark:text-slate-300">
-                          No responders assigned yet. Click <span className="font-semibold">Dispatch Responders</span> to send help.
-                        </div>
-                      ) : (
-                        <div className="mt-3 space-y-2">
-                          {assignedResponders.map((r) => (
-                            <div
-                              key={r.id}
-                              className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 dark:border-[#162544] dark:bg-[#0E1626]"
-                            >
-                              <div className="flex items-center gap-2">
-                                <span
-                                  className={[
-                                    "h-2.5 w-2.5 rounded-full",
-                                    volunteerDotClass(r.status),
-                                  ].join(" ")}
-                                />
-                                <div>
-                                  <div className="text-sm font-bold text-gray-900 dark:text-slate-100">{r.name}</div>
-                                  <div className="text-xs text-gray-600 dark:text-slate-400">{r.skill}</div>
-                                </div>
-                              </div>
-
-                              <button
-                                type="button"
-                                onClick={() => centerOnResponder(r.id)}
-                                className="h-9 w-9 rounded-lg hover:bg-white grid place-items-center text-gray-700 dark:text-slate-300 dark:hover:bg-[#122036]"
-                                title="Center on map"
-                                aria-label="Center responder"
-                              >
-                                <LocateFixed size={16} />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ) : null}
-
-                </div>
-            </div>
-          </div>
-        ) : null}
+        <LguEmergencyDetailsPanel
+          open={detailsOpen && !!selectedEmergencyDetails}
+          onClose={cleanupDetails}
+          emergencyDetails={selectedEmergencyDetails}
+          emergencyReport={selectedEmergency}
+          tasks={selectedEmergencyTasks}
+          tasksLoading={tasksLoading}
+          tasksError={tasksError}
+          onOpenDispatch={openDispatchResponders}
+          assignedRespondersFallback={assignedResponders}
+        />
       </aside>
 
       <DispatchRespondersModal
@@ -951,7 +828,10 @@ export default function LguLiveMapView(props: Props) {
                         <button
                           key={incident.id}
                           type="button"
-                          onClick={() => onEmergencyPinClick(incident.id)}
+                          onClick={() => {
+                            const pin = emergencyPinById.get(incident.id);
+                            if (pin) onEmergencyPinClick(pin);
+                          }}
                           className="w-full text-left rounded-xl border border-gray-200 bg-white hover:bg-gray-50 px-3 py-3 dark:border-[#162544] dark:bg-[#0E1626] dark:hover:bg-[#122036]"
                         >
                           <div className="flex items-start justify-between gap-2">

@@ -21,6 +21,7 @@ import {
   formatTrackingHeadline,
 } from "../../features/requests/utils/formatters";
 import { api } from "../../lib/api";
+import DraggableOverlay from "../../src/components/DraggableOverlay";
 
 type AlertIconName = React.ComponentProps<typeof Ionicons>["name"];
 type AlertTheme = {
@@ -495,23 +496,25 @@ export default function HomeScreen() {
       ) : null}
 
       {__DEV__ && session?.mode === "user" ? (
-        <View className="absolute right-3 top-24 rounded-xl border border-zinc-300 bg-white/95 p-2">
-          <Text className="mb-1 text-[11px] font-semibold text-zinc-700">Push Debug</Text>
-          <Pressable
-            disabled={pushDebugBusy}
-            onPress={onDebugCheckToken}
-            className="mb-1 rounded-md border border-zinc-300 px-2 py-1"
-          >
-            <Text className="text-xs font-semibold text-zinc-800">Check token</Text>
-          </Pressable>
-          <Pressable
-            disabled={pushDebugBusy}
-            onPress={onDebugSendTest}
-            className="rounded-md bg-red-500 px-2 py-1"
-          >
-            <Text className="text-xs font-semibold text-white">Send test</Text>
-          </Pressable>
-        </View>
+        <DraggableOverlay initialTop={160} initialRight={12} zIndex={45}>
+          <View className="rounded-xl border border-gray-300 bg-white/95 p-2 dark:border-lgu-border dark:bg-lgu-card/95">
+            <Text className="mb-1 text-[11px] font-semibold text-slate-700 dark:text-slate-200">Push Debug</Text>
+            <Pressable
+              disabled={pushDebugBusy}
+              onPress={onDebugCheckToken}
+              className="mb-1 rounded-md border border-gray-300 px-2 py-1 dark:border-lgu-border"
+            >
+              <Text className="text-xs font-semibold text-slate-800 dark:text-slate-100">Check token</Text>
+            </Pressable>
+            <Pressable
+              disabled={pushDebugBusy}
+              onPress={onDebugSendTest}
+              className="rounded-md bg-red-500 px-2 py-1"
+            >
+              <Text className="text-xs font-semibold text-white">Send test</Text>
+            </Pressable>
+          </View>
+        </DraggableOverlay>
       ) : null}
     </>
   );
