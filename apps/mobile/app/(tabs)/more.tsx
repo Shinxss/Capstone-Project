@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, ScrollView, Switch, Text, View } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { UserCheck } from "lucide-react-native";
 import { useRouter } from "expo-router";
@@ -139,6 +140,30 @@ function formatRoleLabel(rawRole?: string) {
 
 type RequestShortcutTab = Extract<MyRequestStatusTab, "assigned" | "en_route" | "arrived" | "resolved">;
 
+const SHORTCUT_SEEN_STORAGE_PREFIX = "lifeline.more.shortcuts.seen";
+const DEFAULT_SEEN_SHORTCUT_COUNTS: Record<RequestShortcutTab, number> = {
+  assigned: 0,
+  en_route: 0,
+  arrived: 0,
+  resolved: 0,
+};
+
+function normalizeSeenShortcutCounts(raw: unknown): Record<RequestShortcutTab, number> {
+  const source = (raw ?? {}) as Partial<Record<RequestShortcutTab, unknown>>;
+
+  const toCount = (value: unknown) => {
+    if (typeof value !== "number" || !Number.isFinite(value)) return 0;
+    return Math.max(0, Math.floor(value));
+  };
+
+  return {
+    assigned: toCount(source.assigned),
+    en_route: toCount(source.en_route),
+    arrived: toCount(source.arrived),
+    resolved: toCount(source.resolved),
+  };
+}
+
 const REQUEST_SHORTCUTS: Array<{
   tab: RequestShortcutTab;
   label: string;
@@ -154,16 +179,15 @@ const REQUEST_SHORTCUTS: Array<{
 type RequestShortcutTileProps = {
   label: string;
   icon: RowIconName;
-  count: number;
+  showDot: boolean;
   disabled: boolean;
   verified?: boolean;
   onPress: () => void;
 };
 
-function RequestShortcutTile({ label, icon, count, disabled, verified, onPress }: RequestShortcutTileProps) {
+function RequestShortcutTile({ label, icon, showDot, disabled, verified, onPress }: RequestShortcutTileProps) {
   const { isDark } = useTheme();
   const accentColor = isDark ? "#3B82F6" : "#DC2626";
-  const showBadge = !disabled && count > 0;
   const iconBgClass = isDark
     ? "rounded-sm border border-blue-400/45 bg-blue-500/20"
     : "rounded-sm border border-red-200 bg-red-100";
@@ -195,16 +219,23 @@ function RequestShortcutTile({ label, icon, count, disabled, verified, onPress }
             <Ionicons name={icon} size={25} color={accentColor} />
           )}
         </View>
+        {showDot ? (
+          <View
+            style={{
+              position: "absolute",
+              top: -3,
+              right: -3,
+              width: 10,
+              height: 10,
+              borderRadius: 5,
+              backgroundColor: "#DC2626",
+              borderWidth: 1,
+              borderColor: isDark ? "#0E1626" : "#FFFFFF",
+            }}
+          />
+        ) : null}
       </View>
       <Text className={`mt-1.5 text-[13px] font-semibold ${labelClass}`}>{label}</Text>
-      {showBadge ? (
-        <View
-          className="absolute right-1 top-1 h-[18px] min-w-[18px] items-center justify-center rounded-full px-1.5"
-          style={{ backgroundColor: accentColor }}
-        >
-          <Text className="text-[10px] font-extrabold text-white">{count > 99 ? "99+" : String(count)}</Text>
-        </View>
-      ) : null}
     </Pressable>
   );
 }
@@ -218,6 +249,10 @@ export default function MoreScreen() {
   const [communityUpdatesEnabled, setCommunityUpdatesEnabled] = useState(true);
   const [volunteerAssignmentsEnabled, setVolunteerAssignmentsEnabled] = useState(true);
   const [updatingPrefs, setUpdatingPrefs] = useState(false);
+  const [seenShortcutCounts, setSeenShortcutCounts] = useState<Record<RequestShortcutTab, number>>(
+    DEFAULT_SEEN_SHORTCUT_COUNTS
+  );
+  const [seenCountsLoaded, setSeenCountsLoaded] = useState(false);
   const {
     counts: requestCounts,
     loading: requestCountsLoading,
@@ -230,6 +265,10 @@ export default function MoreScreen() {
   const isGoogleLinked =
     Boolean(user?.googleLinked) || user?.authProvider === "google" || user?.authProvider === "both";
   const userRole = useMemo(() => String(user?.role ?? "").trim().toUpperCase(), [user?.role]);
+  const seenShortcutStorageKey = useMemo(() => {
+    if (!isUser || !user?.id) return null;
+    return `${SHORTCUT_SEEN_STORAGE_PREFIX}.${user.id}`;
+  }, [isUser, user?.id]);
   const volunteerStatus = useMemo(
     () => String(user?.volunteerStatus ?? "").trim().toUpperCase(),
     [user?.volunteerStatus]
@@ -317,13 +356,35 @@ export default function MoreScreen() {
     ]);
   }, [onLogout]);
 
+  const markShortcutSeen = useCallback(
+    (tab: RequestShortcutTab) => {
+      if (!isUser || requestCountsLoading) return;
+      setSeenShortcutCounts((prev) => ({
+        ...prev,
+        [tab]: Math.max(prev[tab], requestCounts[tab]),
+      }));
+    },
+    [isUser, requestCounts, requestCountsLoading]
+  );
+
+  const markAllShortcutsSeen = useCallback(() => {
+    if (!isUser || requestCountsLoading) return;
+    setSeenShortcutCounts({
+      assigned: requestCounts.assigned,
+      en_route: requestCounts.en_route,
+      arrived: requestCounts.arrived,
+      resolved: requestCounts.resolved,
+    });
+  }, [isUser, requestCounts, requestCountsLoading]);
+
   const onPressRequestHistory = useCallback(() => {
     if (!isUser) {
       promptSignInForRequests();
       return;
     }
+    markAllShortcutsSeen();
     router.push("/my-requests/history");
-  }, [isUser, promptSignInForRequests, router]);
+  }, [isUser, markAllShortcutsSeen, promptSignInForRequests, router]);
 
   const onPressRequestShortcut = useCallback(
     (tab: RequestShortcutTab) => {
@@ -331,13 +392,14 @@ export default function MoreScreen() {
         promptSignInForRequests();
         return;
       }
+      markShortcutSeen(tab);
 
       router.push({
         pathname: "/my-requests/history",
         params: { tab },
       });
     },
-    [isUser, promptSignInForRequests, router]
+    [isUser, markShortcutSeen, promptSignInForRequests, router]
   );
 
   const onPressProfileSettings = useCallback(() => {
@@ -401,6 +463,44 @@ export default function MoreScreen() {
       void refreshRequestCounts();
     }, [isUser, refreshRequestCounts])
   );
+
+  useEffect(() => {
+    if (!isUser || !seenShortcutStorageKey) {
+      setSeenShortcutCounts(DEFAULT_SEEN_SHORTCUT_COUNTS);
+      setSeenCountsLoaded(true);
+      return;
+    }
+
+    let alive = true;
+    setSeenCountsLoaded(false);
+
+    void (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(seenShortcutStorageKey);
+        if (!alive) return;
+        if (!raw) {
+          setSeenShortcutCounts(DEFAULT_SEEN_SHORTCUT_COUNTS);
+        } else {
+          const parsed = JSON.parse(raw) as unknown;
+          setSeenShortcutCounts(normalizeSeenShortcutCounts(parsed));
+        }
+      } catch {
+        if (!alive) return;
+        setSeenShortcutCounts(DEFAULT_SEEN_SHORTCUT_COUNTS);
+      } finally {
+        if (alive) setSeenCountsLoaded(true);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [isUser, seenShortcutStorageKey]);
+
+  useEffect(() => {
+    if (!isUser || !seenShortcutStorageKey || !seenCountsLoaded) return;
+    void AsyncStorage.setItem(seenShortcutStorageKey, JSON.stringify(seenShortcutCounts));
+  }, [isUser, seenShortcutCounts, seenCountsLoaded, seenShortcutStorageKey]);
 
   useEffect(() => {
     if (!isUser) return;
@@ -573,7 +673,12 @@ export default function MoreScreen() {
                 label={shortcut.label}
                 icon={shortcut.icon}
                 disabled={!isUser}
-                count={isUser && !requestCountsLoading ? requestCounts[shortcut.tab] : 0}
+                showDot={
+                  isUser &&
+                  seenCountsLoaded &&
+                  !requestCountsLoading &&
+                  requestCounts[shortcut.tab] > (seenShortcutCounts[shortcut.tab] ?? 0)
+                }
                 verified={Boolean(shortcut.verified)}
                 onPress={() => onPressRequestShortcut(shortcut.tab)}
               />

@@ -2,6 +2,7 @@ import { api } from "../../../lib/api";
 
 export type RoutingProfile = "driving" | "walking";
 export type RoutingMode = "optimize" | "evaluate";
+export type RoutingRiskLevel = "LOW" | "MEDIUM" | "HIGH";
 
 export type OptimizeRouteAIRequest = {
   start: { lng: number; lat: number };
@@ -33,6 +34,8 @@ export type OptimizeRouteAIData = {
     duration: number;
     routing_cost: number;
     finalScore: number;
+    risk_level?: RoutingRiskLevel;
+    recommended_speed_kph?: number;
     passability_probability?: number;
     passability_band?: RoutePassabilityBand;
     route_passable?: boolean;
@@ -51,6 +54,8 @@ export type OptimizeRouteAIData = {
     passability_probability?: number;
     passability_band?: RoutePassabilityBand;
     route_passable?: boolean;
+    risk_level?: RoutingRiskLevel;
+    recommended_speed_kph?: number;
     routing_cost: number;
     finalScore: number;
   }>;

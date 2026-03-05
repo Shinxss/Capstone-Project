@@ -92,10 +92,15 @@ function toRouteSummary(input: {
   };
 }
 
-function toRiskLevel(routingCost: number): RiskLevel {
+function isRiskLevel(value: unknown): value is RiskLevel {
+  return value === "LOW" || value === "MEDIUM" || value === "HIGH";
+}
+
+function toRiskLevel(routingCost: number, modelRiskLevel?: unknown): RiskLevel {
+  if (isRiskLevel(modelRiskLevel)) return modelRiskLevel;
   if (!Number.isFinite(routingCost)) return "LOW";
   if (routingCost <= 2.5) return "LOW";
-  if (routingCost <= 4.5) return "MEDIUM";
+  if (routingCost <= 5.0) return "MEDIUM";
   return "HIGH";
 }
 
@@ -109,6 +114,12 @@ function toProbability(value: unknown): number | null {
   if (!Number.isFinite(parsed)) return null;
   if (parsed < 0) return 0;
   if (parsed > 1) return 1;
+  return parsed;
+}
+
+function toRecommendedSpeedKph(value: unknown): number | null {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
   return parsed;
 }
 
@@ -156,7 +167,7 @@ function buildRiskJustification(input: {
   }
 
   if (input.chosenCandidate?.floodBlocked) {
-    reasons.push("flood data marks parts of the route as not safely passable");
+    reasons.push("flood data marks parts of the route as blocked");
   }
 
   if (floodDepth !== null) {
@@ -249,11 +260,18 @@ function buildRiskAssessmentForCandidate(input: {
   const routingCost = Number(
     input.candidate.routing_cost ?? input.optimized.chosen.routing_cost ?? 0
   );
-  const riskLevel = toRiskLevel(routingCost);
+  const riskLevel = toRiskLevel(
+    routingCost,
+    input.candidate.risk_level ?? input.optimized.chosen.risk_level
+  );
+  const recommendedSpeedKph = toRecommendedSpeedKph(
+    input.candidate.recommended_speed_kph ?? input.optimized.chosen.recommended_speed_kph
+  );
 
   return {
     finalScore: Number(input.candidate.finalScore ?? input.optimized.chosen.finalScore ?? 0),
     routingCost,
+    recommendedSpeedKph,
     passabilityProbability,
     comparedAgainst: rankMeta.comparedAgainst,
     rank: rankMeta.rank,

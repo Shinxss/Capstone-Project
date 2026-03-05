@@ -21,7 +21,7 @@ import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Droplets, Construction, Flame, Mountain, ShieldAlert } from "lucide-react-native";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { api } from "../../lib/api";
-import { fetchEmergencyMapReports } from "../../features/emergency/services/emergencyApi";
+import { fetchEmergencyMapReportsWithOptions } from "../../features/emergency/services/emergencyApi";
 import { useAuth } from "../../features/auth/AuthProvider";
 import { useActiveDispatch } from "../../features/dispatch/hooks/useActiveDispatch";
 import { updateDispatchLocation } from "../../features/dispatch/services/dispatchApi";
@@ -73,6 +73,10 @@ const colorForType = (type: EmergencyType) => {
       return "#F59E0B";
     case "Collapse":
       return "#CA8A04";
+    case "Medical":
+      return "#10B981";
+    case "Other":
+      return "#64748B";
     case "SOS":
       return "#EF4444";
     default:
@@ -111,6 +115,8 @@ const EMERGENCY_LEGEND_ITEMS: EmergencyType[] = [
   "Typhoon",
   "Earthquake",
   "Collapse",
+  "Medical",
+  "Other",
 ];
 
 // MaterialCommunityIcons mapping
@@ -126,6 +132,10 @@ const mciForType = (type: EmergencyType) => {
       return "chart-bell-curve-cumulative";
     case "Collapse":
       return "home-city";
+    case "Medical":
+      return "medical-bag";
+    case "Other":
+      return "help-circle";
     case "SOS":
       return "alarm-light";
     default:
@@ -248,6 +258,8 @@ export default function MapTab() {
   const normalizedRole = useMemo(() => String(user?.role ?? "").trim().toUpperCase(), [user?.role]);
   const isVolunteer = mode === "authed" && normalizedRole === "VOLUNTEER";
   const canViewEmergencies = mode === "authed" && normalizedRole !== "COMMUNITY";
+  const canViewUnapprovedEmergencyReports =
+    mode === "authed" && (normalizedRole === "LGU" || normalizedRole === "ADMIN");
   const { activeDispatch } = useActiveDispatch({ pollMs: 10000, enabled: isVolunteer });
 
   const [myLocation, setMyLocation] = useState<[number, number] | null>(null);
@@ -330,7 +342,10 @@ export default function MapTab() {
 
     const loadEmergencyReports = async () => {
       try {
-        const items = await fetchEmergencyMapReports();
+        const items = await fetchEmergencyMapReportsWithOptions({
+          includeUnapproved: canViewUnapprovedEmergencyReports,
+          limit: 300,
+        });
         if (cancelled) return;
 
         setReports(
@@ -362,7 +377,7 @@ export default function MapTab() {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [canViewEmergencies]);
+  }, [canViewEmergencies, canViewUnapprovedEmergencyReports]);
 
   // Keep current location for routing (Direction button)
   useEffect(() => {
@@ -404,8 +419,10 @@ export default function MapTab() {
     if (t === "EARTHQUAKE") return "Earthquake";
     if (t === "TYPHOON") return "Typhoon";
     if (t === "COLLAPSE") return "Collapse";
+    if (t === "MEDICAL") return "Medical";
+    if (t === "OTHER") return "Other";
     if (t === "SOS") return "SOS";
-    return "SOS";
+    return "Other";
   };
   const filteredReports = useMemo(() => {
     const q = query.trim().toLowerCase();

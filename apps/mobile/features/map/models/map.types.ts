@@ -1,6 +1,14 @@
 import type { OptimizeRouteAIData } from "../../routing/services/routingApi";
 
-export type EmergencyType = "SOS" | "Flood" | "Fire" | "Typhoon" | "Earthquake" | "Collapse";
+export type EmergencyType =
+  | "SOS"
+  | "Flood"
+  | "Fire"
+  | "Typhoon"
+  | "Earthquake"
+  | "Collapse"
+  | "Medical"
+  | "Other";
 
 export type Emergency = {
   id: string;
@@ -41,6 +49,7 @@ export type FloodPassabilityBand =
 export type RiskAssessment = {
   finalScore: number;
   routingCost: number;
+  recommendedSpeedKph?: number | null;
   passabilityProbability?: number | null;
   comparedAgainst?: number;
   rank?: number;

@@ -35,18 +35,6 @@ function riskLabel(level: RiskAssessment["riskLevel"]): string {
   return "High";
 }
 
-function passableColor(value: boolean | null | undefined): string {
-  if (value === true) return "#16A34A";
-  if (value === false) return "#DC2626";
-  return "#475569";
-}
-
-function passableText(value: boolean | null | undefined): string {
-  if (value === true) return "true";
-  if (value === false) return "false";
-  return "n/a";
-}
-
 export function EmergencyDirectionsSheet({
   emergency,
   travelMode,
@@ -181,12 +169,11 @@ export function EmergencyDirectionsSheet({
                 Current risk:{" "}
                 <Text style={{ color: riskColor(risk.riskLevel) }}>{riskLabel(risk.riskLevel)}</Text>
               </Text>
-              <Text className="mt-1 text-xs font-bold text-slate-900">
-                Route passable:{" "}
-                <Text style={{ color: passableColor(risk.routePassable) }}>
-                  {passableText(risk.routePassable)}
+              {typeof risk.recommendedSpeedKph === "number" ? (
+                <Text className="mt-1 text-xs font-bold text-slate-900">
+                  AI recommended speed: {Math.round(risk.recommendedSpeedKph)} kph
                 </Text>
-              </Text>
+              ) : null}
               <Text className="mt-1 text-[11px] font-semibold text-slate-600">{risk.justification}</Text>
             </>
           ) : (
