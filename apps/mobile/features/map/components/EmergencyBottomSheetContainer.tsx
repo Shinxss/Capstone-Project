@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import { StyleSheet, View } from "react-native";
-import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
+import BottomSheet, {
+  BottomSheetScrollView,
+  BottomSheetView,
+} from "@gorhom/bottom-sheet";
 import {
   directionsSnapPoints,
   overviewSnapPoints,
@@ -11,12 +14,14 @@ import type { EmergencyBottomSheetController } from "../hooks/useEmergencyBottom
 
 type EmergencyBottomSheetContainerProps = {
   controller: EmergencyBottomSheetController;
+  authToken?: string | null;
 };
 
 const minimizedSnapPoint = "15%";
 
 export function EmergencyBottomSheetContainer({
   controller,
+  authToken,
 }: EmergencyBottomSheetContainerProps) {
   const sheetRef = useRef<BottomSheet>(null);
 
@@ -70,38 +75,48 @@ export function EmergencyBottomSheetContainer({
       backgroundStyle={styles.background}
       handleIndicatorStyle={styles.handle}
     >
-      <BottomSheetView>
-        {controller.selectedEmergency ? (
-          controller.sheetMode === "overview" ? (
+      {controller.selectedEmergency ? (
+        controller.sheetMode === "overview" ? (
+          <BottomSheetScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.scrollContent}
+          >
             <EmergencyOverviewSheet
               emergency={controller.selectedEmergency}
+              emergencyDetail={controller.emergencyDetail}
+              loadingDetail={controller.loadingDetail}
+              etaSummary={controller.etaSummary}
+              loadingEta={controller.loadingEta}
+              authToken={authToken}
               onDirectionPress={() => {
                 void controller.goToDirections();
               }}
               onClose={controller.closeSheet}
             />
-          ) : (
+          </BottomSheetScrollView>
+        ) : (
+          <BottomSheetView>
             <EmergencyDirectionsSheet
               emergency={controller.selectedEmergency}
               travelMode={controller.travelMode}
               route={controller.route}
-              routeAlternatives={controller.routeAlternatives}
-              selectedRouteIndex={controller.selectedRouteIndex}
               risk={controller.risk}
               loadingRoute={controller.loadingRoute}
               onTravelModeChange={controller.setTravelMode}
-              onSelectRoute={controller.selectRoute}
               onOptimizeRoute={() => {
                 void controller.optimizeRoute();
               }}
               onBack={controller.goToOverview}
               onClose={controller.closeSheet}
             />
-          )
-        ) : (
+          </BottomSheetView>
+        )
+      ) : (
+        <BottomSheetView>
           <View />
-        )}
-      </BottomSheetView>
+        </BottomSheetView>
+      )}
     </BottomSheet>
   );
 }
@@ -113,5 +128,8 @@ const styles = StyleSheet.create({
   handle: {
     backgroundColor: "rgba(0,0,0,0.22)",
     width: 42,
+  },
+  scrollContent: {
+    paddingBottom: 8,
   },
 });

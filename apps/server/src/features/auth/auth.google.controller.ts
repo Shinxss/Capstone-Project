@@ -6,6 +6,7 @@ import { signAccessToken } from "../../utils/jwt";
 import { AUDIT_EVENT } from "../audit/audit.constants";
 import { logAudit, logSecurityEvent } from "../audit/audit.service";
 import { User } from "../users/user.model";
+import { generateNextLifelineId } from "../users/userId.service";
 import { toAuthUserPayload } from "./otp.utils";
 import { zodPasswordSchema } from "./password.policy";
 import { resolveAccessTokenExpiresIn } from "./accessTokenExpiry";
@@ -101,8 +102,10 @@ export async function loginWithGoogle(req: Request, res: Response) {
     let user = await User.findOne({ email });
 
     if (!user) {
+      const lifelineId = await generateNextLifelineId();
       user = await User.create({
         email,
+        lifelineId,
         firstName,
         lastName,
         role: "COMMUNITY",
@@ -146,6 +149,11 @@ export async function loginWithGoogle(req: Request, res: Response) {
 
       if (!user.emailVerified) {
         user.emailVerified = true;
+        shouldSave = true;
+      }
+
+      if (!user.lifelineId) {
+        user.lifelineId = await generateNextLifelineId(user.createdAt);
         shouldSave = true;
       }
 
@@ -237,6 +245,9 @@ export async function setPassword(req: Request, res: Response) {
 
     user.passwordHash = await bcrypt.hash(newPassword, 12);
     user.authProvider = resolveAuthProvider(true, Boolean(user.googleSub));
+    if (!user.lifelineId) {
+      user.lifelineId = await generateNextLifelineId(user.createdAt);
+    }
     await user.save();
 
     return res.status(200).json({ success: true, data: { user: toAuthUserPayload(user) } });
@@ -293,6 +304,9 @@ export async function linkGoogle(req: Request, res: Response) {
     user.googleSub = googleSub;
     user.emailVerified = true;
     user.authProvider = resolveAuthProvider(Boolean(user.passwordHash), true);
+    if (!user.lifelineId) {
+      user.lifelineId = await generateNextLifelineId(user.createdAt);
+    }
     await user.save();
 
     return res.status(200).json({

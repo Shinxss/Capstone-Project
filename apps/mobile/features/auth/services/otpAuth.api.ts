@@ -9,6 +9,7 @@ export type SignupRequestOtpPayload = {
 
 export type OtpUserPayload = {
   id: string;
+  lifelineId?: string;
   email: string;
   firstName: string;
   lastName?: string;

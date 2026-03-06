@@ -42,6 +42,234 @@ function expandVolunteerApplicationStatuses(statuses: string[]): string[] {
   return Array.from(expanded);
 }
 
+function safeStr(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function normalizeIso(value: unknown): string | undefined {
+  if (!value) return undefined;
+
+  const iso = value instanceof Date ? value.toISOString() : safeStr(value);
+  return iso || undefined;
+}
+
+function toRecentTimestamp(...values: unknown[]): number {
+  for (const value of values) {
+    const iso = normalizeIso(value);
+    if (!iso) continue;
+
+    const ts = Date.parse(iso);
+    if (Number.isFinite(ts)) return ts;
+  }
+
+  return 0;
+}
+
+function pickPreferredApplication(current: any | undefined, candidate: any) {
+  if (!candidate) return current;
+  if (!current) return candidate;
+
+  const currentIsVerified = normalizeVolunteerApplicationStatus(current?.status) === "verified";
+  const candidateIsVerified = normalizeVolunteerApplicationStatus(candidate?.status) === "verified";
+
+  if (candidateIsVerified && !currentIsVerified) return candidate;
+  if (currentIsVerified && !candidateIsVerified) return current;
+
+  return toRecentTimestamp(candidate?.createdAt, candidate?.updatedAt) >
+    toRecentTimestamp(current?.createdAt, current?.updatedAt)
+    ? candidate
+    : current;
+}
+
+function buildVerifiedVolunteerProfile(user: any, application?: any) {
+  const fullNameFromUser = [safeStr(user?.firstName), safeStr(user?.lastName)]
+    .filter(Boolean)
+    .join(" ");
+
+  return {
+    _id: String(user?._id ?? ""),
+    userId: String(user?._id ?? ""),
+    fullName: safeStr(application?.fullName) || fullNameFromUser || "Verified Volunteer",
+    sex: application?.sex ?? "Prefer not to say",
+    birthdate: safeStr(application?.birthdate) || safeStr(user?.birthdate),
+    mobile: safeStr(application?.mobile) || safeStr(user?.contactNo),
+    email: safeStr(application?.email) || safeStr(user?.email),
+    street: safeStr(application?.street),
+    barangay: safeStr(application?.barangay) || safeStr(user?.barangay),
+    city: safeStr(application?.city) || safeStr(user?.municipality),
+    province: safeStr(application?.province),
+    emergencyContact: {
+      name: safeStr(application?.emergencyContact?.name),
+      relationship: safeStr(application?.emergencyContact?.relationship),
+      mobile: safeStr(application?.emergencyContact?.mobile),
+      addressSameAsApplicant: Boolean(application?.emergencyContact?.addressSameAsApplicant),
+      address: safeStr(application?.emergencyContact?.address),
+    },
+    skillsOther: safeStr(application?.skillsOther),
+    certificationsText: safeStr(application?.certificationsText),
+    availabilityText: safeStr(application?.availabilityText),
+    preferredAssignmentText: safeStr(application?.preferredAssignmentText),
+    healthNotes: safeStr(application?.healthNotes),
+    consent: {
+      truth: Boolean(application?.consent?.truth),
+      rules: Boolean(application?.consent?.rules),
+      data: Boolean(application?.consent?.data),
+    },
+    status: "verified",
+    reviewedBy: application?.reviewedBy ? String(application.reviewedBy) : undefined,
+    reviewedAt:
+      normalizeIso(application?.reviewedAt) ??
+      normalizeIso(user?.updatedAt) ??
+      normalizeIso(user?.createdAt),
+    reviewNotes: safeStr(application?.reviewNotes),
+    createdAt: normalizeIso(application?.createdAt) ?? normalizeIso(user?.createdAt),
+    updatedAt: normalizeIso(application?.updatedAt) ?? normalizeIso(user?.updatedAt),
+  };
+}
+
+function matchesVerifiedVolunteerQuery(profile: any, user: any, q?: string) {
+  const query = safeStr(q);
+  if (!query) return true;
+
+  const rx = new RegExp(escapeRegExp(query), "i");
+
+  return [
+    profile?.fullName,
+    profile?.barangay,
+    profile?.mobile,
+    profile?.email,
+    profile?.emergencyContact?.name,
+    profile?.preferredAssignmentText,
+    profile?.certificationsText,
+    profile?.skillsOther,
+    user?.firstName,
+    user?.lastName,
+    user?.email,
+    user?.barangay,
+    user?.municipality,
+    user?.contactNo,
+  ].some((value) => rx.test(safeStr(value)));
+}
+
+async function getReviewerBarangay(reviewerId: string, reviewerRole: string) {
+  if (reviewerRole !== "LGU") return "";
+
+  const reviewer = await User.findById(new Types.ObjectId(reviewerId)).select("barangay");
+  return safeStr(reviewer?.barangay);
+}
+
+async function findPreferredApplicationForUser(userId: Types.ObjectId | string) {
+  const selectFields =
+    "userId fullName sex birthdate mobile email street barangay city province emergencyContact skillsOther certificationsText availabilityText preferredAssignmentText healthNotes consent status reviewedBy reviewedAt reviewNotes createdAt updatedAt";
+
+  const [verifiedApplication, latestApplication] = await Promise.all([
+    VolunteerApplication.findOne({
+      userId,
+      status: { $in: expandVolunteerApplicationStatuses(["verified"]) },
+    })
+      .select(selectFields)
+      .sort({ createdAt: -1 })
+      .lean(),
+    VolunteerApplication.findOne({ userId }).select(selectFields).sort({ createdAt: -1 }).lean(),
+  ]);
+
+  return verifiedApplication ?? latestApplication ?? null;
+}
+
+async function listVerifiedVolunteerProfilesForReviewer(params: {
+  reviewerId: string;
+  reviewerRole: string;
+  q?: string;
+  page: number;
+  limit: number;
+}) {
+  const { q, page, limit } = params;
+
+  const approvedUsers = await User.find({
+    volunteerStatus: "APPROVED",
+    isActive: true,
+    role: { $in: ["VOLUNTEER", "COMMUNITY"] },
+  })
+    .select(
+      "_id firstName lastName email barangay municipality birthdate contactNo role volunteerStatus isActive createdAt updatedAt"
+    )
+    .sort({ updatedAt: -1, createdAt: -1, _id: -1 })
+    .lean();
+
+  if (approvedUsers.length === 0) {
+    return { items: [], total: 0, page, limit };
+  }
+
+  const userIds = approvedUsers.map((user: any) => user._id as Types.ObjectId);
+  const applications = await VolunteerApplication.find({ userId: { $in: userIds } })
+    .select(
+      "userId fullName sex birthdate mobile email street barangay city province emergencyContact skillsOther certificationsText availabilityText preferredAssignmentText healthNotes consent status reviewedBy reviewedAt reviewNotes createdAt updatedAt"
+    )
+    .sort({ createdAt: -1, updatedAt: -1, _id: -1 })
+    .lean();
+
+  const preferredApplications = new Map<string, any>();
+  for (const application of applications) {
+    const key = String((application as any)?.userId ?? "");
+    preferredApplications.set(
+      key,
+      pickPreferredApplication(preferredApplications.get(key), application)
+    );
+  }
+
+  const profiles = approvedUsers
+    .map((user: any) => {
+      const key = String(user?._id ?? "");
+      const application = preferredApplications.get(key);
+      const profile = buildVerifiedVolunteerProfile(user, application);
+      if (!matchesVerifiedVolunteerQuery(profile, user, q)) return null;
+
+      return profile;
+    })
+    .filter(Boolean)
+    .sort(
+      (a: any, b: any) =>
+        toRecentTimestamp(b?.reviewedAt, b?.updatedAt, b?.createdAt) -
+        toRecentTimestamp(a?.reviewedAt, a?.updatedAt, a?.createdAt)
+    );
+
+  const total = profiles.length;
+  const skip = (page - 1) * limit;
+
+  return {
+    items: profiles.slice(skip, skip + limit),
+    total,
+    page,
+    limit,
+  };
+}
+
+async function getVerifiedVolunteerProfileForReviewer(params: {
+  reviewerId: string;
+  reviewerRole: string;
+  userId: string;
+}) {
+  const { userId } = params;
+
+  const user = await User.findById(userId)
+    .select(
+      "_id firstName lastName email barangay municipality birthdate contactNo role volunteerStatus isActive createdAt updatedAt"
+    )
+    .lean();
+
+  if (!user || user.isActive !== true || user.volunteerStatus !== "APPROVED") {
+    return null;
+  }
+
+  const application = await findPreferredApplicationForUser(String(user._id));
+
+  return buildVerifiedVolunteerProfile(user, application);
+}
+
 export async function submitVolunteerApplication(userId: string, payload: any) {
   const userObjectId = new Types.ObjectId(userId);
 
@@ -125,24 +353,28 @@ export async function listVolunteerApplicationsForReviewer(params: {
 }) {
   const { reviewerId, reviewerRole, statuses, q, page, limit } = params;
 
-  const filter: any = {};
-  let reviewerBarangay = "";
-
-  // ✅ Scope LGU to their barangay (if set)
-  if (reviewerRole === "LGU") {
-    const reviewer = await User.findById(new Types.ObjectId(reviewerId)).select("barangay");
-    reviewerBarangay = String(reviewer?.barangay ?? "").trim();
-  }
-
   const requestedStatuses = statuses?.length
     ? Array.from(new Set(statuses.map((s) => normalizeVolunteerApplicationStatus(s))))
     : undefined;
+
+  if (requestedStatuses?.length === 1 && requestedStatuses[0] === "verified") {
+    return listVerifiedVolunteerProfilesForReviewer({
+      reviewerId,
+      reviewerRole,
+      q,
+      page,
+      limit,
+    });
+  }
+
+  const filter: any = {};
+  const reviewerBarangay = await getReviewerBarangay(reviewerId, reviewerRole);
   const appStatusAliases = requestedStatuses?.length
     ? expandVolunteerApplicationStatuses(requestedStatuses)
     : undefined;
 
   if (q) {
-    const rx = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+    const rx = new RegExp(escapeRegExp(q), "i");
     filter.$or = [
       { fullName: rx },
       { barangay: rx },
@@ -168,10 +400,7 @@ export async function listVolunteerApplicationsForReviewer(params: {
   ];
 
   if (reviewerBarangay) {
-    const reviewerBarangayRegex = new RegExp(
-      `^${reviewerBarangay.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
-      "i"
-    );
+    const reviewerBarangayRegex = new RegExp(`^${escapeRegExp(reviewerBarangay)}$`, "i");
     basePipeline.push({
       $match: {
         $or: [{ barangay: reviewerBarangayRegex }, { "user.barangay": reviewerBarangayRegex }],
@@ -180,20 +409,10 @@ export async function listVolunteerApplicationsForReviewer(params: {
   }
 
   if (appStatusAliases?.length) {
-    const userVolunteerStatuses = new Set<string>();
+    const statusOrUserStatusMatch: any[] = [{ status: { $in: appStatusAliases } }];
 
     if (requestedStatuses?.includes("pending_verification")) {
-      userVolunteerStatuses.add("PENDING");
-    }
-    if (requestedStatuses?.includes("verified")) {
-      userVolunteerStatuses.add("APPROVED");
-    }
-
-    const statusOrUserStatusMatch: any[] = [{ status: { $in: appStatusAliases } }];
-    if (userVolunteerStatuses.size > 0) {
-      statusOrUserStatusMatch.push({
-        "user.volunteerStatus": { $in: Array.from(userVolunteerStatuses) },
-      });
+      statusOrUserStatusMatch.push({ "user.volunteerStatus": "PENDING" });
     }
 
     basePipeline.push({ $match: { $or: statusOrUserStatusMatch } });
@@ -227,22 +446,24 @@ export async function getVolunteerApplicationByIdForReviewer(params: {
   const { reviewerId, reviewerRole, applicationId } = params;
 
   const doc = await VolunteerApplication.findById(applicationId);
-  if (!doc) return null;
+  if (!doc) {
+    return getVerifiedVolunteerProfileForReviewer({
+      reviewerId,
+      reviewerRole,
+      userId: applicationId,
+    });
+  }
 
   const linkedUser = await User.findById(doc.userId).select("_id isActive barangay").lean();
   if (!linkedUser || linkedUser.isActive !== true) {
     return null;
   }
 
-  // ✅ Scope LGU to their barangay (if set)
-  if (reviewerRole === "LGU") {
-    const reviewer = await User.findById(new Types.ObjectId(reviewerId)).select("barangay");
-    const reviewerBarangay = String(reviewer?.barangay ?? "").trim().toLowerCase();
-    const appBarangay = String((doc as any).barangay ?? "").trim().toLowerCase();
-    const userBarangay = String((linkedUser as any).barangay ?? "").trim().toLowerCase();
-    if (reviewerBarangay && appBarangay !== reviewerBarangay && userBarangay !== reviewerBarangay) {
-      return null;
-    }
+  const reviewerBarangay = (await getReviewerBarangay(reviewerId, reviewerRole)).toLowerCase();
+  const appBarangay = String((doc as any).barangay ?? "").trim().toLowerCase();
+  const userBarangay = String((linkedUser as any).barangay ?? "").trim().toLowerCase();
+  if (reviewerBarangay && appBarangay !== reviewerBarangay && userBarangay !== reviewerBarangay) {
+    return null;
   }
 
   (doc as any).status = normalizeVolunteerApplicationStatus((doc as any).status);

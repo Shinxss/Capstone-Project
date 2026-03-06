@@ -2,6 +2,7 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { User } from "../../users/user.model";
+import { generateNextLifelineId } from "../../users/userId.service";
 import { EmailVerificationRequest } from "../models/EmailVerificationRequest.model";
 import { sendSignupVerificationOtpEmail } from "../../../utils/mailer";
 import { signAccessToken } from "../../../utils/jwt";
@@ -91,8 +92,10 @@ signupOtpRoutes.post("/", async (req, res) => {
     const passwordHash = await bcrypt.hash(password, 12);
 
     if (!user) {
+      const lifelineId = await generateNextLifelineId();
       user = await User.create({
         email,
+        lifelineId,
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         passwordHash,
@@ -108,6 +111,9 @@ signupOtpRoutes.post("/", async (req, res) => {
       user.passwordHash = passwordHash;
       user.emailVerified = false;
       user.authProvider = user.googleSub ? "both" : "local";
+      if (!user.lifelineId) {
+        user.lifelineId = await generateNextLifelineId(user.createdAt);
+      }
       await user.save();
     }
 
@@ -166,6 +172,9 @@ signupOtpRoutes.post("/verify-otp", async (req, res) => {
     if (user.googleSub && user.passwordHash) user.authProvider = "both";
     else if (user.googleSub) user.authProvider = "google";
     else user.authProvider = "local";
+    if (!user.lifelineId) {
+      user.lifelineId = await generateNextLifelineId(user.createdAt);
+    }
     await user.save();
 
     await EmailVerificationRequest.deleteMany({ email });

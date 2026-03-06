@@ -43,6 +43,7 @@ export type MapEmergencyReport = {
   referenceNumber: string;
   isSos: boolean;
   type: string;
+  status: PublicEmergencyReport["status"];
   verificationStatus: VerificationStatus;
   isVisibleOnMap: boolean;
   createdAt: Date;
@@ -570,11 +571,29 @@ export async function getEmergencyReportById(id: string) {
 
   const report = await EmergencyReportModel.findById(id)
     .select(
-      "isSos referenceNumber emergencyType status verification visibility location locationLabel notes photos createdAt updatedAt"
+      "isSos referenceNumber emergencyType status verification visibility location locationLabel notes photos reportedBy reporterIsGuest reportedAt createdAt updatedAt"
     )
+    .populate("reportedBy", "firstName lastName contactNo barangay municipality country postalCode")
     .lean();
 
   if (!report) return null;
+
+  const reporterRaw = report.reportedBy;
+  const reporter =
+    reporterRaw && typeof reporterRaw === "object"
+      ? {
+          isGuest: Boolean(report.reporterIsGuest),
+          firstName: String((reporterRaw as any).firstName ?? "").trim() || undefined,
+          lastName: String((reporterRaw as any).lastName ?? "").trim() || undefined,
+          contactNo: String((reporterRaw as any).contactNo ?? "").trim() || undefined,
+          barangay: String((reporterRaw as any).barangay ?? "").trim() || undefined,
+          municipality: String((reporterRaw as any).municipality ?? "").trim() || undefined,
+          country: String((reporterRaw as any).country ?? "").trim() || undefined,
+          postalCode: String((reporterRaw as any).postalCode ?? "").trim() || undefined,
+        }
+      : {
+          isGuest: Boolean(report.reporterIsGuest) || !reporterRaw,
+        };
 
   return {
     incidentId: report._id.toString(),
@@ -593,6 +612,8 @@ export async function getEmergencyReportById(id: string) {
     },
     description: report.notes,
     photos: report.photos ?? [],
+    reporter,
+    reportedAt: report.reportedAt ?? report.createdAt ?? new Date(),
     createdAt: report.createdAt ?? new Date(),
     updatedAt: report.updatedAt ?? new Date(),
   };
@@ -620,12 +641,14 @@ export async function getEmergencyReportByReference(
 
 export async function listMapEmergencyReports(limit = 300): Promise<MapEmergencyReport[]> {
   const docs = await EmergencyReportModel.find({
+    status: { $nin: ["RESOLVED", "CANCELLED"] },
+    "visibility.isVisibleOnMap": true,
     $or: [{ isSos: true }, { "verification.status": "approved" }],
   })
     .sort({ createdAt: -1 })
     .limit(limit)
     .select(
-      "isSos emergencyType verification visibility referenceNumber location locationLabel notes createdAt"
+      "isSos emergencyType status verification visibility referenceNumber location locationLabel notes createdAt"
     )
     .lean();
 
@@ -634,6 +657,7 @@ export async function listMapEmergencyReports(limit = 300): Promise<MapEmergency
     referenceNumber: String(report.referenceNumber ?? ""),
     isSos: Boolean(report.isSos),
     type: String(report.emergencyType ?? "OTHER").toLowerCase(),
+    status: fromDbEmergencyStatus(report.status),
     verificationStatus: report.verification?.status ?? (report.isSos ? "not_required" : "pending"),
     isVisibleOnMap: Boolean(report.visibility?.isVisibleOnMap),
     location: {

@@ -3,6 +3,7 @@ import { Router } from "express";
 import { AUDIT_EVENT } from "../audit/audit.constants";
 import { logAudit, logSecurityEvent } from "../audit/audit.service";
 import { User } from "../users/user.model";
+import { generateNextLifelineId } from "../users/userId.service";
 import { loginLimiter, registerLimiter } from "../../middlewares/rateLimit";
 import { validate } from "../../middlewares/validate";
 import { signAccessToken } from "../../utils/jwt";
@@ -31,8 +32,10 @@ communityAuthRouter.post("/register", registerLimiter, validate(communityRegiste
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
+    const lifelineId = await generateNextLifelineId();
     const user = await User.create({
       email: cleanEmail,
+      lifelineId,
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       passwordHash,
@@ -47,6 +50,7 @@ communityAuthRouter.post("/register", registerLimiter, validate(communityRegiste
       success: true,
       data: {
         id: user._id.toString(),
+        lifelineId: user.lifelineId,
         email: user.email,
         role: user.role,
         volunteerStatus: user.volunteerStatus,

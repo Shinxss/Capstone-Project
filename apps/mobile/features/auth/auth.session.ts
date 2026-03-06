@@ -75,11 +75,16 @@ function parseAuthUser(payload: any): AuthUser | null {
 
   return {
     id,
+    lifelineId: asString(data?.lifelineId) ?? undefined,
     email: asString(data?.email) ?? undefined,
     role: asString(data?.role) ?? undefined,
     firstName: asString(data?.firstName) ?? undefined,
     lastName: asString(data?.lastName) ?? undefined,
     volunteerStatus: asString(data?.volunteerStatus) ?? undefined,
+    contactNo: asString(data?.contactNo) ?? undefined,
+    barangay: asString(data?.barangay) ?? undefined,
+    municipality: asString(data?.municipality) ?? undefined,
+    avatarUrl: asString(data?.avatarUrl) ?? undefined,
     authProvider:
       data?.authProvider === "local" || data?.authProvider === "google" || data?.authProvider === "both"
         ? data.authProvider
@@ -93,11 +98,16 @@ function parseAuthUser(payload: any): AuthUser | null {
 async function persistUserSession(user: AuthUser, token: string): Promise<void> {
   await setUserSession({
     id: user.id,
+    lifelineId: user.lifelineId,
     firstName: user.firstName ?? "",
     lastName: user.lastName,
     email: user.email,
     role: user.role,
     volunteerStatus: user.volunteerStatus,
+    contactNo: user.contactNo,
+    barangay: user.barangay,
+    municipality: user.municipality,
+    avatarUrl: user.avatarUrl,
     authProvider: user.authProvider,
     emailVerified: user.emailVerified,
     passwordSet: user.passwordSet,

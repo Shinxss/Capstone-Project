@@ -71,6 +71,7 @@ type UserLike = {
   _id: { toString(): string } | string;
   username?: string;
   email?: string;
+  lifelineId?: string;
   firstName?: string;
   lastName?: string;
   role?: string;
@@ -100,6 +101,7 @@ type UserLike = {
 export function toAuthUserPayload(user: UserLike) {
   return {
     id: typeof user._id === "string" ? user._id : user._id.toString(),
+    lifelineId: user.lifelineId ?? undefined,
     username: user.username ?? "",
     email: user.email ?? "",
     firstName: user.firstName ?? "",

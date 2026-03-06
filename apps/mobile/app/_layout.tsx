@@ -66,7 +66,16 @@ function RootLayoutInner() {
         <StatusBar style={isDark ? "light" : "dark"} />
         <AuthGate>
           <>
-            <Stack screenOptions={{ headerShown: false }}>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                animation: "slide_from_left",
+                animationDuration: 420,
+                animationTypeForReplace: "push",
+                gestureEnabled: true,
+                fullScreenGestureEnabled: true,
+              }}
+            >
               <Stack.Screen name="(auth)" />
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="report" />

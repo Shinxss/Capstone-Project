@@ -290,7 +290,7 @@ export default function LguLiveMapView(props: Props) {
           onMapReady={onMapReady}
           onPinClick={onEmergencyPinClick}
           onMapClick={isDrawingHazard ? undefined : (_lng, _lat) => onMapClick()}
-          fitReports="initial"
+          fitReports="always"
         />
       </div>
 

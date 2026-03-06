@@ -107,7 +107,13 @@ export function ReportNavigator() {
         ) : null}
 
         <View className="flex-1">
-          <Stack screenOptions={{ headerShown: false, animation: "slide_from_right" }}>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              animation: "slide_from_left",
+              animationDuration: 320,
+            }}
+          >
             <Stack.Screen name="index" />
             <Stack.Screen name="details" />
             <Stack.Screen name="pick-location" />

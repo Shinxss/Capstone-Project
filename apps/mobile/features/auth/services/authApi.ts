@@ -8,6 +8,7 @@ const SET_PASSWORD_PATH = "/api/auth/set-password";
 
 export type CommunityLoginUser = {
   id: string;
+  lifelineId?: string;
   email: string;
   firstName: string;
   lastName?: string;
@@ -39,6 +40,7 @@ function parseUserPayload(data: any): CommunityLoginUser {
 
   return {
     id,
+    lifelineId: typeof data?.lifelineId === "string" ? data.lifelineId : undefined,
     email: String(data?.email ?? ""),
     firstName: String(data?.firstName ?? ""),
     lastName: typeof data?.lastName === "string" ? data.lastName : undefined,

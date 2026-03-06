@@ -68,6 +68,71 @@ function getHazardGeometryPoints(geometry: unknown): LngLat[] {
   return points;
 }
 
+function spreadOverlappingEmergencyPins(pins: MapEmergencyPin[]) {
+  if (pins.length <= 1) return pins;
+
+  const grouped = new Map<string, MapEmergencyPin[]>();
+  pins.forEach((pin) => {
+    const key = `${pin.lng.toFixed(6)},${pin.lat.toFixed(6)}`;
+    const group = grouped.get(key);
+    if (group) group.push(pin);
+    else grouped.set(key, [pin]);
+  });
+
+  return pins.map((pin) => {
+    const key = `${pin.lng.toFixed(6)},${pin.lat.toFixed(6)}`;
+    const group = grouped.get(key);
+    if (!group || group.length <= 1) return pin;
+
+    const sorted = [...group].sort((a, b) => a.id.localeCompare(b.id));
+    const index = sorted.findIndex((item) => item.id === pin.id);
+    if (index <= 0) return pin; // keep one marker at exact coordinate
+
+    const orbitIndex = index - 1;
+    const ring = Math.floor(orbitIndex / 8);
+    const pos = orbitIndex % 8;
+    const ringSize = Math.min(8, Math.max(1, sorted.length - 1 - ring * 8));
+    const angle = (Math.PI * 2 * pos) / ringSize;
+    const radiusDeg = 0.00015 + ring * 0.0001;
+    const latOffset = radiusDeg * Math.sin(angle);
+    const lngScale = Math.max(Math.cos((pin.lat * Math.PI) / 180), 0.2);
+    const lngOffset = (radiusDeg * Math.cos(angle)) / lngScale;
+
+    return {
+      ...pin,
+      lng: pin.lng + lngOffset,
+      lat: pin.lat + latOffset,
+    };
+  });
+}
+
+function emergencyCoordsFromReport(report: unknown): LngLat | null {
+  const maybeReport = report as {
+    location?: {
+      coordinates?: unknown;
+      coords?: { longitude?: unknown; latitude?: unknown };
+      longitude?: unknown;
+      latitude?: unknown;
+    };
+  };
+
+  const fromCoordinates = toFiniteLngLat(maybeReport?.location?.coordinates);
+  if (fromCoordinates) return fromCoordinates;
+
+  const lng = Number(
+    maybeReport?.location?.coords?.longitude ??
+      maybeReport?.location?.longitude ??
+      Number.NaN
+  );
+  const lat = Number(
+    maybeReport?.location?.coords?.latitude ??
+      maybeReport?.location?.latitude ??
+      Number.NaN
+  );
+  if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null;
+  return [lng, lat];
+}
+
 function isResolvedEmergencyStatus(raw?: string) {
   const up = String(raw ?? "").toUpperCase();
   return up === "RESOLVED" || up === "CANCELLED";
@@ -466,17 +531,22 @@ export function useLguLiveMap() {
 
   const emergencyPins: MapEmergencyPin[] = useMemo(() => {
     if (!showEmergencies) return [];
-    return activeReports
-      .filter((r) => r?.location?.coordinates?.length === 2)
-      .map((r) => {
-        const [lng, lat] = r.location.coordinates;
-        return {
-          id: r._id,
-          type: normalizeEmergencyType(r.emergencyType),
+    const mapped = activeReports.flatMap((report) => {
+      const coords = emergencyCoordsFromReport(report);
+      if (!coords) return [];
+
+      const [lng, lat] = coords;
+      return [
+        {
+          id: String(report._id),
+          type: normalizeEmergencyType(report.emergencyType),
           lng,
           lat,
-        };
-      });
+        } satisfies MapEmergencyPin,
+      ];
+    });
+
+    return spreadOverlappingEmergencyPins(mapped);
   }, [activeReports, showEmergencies]);
 
   const selectedEmergency = useMemo(() => {
@@ -485,8 +555,9 @@ export function useLguLiveMap() {
   }, [activeReports, selectedEmergencyId]);
 
   const selectedEmergencyDetails: LguEmergencyDetails | null = useMemo(() => {
-    if (!selectedEmergency?.location?.coordinates) return null;
-    const [lng, lat] = selectedEmergency.location.coordinates;
+    const coords = emergencyCoordsFromReport(selectedEmergency);
+    if (!coords) return null;
+    const [lng, lat] = coords;
     return {
       id: selectedEmergency._id,
       emergencyType: normalizeEmergencyType(selectedEmergency.emergencyType),

@@ -2,6 +2,7 @@ import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { connectDB } from "../config/db";
 import { User } from "../features/users/user.model";
+import { generateNextLifelineId } from "../features/users/userId.service";
 
 type SeedLguAccountInput = {
   username: string;
@@ -88,12 +89,19 @@ async function seedLGU() {
   let updated = 0;
 
   for (const account of lguAccounts) {
+    const existing = await User.findOne({ username: account.username }).select("lifelineId createdAt").lean();
+    const lifelineId =
+      typeof existing?.lifelineId === "string" && existing.lifelineId.trim().length > 0
+        ? existing.lifelineId
+        : await generateNextLifelineId(existing?.createdAt);
+
     const res = await User.updateOne(
       { username: account.username },
       {
         $set: {
           username: account.username,
           email: account.email,
+          lifelineId,
           role: "LGU",
           firstName: account.firstName,
           lastName: account.lastName,

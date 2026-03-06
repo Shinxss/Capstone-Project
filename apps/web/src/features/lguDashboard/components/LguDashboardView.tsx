@@ -341,7 +341,7 @@ export default function LguDashboardView({
   const activeEmergencies = safeRecent
     .filter((e) => {
       const s = String(e.status || "").toUpperCase();
-      return s === "OPEN" || s === "ACKNOWLEDGED" || s === "RESOLVED";
+      return s === "OPEN" || s === "ACKNOWLEDGED";
     })
     .slice(0, 6);
 

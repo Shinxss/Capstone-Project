@@ -12,12 +12,9 @@ type EmergencyDirectionsSheetProps = {
   emergency: Emergency;
   travelMode: TravelMode;
   route: RouteSummary | null;
-  routeAlternatives: RouteSummary[];
-  selectedRouteIndex: number;
   risk: RiskAssessment | null;
   loadingRoute: boolean;
   onTravelModeChange: (mode: TravelMode) => void;
-  onSelectRoute: (index: number) => void;
   onOptimizeRoute: () => void;
   onBack: () => void;
   onClose: () => void;
@@ -39,12 +36,9 @@ export function EmergencyDirectionsSheet({
   emergency,
   travelMode,
   route,
-  routeAlternatives,
-  selectedRouteIndex,
   risk,
   loadingRoute,
   onTravelModeChange,
-  onSelectRoute,
   onOptimizeRoute,
   onBack,
   onClose,
@@ -125,29 +119,9 @@ export function EmergencyDirectionsSheet({
         </Text>
       </Pressable>
 
-      {routeAlternatives.length > 1 ? (
-        <View className="mt-3 flex-row gap-2">
-          {routeAlternatives.slice(0, 3).map((candidate, index) => {
-            const isSelected = selectedRouteIndex === index;
-            return (
-              <Pressable
-                key={`route-option-${index}`}
-                onPress={() => onSelectRoute(index)}
-                className={`flex-1 rounded-xl border px-3 py-2 ${
-                  isSelected ? "border-blue-600 bg-blue-50" : "border-slate-200 bg-white"
-                }`}
-              >
-                <Text className={`text-xs font-bold ${isSelected ? "text-blue-700" : "text-slate-700"}`}>
-                  Route {index + 1}
-                </Text>
-                <Text className="mt-1 text-[11px] font-semibold text-slate-600">
-                  {candidate.distanceKm.toFixed(1)} km | {candidate.durationMin} min
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      ) : null}
+      <Text className="mt-3 text-[11px] font-semibold text-slate-600">
+        Tap a route line on the map to switch routes.
+      </Text>
 
       {route ? (
         <View className="mt-4 rounded-xl border border-slate-200 bg-white p-3">

@@ -1,4 +1,9 @@
 import { Schema, model, models } from "mongoose";
+import {
+  generateNextLifelineId,
+  LIFELINE_ID_REGEX,
+  normalizeLifelineId,
+} from "./userId.service";
 
 export type UserRole = "ADMIN" | "LGU" | "VOLUNTEER" | "COMMUNITY";
 export type AdminTier = "SUPER" | "CDRRMO";
@@ -8,6 +13,7 @@ export type AuthProvider = "local" | "google" | "both";
 export type UserDoc = {
   username?: string;
   email?: string;
+  lifelineId?: string;
 
   firstName: string;
   lastName: string;
@@ -57,6 +63,17 @@ const UserSchema = new Schema<UserDoc>(
   {
     username: { type: String, trim: true, maxlength: 64 },
     email: { type: String, lowercase: true, trim: true, maxlength: 254 },
+    lifelineId: {
+      type: String,
+      trim: true,
+      set: normalizeLifelineId,
+      validate: {
+        validator(value: string | undefined) {
+          return value === undefined || LIFELINE_ID_REGEX.test(value);
+        },
+        message: "lifelineId must match LF-YYYY-000001",
+      },
+    },
 
     firstName: { type: String, default: "", trim: true, maxlength: 100 },
     lastName: { type: String, default: "", trim: true, maxlength: 100 },
@@ -160,6 +177,24 @@ UserSchema.pre("validate", function normalizeAdminTierForDocument() {
   applyAdminTierDefaultsForDoc(this as unknown as { role?: unknown; adminTier?: unknown });
 });
 
+UserSchema.pre("validate", async function assignLifelineIdForNewDocument() {
+  const doc = this as unknown as {
+    isNew?: boolean;
+    lifelineId?: unknown;
+    createdAt?: Date;
+  };
+
+  if (!doc.isNew) return;
+
+  const existingLifelineId = normalizeLifelineId(doc.lifelineId);
+  if (existingLifelineId) {
+    doc.lifelineId = existingLifelineId;
+    return;
+  }
+
+  doc.lifelineId = await generateNextLifelineId(doc.createdAt);
+});
+
 UserSchema.pre(["updateOne", "findOneAndUpdate", "updateMany"], function normalizeAdminTierForQuery() {
   const update = this.getUpdate() as UserUpdateQuery | UserUpdateQuery[] | undefined;
   if (!update || Array.isArray(update)) return;
@@ -181,6 +216,14 @@ UserSchema.index(
   {
     unique: true,
     partialFilterExpression: { email: { $type: "string", $ne: "" } },
+  }
+);
+
+UserSchema.index(
+  { lifelineId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { lifelineId: { $type: "string", $ne: "" } },
   }
 );
 

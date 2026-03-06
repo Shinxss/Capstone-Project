@@ -151,6 +151,7 @@ export async function adminMfaVerify(req: Request, res: Response) {
         role: "ADMIN",
         user: {
           id: user._id.toString(),
+          lifelineId: user.lifelineId ?? undefined,
           username: user.username,
           role: user.role,
           firstName: user.firstName ?? "",
@@ -174,7 +175,7 @@ export async function me(req: Request, res: Response) {
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
     const user = await User.findById(userId).select(
-      "username firstName lastName email role adminTier lguName lguPosition barangay municipality birthdate contactNo country postalCode avatarUrl authProvider passwordHash googleSub emailVerified volunteerStatus onDuty notificationPrefs"
+      "username firstName lastName email lifelineId role adminTier lguName lguPosition barangay municipality birthdate contactNo country postalCode avatarUrl authProvider passwordHash googleSub emailVerified volunteerStatus onDuty notificationPrefs"
     );
     if (!user) return res.status(404).json({ message: "User not found" });
 

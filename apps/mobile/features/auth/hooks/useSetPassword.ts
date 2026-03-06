@@ -33,6 +33,7 @@ export function useSetPassword() {
     try {
       const user = await setAccountPassword({ newPassword, confirmPassword });
       await updateUser({
+        lifelineId: user.lifelineId,
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,

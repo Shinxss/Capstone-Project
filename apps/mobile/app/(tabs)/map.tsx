@@ -159,6 +159,60 @@ function clampToDagupan([lng, lat]: [number, number]): [number, number] {
   return [clampedLng, clampedLat];
 }
 
+type EmergencyMarkerPlacement = {
+  emergency: Emergency;
+  coordinate: [number, number];
+};
+
+function spreadOverlappingEmergencyMarkers(items: Emergency[]): EmergencyMarkerPlacement[] {
+  if (items.length <= 1) {
+    return items.map((emergency) => ({
+      emergency,
+      coordinate: [emergency.location.lng, emergency.location.lat],
+    }));
+  }
+
+  const grouped = new Map<string, Emergency[]>();
+  items.forEach((emergency) => {
+    const key = `${emergency.location.lng.toFixed(6)},${emergency.location.lat.toFixed(6)}`;
+    const group = grouped.get(key);
+    if (group) group.push(emergency);
+    else grouped.set(key, [emergency]);
+  });
+
+  return items.map((emergency) => {
+    const baseLng = emergency.location.lng;
+    const baseLat = emergency.location.lat;
+    const key = `${baseLng.toFixed(6)},${baseLat.toFixed(6)}`;
+    const group = grouped.get(key);
+    if (!group || group.length <= 1) {
+      return { emergency, coordinate: [baseLng, baseLat] };
+    }
+
+    const sorted = [...group].sort((a, b) => a.id.localeCompare(b.id));
+    const index = sorted.findIndex((item) => item.id === emergency.id);
+    if (index <= 0) {
+      return { emergency, coordinate: [baseLng, baseLat] };
+    }
+
+    const orbitIndex = index - 1;
+    const ring = Math.floor(orbitIndex / 8);
+    const pos = orbitIndex % 8;
+    const ringSize = Math.min(8, Math.max(1, sorted.length - 1 - ring * 8));
+    const angle = (Math.PI * 2 * pos) / ringSize;
+    const radiusDeg = 0.00015 + ring * 0.0001;
+    const latOffset = radiusDeg * Math.sin(angle);
+    const lngScale = Math.max(Math.cos((baseLat * Math.PI) / 180), 0.2);
+    const lngOffset = (radiusDeg * Math.cos(angle)) / lngScale;
+    const [markerLng, markerLat] = clampToDagupan([baseLng + lngOffset, baseLat + latOffset]);
+
+    return {
+      emergency,
+      coordinate: [markerLng, markerLat],
+    };
+  });
+}
+
 /**
  * Big pulse wave (RN Animated version of your CSS)
  */
@@ -355,6 +409,9 @@ export default function MapTab() {
             title: `${normalizeType(item.type)} Emergency`,
             description: item.description,
             images: [],
+            referenceNumber: item.referenceNumber,
+            reportedAt: item.createdAt,
+            status: item.status,
             location: {
               lng: item.location.coords.longitude,
               lat: item.location.coords.latitude,
@@ -434,6 +491,11 @@ export default function MapTab() {
         (r.description ?? "").toLowerCase().includes(q)
     );
   }, [reports, query]);
+
+  const visibleEmergencyMarkers = useMemo(
+    () => spreadOverlappingEmergencyMarkers(filteredReports),
+    [filteredReports]
+  );
 
   const hazardZonesGeoJSON = useMemo(() => {
     const features = (hazardZones ?? [])
@@ -636,9 +698,9 @@ export default function MapTab() {
   });
   const inactiveRouteAlternatives = useMemo(
     () =>
-      emergencySheet.routeAlternatives.filter(
-        (_route, index) => index !== emergencySheet.selectedRouteIndex
-      ),
+      emergencySheet.routeAlternatives
+        .map((candidate, index) => ({ candidate, index }))
+        .filter((entry) => entry.index !== emergencySheet.selectedRouteIndex),
     [emergencySheet.routeAlternatives, emergencySheet.selectedRouteIndex]
   );
 
@@ -734,18 +796,25 @@ export default function MapTab() {
             </MapboxGL.ShapeSource>
           ) : null}
 
-          {emergencySheet.route ? (
+          {emergencySheet.sheetMode === "directions" && emergencySheet.route ? (
             <>
               {inactiveRouteAlternatives.length ? (
                 <MapboxGL.ShapeSource
                   id="routeAlternativeSource"
+                  onPress={(event: any) => {
+                    const feature = Array.isArray(event?.features) ? event.features[0] : null;
+                    const routeIndex = Number(feature?.properties?.routeIndex);
+                    if (Number.isInteger(routeIndex)) {
+                      emergencySheet.selectRoute(routeIndex);
+                    }
+                  }}
                   shape={
                     {
                       type: "FeatureCollection",
-                      features: inactiveRouteAlternatives.map((candidate, index) => ({
+                      features: inactiveRouteAlternatives.map((entry) => ({
                         type: "Feature",
-                        properties: { id: `alt-${index}` },
-                        geometry: candidate.geometry,
+                        properties: { id: `alt-${entry.index}`, routeIndex: entry.index },
+                        geometry: entry.candidate.geometry,
                       })),
                     } as any
                   }
@@ -765,13 +834,16 @@ export default function MapTab() {
 
               <MapboxGL.ShapeSource
                 id="routeSource"
+                onPress={() => {
+                  emergencySheet.selectRoute(emergencySheet.selectedRouteIndex);
+                }}
                 shape={
                   {
                     type: "FeatureCollection",
                     features: [
                       {
                         type: "Feature",
-                        properties: {},
+                        properties: { routeIndex: emergencySheet.selectedRouteIndex },
                         geometry: emergencySheet.route.geometry,
                       },
                     ],
@@ -831,14 +903,14 @@ export default function MapTab() {
           ))}
 
           {canViewEmergencies
-            ? filteredReports.map((r) => (
+            ? visibleEmergencyMarkers.map((entry) => (
                 <MapboxGL.MarkerView
-                  key={r.id}
-                  coordinate={[r.location.lng, r.location.lat]}
+                  key={entry.emergency.id}
+                  coordinate={entry.coordinate}
                   anchor={{ x: 0.5, y: 0.5 }}
                 >
-                  <Pressable onPress={() => openSheet(r)} style={{ padding: 2 }}>
-                    <PulseMarker type={r.type} />
+                  <Pressable onPress={() => openSheet(entry.emergency)} style={{ padding: 2 }}>
+                    <PulseMarker type={entry.emergency.type} />
                   </Pressable>
                 </MapboxGL.MarkerView>
               ))
@@ -934,7 +1006,7 @@ export default function MapTab() {
           top={Math.max(164, insets.top + 140)}
         />
 
-        <EmergencyBottomSheetContainer controller={emergencySheet} />
+        <EmergencyBottomSheetContainer controller={emergencySheet} authToken={token} />
 
         <BottomSheet
           ref={layersSheetRef}

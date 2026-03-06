@@ -17,6 +17,7 @@
     "seed:test-collapse:bolosan": "tsx src/scripts/seedTestCollapseReportBolosan.ts",
     "seed:test-flood:pin": "tsx src/scripts/seedTestFloodReportPinned.ts",
     "seed:floodroads": "tsx src/scripts/seedFloodRoads.ts",
+    "backfill:lifeline-ids": "tsx src/scripts/backfillLifelineIds.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "keywords": [],

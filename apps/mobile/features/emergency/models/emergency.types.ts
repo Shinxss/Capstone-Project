@@ -29,6 +29,7 @@ export type MapEmergencyReport = {
   referenceNumber: string;
   isSos: boolean;
   type: string;
+  status?: "open" | "assigned" | "in_progress" | "resolved" | "cancelled";
   verificationStatus: "not_required" | "pending" | "approved" | "rejected";
   isVisibleOnMap: boolean;
   createdAt: string;
@@ -40,4 +41,32 @@ export type MapEmergencyReport = {
     label?: string;
   };
   description?: string;
+};
+
+export type EmergencyReportDetail = {
+  incidentId: string;
+  referenceNumber: string;
+  type: string;
+  status: "open" | "assigned" | "in_progress" | "resolved" | "cancelled";
+  reportedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  location: {
+    coords: {
+      latitude: number;
+      longitude: number;
+    };
+    label?: string;
+  };
+  photos?: string[];
+  reporter?: {
+    isGuest?: boolean;
+    firstName?: string;
+    lastName?: string;
+    contactNo?: string;
+    barangay?: string;
+    municipality?: string;
+    country?: string;
+    postalCode?: string;
+  };
 };

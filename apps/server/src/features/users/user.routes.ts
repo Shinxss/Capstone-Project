@@ -1,11 +1,20 @@
 import { Router } from "express";
 import { requireAuth } from "../../middlewares/requireAuth";
 import { requireRole } from "../../middlewares/requireRole";
-import { listVolunteers } from "./user.controller";
+import {
+  deleteMyAvatar,
+  getMyProfileSummary,
+  listVolunteers,
+  uploadMyAvatar,
+} from "./user.controller";
 
 const router = Router();
 
-// ✅ LGU/Admin: list volunteers for dispatching
+router.get("/me/profile-summary", requireAuth, getMyProfileSummary);
+router.post("/me/avatar", requireAuth, uploadMyAvatar);
+router.delete("/me/avatar", requireAuth, deleteMyAvatar);
+
+// LGU/Admin: list volunteers for dispatching
 // GET /api/users/volunteers
 router.get("/volunteers", requireAuth, requireRole("LGU", "ADMIN"), listVolunteers);
 

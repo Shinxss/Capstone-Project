@@ -24,6 +24,15 @@ function fullName(first?: string, last?: string) {
   return name.length > 0 ? name : undefined;
 }
 
+function toStatus(raw?: string) {
+  return String(raw ?? "").trim().toUpperCase();
+}
+
+function isActiveEmergencyStatus(raw?: string) {
+  const status = toStatus(raw);
+  return status !== "RESOLVED" && status !== "CANCELLED";
+}
+
 export function useLguDashboard() {
   const { reports, loading, error, refetch } = useLguEmergencies();
   const {
@@ -73,7 +82,7 @@ export function useLguDashboard() {
         return {
           id: r._id,
           type: normalizeEmergencyType(r.emergencyType),
-          status: r.status,
+          status: toStatus(r.status),
           lng,
           lat,
           notes: r.notes,
@@ -86,12 +95,20 @@ export function useLguDashboard() {
       .filter((x) => Number.isFinite(x.lng) && Number.isFinite(x.lat));
   }, [reports]);
 
+  const activeItems = useMemo(
+    () => items.filter((item) => isActiveEmergencyStatus(item.status)),
+    [items]
+  );
+
   const stats: DashboardStats = useMemo(() => {
     const total = items.length;
-    const open = items.filter((i) => i.status === "OPEN").length;
-    const acknowledged = items.filter((i) => i.status === "ACKNOWLEDGED").length;
-    const resolved = items.filter((i) => i.status === "RESOLVED").length;
-    const active = items.filter((i) => i.status === "OPEN" || i.status === "ACKNOWLEDGED").length;
+    const open = items.filter((i) => toStatus(i.status) === "OPEN").length;
+    const acknowledged = items.filter((i) => toStatus(i.status) === "ACKNOWLEDGED").length;
+    const resolved = items.filter((i) => toStatus(i.status) === "RESOLVED").length;
+    const active = items.filter((i) => {
+      const status = toStatus(i.status);
+      return status === "OPEN" || status === "ACKNOWLEDGED";
+    }).length;
     return {
       total,
       active,
@@ -110,14 +127,14 @@ export function useLguDashboard() {
 
   const recent = useMemo(() => {
     // newest first (reportedAt or createdAt)
-    return [...items]
+    return [...activeItems]
       .sort((a, b) => {
         const at = a.reportedAt ? new Date(a.reportedAt).getTime() : 0;
         const bt = b.reportedAt ? new Date(b.reportedAt).getTime() : 0;
         return bt - at;
       })
       .slice(0, 7);
-  }, [items]);
+  }, [activeItems]);
 
   return {
     loading: loading || hazardsLoading,
@@ -126,7 +143,7 @@ export function useLguDashboard() {
     stats,
     statsSyncing,
     statsError,
-    pins: items,
+    pins: activeItems,
     recent,
 
     hazardZones,

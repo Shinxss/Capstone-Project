@@ -16,6 +16,9 @@ export type Emergency = {
   title: string;
   description?: string;
   images: string[];
+  referenceNumber?: string;
+  reportedAt?: string;
+  status?: string;
   location: {
     lat: number;
     lng: number;

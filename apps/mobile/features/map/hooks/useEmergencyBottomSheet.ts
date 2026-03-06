@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Alert } from "react-native";
 import type { Emergency, RiskAssessment, RouteSummary, TravelMode } from "../models/map.types";
 import {
@@ -8,6 +8,8 @@ import {
   type DirectionPoint,
   type RoutingContextWeather,
 } from "../services/routingApi";
+import type { EmergencyReportDetail } from "../../emergency/models/emergency.types";
+import { fetchEmergencyReportDetail } from "../../emergency/services/emergencyApi";
 
 type ApiErrorShape = {
   message?: string;
@@ -22,11 +24,22 @@ type ApiErrorShape = {
 
 type UseEmergencyBottomSheetOptions = {
   resolveOrigin: () => Promise<DirectionPoint | null>;
+  resolveEtaOrigin?: () => Promise<DirectionPoint | null>;
   getWeatherContext?: () => RoutingContextWeather | null;
+};
+
+type EtaSummary = {
+  durationMin: number;
+  distanceKm: number;
 };
 
 export type EmergencyBottomSheetController = {
   selectedEmergency: Emergency | null;
+  emergencyDetail: EmergencyReportDetail | null;
+  loadingDetail: boolean;
+  detailError: string | null;
+  etaSummary: EtaSummary | null;
+  loadingEta: boolean;
   sheetMode: "overview" | "directions";
   isMinimized: boolean;
   travelMode: TravelMode;
@@ -55,12 +68,89 @@ function parseApiError(error: unknown): { status?: number; message: string } {
   return { status, message };
 }
 
+function toFiniteNumber(value: unknown, fallback = Number.POSITIVE_INFINITY) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function isRainingWeather(context?: RoutingContextWeather | null) {
+  const rainfall = Number(context?.rainfall_mm ?? 0);
+  const rainingFlag = Number(context?.is_raining ?? 0);
+  return rainfall > 0 || rainingFlag === 1;
+}
+
+function pickNearestRouteIndex(routes: RouteSummary[]) {
+  if (!routes.length) return 0;
+  let bestIndex = 0;
+  let bestDistance = toFiniteNumber(routes[0]?.distanceKm);
+  let bestDuration = toFiniteNumber(routes[0]?.durationMin);
+
+  for (let index = 1; index < routes.length; index += 1) {
+    const candidate = routes[index];
+    if (!candidate) continue;
+    const distance = toFiniteNumber(candidate.distanceKm);
+    const duration = toFiniteNumber(candidate.durationMin);
+
+    if (distance < bestDistance || (distance === bestDistance && duration < bestDuration)) {
+      bestIndex = index;
+      bestDistance = distance;
+      bestDuration = duration;
+    }
+  }
+
+  return bestIndex;
+}
+
+function pickPreferredRouteIndex(input: {
+  routes: RouteSummary[];
+  riskByIndex: Record<number, RiskAssessment>;
+  isRaining: boolean;
+}) {
+  if (!input.routes.length) return 0;
+
+  if (!input.isRaining) {
+    return pickNearestRouteIndex(input.routes);
+  }
+
+  let bestIndex = 0;
+  let bestRoutingCost = toFiniteNumber(input.riskByIndex[0]?.routingCost);
+  let bestDuration = toFiniteNumber(input.routes[0]?.durationMin);
+  let bestDistance = toFiniteNumber(input.routes[0]?.distanceKm);
+
+  for (let index = 1; index < input.routes.length; index += 1) {
+    const route = input.routes[index];
+    if (!route) continue;
+
+    const routingCost = toFiniteNumber(input.riskByIndex[index]?.routingCost);
+    const duration = toFiniteNumber(route.durationMin);
+    const distance = toFiniteNumber(route.distanceKm);
+    const isBetter =
+      routingCost < bestRoutingCost ||
+      (routingCost === bestRoutingCost && duration < bestDuration) ||
+      (routingCost === bestRoutingCost && duration === bestDuration && distance < bestDistance);
+
+    if (isBetter) {
+      bestIndex = index;
+      bestRoutingCost = routingCost;
+      bestDuration = duration;
+      bestDistance = distance;
+    }
+  }
+
+  return bestIndex;
+}
+
 export function useEmergencyBottomSheet(
   options: UseEmergencyBottomSheetOptions
 ): EmergencyBottomSheetController {
-  const { resolveOrigin, getWeatherContext } = options;
+  const { resolveOrigin, resolveEtaOrigin, getWeatherContext } = options;
 
   const [selectedEmergency, setSelectedEmergency] = useState<Emergency | null>(null);
+  const [emergencyDetail, setEmergencyDetail] = useState<EmergencyReportDetail | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [etaSummary, setEtaSummary] = useState<EtaSummary | null>(null);
+  const [loadingEta, setLoadingEta] = useState(false);
   const [sheetMode, setSheetMode] = useState<"overview" | "directions">("overview");
   const [isMinimized, setIsMinimized] = useState(false);
   const [travelMode, setTravelModeState] = useState<TravelMode>("drive");
@@ -70,6 +160,7 @@ export function useEmergencyBottomSheet(
   const [selectedRouteIndex, setSelectedRouteIndex] = useState(0);
   const [risk, setRisk] = useState<RiskAssessment | null>(null);
   const [loadingRoute, setLoadingRoute] = useState(false);
+  const [overviewReloadKey, setOverviewReloadKey] = useState(0);
 
   const closeSheet = useCallback(() => {
     setSelectedEmergency(null);
@@ -81,6 +172,12 @@ export function useEmergencyBottomSheet(
     setRouteRiskByIndex({});
     setSelectedRouteIndex(0);
     setRisk(null);
+    setEmergencyDetail(null);
+    setLoadingDetail(false);
+    setDetailError(null);
+    setEtaSummary(null);
+    setLoadingEta(false);
+    setOverviewReloadKey(0);
     setLoadingRoute(false);
   }, []);
 
@@ -92,6 +189,12 @@ export function useEmergencyBottomSheet(
     setRouteRiskByIndex({});
     setSelectedRouteIndex(0);
     setRisk(null);
+    setEmergencyDetail(null);
+    setLoadingDetail(false);
+    setDetailError(null);
+    setEtaSummary(null);
+    setLoadingEta(false);
+    setOverviewReloadKey((current) => current + 1);
   }, []);
 
   const openEmergency = useCallback((emergency: Emergency) => {
@@ -104,6 +207,11 @@ export function useEmergencyBottomSheet(
     setRouteRiskByIndex({});
     setSelectedRouteIndex(0);
     setRisk(null);
+    setEmergencyDetail(null);
+    setLoadingDetail(false);
+    setDetailError(null);
+    setEtaSummary(null);
+    setLoadingEta(false);
   }, []);
 
   const minimizeSheet = useCallback(() => {
@@ -123,6 +231,8 @@ export function useEmergencyBottomSheet(
 
       setLoadingRoute(true);
       try {
+        const contextWeather = getWeatherContext?.() ?? undefined;
+        const raining = isRainingWeather(contextWeather);
         const evaluated = await getRouteAlternativesWithEvaluation({
           from: origin,
           to: {
@@ -130,14 +240,19 @@ export function useEmergencyBottomSheet(
             lng: selectedEmergency.location.lng,
           },
           mode,
-          contextWeather: getWeatherContext?.() ?? undefined,
+          contextWeather,
         });
-        const primaryRoute = evaluated.routes[0] ?? null;
+        const selectedIndex = pickPreferredRouteIndex({
+          routes: evaluated.routes,
+          riskByIndex: evaluated.riskByIndex,
+          isRaining: raining,
+        });
+        const primaryRoute = evaluated.routes[selectedIndex] ?? evaluated.routes[0] ?? null;
         setRouteAlternatives(evaluated.routes);
         setRouteRiskByIndex(evaluated.riskByIndex);
-        setSelectedRouteIndex(0);
+        setSelectedRouteIndex(selectedIndex);
         setRoute(primaryRoute);
-        setRisk(evaluated.riskByIndex[0] ?? null);
+        setRisk(evaluated.riskByIndex[selectedIndex] ?? null);
       } catch {
         try {
           const nextRoutes = await getRouteAlternatives({
@@ -148,10 +263,11 @@ export function useEmergencyBottomSheet(
             },
             mode,
           });
-          const primaryRoute = nextRoutes[0] ?? null;
+          const selectedIndex = pickNearestRouteIndex(nextRoutes);
+          const primaryRoute = nextRoutes[selectedIndex] ?? nextRoutes[0] ?? null;
           setRouteAlternatives(nextRoutes);
           setRouteRiskByIndex({});
-          setSelectedRouteIndex(0);
+          setSelectedRouteIndex(selectedIndex);
           setRoute(primaryRoute);
           setRisk(null);
         } catch {
@@ -163,6 +279,129 @@ export function useEmergencyBottomSheet(
     },
     [getWeatherContext, resolveOrigin, selectedEmergency]
   );
+
+  useEffect(() => {
+    if (!selectedEmergency) return;
+    let cancelled = false;
+
+    const activeEmergency = selectedEmergency;
+    setEmergencyDetail(null);
+    setDetailError(null);
+    setLoadingDetail(true);
+    setEtaSummary(null);
+    setLoadingEta(true);
+
+    void (async () => {
+      try {
+        const detail = await fetchEmergencyReportDetail(activeEmergency.id);
+        if (cancelled) return;
+
+        setEmergencyDetail(detail);
+        setSelectedEmergency((current) => {
+          if (!current || current.id !== activeEmergency.id) return current;
+          return {
+            ...current,
+            referenceNumber:
+              current.referenceNumber || String(detail.referenceNumber ?? "").trim() || current.referenceNumber,
+            reportedAt:
+              current.reportedAt ||
+              String(detail.reportedAt ?? detail.createdAt ?? "").trim() ||
+              current.reportedAt,
+            status: current.status || String(detail.status ?? "").trim() || current.status,
+            location: {
+              ...current.location,
+              label:
+                current.location.label ||
+                String(detail.location?.label ?? "").trim() ||
+                current.location.label,
+            },
+          };
+        });
+      } catch (error) {
+        if (cancelled) return;
+        const parsed = parseApiError(error);
+        setDetailError(parsed.message);
+      } finally {
+        if (!cancelled) {
+          setLoadingDetail(false);
+        }
+      }
+    })();
+
+    void (async () => {
+      try {
+        const originResolver = resolveEtaOrigin ?? resolveOrigin;
+        const origin = await originResolver();
+        if (cancelled) return;
+
+        if (!origin) {
+          setEtaSummary(null);
+          return;
+        }
+
+        try {
+          const contextWeather = getWeatherContext?.() ?? undefined;
+          const raining = isRainingWeather(contextWeather);
+          const evaluated = await getRouteAlternativesWithEvaluation({
+            from: origin,
+            to: {
+              lat: activeEmergency.location.lat,
+              lng: activeEmergency.location.lng,
+            },
+            mode: "drive",
+            contextWeather,
+          });
+          if (cancelled) return;
+          const selectedIndex = pickPreferredRouteIndex({
+            routes: evaluated.routes,
+            riskByIndex: evaluated.riskByIndex,
+            isRaining: raining,
+          });
+          const top = evaluated.routes[selectedIndex] ?? evaluated.routes[0] ?? null;
+          setEtaSummary(
+            top
+              ? {
+                  durationMin: top.durationMin,
+                  distanceKm: top.distanceKm,
+                }
+              : null
+          );
+        } catch {
+          const fallbackRoutes = await getRouteAlternatives({
+            from: origin,
+            to: {
+              lat: activeEmergency.location.lat,
+              lng: activeEmergency.location.lng,
+            },
+            mode: "drive",
+          });
+          if (cancelled) return;
+          const selectedIndex = pickNearestRouteIndex(fallbackRoutes);
+          const top = fallbackRoutes[selectedIndex] ?? fallbackRoutes[0] ?? null;
+          setEtaSummary(
+            top
+              ? {
+                  durationMin: top.durationMin,
+                  distanceKm: top.distanceKm,
+                }
+              : null
+          );
+        }
+      } catch {
+        if (!cancelled) {
+          setEtaSummary(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingEta(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [overviewReloadKey, selectedEmergency?.id]);
 
   const fetchRouteAction = useCallback(async () => {
     await fetchRouteByMode(travelMode);
@@ -206,6 +445,13 @@ export function useEmergencyBottomSheet(
     const origin = await resolveOrigin();
     if (!origin) return;
 
+    const contextWeather = getWeatherContext?.() ?? undefined;
+    const raining = isRainingWeather(contextWeather);
+    if (!raining) {
+      await fetchRouteByMode(travelMode);
+      return;
+    }
+
     setLoadingRoute(true);
     try {
       const optimized = await optimizeRoute({
@@ -215,7 +461,7 @@ export function useEmergencyBottomSheet(
           lng: selectedEmergency.location.lng,
         },
         mode: travelMode,
-        contextWeather: getWeatherContext?.() ?? undefined,
+        contextWeather,
       });
 
       const applyOptimizedResult = (result: typeof optimized) => {
@@ -253,7 +499,7 @@ export function useEmergencyBottomSheet(
                       },
                       mode: travelMode,
                       allowNonPassableFallback: true,
-                      contextWeather: getWeatherContext?.() ?? undefined,
+                      contextWeather,
                     });
 
                     setRoute(fallbackOptimized.route);
@@ -288,13 +534,18 @@ export function useEmergencyBottomSheet(
             lng: selectedEmergency.location.lng,
           },
           mode: travelMode,
-          contextWeather: getWeatherContext?.() ?? undefined,
+          contextWeather,
+        });
+        const selectedIndex = pickPreferredRouteIndex({
+          routes: fallbackEvaluated.routes,
+          riskByIndex: fallbackEvaluated.riskByIndex,
+          isRaining: true,
         });
         setRouteAlternatives(fallbackEvaluated.routes);
         setRouteRiskByIndex(fallbackEvaluated.riskByIndex);
-        setSelectedRouteIndex(0);
-        setRoute(fallbackEvaluated.routes[0] ?? null);
-        setRisk(fallbackEvaluated.riskByIndex[0] ?? null);
+        setSelectedRouteIndex(selectedIndex);
+        setRoute(fallbackEvaluated.routes[selectedIndex] ?? fallbackEvaluated.routes[0] ?? null);
+        setRisk(fallbackEvaluated.riskByIndex[selectedIndex] ?? null);
       } catch {
         try {
           const fallbackRoutes = await getRouteAlternatives({
@@ -305,10 +556,11 @@ export function useEmergencyBottomSheet(
             },
             mode: travelMode,
           });
+          const selectedIndex = pickNearestRouteIndex(fallbackRoutes);
           setRouteAlternatives(fallbackRoutes);
           setRouteRiskByIndex({});
-          setSelectedRouteIndex(0);
-          setRoute(fallbackRoutes[0] ?? null);
+          setSelectedRouteIndex(selectedIndex);
+          setRoute(fallbackRoutes[selectedIndex] ?? fallbackRoutes[0] ?? null);
           setRisk(null);
         } catch {
           Alert.alert("Directions unavailable", "Unable to fetch route. Try again.");
@@ -317,10 +569,15 @@ export function useEmergencyBottomSheet(
     } finally {
       setLoadingRoute(false);
     }
-  }, [getWeatherContext, resolveOrigin, selectedEmergency, travelMode]);
+  }, [fetchRouteByMode, getWeatherContext, resolveOrigin, selectedEmergency, travelMode]);
 
   return {
     selectedEmergency,
+    emergencyDetail,
+    loadingDetail,
+    detailError,
+    etaSummary,
+    loadingEta,
     sheetMode,
     isMinimized,
     travelMode,

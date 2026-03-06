@@ -73,7 +73,10 @@ export default function TabLayout() {
   return (
     <>
       <Tabs
-        screenOptions={{ headerShown: false }}
+        screenOptions={{
+          headerShown: false,
+          animation: "shift",
+        }}
         tabBar={(props) => (
           <BottomNav
             {...props}
@@ -90,7 +93,12 @@ export default function TabLayout() {
             tabPress: onProtectedTabPress,
           }}
         />
-        <Tabs.Screen name="more" />
+        <Tabs.Screen
+          name="more"
+          options={{
+            title: "Profile",
+          }}
+        />
       </Tabs>
 
       {reportPillVisible ? (

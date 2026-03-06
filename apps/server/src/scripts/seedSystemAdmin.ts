@@ -2,6 +2,7 @@ import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { connectDB } from "../config/db";
 import { User } from "../features/users/user.model";
+import { generateNextLifelineId } from "../features/users/userId.service";
 
 async function seedSystemAdmin() {
   const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGO_URI || "";
@@ -16,6 +17,11 @@ async function seedSystemAdmin() {
   if (!password) throw new Error("Missing SYSTEM_ADMIN_PASSWORD in .env");
 
   const passwordHash = await bcrypt.hash(password, 10);
+  const existing = await User.findOne({ username }).select("lifelineId createdAt").lean();
+  const lifelineId =
+    typeof existing?.lifelineId === "string" && existing.lifelineId.trim().length > 0
+      ? existing.lifelineId
+      : await generateNextLifelineId(existing?.createdAt);
 
   const res = await User.updateOne(
     { username },
@@ -23,6 +29,7 @@ async function seedSystemAdmin() {
       $set: {
         username,
         email,
+        lifelineId,
         role: "ADMIN",
         adminTier: "SUPER",
         firstName: "System",

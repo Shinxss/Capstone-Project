@@ -102,11 +102,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     await setUserSession({
       id: nextUser.id,
+      lifelineId: nextUser.lifelineId,
       firstName: nextUser.firstName ?? "",
       lastName: nextUser.lastName,
       email: nextUser.email,
       role: nextUser.role,
       volunteerStatus: nextUser.volunteerStatus,
+      contactNo: nextUser.contactNo,
+      barangay: nextUser.barangay,
+      municipality: nextUser.municipality,
+      avatarUrl: nextUser.avatarUrl,
       authProvider: nextUser.authProvider,
       emailVerified: nextUser.emailVerified,
       passwordSet: nextUser.passwordSet,

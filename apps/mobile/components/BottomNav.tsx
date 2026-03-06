@@ -18,11 +18,11 @@ type Props = BottomTabBarProps & {
 
 type TabKey = "index" | "map" | "alert" | "more";
 
-const TABS: Array<{ name: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
+const TABS: { name: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { name: "index", label: "Home", icon: "home-outline" },
   { name: "map", label: "Map", icon: "map-outline" },
   { name: "alert", label: "Tasks", icon: "clipboard-outline" },
-  { name: "more", label: "More", icon: "ellipsis-horizontal" },
+  { name: "more", label: "Profile", icon: "person-outline" },
 ];
 
 export default function BottomNav(props: Props) {

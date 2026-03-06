@@ -1,6 +1,7 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import {
   Animated,
+  Image,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -12,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { WeatherSeverity } from "../../weather/services/weatherApi";
 import { useTheme } from "../../theme/useTheme";
+import { resolveAvatarUri } from "../../profile/utils/avatarUrl";
 
 type AlertIconName = React.ComponentProps<typeof Ionicons>["name"];
 type AlertTheme = {
@@ -91,6 +93,9 @@ function shadeHex(color: string, amount: number): string | null {
 
 type Props = {
   displayName: string;
+  avatarUrl?: string | null;
+  avatarAuthToken?: string | null;
+  onPressProfile?: () => void;
   holding: boolean;
   remainingSeconds: number;
   alertTitle: string;
@@ -116,6 +121,9 @@ type Props = {
 
 export function HomeView({
   displayName,
+  avatarUrl,
+  avatarAuthToken,
+  onPressProfile,
   holding,
   remainingSeconds,
   alertTitle,
@@ -148,6 +156,7 @@ export function HomeView({
     : (shadeHex(alertTheme.retryColor, 0.16) ?? alertTheme.retryColor);
   const pulseScale = useRef(new Animated.Value(1)).current;
   const pulseOpacity = useRef(new Animated.Value(0)).current;
+  const resolvedAvatarUri = useMemo(() => resolveAvatarUri(avatarUrl), [avatarUrl]);
 
   useEffect(() => {
     if (!holding) {
@@ -211,17 +220,32 @@ export function HomeView({
         {/* Top bar */}
         <View style={styles.topRow}>
           <View style={styles.profile}>
-            <View
-              style={[
+            <Pressable
+              onPress={onPressProfile}
+              disabled={!onPressProfile}
+              hitSlop={8}
+              style={({ pressed }) => [
                 styles.avatar,
                 {
                   borderColor: isDark ? "#2563EB" : "#EF4444",
                   backgroundColor: isDark ? "#0E1626" : "#FFFFFF",
                 },
+                onPressProfile && pressed ? { opacity: 0.78 } : null,
               ]}
             >
-              <Ionicons name="person" size={16} color={isDark ? "#E2E8F0" : "#111827"} />
-            </View>
+              {resolvedAvatarUri ? (
+                <Image
+                  source={{
+                    uri: resolvedAvatarUri,
+                    ...(avatarAuthToken ? { headers: { Authorization: `Bearer ${avatarAuthToken}` } } : {}),
+                  }}
+                  style={styles.avatarImage}
+                  resizeMode="cover"
+                />
+              ) : (
+                <Ionicons name="person" size={16} color={isDark ? "#E2E8F0" : "#111827"} />
+              )}
+            </Pressable>
             <View>
               <Text style={[styles.hello, isDark ? styles.helloDark : null]}>Hi, {displayName}</Text>
               <Text style={[styles.sub, isDark ? styles.subDark : null]}>How are you today</Text>
@@ -390,6 +414,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
     borderColor: "#EF4444",
+  },
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 100,
   },
   hello: { fontSize: 18, color: "#111827", fontWeight: "700" },
   helloDark: { color: "#F1F5F9" },

@@ -460,6 +460,9 @@ export default function HomeScreen() {
     <>
       <HomeView
         displayName={displayName}
+        avatarUrl={session?.mode === "user" ? session.user.avatarUrl : null}
+        avatarAuthToken={session?.mode === "user" ? session.user.accessToken : null}
+        onPressProfile={() => router.push("/(tabs)/more")}
         holding={holding}
         remainingSeconds={remainingSeconds}
         alertTitle={weatherCard.title}

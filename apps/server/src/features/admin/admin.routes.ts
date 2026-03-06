@@ -7,6 +7,7 @@ import { requireAdminTier } from "../../middlewares/requireAdminTier";
 import { requirePerm } from "../../middlewares/requirePerm";
 import { validate } from "../../middlewares/validate";
 import { User } from "../users/user.model";
+import { generateNextLifelineId } from "../users/userId.service";
 import { AUDIT_EVENT } from "../audit/audit.constants";
 import { logAudit } from "../audit/audit.service";
 import { BarangayModel } from "../barangays/barangay.model";
@@ -162,7 +163,7 @@ router.get(
     const [items, total] = await Promise.all([
       User.find(filter)
         .select(
-          "username email firstName lastName role adminTier lguName lguPosition barangay municipality volunteerStatus isActive createdAt updatedAt"
+          "username email lifelineId firstName lastName role adminTier lguName lguPosition barangay municipality volunteerStatus isActive createdAt updatedAt"
         )
         .sort({ createdAt: -1, _id: -1 })
         .skip((page - 1) * limit)
@@ -215,9 +216,11 @@ router.post(
     }
 
     const passwordHash = await bcrypt.hash(payload.password, 10);
+    const lifelineId = await generateNextLifelineId();
     const created = await User.create({
       username: payload.username,
       email: payload.email,
+      lifelineId,
       passwordHash,
       role: payload.role,
       adminTier: payload.role === "ADMIN" ? "CDRRMO" : undefined,
@@ -296,7 +299,7 @@ router.patch(
 
       const updated = await User.findByIdAndUpdate(targetUserId, { $set: updates }, { new: true })
         .select(
-          "username email firstName lastName role adminTier lguName lguPosition barangay municipality volunteerStatus isActive createdAt updatedAt"
+          "username email lifelineId firstName lastName role adminTier lguName lguPosition barangay municipality volunteerStatus isActive createdAt updatedAt"
         )
         .lean();
 
@@ -328,7 +331,7 @@ router.patch(
 
     const updated = await User.findByIdAndUpdate(targetUserId, { $set: parsed.data }, { new: true })
       .select(
-        "username email firstName lastName role adminTier lguName lguPosition barangay municipality volunteerStatus isActive createdAt updatedAt"
+        "username email lifelineId firstName lastName role adminTier lguName lguPosition barangay municipality volunteerStatus isActive createdAt updatedAt"
       )
       .lean();
 
@@ -378,7 +381,7 @@ async function updateUserActivation(req: any, res: any, isActive: boolean) {
     { new: true }
   )
     .select(
-      "username email firstName lastName role adminTier lguName lguPosition barangay municipality volunteerStatus isActive createdAt updatedAt"
+      "username email lifelineId firstName lastName role adminTier lguName lguPosition barangay municipality volunteerStatus isActive createdAt updatedAt"
     )
     .lean();
 

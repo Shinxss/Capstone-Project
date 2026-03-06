@@ -27,7 +27,7 @@ export default function VerifiedVolunteerDetailsModal(props: {
         <div className="p-5 border-b flex items-center justify-between dark:border-[#162544]">
           <div>
             <div className="text-lg font-black text-gray-900 dark:text-slate-100">Verified Volunteer</div>
-            <div className="text-sm text-gray-600 dark:text-slate-400">Volunteer profile (from verified application)</div>
+            <div className="text-sm text-gray-600 dark:text-slate-400">Volunteer profile and verification details</div>
           </div>
           <button
             onClick={onClose}
