@@ -32,9 +32,10 @@ export default function ProfileActivitiesGrid({
     () => [
       {
         key: "completedTasks",
-        label: "Completed Tasks",
+        label: "Completed\nTasks",
         value: formatInteger(summary.stats.completedTasks),
-        unit: "tasks",
+        unit: "",
+        subtitle: "tasks completed",
         icon: "checkmark-circle-outline" as const,
         iconBgLight: "#DCFCE7",
         iconBgDark: "rgba(34,197,94,0.2)",
@@ -43,9 +44,10 @@ export default function ProfileActivitiesGrid({
       },
       {
         key: "volunteerHours",
-        label: "Volunteer Hours",
+        label: "Volunteer\nHours",
         value: formatMetricValue(summary.stats.volunteerHours),
-        unit: "hours",
+        unit: "h",
+        subtitle: "hours served",
         icon: "time-outline" as const,
         iconBgLight: "#DBEAFE",
         iconBgDark: "rgba(59,130,246,0.22)",
@@ -54,12 +56,13 @@ export default function ProfileActivitiesGrid({
       },
       {
         key: "avgResponseTimeMinutes",
-        label: "Avg Response Time",
+        label: "Avg Response\nTime",
         value:
           summary.stats.avgResponseTimeMinutes === null
             ? "—"
             : formatMetricValue(summary.stats.avgResponseTimeMinutes),
-        unit: summary.stats.avgResponseTimeMinutes === null ? "" : "min",
+        unit: summary.stats.avgResponseTimeMinutes === null ? "" : "m",
+        subtitle: "average response",
         icon: "flash-outline" as const,
         iconBgLight: "#FEF3C7",
         iconBgDark: "rgba(245,158,11,0.2)",
@@ -68,9 +71,10 @@ export default function ProfileActivitiesGrid({
       },
       {
         key: "verifiedTasks",
-        label: "Verified Tasks",
+        label: "Verified\nTasks",
         value: formatInteger(summary.stats.verifiedTasks),
-        unit: "tasks",
+        unit: "",
+        subtitle: "verified tasks",
         icon: "shield-checkmark-outline" as const,
         iconBgLight: "#FEE2E2",
         iconBgDark: "rgba(239,68,68,0.2)",
@@ -82,7 +86,7 @@ export default function ProfileActivitiesGrid({
   );
 
   return (
-    <View className="mt-4">
+    <View style={{ marginTop: 7 }}>
       <View
         style={{
           borderRadius: 0,
@@ -92,7 +96,7 @@ export default function ProfileActivitiesGrid({
           paddingHorizontal: 20,
           paddingTop: 12,
           paddingBottom: 14,
-          backgroundColor: "#FFFFFF",
+          backgroundColor: isDark ? "#0B1220" : "#FFFFFF",
         }}
       >
         {isCommunityUser ? (
@@ -141,13 +145,14 @@ export default function ProfileActivitiesGrid({
                   key={card.key}
                   style={{
                     width: "48.5%",
-                    minHeight: 96,
+                    aspectRatio: 1,
                     borderRadius: 12,
                     borderWidth: 1,
-                    paddingHorizontal: 12,
-                    paddingVertical: 10,
+                    paddingHorizontal: 16,
+                    paddingVertical: 20,
                     backgroundColor: isDark ? "#0E1626" : "#FFFFFF",
                     borderColor: isDark ? "#162544" : "#E5E7EB",
+                    justifyContent: "space-between",
                   }}
                 >
                   <View
@@ -162,17 +167,18 @@ export default function ProfileActivitiesGrid({
                         flex: 1,
                         paddingRight: 8,
                         color: isDark ? "#CBD5E1" : "#64748B",
-                        fontSize: 12,
+                        fontSize: 13,
                         fontWeight: "600",
-                        lineHeight: 15,
+                        lineHeight: 17,
                       }}
+                      numberOfLines={2}
                     >
                       {card.label}
                     </Text>
                     <View
                       style={{
-                        width: 30,
-                        height: 30,
+                        width: 44,
+                        height: 44,
                         borderRadius: 14,
                         alignItems: "center",
                         justifyContent: "center",
@@ -181,29 +187,42 @@ export default function ProfileActivitiesGrid({
                     >
                       <Ionicons
                         name={card.icon}
-                        size={20}
+                        size={26}
                         color={isDark ? card.iconColorDark : card.iconColorLight}
                       />
                     </View>
                   </View>
 
-                  <View style={{ marginTop: 10, flexDirection: "row", alignItems: "flex-end" }}>
-                    <Text className="text-[34px] leading-[36px] font-extrabold text-slate-900 dark:text-slate-100">
-                      {card.value}
-                    </Text>
-                    {card.unit ? (
-                      <Text
-                        style={{
-                          marginLeft: 4,
-                          marginBottom: 4,
-                          color: isDark ? "#94A3B8" : "#6B7280",
-                          fontSize: 12,
-                          fontWeight: "600",
-                        }}
-                      >
-                        {card.unit}
+                  <View style={{ marginTop: 8 }}>
+                    <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
+                      <Text className="text-[38px] leading-[40px] font-extrabold text-slate-900 dark:text-slate-100">
+                        {card.value}
                       </Text>
-                    ) : null}
+                      {card.unit ? (
+                        <Text
+                          style={{
+                            marginLeft: 4,
+                            marginBottom: 5,
+                            color: isDark ? "#94A3B8" : "#6B7280",
+                            fontSize: 14,
+                            fontWeight: "700",
+                          }}
+                        >
+                          {card.unit}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <Text
+                      style={{
+                        marginTop: 3,
+                        color: isDark ? "#64748B" : "#94A3B8",
+                        fontSize: 12,
+                        fontWeight: "600",
+                      }}
+                      numberOfLines={1}
+                    >
+                      {card.subtitle}
+                    </Text>
                   </View>
                 </View>
               ))}

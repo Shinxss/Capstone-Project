@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, ScrollView, Text, View } from "react-native";
+import { Alert, Pressable, Text, View } from "react-native";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
@@ -7,6 +7,8 @@ import { useRouter } from "expo-router";
 import type { DispatchOffer } from "../../features/dispatch/models/dispatch";
 import { completeDispatch, fetchMyCurrentDispatch, uploadDispatchProof } from "../../features/dispatch/services/dispatchApi";
 import { useTasksAccess } from "../../features/auth/hooks/useTasksAccess";
+import { usePullToRefresh } from "../../features/common/hooks/usePullToRefresh";
+import { RefreshableScrollScreen } from "../../features/common/components/RefreshableScrollScreen";
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || "";
 // Backend must still enforce auth + role checks on Tasks APIs (return 401/403 as needed).
@@ -35,22 +37,34 @@ export default function TasksScreen() {
   const hasTask = !!task;
   const proofs = useMemo(() => (task?.proofs ?? []).slice().reverse(), [task]);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (options?: { showLoading?: boolean }) => {
+    const showLoading = options?.showLoading ?? true;
+
     if (!canAccessTasks) {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
       return;
     }
 
-    setLoading(true);
+    if (showLoading) {
+      setLoading(true);
+    }
     try {
       const current = await fetchMyCurrentDispatch();
       setTask(current);
     } catch {
       // ignore
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   }, [canAccessTasks]);
+  const refreshTasks = useCallback(async () => {
+    await refresh({ showLoading: false });
+  }, [refresh]);
+  const { refreshing, triggerRefresh: triggerRefreshTasks } = usePullToRefresh(refreshTasks);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -59,7 +73,7 @@ export default function TasksScreen() {
       return;
     }
 
-    refresh();
+    void refresh();
   }, [canAccessTasks, hydrated, refresh, router]);
 
   const pickAndUpload = useCallback(async () => {
@@ -142,15 +156,20 @@ export default function TasksScreen() {
         </View>
 
         <Pressable
-          onPress={refresh}
-          disabled={loading || busy}
+          onPress={triggerRefreshTasks}
+          disabled={loading || busy || refreshing}
           className="px-3 py-2 rounded-xl bg-white border border-gray-200"
         >
-          <Text className="text-gray-800 font-semibold">Refresh</Text>
+          <Text className="text-gray-800 font-semibold">{refreshing ? "Refreshing..." : "Refresh"}</Text>
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingTop: 6 }}>
+      <RefreshableScrollScreen
+        refreshing={refreshing}
+        onRefresh={triggerRefreshTasks}
+        refreshControlProps={{ progressViewOffset: 90 }}
+        contentContainerStyle={{ padding: 20, paddingTop: 6 }}
+      >
         {loading ? (
           <View className="bg-white border border-gray-200 rounded-2xl p-4">
             <Text className="text-gray-600">Loading…</Text>
@@ -241,7 +260,7 @@ export default function TasksScreen() {
             </View>
           </>
         )}
-      </ScrollView>
+      </RefreshableScrollScreen>
     </View>
   );
 }

@@ -32,22 +32,23 @@ export default function ApplicantDetailsModal(props: {
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
 
-      <div className="relative w-full max-w-3xl rounded-2xl bg-white shadow-lg overflow-hidden dark:bg-[#0B1220] dark:border dark:border-[#162544]">
-        <div className="p-5 border-b flex items-center justify-between dark:border-[#162544]">
-          <div>
-            <div className="text-lg font-black text-gray-900 dark:text-slate-100">Applicant Details</div>
-            <div className="text-sm text-gray-600 dark:text-slate-400">View and verify volunteer application</div>
+      <div className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-lg dark:border dark:border-[#162544] dark:bg-[#0B1220]">
+        <div className="shrink-0 border-b p-5 dark:border-[#162544]">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-lg font-black text-gray-900 dark:text-slate-100">Applicant Details</div>
+              <div className="text-sm text-gray-600 dark:text-slate-400">View and verify volunteer application</div>
+            </div>
+            <button
+              onClick={onClose}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-semibold hover:bg-gray-50 dark:border-[#162544] dark:text-slate-300 dark:hover:bg-[#122036]"
+              disabled={reviewLoading}
+            >
+              Close
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-semibold hover:bg-gray-50 dark:border-[#162544] dark:text-slate-300 dark:hover:bg-[#122036]"
-            disabled={reviewLoading}
-          >
-            Close
-          </button>
         </div>
-
-        <div className="p-5">
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">
           {loading && <div className="text-sm text-gray-600 dark:text-slate-400">Loading application...</div>}
           {!!error && <div className="text-sm text-red-600">{error}</div>}
 
@@ -110,7 +111,8 @@ export default function ApplicantDetailsModal(props: {
           )}
         </div>
 
-        <div className="p-5 border-t flex flex-wrap gap-2 justify-end dark:border-[#162544]">
+        <div className="shrink-0 border-t p-5 dark:border-[#162544]">
+          <div className="flex flex-wrap justify-end gap-2">
           <button
             onClick={() => onReview("rejected")}
             className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-60 dark:border-[#162544] dark:text-slate-300 dark:hover:bg-[#122036]"
@@ -134,6 +136,7 @@ export default function ApplicantDetailsModal(props: {
           >
             {reviewLoading ? "Verifying..." : "Verify Applicant"}
           </button>
+          </div>
         </div>
       </div>
     </div>

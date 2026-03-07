@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StatusBar } from "expo-status-bar";
 import {
+  ActivityIndicator,
   Alert,
   View,
   Text,
@@ -15,7 +16,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import MapboxGL, { Logger } from "@rnmapbox/maps";
 import * as Location from "expo-location";
-import { useIsFocused } from "@react-navigation/native";
+import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import { useMapStyle } from "../../features/map/hooks/useMapStyle";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Droplets, Construction, Flame, Mountain, ShieldAlert } from "lucide-react-native";
@@ -36,6 +37,7 @@ import { getEffectiveLocation } from "../../features/location/utils/getEffective
 import { useVolunteerMapFeed } from "../../features/realtime/hooks/useVolunteerMapFeed";
 import { connectRealtime } from "../../features/realtime/socketClient";
 import { useTheme } from "../../features/theme/useTheme";
+import { usePullToRefresh } from "../../features/common/hooks/usePullToRefresh";
 
 type HazardZone = {
   _id: string;
@@ -142,6 +144,19 @@ const mciForType = (type: EmergencyType) => {
       return "alert";
   }
 };
+
+function normalizeEmergencyType(raw: string): EmergencyType {
+  const normalized = String(raw ?? "").toUpperCase();
+  if (normalized === "FIRE") return "Fire";
+  if (normalized === "FLOOD") return "Flood";
+  if (normalized === "EARTHQUAKE") return "Earthquake";
+  if (normalized === "TYPHOON") return "Typhoon";
+  if (normalized === "COLLAPSE") return "Collapse";
+  if (normalized === "MEDICAL") return "Medical";
+  if (normalized === "OTHER") return "Other";
+  if (normalized === "SOS") return "SOS";
+  return "Other";
+}
 
 function hexToRgba(hex: string, alpha: number) {
   const h = hex.replace("#", "");
@@ -314,7 +329,10 @@ export default function MapTab() {
   const canViewEmergencies = mode === "authed" && normalizedRole !== "COMMUNITY";
   const canViewUnapprovedEmergencyReports =
     mode === "authed" && (normalizedRole === "LGU" || normalizedRole === "ADMIN");
-  const { activeDispatch } = useActiveDispatch({ pollMs: 10000, enabled: isVolunteer });
+  const { activeDispatch, refresh: refreshActiveDispatch } = useActiveDispatch({
+    pollMs: 10000,
+    enabled: isVolunteer,
+  });
 
   const [myLocation, setMyLocation] = useState<[number, number] | null>(null);
   const [hazardZones, setHazardZones] = useState<HazardZone[]>([]);
@@ -364,49 +382,45 @@ export default function MapTab() {
       ),
     [volunteerFeed, user?.id]
   );
+  const hazardRefreshInFlightRef = useRef(false);
+  const emergencyRefreshInFlightRef = useRef(false);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadHazardZones = async () => {
-      try {
-        const res = await api.get<{ data: HazardZone[] }>("/api/hazard-zones", {
-          params: { limit: 500 },
-        });
-        if (cancelled) return;
-        setHazardZones(res.data?.data ?? []);
-      } catch {
-        if (!cancelled) setHazardZones([]);
-      }
-    };
-
-    void loadHazardZones();
-    return () => {
-      cancelled = true;
-    };
+  const loadHazardZones = useCallback(async () => {
+    if (hazardRefreshInFlightRef.current) return;
+    hazardRefreshInFlightRef.current = true;
+    try {
+      const res = await api.get<{ data: HazardZone[] }>("/api/hazard-zones", {
+        params: { limit: 500 },
+      });
+      setHazardZones(res.data?.data ?? []);
+    } catch {
+      setHazardZones([]);
+    } finally {
+      hazardRefreshInFlightRef.current = false;
+    }
   }, []);
 
-  useEffect(() => {
+  const loadEmergencyReports = useCallback(async () => {
     if (!canViewEmergencies) {
       setReports([]);
       return;
     }
+    if (emergencyRefreshInFlightRef.current) return;
 
-    let cancelled = false;
+    emergencyRefreshInFlightRef.current = true;
+    try {
+      const items = await fetchEmergencyMapReportsWithOptions({
+        includeUnapproved: canViewUnapprovedEmergencyReports,
+        limit: 300,
+      });
 
-    const loadEmergencyReports = async () => {
-      try {
-        const items = await fetchEmergencyMapReportsWithOptions({
-          includeUnapproved: canViewUnapprovedEmergencyReports,
-          limit: 300,
-        });
-        if (cancelled) return;
-
-        setReports(
-          items.map((item) => ({
+      setReports(
+        items.map((item) => {
+          const emergencyType = normalizeEmergencyType(item.type);
+          return {
             id: item.incidentId,
-            type: normalizeType(item.type),
-            title: `${normalizeType(item.type)} Emergency`,
+            type: emergencyType,
+            title: `${emergencyType} Emergency`,
             description: item.description,
             images: [],
             referenceNumber: item.referenceNumber,
@@ -418,12 +432,25 @@ export default function MapTab() {
               label: item.location.label,
             },
             updatedAt: item.createdAt ? new Date(item.createdAt).toLocaleString() : "just now",
-          }))
-        );
-      } catch {
-        if (!cancelled) setReports([]);
-      }
-    };
+          };
+        })
+      );
+    } catch {
+      setReports([]);
+    } finally {
+      emergencyRefreshInFlightRef.current = false;
+    }
+  }, [canViewEmergencies, canViewUnapprovedEmergencyReports]);
+
+  useEffect(() => {
+    void loadHazardZones();
+  }, [loadHazardZones]);
+
+  useEffect(() => {
+    if (!canViewEmergencies) {
+      setReports([]);
+      return;
+    }
 
     void loadEmergencyReports();
     const timer = setInterval(() => {
@@ -431,10 +458,9 @@ export default function MapTab() {
     }, 10000);
 
     return () => {
-      cancelled = true;
       clearInterval(timer);
     };
-  }, [canViewEmergencies, canViewUnapprovedEmergencyReports]);
+  }, [canViewEmergencies, loadEmergencyReports]);
 
   // Keep current location for routing (Direction button)
   useEffect(() => {
@@ -469,18 +495,6 @@ export default function MapTab() {
   }, []);
 
 
-  const normalizeType = (raw: string): EmergencyType => {
-    const t = String(raw ?? "").toUpperCase();
-    if (t === "FIRE") return "Fire";
-    if (t === "FLOOD") return "Flood";
-    if (t === "EARTHQUAKE") return "Earthquake";
-    if (t === "TYPHOON") return "Typhoon";
-    if (t === "COLLAPSE") return "Collapse";
-    if (t === "MEDICAL") return "Medical";
-    if (t === "OTHER") return "Other";
-    if (t === "SOS") return "SOS";
-    return "Other";
-  };
   const filteredReports = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return reports;
@@ -696,6 +710,31 @@ export default function MapTab() {
           }
         : null,
   });
+  const refreshSelectedEmergency = emergencySheet.refreshSelectedEmergency;
+  const closeEmergencySheet = emergencySheet.closeSheet;
+
+  const refreshMapData = useCallback(async () => {
+    await Promise.allSettled([
+      loadHazardZones(),
+      loadEmergencyReports(),
+      refreshActiveDispatch(),
+      refreshSelectedEmergency(),
+    ]);
+  }, [
+    loadEmergencyReports,
+    loadHazardZones,
+    refreshSelectedEmergency,
+    refreshActiveDispatch,
+  ]);
+  const { refreshing: refreshingMapData, triggerRefresh: triggerRefreshMapData } =
+    usePullToRefresh(refreshMapData, { minSpinnerMs: 350 });
+
+  useFocusEffect(
+    useCallback(() => {
+      void refreshMapData();
+    }, [refreshMapData])
+  );
+
   const inactiveRouteAlternatives = useMemo(
     () =>
       emergencySheet.routeAlternatives
@@ -706,8 +745,8 @@ export default function MapTab() {
 
   useEffect(() => {
     if (canViewEmergencies) return;
-    emergencySheet.closeSheet();
-  }, [canViewEmergencies, emergencySheet.closeSheet]);
+    closeEmergencySheet();
+  }, [canViewEmergencies, closeEmergencySheet]);
 
   useEffect(() => {
     if (emergencySheet.sheetMode !== "directions") return;
@@ -981,6 +1020,18 @@ export default function MapTab() {
 
             <View style={styles.layerControlRow}>
               <Pressable
+                onPress={triggerRefreshMapData}
+                disabled={refreshingMapData}
+                style={[styles.layerControlBtn, isDark ? styles.layerControlBtnDark : null]}
+                hitSlop={10}
+              >
+                {refreshingMapData ? (
+                  <ActivityIndicator size="small" color={isDark ? "#E2E8F0" : "#0F172A"} />
+                ) : (
+                  <Feather name="refresh-cw" size={20} color={isDark ? "#E2E8F0" : "#0F172A"} />
+                )}
+              </Pressable>
+              <Pressable
                 onPress={openLayersSheet}
                 style={[styles.layerControlBtn, isDark ? styles.layerControlBtnDark : null]}
                 hitSlop={10}
@@ -1216,6 +1267,7 @@ const styles = StyleSheet.create({
   layerControlRow: {
     marginTop: 8,
     alignItems: "flex-end",
+    gap: 10,
   },
   layerControlBtn: {
     width: 46,

@@ -13,7 +13,7 @@ export default function AdminMasterData() {
   }
 
   return (
-    <AdminShell title="Master Data" subtitle="Maintain emergency, severity, template, and workflow definitions">
+    <AdminShell title="Master Data" subtitle="Maintain emergency, severity, template, workflow, and profile skill definitions">
       <AdminMasterDataView {...vm} />
     </AdminShell>
   );

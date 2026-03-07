@@ -1,17 +1,26 @@
 import { z } from "zod";
+import { Expo } from "expo-server-sdk";
 
-const expoPushTokenPattern = /^ExponentPushToken\[[^\]]+\]$/;
+function isValidExpoPushToken(value: string) {
+  return Expo.isExpoPushToken(String(value || "").trim());
+}
 
 export const registerPushSchema = z
   .object({
-    token: z.string().trim().regex(expoPushTokenPattern, "Invalid Expo push token"),
+    token: z
+      .string()
+      .trim()
+      .refine(isValidExpoPushToken, "Invalid Expo push token"),
     platform: z.enum(["android", "ios"]),
   })
   .strict();
 
 export const unregisterPushSchema = z
   .object({
-    token: z.string().trim().regex(expoPushTokenPattern, "Invalid Expo push token"),
+    token: z
+      .string()
+      .trim()
+      .refine(isValidExpoPushToken, "Invalid Expo push token"),
   })
   .strict();
 

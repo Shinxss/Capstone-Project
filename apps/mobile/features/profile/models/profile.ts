@@ -29,6 +29,37 @@ export type ProfileAchievement = {
 
 export type ProfileRequestShortcutTab = "assigned" | "en_route" | "arrived" | "resolved";
 
+export type ProfileGender = "Male" | "Female" | "Prefer not to say";
+
+export type EditableProfileFields = {
+  firstName: string;
+  lastName: string;
+  contactNo: string;
+  birthdate: string;
+  barangay: string;
+  gender: string;
+  skills: string;
+};
+
+export type EditableProfile = EditableProfileFields & {
+  id: string;
+  lifelineId: string | null;
+  email: string | null;
+  role: string;
+  volunteerStatus: string | null;
+  avatarUrl: string | null;
+};
+
+export type UpdateMyProfilePayload = {
+  firstName: string;
+  lastName: string;
+  contactNo?: string;
+  birthdate?: string;
+  barangay?: string;
+  gender?: ProfileGender | "";
+  skills?: string;
+};
+
 export const MOCK_PROFILE_ACHIEVEMENTS: ProfileAchievement[] = [
   { id: "first-responder", title: "First Responder", icon: "flash-outline" },
   { id: "verified-volunteer", title: "Verified Volunteer", icon: "shield-checkmark-outline" },
@@ -40,6 +71,18 @@ function safeString(value: unknown) {
   if (typeof value !== "string") return null;
   const normalized = value.trim();
   return normalized.length > 0 ? normalized : null;
+}
+
+export function normalizeStringValue(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+export function isVolunteerRole(role?: string | null) {
+  return String(role ?? "").trim().toUpperCase() === "VOLUNTEER";
+}
+
+export function isCommunityRole(role?: string | null) {
+  return String(role ?? "").trim().toUpperCase() === "COMMUNITY";
 }
 
 function safeNumber(value: unknown, fallback = 0) {
@@ -86,7 +129,10 @@ export function createProfileSummaryFallbackFromUser(user?: Partial<AuthUser> | 
     volunteerStatus: safeString(user?.volunteerStatus),
     email: safeString(user?.email),
     contactNo: safeString(user?.contactNo),
+    birthdate: safeString(user?.birthdate),
+    gender: safeString(user?.gender),
     barangay: safeString(user?.barangay),
+    skills: safeString(user?.skills),
     avatarUrl: safeString(user?.avatarUrl),
   });
 }
@@ -128,4 +174,52 @@ export function isApprovedVolunteer(role?: string | null, volunteerStatus?: stri
     String(role ?? "").trim().toUpperCase() === "VOLUNTEER" &&
     String(volunteerStatus ?? "").trim().toUpperCase() === "APPROVED"
   );
+}
+
+export function normalizeEditableProfile(raw: any): EditableProfile {
+  return {
+    id: normalizeStringValue(raw?.id || raw?._id),
+    lifelineId: safeString(raw?.lifelineId),
+    email: safeString(raw?.email),
+    role: normalizeStringValue(raw?.role || "COMMUNITY") || "COMMUNITY",
+    volunteerStatus: safeString(raw?.volunteerStatus),
+    avatarUrl: safeString(raw?.avatarUrl),
+    firstName: normalizeStringValue(raw?.firstName),
+    lastName: normalizeStringValue(raw?.lastName),
+    contactNo: normalizeStringValue(raw?.contactNo),
+    birthdate: normalizeStringValue(raw?.birthdate),
+    barangay: normalizeStringValue(raw?.barangay),
+    gender: normalizeStringValue(raw?.gender),
+    skills: normalizeStringValue(raw?.skills),
+  };
+}
+
+export function editableProfileFromUser(user?: Partial<AuthUser> | null): EditableProfile {
+  return {
+    id: normalizeStringValue(user?.id),
+    lifelineId: safeString(user?.lifelineId),
+    email: safeString(user?.email),
+    role: normalizeStringValue(user?.role || "COMMUNITY") || "COMMUNITY",
+    volunteerStatus: safeString(user?.volunteerStatus),
+    avatarUrl: safeString(user?.avatarUrl),
+    firstName: normalizeStringValue(user?.firstName),
+    lastName: normalizeStringValue(user?.lastName),
+    contactNo: normalizeStringValue(user?.contactNo),
+    birthdate: normalizeStringValue(user?.birthdate),
+    barangay: normalizeStringValue(user?.barangay),
+    gender: normalizeStringValue(user?.gender),
+    skills: normalizeStringValue(user?.skills),
+  };
+}
+
+export function buildEditableProfilePayload(fields: EditableProfileFields): UpdateMyProfilePayload {
+  return {
+    firstName: fields.firstName.trim(),
+    lastName: fields.lastName.trim(),
+    contactNo: fields.contactNo.trim() || undefined,
+    birthdate: fields.birthdate.trim() || undefined,
+    barangay: fields.barangay.trim() || undefined,
+    gender: (fields.gender.trim() as ProfileGender | "") || undefined,
+    skills: fields.skills.trim() || undefined,
+  };
 }

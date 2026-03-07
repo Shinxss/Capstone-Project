@@ -15,6 +15,12 @@ export type OtpUserPayload = {
   lastName?: string;
   role?: string;
   volunteerStatus?: string;
+  birthdate?: string;
+  contactNo?: string;
+  barangay?: string;
+  gender?: string;
+  skills?: string;
+  avatarUrl?: string;
   authProvider?: "local" | "google" | "both";
   emailVerified?: boolean;
   passwordSet?: boolean;

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DEFAULT_CITY, DEFAULT_PROVINCE } from "../constants/volunteer.constants";
 import { VolunteerApplicationInput } from "../models/volunteerApplication.model";
 import { volunteerApplicationService } from "../services/volunteerApplication.service";
@@ -6,6 +6,9 @@ import {
   buildVolunteerSubmitPayload,
   validateVolunteerApplication,
 } from "../utils/volunteerApplication.validators";
+import { useSession } from "../../auth/hooks/useSession";
+import { getProfileSkillOptions } from "../../profile/services/profileApi";
+import { normalizeSkillOptions } from "../../profile/utils/skills";
 
 // ✅ define initial state (this fixes "Cannot find name 'initial'")
 const initial: VolunteerApplicationInput = {
@@ -38,11 +41,105 @@ const initial: VolunteerApplicationInput = {
   consent: { truth: false, rules: false, data: false },
 };
 
+function normalizeSexInput(value?: string | null): VolunteerApplicationInput["sex"] {
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase();
+
+  if (normalized === "male") return "Male";
+  if (normalized === "female") return "Female";
+  if (
+    normalized === "prefer not to say" ||
+    normalized === "prefer not say" ||
+    normalized === "prefer"
+  ) {
+    return "Prefer not to say";
+  }
+
+  return "";
+}
+
+function buildPrefilledForm(user?: {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  contactNo?: string;
+  birthdate?: string;
+  gender?: string;
+  skills?: string;
+  barangay?: string;
+  municipality?: string;
+} | null): VolunteerApplicationInput {
+  const fullName = [user?.firstName ?? "", user?.lastName ?? ""]
+    .join(" ")
+    .trim();
+
+  return {
+    ...initial,
+    fullName,
+    sex: normalizeSexInput(user?.gender),
+    birthdate: String(user?.birthdate ?? "").trim(),
+    mobile: String(user?.contactNo ?? "").trim(),
+    email: String(user?.email ?? "").trim(),
+    barangay: String(user?.barangay ?? "").trim(),
+    city: String(user?.municipality ?? "").trim() || DEFAULT_CITY,
+    skillsOther: String(user?.skills ?? "").trim(),
+  };
+}
+
 export function useVolunteerApplicationForm() {
-  const [form, setForm] = useState<VolunteerApplicationInput>(initial);
+  const { session } = useSession();
+  const sessionUser = session?.mode === "user" ? session.user : null;
+
+  const [form, setForm] = useState<VolunteerApplicationInput>(() =>
+    buildPrefilledForm(sessionUser)
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [skillOptions, setSkillOptions] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!sessionUser) return;
+
+    const next = buildPrefilledForm(sessionUser);
+
+    setForm((prev) => ({
+      ...prev,
+      fullName: prev.fullName.trim() ? prev.fullName : next.fullName,
+      sex: prev.sex || next.sex,
+      birthdate: prev.birthdate.trim() ? prev.birthdate : next.birthdate,
+      mobile: prev.mobile.trim() ? prev.mobile : next.mobile,
+      email: prev.email?.trim() ? prev.email : next.email,
+      barangay: prev.barangay.trim() ? prev.barangay : next.barangay,
+      city: prev.city?.trim() ? prev.city : next.city,
+      skillsOther: prev.skillsOther?.trim() ? prev.skillsOther : next.skillsOther,
+    }));
+  }, [sessionUser]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!sessionUser) {
+      setSkillOptions([]);
+      return;
+    }
+
+    (async () => {
+      try {
+        const options = await getProfileSkillOptions();
+        if (cancelled) return;
+        setSkillOptions(normalizeSkillOptions(options));
+      } catch {
+        if (cancelled) return;
+        setSkillOptions([]);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionUser?.id]);
 
   const validation = useMemo(() => validateVolunteerApplication(form), [form]);
 
@@ -79,6 +176,7 @@ export function useVolunteerApplicationForm() {
   return {
     form,
     setForm,
+    skillOptions,
     submitting,
     error,
 

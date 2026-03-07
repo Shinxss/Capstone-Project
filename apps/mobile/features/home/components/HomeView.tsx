@@ -4,7 +4,6 @@ import {
   Image,
   Pressable,
   SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -14,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { WeatherSeverity } from "../../weather/services/weatherApi";
 import { useTheme } from "../../theme/useTheme";
 import { resolveAvatarUri } from "../../profile/utils/avatarUrl";
+import { RefreshableScrollScreen } from "../../common/components/RefreshableScrollScreen";
 
 type AlertIconName = React.ComponentProps<typeof Ionicons>["name"];
 type AlertTheme = {
@@ -104,6 +104,7 @@ type Props = {
   alertIconName: AlertIconName;
   alertTheme: AlertTheme;
   alertRetryEnabled?: boolean;
+  refreshing?: boolean;
   activeRequest?: {
     id: string;
     trackingLabel: string;
@@ -112,6 +113,7 @@ type Props = {
   };
   onStartHold: () => void;
   onCancelHold: () => void;
+  onRefresh?: () => void;
   onPressAlert?: () => void;
   onPressTracking?: () => void;
   onPressNotifications?: () => void;
@@ -132,9 +134,11 @@ export function HomeView({
   alertIconName,
   alertTheme,
   alertRetryEnabled,
+  refreshing,
   activeRequest,
   onStartHold,
   onCancelHold,
+  onRefresh,
   onPressAlert,
   onPressTracking,
   onPressNotifications,
@@ -210,7 +214,9 @@ export function HomeView({
       style={[styles.safe, isDark ? styles.safeDark : styles.safeLight]}
       className="bg-lgu-lightBg dark:bg-lgu-darkBg"
     >
-      <ScrollView
+      <RefreshableScrollScreen
+        refreshing={refreshing}
+        onRefresh={onRefresh}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.container,
@@ -388,7 +394,7 @@ export function HomeView({
             <Text style={styles.applyText}>Apply Now</Text>
           </Pressable>
         </View>
-      </ScrollView>
+      </RefreshableScrollScreen>
     </SafeAreaView>
   );
 }

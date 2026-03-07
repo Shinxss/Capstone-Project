@@ -47,15 +47,24 @@ const workflowCreateSchema = z.object({
   transitions: z.array(z.object({ from: z.string().trim().min(1), to: z.string().trim().min(1) })).default([]),
 });
 
+const profileSkillCreateSchema = z.object({
+  code: z.string().trim().min(1).max(80),
+  label: z.string().trim().min(1).max(120),
+  sortOrder: z.number().int().min(0).optional(),
+  isActive: z.boolean().optional(),
+});
+
 const emergencyTypePatchSchema = emergencyTypeCreateSchema.partial();
 const severityLevelPatchSchema = severityLevelCreateSchema.partial();
 const taskTemplatePatchSchema = taskTemplateCreateSchema.partial();
 const workflowPatchSchema = workflowCreateSchema.partial();
+const profileSkillPatchSchema = profileSkillCreateSchema.partial();
 
 function parseCreatePayload(type: MasterDataType, payload: unknown) {
   if (type === "emergency-types") return emergencyTypeCreateSchema.safeParse(payload);
   if (type === "severity-levels") return severityLevelCreateSchema.safeParse(payload);
   if (type === "task-templates") return taskTemplateCreateSchema.safeParse(payload);
+  if (type === "profile-skills") return profileSkillCreateSchema.safeParse(payload);
   return workflowCreateSchema.safeParse(payload);
 }
 
@@ -63,6 +72,7 @@ function parsePatchPayload(type: MasterDataType, payload: unknown) {
   if (type === "emergency-types") return emergencyTypePatchSchema.safeParse(payload);
   if (type === "severity-levels") return severityLevelPatchSchema.safeParse(payload);
   if (type === "task-templates") return taskTemplatePatchSchema.safeParse(payload);
+  if (type === "profile-skills") return profileSkillPatchSchema.safeParse(payload);
   return workflowPatchSchema.safeParse(payload);
 }
 

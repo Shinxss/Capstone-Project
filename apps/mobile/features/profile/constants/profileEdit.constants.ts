@@ -1,0 +1,37 @@
+import type { ProfileGender } from "../models/profile";
+
+export const PROFILE_GENDER_OPTIONS: ProfileGender[] = ["Male", "Female", "Prefer not to say"];
+
+export const DAGUPAN_BARANGAY_OPTIONS = [
+  "Bacayao Norte",
+  "Bacayao Sur",
+  "Barangay I (T. Bugallon)",
+  "Barangay II (Nueva)",
+  "Barangay IV (Zamora)",
+  "Bolosan",
+  "Bonuan Binloc",
+  "Bonuan Boquig",
+  "Bonuan Gueset",
+  "Calmay",
+  "Carael",
+  "Caranglaan",
+  "Herrero",
+  "Lasip Chico",
+  "Lasip Grande",
+  "Lomboy",
+  "Lucao",
+  "Malued",
+  "Mamalingling",
+  "Mangin",
+  "Mayombo",
+  "Pantal",
+  "Poblacion Oeste",
+  "Pogo Chico",
+  "Pogo Grande",
+  "Pugaro Suit",
+  "Salapingao",
+  "Salisay",
+  "Tambac",
+  "Tapuac",
+  "Tebeng",
+] as const;

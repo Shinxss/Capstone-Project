@@ -10,12 +10,14 @@ const tabs: Array<{ key: MasterDataTab; label: string }> = [
   { key: "severity-levels", label: "Severity Levels" },
   { key: "task-templates", label: "Task Templates" },
   { key: "workflows", label: "Workflows" },
+  { key: "profile-skills", label: "Profile Skills" },
 ];
 
 type FormState = {
   code: string;
   label: string;
   rank: string;
+  sortOrder: string;
   isActive: boolean;
   checklistItems: string;
   entityType: "emergency" | "dispatch" | "volunteerApplication";
@@ -28,6 +30,7 @@ function defaultForm(): FormState {
     code: "",
     label: "",
     rank: "1",
+    sortOrder: "0",
     isActive: true,
     checklistItems: "",
     entityType: "emergency",
@@ -58,6 +61,15 @@ function buildPayload(tab: MasterDataTab, form: FormState): Record<string, unkno
         .split("\n")
         .map((value) => value.trim())
         .filter(Boolean),
+      isActive: form.isActive,
+    };
+  }
+
+  if (tab === "profile-skills") {
+    return {
+      code: form.code.trim(),
+      label: form.label.trim(),
+      sortOrder: Number(form.sortOrder || "0"),
       isActive: form.isActive,
     };
   }
@@ -95,6 +107,7 @@ function hydrateForm(tab: MasterDataTab, record: MasterDataRecord): FormState {
     code: record.code ?? "",
     label: record.label ?? "",
     rank: String(record.rank ?? 1),
+    sortOrder: String(record.sortOrder ?? 0),
     isActive: record.isActive ?? true,
     checklistItems: (record.checklistItems ?? []).join("\n"),
   };
@@ -198,6 +211,7 @@ export default function AdminMasterDataView({ tab, setTab, items, loading, error
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-700 dark:text-slate-300">
                       {tab === "severity-levels" ? `Rank: ${item.rank ?? "-"}` : null}
+                      {tab === "profile-skills" ? `Sort order: ${item.sortOrder ?? "-"}` : null}
                       {tab === "task-templates" ? `Checklist items: ${(item.checklistItems ?? []).length}` : null}
                       {tab === "workflows" ? `States: ${(item.states ?? []).length}, transitions: ${(item.transitions ?? []).length}` : null}
                       {tab !== "workflows" ? `Active: ${item.isActive ? "Yes" : "No"}` : null}
@@ -251,6 +265,9 @@ export default function AdminMasterDataView({ tab, setTab, items, loading, error
             <input value={form.label} onChange={(event) => setForm((prev) => ({ ...prev, label: event.target.value }))} placeholder="Label" className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-gray-300 dark:border-[#162544] dark:bg-[#0E1626] dark:text-slate-100" />
             {tab === "severity-levels" ? (
               <input value={form.rank} onChange={(event) => setForm((prev) => ({ ...prev, rank: event.target.value }))} placeholder="Rank" type="number" className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-gray-300 dark:border-[#162544] dark:bg-[#0E1626] dark:text-slate-100" />
+            ) : null}
+            {tab === "profile-skills" ? (
+              <input value={form.sortOrder} onChange={(event) => setForm((prev) => ({ ...prev, sortOrder: event.target.value }))} placeholder="Sort Order" type="number" min={0} className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-gray-300 dark:border-[#162544] dark:bg-[#0E1626] dark:text-slate-100" />
             ) : null}
             {tab === "task-templates" ? (
               <textarea value={form.checklistItems} onChange={(event) => setForm((prev) => ({ ...prev, checklistItems: event.target.value }))} placeholder="Checklist items (one per line)" className="min-h-32 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-gray-300 dark:border-[#162544] dark:bg-[#0E1626] dark:text-slate-100 sm:col-span-2" />

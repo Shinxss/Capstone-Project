@@ -4,6 +4,7 @@ import { requireRole } from "../../middlewares/requireRole";
 import {
   deleteMyAvatar,
   getMyProfileSummary,
+  getProfileSkillOptions,
   listVolunteers,
   uploadMyAvatar,
 } from "./user.controller";
@@ -11,6 +12,7 @@ import {
 const router = Router();
 
 router.get("/me/profile-summary", requireAuth, getMyProfileSummary);
+router.get("/profile-skill-options", requireAuth, getProfileSkillOptions);
 router.post("/me/avatar", requireAuth, uploadMyAvatar);
 router.delete("/me/avatar", requireAuth, deleteMyAvatar);
 

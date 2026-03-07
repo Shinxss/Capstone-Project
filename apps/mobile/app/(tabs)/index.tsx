@@ -2,6 +2,8 @@ import React, { useCallback, useMemo, useState } from "react";
 import { Alert, Pressable, Text, View } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import * as Device from "expo-device";
+import * as Notifications from "expo-notifications";
 import { HomeView } from "../../features/home/components/HomeView";
 import { SosConfirmationModal } from "../../features/home/components/SosConfirmationModal";
 import { useSession } from "../../features/auth/hooks/useSession";
@@ -15,6 +17,7 @@ import { setStoredActiveDispatch } from "../../features/dispatch/services/dispat
 import { useWeatherSummary } from "../../features/weather/hooks/useWeatherSummary";
 import type { WeatherSeverity } from "../../features/weather/services/weatherApi";
 import { useMyActiveRequest } from "../../features/requests/hooks/useMyActiveRequest";
+import { usePullToRefresh } from "../../features/common/hooks/usePullToRefresh";
 import {
   formatEtaText,
   formatRelativeTime,
@@ -214,7 +217,10 @@ export default function HomeScreen() {
   const { displayName, session, isUser } = useSession();
   const { sendSos, sending: sosSending } = useSosReport();
   const isVolunteer = useMemo(() => session?.mode === "user" && String(session.user.role ?? "").toUpperCase() === "VOLUNTEER", [session]);
-  const { activeRequest: myActiveRequest } = useMyActiveRequest({ pollMs: 8000, enabled: isUser });
+  const { activeRequest: myActiveRequest, refresh: refreshMyActiveRequest } = useMyActiveRequest({
+    pollMs: 8000,
+    enabled: isUser,
+  });
   const {
     summary: weatherSummary,
     loading: weatherLoading,
@@ -228,6 +234,16 @@ export default function HomeScreen() {
     pollMs: 8000,
     enabled: isVolunteer,
   });
+  const refreshHome = useCallback(async () => {
+    const refreshJobs: Promise<unknown>[] = [refreshMyActiveRequest(), retryWeather()];
+
+    if (isVolunteer) {
+      refreshJobs.push(refreshPending(), refreshActive());
+    }
+
+    await Promise.allSettled(refreshJobs);
+  }, [isVolunteer, refreshActive, refreshMyActiveRequest, refreshPending, retryWeather]);
+  const { refreshing: refreshingHome, triggerRefresh: triggerRefreshHome } = usePullToRefresh(refreshHome);
 
   const [sosConfirmVisible, setSosConfirmVisible] = useState(false);
   const [dispatchBusy, setDispatchBusy] = useState(false);
@@ -409,6 +425,7 @@ export default function HomeScreen() {
   const onDebugCheckToken = useCallback(async () => {
     try {
       setPushDebugBusy(true);
+      const permission = await Notifications.getPermissionsAsync();
       const res = await api.get<{
         count: number;
         activeCount: number;
@@ -423,7 +440,7 @@ export default function HomeScreen() {
 
       Alert.alert(
         "Push Token Status",
-        `active=${payload.activeCount}, total=${payload.count}, first=${tokenPreview}`
+        `device=${Device.isDevice ? "physical" : "emulator/simulator"}, perm=${permission.status}, active=${payload.activeCount}, total=${payload.count}, first=${tokenPreview}`
       );
     } catch (e: any) {
       Alert.alert(
@@ -471,7 +488,9 @@ export default function HomeScreen() {
         alertIconName={weatherCard.iconName}
         alertTheme={weatherCard.theme}
         alertRetryEnabled={weatherCard.retryEnabled}
+        refreshing={refreshingHome}
         activeRequest={homeActiveRequest}
+        onRefresh={triggerRefreshHome}
         onPressAlert={weatherCard.retryEnabled ? onPressWeatherCard : undefined}
         onPressTracking={homeActiveRequest ? onPressTracking : undefined}
         onStartHold={onStartSosHold}

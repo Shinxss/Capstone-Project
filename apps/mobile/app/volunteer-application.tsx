@@ -9,10 +9,10 @@ export default function VolunteerApplicationScreen() {
   const {
     form,
     setForm,
+    skillOptions,
     submitting,
     error,
     errors,
-    isValid,
     submitAttempted,
     submit,
   } = useVolunteerApplicationForm();
@@ -43,6 +43,7 @@ export default function VolunteerApplicationScreen() {
     <VolunteerApplicationView
       form={form}
       setForm={setForm}
+      skillOptions={skillOptions}
       submitting={submitting}
       error={error}
       errors={errors}

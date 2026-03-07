@@ -80,8 +80,8 @@ const MY_REQUEST_LIST_LABELS = [
   "Assigned",
   "En Route",
   "Arrived",
-  "Review",
   "Resolved",
+  "Review",
   "Cancelled",
 ] as const;
 
@@ -318,6 +318,29 @@ function toMyRequestTrackingLabel(
     return "Review";
   }
   return MY_REQUEST_TRACKING_LABEL_BY_TAB[tab];
+}
+
+function getRequestFlowRank(label: MyRequestListTrackingLabel) {
+  switch (label) {
+    case "Submitted":
+      return 0;
+    case "Verification":
+      return 1;
+    case "Assigned":
+      return 2;
+    case "En Route":
+      return 3;
+    case "Arrived":
+      return 4;
+    case "Resolved":
+      return 5;
+    case "Review":
+      return 6;
+    case "Cancelled":
+      return 7;
+    default:
+      return 999;
+  }
 }
 
 function matchesMyRequestFilter(
@@ -879,7 +902,17 @@ export async function listMyEmergencyReports(
     })
   );
 
-  return summaries.filter((item): item is MyRequestSummary => item !== null);
+  const filtered = summaries.filter((item): item is MyRequestSummary => item !== null);
+
+  if (!normalizedOptions.tab || normalizedOptions.tab === "all") {
+    return filtered.sort((a, b) => {
+      const rankDiff = getRequestFlowRank(a.trackingLabel) - getRequestFlowRank(b.trackingLabel);
+      if (rankDiff !== 0) return rankDiff;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  }
+
+  return filtered;
 }
 
 export async function getMyEmergencyReportCounts(

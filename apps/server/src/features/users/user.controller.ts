@@ -4,6 +4,7 @@ import { toAuthUserPayload } from "../auth/otp.utils";
 import { User } from "./user.model";
 import * as userService from "./user.service";
 import { removeLocalProfileAvatarFileByUrl, uploadUserAvatar } from "./userAvatar.service";
+import { listActiveProfileSkillLabels } from "./profileSkill.service";
 
 type AuthedRequest = Request & { user?: { id: string; role?: string }; userId?: string };
 
@@ -34,6 +35,18 @@ export async function getMyProfileSummary(req: AuthedRequest, res: Response) {
     return res.json(summary);
   } catch (err: any) {
     return res.status(500).json({ message: err?.message ?? "Server error" });
+  }
+}
+
+export async function getProfileSkillOptions(req: AuthedRequest, res: Response) {
+  try {
+    const userId = req.userId ?? req.user?.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+    const skills = await listActiveProfileSkillLabels();
+    return res.status(200).json({ skills });
+  } catch (err: any) {
+    return res.status(500).json({ message: err?.message ?? "Failed to load profile skill options" });
   }
 }
 

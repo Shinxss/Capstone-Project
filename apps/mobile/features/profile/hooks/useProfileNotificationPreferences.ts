@@ -22,29 +22,25 @@ export function useProfileNotificationPreferences(options: UseProfileNotificatio
     return enabled && (normalizedRole === "VOLUNTEER" || normalizedVolunteerStatus === "APPROVED");
   }, [enabled, role, volunteerStatus]);
 
-  useEffect(() => {
+  const refresh = useCallback(async () => {
     if (!enabled) {
       setCommunityUpdatesEnabled(true);
       setVolunteerAssignmentsEnabled(true);
       return;
     }
 
-    let alive = true;
-    void (async () => {
-      try {
-        const prefs = await fetchPushPreferences();
-        if (!alive) return;
-        setCommunityUpdatesEnabled(Boolean(prefs.notificationPrefs?.communityRequestUpdates ?? true));
-        setVolunteerAssignmentsEnabled(Boolean(prefs.notificationPrefs?.volunteerAssignments ?? true));
-      } catch {
-        if (!alive) return;
-      }
-    })();
-
-    return () => {
-      alive = false;
-    };
+    try {
+      const prefs = await fetchPushPreferences();
+      setCommunityUpdatesEnabled(Boolean(prefs.notificationPrefs?.communityRequestUpdates ?? true));
+      setVolunteerAssignmentsEnabled(Boolean(prefs.notificationPrefs?.volunteerAssignments ?? true));
+    } catch {
+      // Keep previous values when preferences cannot be loaded.
+    }
   }, [enabled]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
 
   const onToggleCommunityUpdates = useCallback(
     async (nextValue: boolean) => {
@@ -85,6 +81,7 @@ export function useProfileNotificationPreferences(options: UseProfileNotificatio
     volunteerAssignmentsEnabled,
     updating,
     canShowVolunteerAssignmentsToggle,
+    refresh,
     onToggleCommunityUpdates,
     onToggleVolunteerAssignments,
   };

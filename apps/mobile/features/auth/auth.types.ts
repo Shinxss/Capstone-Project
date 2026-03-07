@@ -7,6 +7,9 @@ export type AuthUser = {
   lastName?: string;
   volunteerStatus?: string;
   contactNo?: string;
+  birthdate?: string;
+  gender?: string;
+  skills?: string;
   barangay?: string;
   municipality?: string;
   avatarUrl?: string;

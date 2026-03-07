@@ -24,8 +24,19 @@ export async function registerPushController(req: Request, res: Response) {
       platform: req.body?.platform,
     });
 
+    console.info("[push] token registered", {
+      userId,
+      platform: req.body?.platform,
+      route: "/api/push/register",
+    });
+
     return res.status(200).json({ ok: true });
   } catch (error: any) {
+    console.warn("[push] token registration failed", {
+      userId: String(req.user?.id || ""),
+      message: error?.message,
+      route: "/api/push/register",
+    });
     return res.status(400).json({ message: error?.message ?? "Failed to register push token" });
   }
 }

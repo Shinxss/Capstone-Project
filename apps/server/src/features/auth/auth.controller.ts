@@ -4,6 +4,7 @@ import { z } from "zod";
 import { AUDIT_EVENT } from "../audit/audit.constants";
 import { logAudit, logSecurityEvent } from "../audit/audit.service";
 import { User } from "../users/user.model";
+import { VolunteerApplication } from "../volunteerApplications/volunteerApplication.model";
 import { verifyMfaChallenge } from "../../utils/mfa";
 import { signAccessToken } from "../../utils/jwt";
 import { authenticateUser } from "./auth.service";
@@ -13,12 +14,18 @@ import { resolveAccessTokenExpiresIn } from "./accessTokenExpiry";
 
 const ACCOUNT_SUSPENDED = "Account is suspended. Please contact your administrator.";
 const BIRTHDATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const ALLOWED_GENDERS = ["Male", "Female", "Prefer not to say"] as const;
+const ALLOWED_GENDER_SET = new Set<string>(ALLOWED_GENDERS);
+
+function asTrimmedString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
 
 const updateMeSchema = z
   .object({
     firstName: z.string().trim().min(1, "First name is required").max(100, "First name is too long"),
     lastName: z.string().trim().min(1, "Last name is required").max(100, "Last name is too long"),
-    email: z.string().trim().email("Email must be valid"),
+    email: z.string().trim().email("Email must be valid").optional(),
     birthdate: z
       .string()
       .trim()
@@ -26,6 +33,16 @@ const updateMeSchema = z
       .optional()
       .refine((v) => v === undefined || v === "" || BIRTHDATE_REGEX.test(v), "Birthdate must be YYYY-MM-DD"),
     contactNo: z.string().trim().max(20, "Contact number is too long").optional(),
+    gender: z
+      .string()
+      .trim()
+      .max(30, "Gender is too long")
+      .optional()
+      .refine(
+        (value) => value === undefined || value === "" || ALLOWED_GENDER_SET.has(value),
+        "Gender must be Male, Female, or Prefer not to say"
+      ),
+    skills: z.string().trim().max(300, "Skills is too long").optional(),
     lguPosition: z.string().trim().max(200, "LGU position is too long").optional(),
     barangay: z.string().trim().max(200, "Barangay is too long").optional(),
     municipality: z.string().trim().max(200, "City/State is too long").optional(),
@@ -175,12 +192,35 @@ export async function me(req: Request, res: Response) {
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
     const user = await User.findById(userId).select(
-      "username firstName lastName email lifelineId role adminTier lguName lguPosition barangay municipality birthdate contactNo country postalCode avatarUrl authProvider passwordHash googleSub emailVerified volunteerStatus onDuty notificationPrefs"
+      "username firstName lastName email lifelineId role adminTier lguName lguPosition barangay municipality birthdate contactNo gender skills country postalCode avatarUrl authProvider passwordHash googleSub emailVerified volunteerStatus onDuty notificationPrefs"
     );
     if (!user) return res.status(404).json({ message: "User not found" });
 
+    let fallbackGender = "";
+    let fallbackSkills = "";
+    if (user.role === "VOLUNTEER" && (!asTrimmedString(user.gender) || !asTrimmedString(user.skills))) {
+      const latestVerifiedApplication = await VolunteerApplication.findOne({
+        userId: user._id,
+        status: "verified",
+      })
+        .select("sex skillsOther")
+        .sort({ createdAt: -1 })
+        .lean();
+
+      fallbackGender = asTrimmedString(latestVerifiedApplication?.sex);
+      fallbackSkills = asTrimmedString(latestVerifiedApplication?.skillsOther);
+    }
+
+    const payload = toAuthUserPayload(user);
+    if (!asTrimmedString(payload.gender) && fallbackGender) {
+      payload.gender = fallbackGender;
+    }
+    if (!asTrimmedString(payload.skills) && fallbackSkills) {
+      payload.skills = fallbackSkills;
+    }
+
     return res.status(200).json({
-      user: toAuthUserPayload(user),
+      user: payload,
     });
   } catch {
     return res.status(500).json({ message: "Failed to fetch profile." });
@@ -198,7 +238,7 @@ export async function updateMe(req: Request, res: Response) {
     }
 
     const body = parsed.data;
-    const normalizedEmail = body.email.toLowerCase();
+    const normalizedEmail = body.email ? body.email.toLowerCase() : null;
 
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ message: "User not found" });
@@ -209,7 +249,7 @@ export async function updateMe(req: Request, res: Response) {
       });
     }
 
-    if ((user.email ?? "").toLowerCase() !== normalizedEmail) {
+    if (normalizedEmail && (user.email ?? "").toLowerCase() !== normalizedEmail) {
       const emailTaken = await User.findOne({
         _id: { $ne: user._id },
         email: normalizedEmail,
@@ -229,8 +269,10 @@ export async function updateMe(req: Request, res: Response) {
     if ((user.lastName ?? "") !== nextLastName) changedFields.push("lastName");
     user.lastName = nextLastName;
 
-    if ((user.email ?? "").toLowerCase() !== normalizedEmail) changedFields.push("email");
-    user.email = normalizedEmail;
+    if (normalizedEmail !== null) {
+      if ((user.email ?? "").toLowerCase() !== normalizedEmail) changedFields.push("email");
+      user.email = normalizedEmail;
+    }
 
     const nextBirthdate = body.birthdate ?? "";
     if ((user.birthdate ?? "") !== nextBirthdate) changedFields.push("birthdate");
@@ -239,6 +281,14 @@ export async function updateMe(req: Request, res: Response) {
     const nextContactNo = body.contactNo ?? "";
     if ((user.contactNo ?? "") !== nextContactNo) changedFields.push("contactNo");
     user.contactNo = nextContactNo;
+
+    const nextGender = body.gender ?? "";
+    if ((user.gender ?? "") !== nextGender) changedFields.push("gender");
+    user.gender = nextGender;
+
+    const nextSkills = body.skills ?? "";
+    if ((user.skills ?? "") !== nextSkills) changedFields.push("skills");
+    user.skills = nextSkills;
 
     const nextCountry = body.country ?? "";
     if ((user.country ?? "") !== nextCountry) changedFields.push("country");

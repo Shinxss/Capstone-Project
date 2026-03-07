@@ -7,6 +7,17 @@ const expo = new Expo({
   accessToken: process.env.EXPO_ACCESS_TOKEN,
 });
 
+const DISPATCH_CHANNEL_ID = "lifeline_dispatch_v4";
+const ALERTS_CHANNEL_ID = "lifeline_alerts_v2";
+
+function resolveExpoPushToken(row: { expoPushToken?: unknown; token?: unknown }) {
+  const primary = String(row.expoPushToken || "").trim();
+  if (Expo.isExpoPushToken(primary)) return primary;
+  const legacy = String(row.token || "").trim();
+  if (Expo.isExpoPushToken(legacy)) return legacy;
+  return "";
+}
+
 type RegisterPushTokenInput = {
   userId: string;
   expoPushToken: string;
@@ -67,12 +78,10 @@ async function listActiveExpoTokensForUsers(userIds: string[]) {
     userId: { $in: normalizedIds.map((id) => new Types.ObjectId(id)) },
     isActive: true,
   })
-    .select("expoPushToken")
+    .select("expoPushToken token")
     .lean();
 
-  return rows
-    .map((row) => String(row.expoPushToken || "").trim())
-    .filter((token) => Expo.isExpoPushToken(token));
+  return Array.from(new Set(rows.map(resolveExpoPushToken).filter(Boolean)));
 }
 
 async function sendExpoMessages(messages: ExpoPushMessage[]) {
@@ -105,7 +114,12 @@ async function sendExpoMessages(messages: ExpoPushMessage[]) {
 
   if (deactivateTokens.size > 0) {
     await PushToken.updateMany(
-      { expoPushToken: { $in: Array.from(deactivateTokens) } },
+      {
+        $or: [
+          { expoPushToken: { $in: Array.from(deactivateTokens) } },
+          { token: { $in: Array.from(deactivateTokens) } },
+        ],
+      },
       { $set: { isActive: false } }
     );
   }
@@ -120,12 +134,12 @@ export async function getUserPushTokens(userId: string) {
   if (!Types.ObjectId.isValid(userId)) return [];
 
   const rows = await PushToken.find({ userId: new Types.ObjectId(userId) })
-    .select("expoPushToken platform isActive lastSeenAt createdAt updatedAt")
+    .select("expoPushToken token platform isActive lastSeenAt createdAt updatedAt")
     .sort({ updatedAt: -1 })
     .lean();
 
   return rows.map((row) => ({
-    expoPushToken: String(row.expoPushToken || ""),
+    expoPushToken: resolveExpoPushToken(row),
     platform: row.platform,
     isActive: Boolean(row.isActive),
     lastSeenAt: row.lastSeenAt,
@@ -143,12 +157,10 @@ export async function sendTestDispatchPushToUser(userId: string) {
     userId: new Types.ObjectId(userId),
     isActive: true,
   })
-    .select("expoPushToken")
+    .select("expoPushToken token")
     .lean();
 
-  const tokens = rows
-    .map((row) => String(row.expoPushToken || "").trim())
-    .filter((token) => Expo.isExpoPushToken(token));
+  const tokens = Array.from(new Set(rows.map(resolveExpoPushToken).filter(Boolean)));
 
   if (tokens.length === 0) {
     return { attempted: 0, sent: 0, errors: [] as string[] };
@@ -159,7 +171,7 @@ export async function sendTestDispatchPushToUser(userId: string) {
     title: "Lifeline test dispatch",
     body: "Test notification from local server. If you see this, push is working.",
     sound: "siren.wav",
-    channelId: "lifeline_dispatch",
+    channelId: DISPATCH_CHANNEL_ID,
     priority: "high",
     data: {
       type: "dispatch_offer",
@@ -222,7 +234,7 @@ export async function sendPushToUser(userId: string, messages: SendPushToUserInp
         to: token,
         title: message.title,
         body: message.body,
-        channelId: message.channelId ?? "lifeline_alerts",
+        channelId: message.channelId ?? ALERTS_CHANNEL_ID,
         sound: message.sound ?? undefined,
         priority: message.priority ?? "high",
         data: message.data,
@@ -259,8 +271,8 @@ export async function sendRequestStatusPush(input: RequestStatusPushInput) {
     {
       title: input.title,
       body: input.body,
-      channelId: "lifeline_alerts",
-      sound: null,
+      channelId: ALERTS_CHANNEL_ID,
+      sound: "default",
       data: {
         type: "REQUEST_UPDATE",
         requestId,
@@ -285,11 +297,18 @@ export async function registerPushToken(input: RegisterPushTokenInput) {
 
   await PushToken.findOneAndUpdate(
     {
-      userId: new Types.ObjectId(userId),
-      expoPushToken,
+      $or: [
+        { userId: new Types.ObjectId(userId), expoPushToken },
+        { userId: new Types.ObjectId(userId), token: expoPushToken },
+        { expoPushToken },
+        { token: expoPushToken },
+      ],
     },
     {
       $set: {
+        userId: new Types.ObjectId(userId),
+        expoPushToken,
+        token: expoPushToken,
         platform: input.platform,
         isActive: true,
         lastSeenAt: new Date(),
@@ -311,7 +330,7 @@ export async function unregisterPushToken(userId: string, expoPushToken: string)
   await PushToken.updateOne(
     {
       userId: new Types.ObjectId(userId),
-      expoPushToken: token,
+      $or: [{ expoPushToken: token }, { token }],
     },
     {
       $set: {
@@ -348,12 +367,15 @@ export async function sendDispatchOfferPush(input: DispatchPushInput) {
     userId: { $in: enabledVolunteerUserIds.map((id) => new Types.ObjectId(id)) },
     isActive: true,
   })
-    .select("expoPushToken userId")
+    .select("expoPushToken token userId")
     .lean();
 
-  const validTokenRows = tokenRows.filter((row) =>
-    Expo.isExpoPushToken(String(row.expoPushToken || "").trim())
-  );
+  const validTokenRows = tokenRows
+    .map((row) => ({
+      userId: String(row.userId ?? ""),
+      token: resolveExpoPushToken(row),
+    }))
+    .filter((row) => Boolean(row.token));
 
   if (validTokenRows.length === 0) {
     console.info("[push] no active Expo tokens for volunteers", {
@@ -365,8 +387,8 @@ export async function sendDispatchOfferPush(input: DispatchPushInput) {
   const typeLabel = String(input.emergencyType || "Emergency").toLowerCase();
 
   const messages: ExpoPushMessage[] = validTokenRows.map((row) => {
-    const token = String(row.expoPushToken || "").trim();
-    const volunteerId = String(row.userId ?? "");
+    const token = row.token;
+    const volunteerId = row.userId;
     const dispatchId = String(input.dispatchByVolunteerId?.[volunteerId] ?? "").trim();
 
     return {
@@ -374,7 +396,7 @@ export async function sendDispatchOfferPush(input: DispatchPushInput) {
       title: "New dispatch assignment",
       body: `You have a new ${typeLabel} dispatch. Tap to respond.`,
       sound: "siren.wav",
-      channelId: "lifeline_dispatch",
+      channelId: DISPATCH_CHANNEL_ID,
       priority: "high",
       data: {
         type: "DISPATCH_OFFER",

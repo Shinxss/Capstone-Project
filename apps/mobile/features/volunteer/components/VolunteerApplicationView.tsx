@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,6 +14,12 @@ import type {
   VolunteerValidationErrors,
   VolunteerFieldKey,
 } from "../utils/volunteerApplication.validators";
+import { DAGUPAN_BARANGAY_OPTIONS } from "../../profile/constants/profileEdit.constants";
+import {
+  composeSkillsText,
+  formatSkillsDisplayText,
+  parseSkillState,
+} from "../../profile/utils/skills";
 
 type SectionKey =
   | "personal"
@@ -30,6 +37,7 @@ type SectionKey =
 type Props = {
   form: VolunteerApplicationInput;
   setForm: React.Dispatch<React.SetStateAction<VolunteerApplicationInput>>;
+  skillOptions: string[];
   submitting: boolean;
   error: string | null;
 
@@ -45,6 +53,7 @@ type Props = {
 export function VolunteerApplicationView({
   form,
   setForm,
+  skillOptions,
   submitting,
   error,
   errors,
@@ -54,6 +63,12 @@ export function VolunteerApplicationView({
   onSubmit,
 }: Props) {
   const [open, setOpen] = useState<SectionKey>("personal");
+  const [barangayPickerOpen, setBarangayPickerOpen] = useState(false);
+  const [skillsPickerOpen, setSkillsPickerOpen] = useState(false);
+  const [skillsSearchText, setSkillsSearchText] = useState("");
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [otherSkillEnabled, setOtherSkillEnabled] = useState(false);
+  const [otherSkillText, setOtherSkillText] = useState("");
 
   // ✅ show error automatically after user leaves an input (blur)
   const [touched, setTouched] = useState<
@@ -83,6 +98,70 @@ export function VolunteerApplicationView({
 
   const hasSectionError = (section: Exclude<SectionKey, "verify">) => {
     return sectionFields[section].some((key) => !!fieldError(key));
+  };
+
+  const normalizedSkillOptions = useMemo(() => {
+    const cleaned = skillOptions.map((option) => option.trim()).filter(Boolean);
+    return Array.from(new Set(cleaned));
+  }, [skillOptions]);
+
+  const filteredSkillOptions = useMemo(() => {
+    const query = skillsSearchText.trim().toLowerCase();
+    if (!query) return normalizedSkillOptions;
+    return normalizedSkillOptions.filter((option) =>
+      option.toLowerCase().includes(query)
+    );
+  }, [normalizedSkillOptions, skillsSearchText]);
+
+  const syncSkillsToForm = (
+    nextSelectedSkills: string[],
+    nextOtherSkillEnabled: boolean,
+    nextOtherSkillText: string
+  ) => {
+    const nextSkills = composeSkillsText(
+      nextSelectedSkills,
+      nextOtherSkillEnabled,
+      nextOtherSkillText
+    );
+    setForm((prev) => ({ ...prev, skillsOther: nextSkills }));
+  };
+
+  const openSkillsSelector = () => {
+    const parsed = parseSkillState(
+      String(form.skillsOther ?? ""),
+      normalizedSkillOptions
+    );
+    setSelectedSkills(parsed.selectedSkills);
+    setOtherSkillEnabled(parsed.otherSkillEnabled);
+    setOtherSkillText(parsed.otherSkillText);
+    setSkillsSearchText("");
+    setSkillsPickerOpen(true);
+  };
+
+  const onToggleSkill = (skill: string) => {
+    const nextSelectedSkills = selectedSkills.includes(skill)
+      ? selectedSkills.filter((item) => item !== skill)
+      : [...selectedSkills, skill];
+
+    setSelectedSkills(nextSelectedSkills);
+    syncSkillsToForm(nextSelectedSkills, otherSkillEnabled, otherSkillText);
+  };
+
+  const onToggleOtherSkill = () => {
+    const nextEnabled = !otherSkillEnabled;
+    const nextText = nextEnabled ? otherSkillText : "";
+
+    setOtherSkillEnabled(nextEnabled);
+    if (!nextEnabled) {
+      setOtherSkillText("");
+    }
+
+    syncSkillsToForm(selectedSkills, nextEnabled, nextText);
+  };
+
+  const onChangeOtherSkillText = (value: string) => {
+    setOtherSkillText(value);
+    syncSkillsToForm(selectedSkills, otherSkillEnabled, value);
   };
 
   return (
@@ -184,13 +263,15 @@ export function VolunteerApplicationView({
             value={form.street}
             onChangeText={(v) => setForm((p) => ({ ...p, street: v }))}
           />
-          <Field
+          <SelectField
             label="Barangay *"
-            placeholder="e.g., Brgy. San Antonio"
+            placeholder="Select barangay"
             value={form.barangay}
             error={fieldError("barangay")}
-            onBlur={() => markTouched("barangay")}
-            onChangeText={(v) => setForm((p) => ({ ...p, barangay: v }))}
+            onPress={() => {
+              markTouched("barangay");
+              setBarangayPickerOpen(true);
+            }}
           />
           <Field
             label="City/Municipality"
@@ -264,11 +345,11 @@ export function VolunteerApplicationView({
           isOpen={open === "skills"}
           onToggle={() => setOpen(open === "skills" ? "certs" : "skills")}
         >
-          <Field
-            label="Other Skills (optional)"
-            placeholder="e.g., First Aid, Logistics, Crowd Control"
-            value={form.skillsOther}
-            onChangeText={(v) => setForm((p) => ({ ...p, skillsOther: v }))}
+          <SelectField
+            label="Skills (optional)"
+            placeholder="Select skills"
+            value={formatSkillsDisplayText(form.skillsOther)}
+            onPress={openSkillsSelector}
           />
         </Accordion>
 
@@ -415,6 +496,33 @@ export function VolunteerApplicationView({
           </Text>
         </Pressable>
       </ScrollView>
+
+      <OptionPickerSheet
+        visible={barangayPickerOpen}
+        title="Select Barangay"
+        options={[...DAGUPAN_BARANGAY_OPTIONS]}
+        value={form.barangay}
+        onClose={() => setBarangayPickerOpen(false)}
+        onSelect={(nextBarangay) => {
+          markTouched("barangay");
+          setForm((p) => ({ ...p, barangay: nextBarangay }));
+          setBarangayPickerOpen(false);
+        }}
+      />
+
+      <SkillsPickerSheet
+        visible={skillsPickerOpen}
+        searchText={skillsSearchText}
+        onChangeSearchText={setSkillsSearchText}
+        options={filteredSkillOptions}
+        selectedSkills={selectedSkills}
+        otherSkillEnabled={otherSkillEnabled}
+        otherSkillText={otherSkillText}
+        onToggleSkill={onToggleSkill}
+        onToggleOtherSkill={onToggleOtherSkill}
+        onChangeOtherSkillText={onChangeOtherSkillText}
+        onClose={() => setSkillsPickerOpen(false)}
+      />
     </View>
   );
 }
@@ -477,6 +585,192 @@ function Field(props: {
 
       {!!props.error && <Text style={styles.errorInline}>{props.error}</Text>}
     </View>
+  );
+}
+
+function SelectField(props: {
+  label: string;
+  value?: string;
+  placeholder?: string;
+  error?: string;
+  onPress: () => void;
+}) {
+  return (
+    <View style={{ marginBottom: 12 }}>
+      <Text style={styles.fieldLabel}>{props.label}</Text>
+      <Pressable
+        style={[styles.input, styles.inputPicker, !!props.error && styles.inputError]}
+        onPress={props.onPress}
+      >
+        <Text style={[styles.inputPickerText, !props.value && styles.inputPlaceholder]}>
+          {props.value?.trim() ? props.value : props.placeholder ?? ""}
+        </Text>
+        <Ionicons name="chevron-down" size={16} color="#6B7280" />
+      </Pressable>
+      {!!props.error && <Text style={styles.errorInline}>{props.error}</Text>}
+    </View>
+  );
+}
+
+function OptionPickerSheet(props: {
+  visible: boolean;
+  title: string;
+  options: string[];
+  value?: string;
+  onClose: () => void;
+  onSelect: (value: string) => void;
+}) {
+  return (
+    <Modal
+      visible={props.visible}
+      transparent
+      animationType="slide"
+      onRequestClose={props.onClose}
+    >
+      <Pressable style={styles.sheetBackdrop} onPress={props.onClose}>
+        <Pressable style={styles.sheetCard} onPress={() => undefined}>
+          <View style={styles.sheetHandleWrap}>
+            <View style={styles.sheetHandle} />
+          </View>
+
+          <Text style={styles.sheetTitle}>{props.title}</Text>
+
+          <ScrollView
+            style={styles.sheetList}
+            contentContainerStyle={styles.sheetListContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {props.options.map((option) => {
+              const selected = option === props.value;
+              return (
+                <Pressable
+                  key={option}
+                  onPress={() => props.onSelect(option)}
+                  style={styles.sheetOption}
+                >
+                  <Text style={[styles.sheetOptionText, selected && styles.sheetOptionTextSelected]}>
+                    {option}
+                  </Text>
+                  {selected ? (
+                    <Ionicons name="checkmark" size={18} color="#EF4444" />
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          <Pressable style={styles.sheetCloseBtn} onPress={props.onClose}>
+            <Text style={styles.sheetCloseText}>Close</Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+function SkillsPickerSheet(props: {
+  visible: boolean;
+  searchText: string;
+  onChangeSearchText: (value: string) => void;
+  options: string[];
+  selectedSkills: string[];
+  otherSkillEnabled: boolean;
+  otherSkillText: string;
+  onToggleSkill: (skill: string) => void;
+  onToggleOtherSkill: () => void;
+  onChangeOtherSkillText: (value: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Modal
+      visible={props.visible}
+      transparent
+      animationType="slide"
+      onRequestClose={props.onClose}
+    >
+      <Pressable style={styles.sheetBackdrop} onPress={props.onClose}>
+        <Pressable style={styles.sheetCard} onPress={() => undefined}>
+          <View style={styles.sheetHandleWrap}>
+            <View style={styles.sheetHandle} />
+          </View>
+
+          <Text style={styles.sheetTitle}>Select Skills</Text>
+
+          <View style={styles.skillSearchWrap}>
+            <Ionicons name="search-outline" size={18} color="#6B7280" />
+            <TextInput
+              value={props.searchText}
+              onChangeText={props.onChangeSearchText}
+              placeholder="Search skills"
+              placeholderTextColor="#9CA3AF"
+              style={styles.skillSearchInput}
+            />
+          </View>
+
+          <ScrollView
+            style={styles.sheetList}
+            contentContainerStyle={styles.sheetListContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {props.options.map((option) => {
+              const checked = props.selectedSkills.includes(option);
+              return (
+                <Pressable
+                  key={option}
+                  onPress={() => props.onToggleSkill(option)}
+                  style={styles.sheetOption}
+                >
+                  <Text style={[styles.sheetOptionText, checked && styles.sheetOptionTextSelected]}>
+                    {option}
+                  </Text>
+                  <Ionicons
+                    name={checked ? "checkbox-outline" : "square-outline"}
+                    size={20}
+                    color={checked ? "#EF4444" : "#9CA3AF"}
+                  />
+                </Pressable>
+              );
+            })}
+
+            {props.options.length === 0 ? (
+              <Text style={styles.sheetEmptyText}>No matching skills.</Text>
+            ) : null}
+
+            <Pressable style={styles.sheetOption} onPress={props.onToggleOtherSkill}>
+              <Text
+                style={[
+                  styles.sheetOptionText,
+                  props.otherSkillEnabled && styles.sheetOptionTextSelected,
+                ]}
+              >
+                Other
+              </Text>
+              <Ionicons
+                name={props.otherSkillEnabled ? "checkbox-outline" : "square-outline"}
+                size={20}
+                color={props.otherSkillEnabled ? "#EF4444" : "#9CA3AF"}
+              />
+            </Pressable>
+
+            {props.otherSkillEnabled ? (
+              <View style={styles.otherSkillWrap}>
+                <TextInput
+                  value={props.otherSkillText}
+                  onChangeText={props.onChangeOtherSkillText}
+                  placeholder="Type other skill"
+                  placeholderTextColor="#9CA3AF"
+                  style={styles.otherSkillInput}
+                />
+              </View>
+            ) : null}
+          </ScrollView>
+
+          <Pressable style={styles.sheetCloseBtn} onPress={props.onClose}>
+            <Text style={styles.sheetCloseText}>Done</Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -595,6 +889,18 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     color: "#111827",
   },
+  inputPicker: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  inputPickerText: {
+    flex: 1,
+    color: "#111827",
+  },
+  inputPlaceholder: {
+    color: "#9CA3AF",
+  },
   inputError: { borderColor: "#EF4444" },
   errorInline: {
     marginTop: 6,
@@ -634,4 +940,119 @@ const styles = StyleSheet.create({
   },
   submitDisabled: { opacity: 0.55 },
   submitText: { color: "#fff", fontWeight: "900", fontSize: 14 },
+
+  sheetBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(17,24,39,0.52)",
+    justifyContent: "flex-end",
+  },
+  sheetCard: {
+    maxHeight: "75%",
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    borderTopWidth: 1,
+    borderColor: "#E5E7EB",
+    paddingBottom: 12,
+  },
+  sheetHandleWrap: {
+    alignItems: "center",
+    paddingTop: 10,
+  },
+  sheetHandle: {
+    width: 46,
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: "#D1D5DB",
+  },
+  sheetTitle: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 8,
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#111827",
+  },
+  skillSearchWrap: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    minHeight: 40,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "#F9FAFB",
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  skillSearchInput: {
+    flex: 1,
+    color: "#111827",
+    fontSize: 14,
+    fontWeight: "500",
+    paddingVertical: 8,
+  },
+  sheetList: {
+    flexGrow: 0,
+  },
+  sheetListContent: {
+    paddingBottom: 8,
+  },
+  sheetOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  sheetOptionText: {
+    color: "#111827",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  sheetOptionTextSelected: {
+    color: "#EF4444",
+    fontWeight: "800",
+  },
+  sheetEmptyText: {
+    color: "#6B7280",
+    fontSize: 13,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  otherSkillWrap: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  otherSkillInput: {
+    minHeight: 40,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "#F9FAFB",
+    color: "#111827",
+    fontSize: 14,
+    fontWeight: "500",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  sheetCloseBtn: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    height: 40,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff",
+  },
+  sheetCloseText: {
+    color: "#111827",
+    fontSize: 14,
+    fontWeight: "800",
+  },
 });

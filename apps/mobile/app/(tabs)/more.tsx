@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { Alert, ScrollView } from "react-native";
+import { Alert } from "react-native";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import GradientScreen from "../../src/components/GradientScreen";
@@ -20,6 +20,8 @@ import { useProfileNotificationPreferences } from "../../features/profile/hooks/
 import { useProfileAvatar } from "../../features/profile/hooks/useProfileAvatar";
 import { useProfileRequestShortcuts } from "../../features/profile/hooks/useProfileRequestShortcuts";
 import { useProfileSummary } from "../../features/profile/hooks/useProfileSummary";
+import { usePullToRefresh } from "../../features/common/hooks/usePullToRefresh";
+import { RefreshableScrollScreen } from "../../features/common/components/RefreshableScrollScreen";
 import {
   formatProfileRoleLabel,
   isApprovedVolunteer,
@@ -63,6 +65,7 @@ export default function MoreScreen() {
     volunteerAssignmentsEnabled,
     updating,
     canShowVolunteerAssignmentsToggle,
+    refresh: refreshNotificationPreferences,
     onToggleCommunityUpdates,
     onToggleVolunteerAssignments,
   } = useProfileNotificationPreferences({
@@ -227,6 +230,31 @@ export default function MoreScreen() {
     Alert.alert("Profile Settings", "Manage your account credentials.", actions);
   }, [hasPassword, isGoogleLinked, isUser, linkingGoogle, onCreatePassword, onLinkGoogle, onLogout, onResetPassword]);
 
+  const onPressEditProfile = useCallback(() => {
+    if (!isUser) {
+      onLogout();
+      return;
+    }
+
+    router.push("/profile/edit");
+  }, [isUser, onLogout, router]);
+
+  const onPressPersonalInfoRow = useCallback(
+    (rowKey: "email" | "number" | "barangay" | "gender" | "skills") => {
+      if (rowKey === "skills") {
+        if (!isUser) {
+          onLogout();
+          return;
+        }
+        router.push("/profile/skills");
+        return;
+      }
+
+      onPressEditProfile();
+    },
+    [isUser, onLogout, onPressEditProfile, router]
+  );
+
   const onComingSoon = useCallback((title: string) => {
     Alert.alert(title, "This page is not available yet.");
   }, []);
@@ -282,14 +310,22 @@ export default function MoreScreen() {
 
     router.push("/volunteer-apply-modal");
   }, [isUser, onLogout, router]);
+  const refreshProfilePage = useCallback(async () => {
+    if (!isUser) return;
+
+    await Promise.allSettled([
+      refreshRequestCounts(),
+      refreshProfileSummary(),
+      refreshNotificationPreferences(),
+    ]);
+  }, [isUser, refreshNotificationPreferences, refreshProfileSummary, refreshRequestCounts]);
+  const { refreshing: refreshingProfilePage, triggerRefresh: triggerRefreshProfilePage } =
+    usePullToRefresh(refreshProfilePage);
 
   useFocusEffect(
     useCallback(() => {
-      if (!isUser) return;
-
-      void refreshRequestCounts();
-      void refreshProfileSummary();
-    }, [isUser, refreshProfileSummary, refreshRequestCounts])
+      void refreshProfilePage();
+    }, [refreshProfilePage])
   );
 
   const fullName = useMemo(() => {
@@ -307,7 +343,10 @@ export default function MoreScreen() {
 
   return (
     <GradientScreen gradientHeight={220}>
-      <ScrollView
+      <RefreshableScrollScreen
+        refreshing={isUser ? refreshingProfilePage : false}
+        onRefresh={isUser ? triggerRefreshProfilePage : undefined}
+        refreshControlProps={{ progressViewOffset: 90 }}
         className="bg-transparent"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 28 }}
@@ -322,7 +361,7 @@ export default function MoreScreen() {
           isGuest={!isUser}
           showVerified={showVerified}
           onPressAvatar={onPressAvatar}
-          onPressEdit={onPressProfileSettings}
+          onPressEdit={onPressEditProfile}
           onPressMenu={() => setDrawerVisible(true)}
         />
 
@@ -334,9 +373,13 @@ export default function MoreScreen() {
         />
 
         <ProfileActivitiesGrid summary={summary} onPressApplyVolunteer={onPressApplyVolunteer} />
-        <ProfilePersonalInfoCard summary={summary} />
+        <ProfilePersonalInfoCard
+          summary={summary}
+          onPressHeader={onPressEditProfile}
+          onPressRow={onPressPersonalInfoRow}
+        />
         <ProfileAchievementsCard achievements={MOCK_PROFILE_ACHIEVEMENTS} />
-      </ScrollView>
+      </RefreshableScrollScreen>
 
       <ProfileMoreDrawer
         visible={drawerVisible}

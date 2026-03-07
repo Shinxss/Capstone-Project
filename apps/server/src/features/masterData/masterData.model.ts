@@ -5,6 +5,7 @@ export const MASTER_DATA_TYPES = [
   "severity-levels",
   "task-templates",
   "workflows",
+  "profile-skills",
 ] as const;
 
 export type MasterDataType = (typeof MASTER_DATA_TYPES)[number];

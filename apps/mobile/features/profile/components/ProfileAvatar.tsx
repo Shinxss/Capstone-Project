@@ -49,7 +49,7 @@ export default function ProfileAvatar({
           height: size,
           borderRadius: size / 2,
           overflow: "hidden",
-          borderWidth: 2,
+          borderWidth: 3,
           borderColor: isDark ? "#3B82F6" : "#DC2626",
           backgroundColor: isDark ? "#0E1626" : "#F8FAFC",
           alignItems: "center",

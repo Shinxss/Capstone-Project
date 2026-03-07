@@ -7,11 +7,13 @@ import {
   StatusWorkflowModel,
   TaskTemplateModel,
 } from "./masterData.model";
+import { ProfileSkill } from "../users/profileSkill.model";
 
 function getModel(type: MasterDataType) {
   if (type === "emergency-types") return EmergencyTypeModel;
   if (type === "severity-levels") return SeverityLevelModel;
   if (type === "task-templates") return TaskTemplateModel;
+  if (type === "profile-skills") return ProfileSkill;
   return StatusWorkflowModel;
 }
 
@@ -22,6 +24,10 @@ function getSort(type: MasterDataType) {
 
   if (type === "workflows") {
     return { entityType: 1 } as Record<string, SortOrder>;
+  }
+
+  if (type === "profile-skills") {
+    return { sortOrder: 1, label: 1 } as Record<string, SortOrder>;
   }
 
   return { code: 1 } as Record<string, SortOrder>;

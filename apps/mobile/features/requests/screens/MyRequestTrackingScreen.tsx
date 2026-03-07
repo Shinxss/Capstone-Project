@@ -4,7 +4,6 @@ import {
   Alert,
   Linking,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -15,6 +14,8 @@ import { useIsFocused } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useSession } from "../../auth/hooks/useSession";
+import { usePullToRefresh } from "../../common/hooks/usePullToRefresh";
+import { RefreshableScrollScreen } from "../../common/components/RefreshableScrollScreen";
 import { useRequestLiveTracking } from "../hooks/useRequestLiveTracking";
 import { formatEtaText, formatTrackingHeadline } from "../utils/formatters";
 
@@ -84,6 +85,11 @@ export function MyRequestTrackingScreen() {
     pollMs: 6000,
     enabled: isUser && isFocused && Boolean(requestId),
   });
+  const refreshTracking = useCallback(async () => {
+    await refresh();
+  }, [refresh]);
+  const { refreshing: refreshingTracking, triggerRefresh: triggerRefreshTracking } =
+    usePullToRefresh(refreshTracking);
 
   const emergencyCoordinate = useMemo(
     () => toCoordinate(data?.request?.location),
@@ -217,7 +223,7 @@ export function MyRequestTrackingScreen() {
         <View style={styles.stateWrap}>
           <Text style={styles.stateTitle}>Tracking unavailable</Text>
           <Text style={styles.stateSub}>{error ?? "Unable to load tracking details."}</Text>
-          <Pressable style={styles.actionBtn} onPress={() => void refresh()}>
+          <Pressable style={styles.actionBtn} onPress={() => void refreshTracking()}>
             <Text style={styles.actionBtnText}>Retry</Text>
           </Pressable>
         </View>
@@ -234,7 +240,11 @@ export function MyRequestTrackingScreen() {
         <Text style={styles.headerTitle}>Request Tracking</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <RefreshableScrollScreen
+        refreshing={refreshingTracking}
+        onRefresh={triggerRefreshTracking}
+        contentContainerStyle={styles.content}
+      >
         <View style={styles.summaryCard}>
           <View
             style={[
@@ -365,7 +375,7 @@ export function MyRequestTrackingScreen() {
             );
           })}
         </View>
-      </ScrollView>
+      </RefreshableScrollScreen>
     </SafeAreaView>
   );
 }

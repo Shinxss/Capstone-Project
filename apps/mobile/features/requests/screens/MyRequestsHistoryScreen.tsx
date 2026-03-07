@@ -5,6 +5,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSession } from "../../auth/hooks/useSession";
+import { usePullToRefresh } from "../../common/hooks/usePullToRefresh";
 import { RequestHistoryCard } from "../components/RequestHistoryCard";
 import { RequestStatusTabs, type RequestStatusTabOption } from "../components/RequestStatusTabs";
 import { useMyRequestsHistory } from "../hooks/useMyRequestsHistory";
@@ -23,8 +24,8 @@ const STATUS_TAB_ORDER: MyRequestStatusTab[] = [
   "assigned",
   "en_route",
   "arrived",
-  "review",
   "resolved",
+  "review",
   "cancelled",
 ];
 
@@ -51,6 +52,11 @@ export function MyRequestsHistoryScreen() {
   );
   const [activeTab, setActiveTab] = useState<MyRequestStatusTab>(initialTab);
   const { items, loading, error, refresh } = useMyRequestsHistory(activeTab, { enabled: isUser });
+  const refreshHistory = useCallback(async () => {
+    await refresh();
+  }, [refresh]);
+  const { refreshing: refreshingHistory, triggerRefresh: triggerRefreshHistory } =
+    usePullToRefresh(refreshHistory);
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -66,8 +72,8 @@ export function MyRequestsHistoryScreen() {
   useFocusEffect(
     useCallback(() => {
       if (!isUser) return;
-      void refresh();
-    }, [isUser, refresh])
+      void refreshHistory();
+    }, [isUser, refreshHistory])
   );
 
   const openTracking = useCallback((requestId: string) => {
@@ -125,10 +131,8 @@ export function MyRequestsHistoryScreen() {
       <FlatList
         data={items}
         keyExtractor={(item) => item.id}
-        refreshing={loading}
-        onRefresh={() => {
-          void refresh();
-        }}
+        refreshing={refreshingHistory}
+        onRefresh={triggerRefreshHistory}
         contentContainerStyle={{
           paddingHorizontal: 16,
           paddingTop: 14,
@@ -163,7 +167,7 @@ export function MyRequestsHistoryScreen() {
               <Pressable
                 className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2"
                 onPress={() => {
-                  void refresh();
+                  void refreshHistory();
                 }}
               >
                 <Text className="text-xs font-extrabold text-red-600">Retry</Text>

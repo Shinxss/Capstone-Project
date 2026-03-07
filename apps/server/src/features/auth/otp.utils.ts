@@ -82,6 +82,8 @@ type UserLike = {
   municipality?: string;
   birthdate?: string;
   contactNo?: string;
+  gender?: string;
+  skills?: string;
   country?: string;
   postalCode?: string;
   avatarUrl?: string;
@@ -114,6 +116,8 @@ export function toAuthUserPayload(user: UserLike) {
     municipality: user.municipality ?? "",
     birthdate: user.birthdate ?? "",
     contactNo: user.contactNo ?? "",
+    gender: user.gender ?? "",
+    skills: user.skills ?? "",
     country: user.country ?? "",
     postalCode: user.postalCode ?? "",
     avatarUrl: user.avatarUrl ?? "",

@@ -56,6 +56,7 @@ export type EmergencyBottomSheetController = {
   goToDirections: () => Promise<void>;
   setTravelMode: (mode: TravelMode) => void;
   selectRoute: (index: number) => void;
+  refreshSelectedEmergency: () => Promise<void>;
   fetchRoute: () => Promise<void>;
   optimizeRoute: () => Promise<void>;
 };
@@ -570,6 +571,14 @@ export function useEmergencyBottomSheet(
       setLoadingRoute(false);
     }
   }, [fetchRouteByMode, getWeatherContext, resolveOrigin, selectedEmergency, travelMode]);
+  const refreshSelectedEmergency = useCallback(async () => {
+    if (!selectedEmergency) return;
+
+    setOverviewReloadKey((current) => current + 1);
+    if (sheetMode === "directions") {
+      await fetchRouteByMode(travelMode);
+    }
+  }, [fetchRouteByMode, selectedEmergency, sheetMode, travelMode]);
 
   return {
     selectedEmergency,
@@ -594,6 +603,7 @@ export function useEmergencyBottomSheet(
     goToDirections,
     setTravelMode,
     selectRoute,
+    refreshSelectedEmergency,
     fetchRoute: fetchRouteAction,
     optimizeRoute: optimizeRouteAction,
   };

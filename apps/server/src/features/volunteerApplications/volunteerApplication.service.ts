@@ -155,13 +155,6 @@ function matchesVerifiedVolunteerQuery(profile: any, user: any, q?: string) {
   ].some((value) => rx.test(safeStr(value)));
 }
 
-async function getReviewerBarangay(reviewerId: string, reviewerRole: string) {
-  if (reviewerRole !== "LGU") return "";
-
-  const reviewer = await User.findById(new Types.ObjectId(reviewerId)).select("barangay");
-  return safeStr(reviewer?.barangay);
-}
-
 async function findPreferredApplicationForUser(userId: Types.ObjectId | string) {
   const selectFields =
     "userId fullName sex birthdate mobile email street barangay city province emergencyContact skillsOther certificationsText availabilityText preferredAssignmentText healthNotes consent status reviewedBy reviewedAt reviewNotes createdAt updatedAt";
@@ -368,7 +361,6 @@ export async function listVolunteerApplicationsForReviewer(params: {
   }
 
   const filter: any = {};
-  const reviewerBarangay = await getReviewerBarangay(reviewerId, reviewerRole);
   const appStatusAliases = requestedStatuses?.length
     ? expandVolunteerApplicationStatuses(requestedStatuses)
     : undefined;
@@ -398,15 +390,6 @@ export async function listVolunteerApplicationsForReviewer(params: {
     { $unwind: "$user" },
     { $match: { "user.isActive": true } },
   ];
-
-  if (reviewerBarangay) {
-    const reviewerBarangayRegex = new RegExp(`^${escapeRegExp(reviewerBarangay)}$`, "i");
-    basePipeline.push({
-      $match: {
-        $or: [{ barangay: reviewerBarangayRegex }, { "user.barangay": reviewerBarangayRegex }],
-      },
-    });
-  }
 
   if (appStatusAliases?.length) {
     const statusOrUserStatusMatch: any[] = [{ status: { $in: appStatusAliases } }];
@@ -456,13 +439,6 @@ export async function getVolunteerApplicationByIdForReviewer(params: {
 
   const linkedUser = await User.findById(doc.userId).select("_id isActive barangay").lean();
   if (!linkedUser || linkedUser.isActive !== true) {
-    return null;
-  }
-
-  const reviewerBarangay = (await getReviewerBarangay(reviewerId, reviewerRole)).toLowerCase();
-  const appBarangay = String((doc as any).barangay ?? "").trim().toLowerCase();
-  const userBarangay = String((linkedUser as any).barangay ?? "").trim().toLowerCase();
-  if (reviewerBarangay && appBarangay !== reviewerBarangay && userBarangay !== reviewerBarangay) {
     return null;
   }
 

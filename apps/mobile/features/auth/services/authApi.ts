@@ -14,6 +14,12 @@ export type CommunityLoginUser = {
   lastName?: string;
   role?: string;
   volunteerStatus?: string;
+  birthdate?: string;
+  contactNo?: string;
+  barangay?: string;
+  gender?: string;
+  skills?: string;
+  avatarUrl?: string;
   authProvider?: "local" | "google" | "both";
   emailVerified?: boolean;
   passwordSet?: boolean;
@@ -46,6 +52,12 @@ function parseUserPayload(data: any): CommunityLoginUser {
     lastName: typeof data?.lastName === "string" ? data.lastName : undefined,
     role: typeof data?.role === "string" ? data.role : undefined,
     volunteerStatus: typeof data?.volunteerStatus === "string" ? data.volunteerStatus : undefined,
+    birthdate: typeof data?.birthdate === "string" ? data.birthdate : undefined,
+    contactNo: typeof data?.contactNo === "string" ? data.contactNo : undefined,
+    barangay: typeof data?.barangay === "string" ? data.barangay : undefined,
+    gender: typeof data?.gender === "string" ? data.gender : undefined,
+    skills: typeof data?.skills === "string" ? data.skills : undefined,
+    avatarUrl: typeof data?.avatarUrl === "string" ? data.avatarUrl : undefined,
     authProvider:
       data?.authProvider === "local" || data?.authProvider === "google" || data?.authProvider === "both"
         ? data.authProvider

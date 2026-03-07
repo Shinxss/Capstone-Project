@@ -33,6 +33,8 @@ export type UserDoc = {
   municipality?: string;
   birthdate?: string;
   contactNo?: string;
+  gender?: string;
+  skills?: string;
   country?: string;
   postalCode?: string;
   avatarUrl?: string;
@@ -102,6 +104,13 @@ const UserSchema = new Schema<UserDoc>(
     municipality: { type: String, default: "", trim: true, maxlength: 200 },
     birthdate: { type: String, default: "", trim: true, maxlength: 10 },
     contactNo: { type: String, default: "", trim: true, maxlength: 20 },
+    gender: {
+      type: String,
+      default: "",
+      trim: true,
+      enum: ["", "Male", "Female", "Prefer not to say"],
+    },
+    skills: { type: String, default: "", trim: true, maxlength: 300 },
     country: { type: String, default: "", trim: true, maxlength: 100 },
     postalCode: { type: String, default: "", trim: true, maxlength: 20 },
     avatarUrl: { type: String, default: "", trim: true, maxlength: 500 },

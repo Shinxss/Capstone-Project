@@ -128,7 +128,9 @@ export async function getUserProfileSummary(userId: string): Promise<UserProfile
 
   const objectId = new Types.ObjectId(userId);
   const user = await User.findById(objectId)
-    .select("_id lifelineId firstName lastName email role volunteerStatus contactNo barangay municipality birthdate avatarUrl")
+    .select(
+      "_id lifelineId firstName lastName email role volunteerStatus contactNo barangay municipality birthdate gender skills avatarUrl"
+    )
     .lean();
 
   if (!user) return null;
@@ -239,9 +241,11 @@ export async function getUserProfileSummary(userId: string): Promise<UserProfile
     contactNo: toNullableString(user.contactNo) ?? toNullableString(latestVerifiedApplication?.mobile),
     birthdate: toNullableString(user.birthdate) ?? toNullableString(latestVerifiedApplication?.birthdate),
     address: toNullableString(resolvedAddress),
-    gender: toNullableString(latestVerifiedApplication?.sex),
+    gender: toNullableString(user.gender) ?? toNullableString(latestVerifiedApplication?.sex),
     barangay: toNullableString(user.barangay) ?? toNullableString(latestVerifiedApplication?.barangay),
-    skills: isVolunteer ? toNullableString(latestVerifiedApplication?.skillsOther) : null,
+    skills: isVolunteer
+      ? toNullableString(user.skills) ?? toNullableString(latestVerifiedApplication?.skillsOther)
+      : toNullableString(user.skills),
     avatarUrl: toNullableString(user.avatarUrl),
     stats: {
       completedTasks,

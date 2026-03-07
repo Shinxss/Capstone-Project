@@ -21,6 +21,9 @@ Notifications.setNotificationHandler({
   }),
 });
 
+const DISPATCH_CHANNEL_ID = "lifeline_dispatch_v4";
+const ALERTS_CHANNEL_ID = "lifeline_alerts_v2";
+
 function getProjectId(): string | undefined {
   const easProjectId =
     Constants?.expoConfig?.extra?.eas?.projectId ??
@@ -36,23 +39,33 @@ function getProjectId(): string | undefined {
 async function ensureNotificationChannels() {
   if (Platform.OS !== "android") return;
 
-  await Notifications.setNotificationChannelAsync("lifeline_dispatch", {
-    name: "Dispatch Alerts",
-    importance: Notifications.AndroidImportance.MAX,
-    sound: "siren.wav",
-    vibrationPattern: [0, 250, 250, 250],
-    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-    bypassDnd: true,
-  });
+  try {
+    await Notifications.setNotificationChannelAsync(DISPATCH_CHANNEL_ID, {
+      name: "Dispatch Alerts",
+      importance: Notifications.AndroidImportance.MAX,
+      sound: "siren.wav",
+      vibrationPattern: [0, 250, 250, 250],
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      bypassDnd: true,
+    });
+  } catch (error) {
+    console.warn("[push] dispatch channel setup failed", error);
+  }
 
-  await Notifications.setNotificationChannelAsync("lifeline_alerts", {
-    name: "General Alerts",
-    importance: Notifications.AndroidImportance.HIGH,
-  });
+  try {
+    await Notifications.setNotificationChannelAsync(ALERTS_CHANNEL_ID, {
+      name: "General Alerts",
+      importance: Notifications.AndroidImportance.HIGH,
+      sound: "default",
+    });
+  } catch (error) {
+    console.warn("[push] alerts channel setup failed", error);
+  }
 }
 
 async function getExpoPushToken(): Promise<string | null> {
   if (!Device.isDevice) {
+    console.info("[push] registration skipped: requires physical device");
     return null;
   }
 
@@ -67,15 +80,31 @@ async function getExpoPushToken(): Promise<string | null> {
   }
 
   if (status !== "granted") {
+    console.info("[push] registration skipped: notification permission not granted", { status });
     return null;
   }
 
   const projectId = getProjectId();
-  const tokenResponse = projectId
-    ? await Notifications.getExpoPushTokenAsync({ projectId })
-    : await Notifications.getExpoPushTokenAsync();
+  if (!projectId) {
+    console.warn("[push] EAS projectId missing. Falling back to getExpoPushTokenAsync() without explicit project id");
+  }
 
-  return tokenResponse.data;
+  try {
+    const tokenResponse = projectId
+      ? await Notifications.getExpoPushTokenAsync({ projectId })
+      : await Notifications.getExpoPushTokenAsync();
+
+    const token = String(tokenResponse.data || "").trim();
+    if (!token) {
+      console.warn("[push] getExpoPushTokenAsync returned empty token");
+      return null;
+    }
+
+    return token;
+  } catch (error) {
+    console.warn("[push] getExpoPushTokenAsync failed", error);
+    return null;
+  }
 }
 
 export function usePushNotificationsBootstrap() {
@@ -146,6 +175,12 @@ export function usePushNotificationsBootstrap() {
       foregroundSubscription.remove();
     };
   }, [router]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    if (Platform.OS !== "android") return;
+    void ensureNotificationChannels();
+  }, [hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;

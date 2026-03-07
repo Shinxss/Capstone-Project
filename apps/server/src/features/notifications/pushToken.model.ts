@@ -5,6 +5,7 @@ export type PushPlatform = "android" | "ios";
 export type PushTokenDoc = {
   userId: Types.ObjectId;
   expoPushToken: string;
+  token?: string;
   platform: PushPlatform;
   isActive: boolean;
   lastSeenAt: Date;
@@ -16,6 +17,8 @@ const PushTokenSchema = new Schema<PushTokenDoc>(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     expoPushToken: { type: String, required: true, trim: true },
+    // Legacy compatibility: older deployments indexed `token`.
+    token: { type: String, trim: true },
     platform: { type: String, enum: ["android", "ios"], required: true },
     isActive: { type: Boolean, default: true, index: true },
     lastSeenAt: { type: Date, default: Date.now },
