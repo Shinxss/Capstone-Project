@@ -1,12 +1,13 @@
 import type { EmergencyType } from "../../emergency/constants/emergency.constants";
 import type { HazardType } from "../../hazardZones/constants/hazardZones.constants";
 
-export type VolunteerStatus = "available" | "busy" | "offline";
+export type VolunteerStatus = "available" | "busy" | "idle" | "offline";
 
 export type Volunteer = {
   id: string;
   name: string;
   status: VolunteerStatus;
+  lastSeenAt?: string;
   // May be missing until the mobile app starts sending live GPS updates
   lng?: number;
   lat?: number;

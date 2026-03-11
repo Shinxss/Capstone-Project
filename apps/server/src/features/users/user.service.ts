@@ -2,6 +2,7 @@ import { Types } from "mongoose";
 import { User } from "./user.model";
 import { VolunteerApplication } from "../volunteerApplications/volunteerApplication.model";
 import { DispatchOffer } from "../dispatches/dispatch.model";
+import { getVolunteerPresenceStatus } from "../../realtime/notificationsSocket";
 
 export type DispatchVolunteer = {
   id: string;
@@ -115,7 +116,7 @@ export async function listDispatchVolunteers(
     return {
       id,
       name,
-      status: u.isActive ? "available" : "offline",
+      status: getVolunteerPresenceStatus(id) === "ONLINE" ? "available" : "offline",
       skill,
       barangay,
       municipality,
@@ -185,8 +186,21 @@ export async function getUserProfileSummary(userId: string): Promise<UserProfile
             ? new Date(offer.respondedAt)
             : null;
 
-      if (respondedAt && Number.isFinite(createdAt.getTime()) && Number.isFinite(respondedAt.getTime())) {
-        const diffMinutes = (respondedAt.getTime() - createdAt.getTime()) / 60_000;
+      const completedAtForResponse =
+        offer.completedAt instanceof Date
+          ? offer.completedAt
+          : offer.completedAt
+            ? new Date(offer.completedAt)
+            : null;
+
+      // "Average response time" in volunteer profile is measured as:
+      // assignment (dispatch createdAt) -> arrived on scene (completedAt / DONE).
+      if (
+        completedAtForResponse &&
+        Number.isFinite(createdAt.getTime()) &&
+        Number.isFinite(completedAtForResponse.getTime())
+      ) {
+        const diffMinutes = (completedAtForResponse.getTime() - createdAt.getTime()) / 60_000;
         if (diffMinutes >= 0) {
           responseDeltaSum += diffMinutes;
           responseDeltaCount += 1;

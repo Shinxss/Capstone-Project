@@ -6,7 +6,7 @@ type VolunteersSnapshotPayload = {
   at?: string;
   volunteers?: Array<{
     volunteerId?: string;
-    status?: "ONLINE" | "BUSY";
+    status?: "ONLINE" | "BUSY" | "IDLE";
     onDuty?: boolean;
     lastSeenAt?: string;
     lastLocation?: {
@@ -25,7 +25,7 @@ type VolunteersPresenceChangedPayload = {
   reason?: string;
   volunteer?: {
     volunteerId?: string;
-    status?: "ONLINE" | "BUSY" | "OFFLINE";
+    status?: "ONLINE" | "BUSY" | "IDLE" | "OFFLINE";
     onDuty?: boolean;
     lastSeenAt?: string;
     lastLocation?: {
@@ -43,7 +43,7 @@ type VolunteersLocationUpdatePayload = {
   at?: string;
   volunteer?: {
     volunteerId?: string;
-    status?: "ONLINE" | "BUSY";
+    status?: "ONLINE" | "BUSY" | "IDLE";
     location?: {
       lng?: number;
       lat?: number;

@@ -1,0 +1,31 @@
+{
+  "id": "perf_06_blockchain_verify_latency",
+  "session": "performance",
+  "testCase": "Blockchain verifyTask Latency",
+  "stepsShort": "Run blockchain test suite and capture verify scenario timing",
+  "expectedResult": "Local-chain verification flow completes within 2.0 s",
+  "actualResult": "Verifier can verifyTask completed in 1035 ms",
+  "passFail": "PASS",
+  "notes": "Measured from Hardhat test output in apps/blockchain (`pnpm --dir apps/blockchain test`); verify scenario timing captured from reporter output; 1 suite run.",
+  "sourceFiles": [
+    "apps/blockchain/test/SecurityCases.test.ts"
+  ],
+  "runnerCommand": "pnpm module12:evidence:blockchain-verify-latency",
+  "rawEvidencePath": "C:\\Projects\\Lifeline\\tools\\module12-evidence\\results\\20260310-211659\\raw\\cases\\perf_06_blockchain_verify_latency.json",
+  "measurement": {
+    "verifyLatencyMs": 1035,
+    "reverifyLatencyMs": 72,
+    "unauthorizedVerifyLatencyMs": 66,
+    "unauthorizedRevokeLatencyMs": 67,
+    "unauthorizedGrantLatencyMs": null,
+    "replayLatencyMs": null,
+    "hasUnauthorizedVerify": true,
+    "hasUnauthorizedAdmin": true,
+    "hasReplay": true,
+    "hasNotVerified": true,
+    "gasUsed": 49287,
+    "passingCount": 13,
+    "logPath": "C:\\Projects\\Lifeline\\tools\\module12-evidence\\results\\20260310-211659\\raw\\logs\\blockchain-test.log",
+    "tracePath": "C:\\Projects\\Lifeline\\tools\\module12-evidence\\results\\20260310-211659\\raw\\traces\\blockchain-test.json"
+  }
+}

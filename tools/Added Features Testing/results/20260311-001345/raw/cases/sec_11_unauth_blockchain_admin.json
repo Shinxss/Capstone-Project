@@ -1,0 +1,32 @@
+{
+  "id": "sec_11_unauth_blockchain_admin",
+  "session": "security",
+  "testCase": "Unauthorized Blockchain Admin Actions",
+  "stepsShort": "Run non-admin revoke/reverify and grant-verifier attempts",
+  "expectedResult": "Unauthorized admin-level actions are blocked",
+  "actualResult": "Revoke/Reverify blocked (39 ms); GrantVerifier blocked",
+  "passFail": "PASS",
+  "notes": "Measured from the HK unauthorized-admin cases in SecurityCases.test.ts output; source command: pnpm --dir apps/blockchain test; 1 suite run.",
+  "sourceFiles": [
+    "apps/blockchain/test/SecurityCases.test.ts"
+  ],
+  "runnerCommand": "pnpm test:unauth-blockchain-admin",
+  "rawEvidencePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260311-001345\\raw\\cases\\sec_11_unauth_blockchain_admin.json",
+  "measurement": {
+    "verifyLatencyMs": 1215,
+    "reverifyLatencyMs": 53,
+    "unauthorizedVerifyLatencyMs": 40,
+    "unauthorizedRevokeLatencyMs": 39,
+    "unauthorizedGrantLatencyMs": null,
+    "replayLatencyMs": null,
+    "hasUnauthorizedVerify": true,
+    "hasUnauthorizedAdmin": true,
+    "hasReplay": true,
+    "hasNotVerified": true,
+    "gasUsed": 49287,
+    "passingCount": 13,
+    "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260311-001345\\raw\\logs\\blockchain-test.log",
+    "tracePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260311-001345\\raw\\traces\\blockchain-test.json"
+  },
+  "actualResultCompact": "PASS 1"
+}

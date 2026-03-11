@@ -1,0 +1,15 @@
+{
+  "verifyLatencyMs": 833,
+  "reverifyLatencyMs": 45,
+  "unauthorizedVerifyLatencyMs": null,
+  "unauthorizedRevokeLatencyMs": null,
+  "unauthorizedGrantLatencyMs": null,
+  "replayLatencyMs": null,
+  "hasUnauthorizedVerify": true,
+  "hasUnauthorizedAdmin": true,
+  "hasReplay": true,
+  "hasNotVerified": true,
+  "gasUsed": 49287,
+  "passingCount": 13,
+  "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\logs\\blockchain-test.log"
+}

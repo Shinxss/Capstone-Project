@@ -1,0 +1,66 @@
+{
+  "id": "sec_02_flood_oversized",
+  "session": "security",
+  "testCase": "Flood Risk Oversized Payload Rejection",
+  "stepsShort": "Validate schema with 1,001 segments",
+  "expectedResult": "Request is rejected for exceeding max segment count (1000)",
+  "actualResult": "Rejected with too_big: \"Too big: expected array to have <=1000 items\"",
+  "passFail": "PASS",
+  "notes": "Validated 1,001-segment payload with routingRiskPredictSchema.safeParse in TSX harness; measured through returned Zod issue list; 1 run.",
+  "sourceFiles": [
+    "apps/server/src/features/routingRisk/routingRisk.schema.ts",
+    "tools/Added Features Testing/scripts/sec/server-routing-risk-schema-security.ts"
+  ],
+  "runnerCommand": "pnpm module12:evidence:flood-oversized-payload",
+  "rawEvidencePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-231735\\raw\\cases\\sec_02_flood_oversized.json",
+  "measurement": {
+    "empty": {
+      "success": false,
+      "issues": [
+        {
+          "path": "segments",
+          "code": "too_small",
+          "message": "Too small: expected array to have >=1 items"
+        }
+      ]
+    },
+    "oversized": {
+      "success": false,
+      "issues": [
+        {
+          "path": "segments",
+          "code": "too_big",
+          "message": "Too big: expected array to have <=1000 items"
+        }
+      ]
+    },
+    "scriptType": {
+      "success": false,
+      "issues": [
+        {
+          "path": "segments.0.flood_depth_5yr",
+          "code": "invalid_type",
+          "message": "Invalid input: expected number, received string"
+        }
+      ]
+    },
+    "strictKeys": {
+      "success": false,
+      "issues": [
+        {
+          "path": "segments.0",
+          "code": "unrecognized_keys",
+          "message": "Unrecognized key: \"admin\""
+        },
+        {
+          "path": "",
+          "code": "unrecognized_keys",
+          "message": "Unrecognized key: \"debug\""
+        }
+      ]
+    },
+    "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-231735\\raw\\logs\\server-routing-risk-schema-security.log",
+    "tracePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-231735\\raw\\traces\\routing-risk-schema-security.json"
+  },
+  "actualResultCompact": "PASS 1"
+}

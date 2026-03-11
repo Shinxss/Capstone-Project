@@ -54,7 +54,7 @@ export function ReportEmergencyHeader({
     <View className="px-4 pb-4 pt-2">
       <View className="flex-row items-center pb-1">
         <Pressable onPress={onBack} className="h-10 w-10 items-center justify-center">
-          <Ionicons name="chevron-back" size={20} color="#18181b" />
+          <Ionicons name="arrow-back" size={20} color="#18181b" />
         </Pressable>
         <Text className="ml-3 text-2xl font-bold text-zinc-900">{title}</Text>
       </View>

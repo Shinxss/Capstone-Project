@@ -21,7 +21,7 @@ Notifications.setNotificationHandler({
   }),
 });
 
-const DISPATCH_CHANNEL_ID = "lifeline_dispatch_v4";
+const DISPATCH_CHANNEL_ID = "lifeline_dispatch_v6";
 const ALERTS_CHANNEL_ID = "lifeline_alerts_v2";
 
 function getProjectId(): string | undefined {
@@ -43,7 +43,7 @@ async function ensureNotificationChannels() {
     await Notifications.setNotificationChannelAsync(DISPATCH_CHANNEL_ID, {
       name: "Dispatch Alerts",
       importance: Notifications.AndroidImportance.MAX,
-      sound: "siren.wav",
+      sound: "alarm.wav",
       vibrationPattern: [0, 250, 250, 250],
       lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       bypassDnd: true,
@@ -127,13 +127,13 @@ export function usePushNotificationsBootstrap() {
 
     if (kind === "DISPATCH_OFFER") {
       return {
-        pathname: "/(tabs)/alert",
+        pathname: "/(tabs)/tasks",
       };
     }
 
     if (kind === "DISPATCH_OFFER".toLowerCase()) {
       return {
-        pathname: "/(tabs)/alert",
+        pathname: "/(tabs)/tasks",
       };
     }
 

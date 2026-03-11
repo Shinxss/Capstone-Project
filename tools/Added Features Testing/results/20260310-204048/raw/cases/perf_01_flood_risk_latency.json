@@ -1,0 +1,89 @@
+{
+  "id": "perf_01_flood_risk_latency",
+  "session": "performance",
+  "testCase": "Flood Risk Categorization Latency (Module 11)",
+  "stepsShort": "Run predictRoutingRiskCosts on 1 segment, repeat 5 runs",
+  "expectedResult": "Risk output (routing_cost, risk_level) returns within 1.0 s per call",
+  "actualResult": "Median: 0.538 ms across 5 runs; cold-start first run: 1079.243 ms; risk_level returned",
+  "passFail": "PASS",
+  "notes": "Measured with performance.now() in TSX harness under apps/server; executed 5 single-segment runs; source: raw benchmark JSON trace and harness log.",
+  "sourceFiles": [
+    "apps/server/src/features/routingRisk/routingRisk.service.ts",
+    "tools/module12-evidence/scripts/perf/server-routing-risk-benchmark.ts"
+  ],
+  "runnerCommand": "pnpm module12:evidence:flood-risk-latency",
+  "rawEvidencePath": "C:\\Projects\\Lifeline\\tools\\module12-evidence\\results\\20260310-204048\\raw\\cases\\perf_01_flood_risk_latency.json",
+  "measurement": {
+    "singleRow": {
+      "runsMs": [
+        1079.2432000000001,
+        0.5817999999999302,
+        0.5382999999999356,
+        0.3614000000000033,
+        0.48450000000002547
+      ],
+      "firstRunMs": 1079.2432000000001,
+      "medianMs": 0.5382999999999356,
+      "avgMs": 216.24184,
+      "p95Ms": 0.5817999999999302,
+      "riskLevelReturned": true
+    },
+    "bulk1000": {
+      "runsMs": [
+        7.8103000000000975,
+        4.981599999999844,
+        5.072699999999941,
+        4.780899999999974,
+        3.7396000000001095
+      ],
+      "avgMs": 5.277019999999993,
+      "medianMs": 4.981599999999844,
+      "p95Ms": 5.072699999999941,
+      "riskSet": [
+        "LOW",
+        "MEDIUM",
+        "HIGH"
+      ],
+      "speedSet": [
+        15,
+        25,
+        35,
+        45
+      ]
+    },
+    "concurrency": {
+      "requests": 20,
+      "rowsPerRequest": 100,
+      "totalMs": 9.720199999999977,
+      "avgPerRequestMs": 0.48600999999999883,
+      "success": 20,
+      "failures": 0
+    },
+    "csv": {
+      "logPath": "C:\\Projects\\Lifeline\\tools\\module12-evidence\\results\\20260310-204048\\raw\\artifacts\\routing-risk-benchmark.csv",
+      "offRunsMs": [
+        2.866700000000037,
+        4.2065000000000055,
+        3.6480999999998858,
+        3.4849000000001524,
+        3.3070999999999913
+      ],
+      "onRunsMs": [
+        17.14740000000006,
+        18.170200000000023,
+        8.617599999999811,
+        12.253999999999905,
+        9.3445999999999
+      ],
+      "offAvgMs": 3.5026600000000143,
+      "onAvgMs": 13.106759999999941,
+      "overheadPct": 274.1944693461508,
+      "header": "timestamp,model_available,routing_cost,risk_level,recommended_speed_kph,flood_depth_5yr,rainfall_mm,is_raining,bridge,road_priority,feature_order",
+      "firstDataRow": "2026-03-10T12:40:51.665Z,1,2.300000,LOW,45,0.000000,0.000000,0,1,0,flood_depth_5yr|rainfall_mm|is_raining|bridge|road_priority",
+      "dataRows": 5000
+    },
+    "logPath": "C:\\Projects\\Lifeline\\tools\\module12-evidence\\results\\20260310-204048\\raw\\logs\\server-routing-risk-benchmark.log",
+    "tracePath": "C:\\Projects\\Lifeline\\tools\\module12-evidence\\results\\20260310-204048\\raw\\traces\\routing-risk-benchmark.json",
+    "csvPath": "C:\\Projects\\Lifeline\\tools\\module12-evidence\\results\\20260310-204048\\raw\\artifacts\\routing-risk-benchmark.csv"
+  }
+}

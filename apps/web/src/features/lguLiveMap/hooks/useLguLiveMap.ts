@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import { useSearchParams } from "react-router-dom";
 import { useConfirm } from "@/features/feedback/hooks/useConfirm";
-import { toastError, toastSuccess, toastWarning } from "@/services/feedback/toast.service";
+import { toastError, toastInfo, toastSuccess, toastWarning } from "@/services/feedback/toast.service";
 import { appendActivityLog } from "../../activityLog/services/activityLog.service";
 
 import type { MapEmergencyPin } from "../../emergency/components/EmergencyMap";
@@ -39,6 +39,10 @@ import { createDispatchOffers, fetchDispatchTasks } from "../services/dispatch.s
 import { fetchDispatchVolunteers } from "../services/volunteers.service";
 import { getLguToken } from "../../auth/services/authStorage";
 import { createLivePresenceSocket } from "../services/livePresence.socket";
+import {
+  createNotificationsSocket,
+  type NotificationsRefreshPayload,
+} from "../../notifications/services/notifications.socket";
 
 type LngLat = [number, number];
 
@@ -141,8 +145,15 @@ function isResolvedEmergencyStatus(raw?: string) {
 function toVolunteerStatusFromPresence(raw?: string): Volunteer["status"] {
   const status = String(raw ?? "").trim().toUpperCase();
   if (status === "BUSY") return "busy";
+  if (status === "IDLE") return "idle";
   if (status === "ONLINE") return "available";
   return "offline";
+}
+
+function volunteerPresenceLabel(statusRaw: Volunteer["status"]) {
+  if (statusRaw === "busy") return "BUSY";
+  if (statusRaw === "idle") return "IDLE";
+  return "ONLINE";
 }
 
 function escapeHtml(value: unknown) {
@@ -225,6 +236,10 @@ function ensureVolunteerPinStyles() {
     .ll-vol-pin-wrap[data-status="available"] .ll-vol-pin-chip {
       background: rgba(22, 163, 74, 0.92);
     }
+
+    .ll-vol-pin-wrap[data-status="idle"] .ll-vol-pin-chip {
+      background: rgba(51, 65, 85, 0.92);
+    }
   `;
 
   document.head.appendChild(style);
@@ -242,6 +257,9 @@ export function useLguLiveMap() {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const volunteerMarkersRef = useRef<mapboxgl.Marker[]>([]);
   const meMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const volunteerStatusByIdRef = useRef<Map<string, Volunteer["status"]>>(new Map());
+  const volunteerNameByIdRef = useRef<Map<string, string>>(new Map());
+  const lastVolunteerOnlineToastAtRef = useRef<Map<string, number>>(new Map());
   const draggingDraftVertexIdxRef = useRef<number | null>(null);
   const suppressNextMapClickRef = useRef(false);
   const dragPanWasEnabledRef = useRef(false);
@@ -333,6 +351,15 @@ export function useLguLiveMap() {
   }, [refetchVolunteers]);
 
   useEffect(() => {
+    const statusById = volunteerStatusByIdRef.current;
+    const nameById = volunteerNameByIdRef.current;
+    for (const volunteer of volunteers) {
+      statusById.set(volunteer.id, volunteer.status);
+      nameById.set(volunteer.id, volunteer.name);
+    }
+  }, [volunteers]);
+
+  useEffect(() => {
     const token = getLguToken();
     if (!token) return;
 
@@ -349,7 +376,7 @@ export function useLguLiveMap() {
       setVolunteers((prev) => {
         if (options?.remove) {
           return prev.map((volunteer) =>
-            volunteer.id === volunteerId ? { ...volunteer, status: "offline" } : volunteer
+            volunteer.id === volunteerId ? { ...volunteer, ...patch, status: "offline" } : volunteer
           );
         }
 
@@ -377,6 +404,7 @@ export function useLguLiveMap() {
       volunteers?: Array<{
         volunteerId?: string;
         status?: string;
+        lastSeenAt?: string;
         lastLocation?: { lng?: number; lat?: number };
       }>;
     }) => {
@@ -385,6 +413,7 @@ export function useLguLiveMap() {
         {
           volunteerId?: string;
           status?: string;
+          lastSeenAt?: string;
           lastLocation?: { lng?: number; lat?: number };
         }
       >();
@@ -406,6 +435,7 @@ export function useLguLiveMap() {
           return {
             ...volunteer,
             status: toVolunteerStatusFromPresence(matched.status),
+            lastSeenAt: matched.lastSeenAt ?? volunteer.lastSeenAt,
             ...(Number.isFinite(lng) && Number.isFinite(lat) ? { lng, lat } : {}),
           };
         })
@@ -416,6 +446,7 @@ export function useLguLiveMap() {
       volunteer?: {
         volunteerId?: string;
         status?: string;
+        lastSeenAt?: string;
         lastLocation?: { lng?: number; lat?: number };
       };
     }) => {
@@ -423,18 +454,44 @@ export function useLguLiveMap() {
       const status = String(payload?.volunteer?.status ?? "").trim().toUpperCase();
       if (!volunteerId) return;
 
+      const prevStatus = volunteerStatusByIdRef.current.get(volunteerId);
+
       if (status === "OFFLINE") {
-        mergePresence(volunteerId, {}, { remove: true });
+        volunteerStatusByIdRef.current.set(volunteerId, "offline");
+        mergePresence(
+          volunteerId,
+          {
+            lastSeenAt: payload?.volunteer?.lastSeenAt,
+          },
+          { remove: true }
+        );
         return;
       }
+
+      const nextStatus = toVolunteerStatusFromPresence(status);
+      volunteerStatusByIdRef.current.set(volunteerId, nextStatus);
 
       const lng = Number(payload?.volunteer?.lastLocation?.lng);
       const lat = Number(payload?.volunteer?.lastLocation?.lat);
 
       mergePresence(volunteerId, {
-        status: toVolunteerStatusFromPresence(status),
+        status: nextStatus,
+        lastSeenAt: payload?.volunteer?.lastSeenAt,
         ...(Number.isFinite(lng) && Number.isFinite(lat) ? { lng, lat } : {}),
       });
+
+      const shouldNotifyOnline =
+        nextStatus === "available" &&
+        (prevStatus === "offline" || prevStatus === "idle");
+      if (shouldNotifyOnline) {
+        const now = Date.now();
+        const lastToastAt = lastVolunteerOnlineToastAtRef.current.get(volunteerId) ?? 0;
+        if (now - lastToastAt >= 30_000) {
+          lastVolunteerOnlineToastAtRef.current.set(volunteerId, now);
+          const volunteerName = volunteerNameByIdRef.current.get(volunteerId) || "Volunteer";
+          toastInfo(`${volunteerName} is now online`);
+        }
+      }
     };
 
     const onLocationUpdate = (payload: {
@@ -484,6 +541,36 @@ export function useLguLiveMap() {
     };
   }, []);
 
+  useEffect(() => {
+    const token = getLguToken();
+    if (!token) return;
+
+    let lastRefreshAt = 0;
+    const socket = createNotificationsSocket(token);
+
+    const onRefresh = (payload: NotificationsRefreshPayload) => {
+      const now = Date.now();
+      if (now - lastRefreshAt < 1000) return;
+      lastRefreshAt = now;
+
+      const reason = String(payload?.reason ?? "").trim().toLowerCase();
+      if (reason === "emergency_reported") {
+        toastInfo("New emergency reported");
+      }
+
+      void refetchEmergencies();
+      void refetchVolunteers();
+    };
+
+    socket.on("notifications:refresh", onRefresh);
+    socket.connect();
+
+    return () => {
+      socket.off("notifications:refresh", onRefresh);
+      socket.disconnect();
+    };
+  }, [refetchEmergencies, refetchVolunteers]);
+
   // Per-emergency responder assignment (volunteer ids)
   const [assignmentsByEmergency, setAssignmentsByEmergency] = useState<Record<string, string[]>>({});
 
@@ -503,6 +590,10 @@ export function useLguLiveMap() {
       );
     });
   }, [volunteers, query]);
+
+  const availableVolunteersCount = useMemo(() => {
+    return volunteers.filter((v) => String(v.status ?? "").toLowerCase() === "available").length;
+  }, [volunteers]);
 
   const activeVolunteersCount = useMemo(() => {
     return volunteers.filter((v) => String(v.status ?? "").toLowerCase() !== "offline").length;
@@ -555,6 +646,7 @@ export function useLguLiveMap() {
   }, [activeReports, selectedEmergencyId]);
 
   const selectedEmergencyDetails: LguEmergencyDetails | null = useMemo(() => {
+    if (!selectedEmergency) return null;
     const coords = emergencyCoordsFromReport(selectedEmergency);
     if (!coords) return null;
     const [lng, lat] = coords;
@@ -776,7 +868,7 @@ export function useLguLiveMap() {
 
       const el = document.createElement("div");
       const color = colorForVolunteerStatus(v.status);
-      const statusText = String(v.status ?? "").toLowerCase() === "busy" ? "BUSY" : "ONLINE";
+      const statusText = volunteerPresenceLabel(v.status);
       const volunteerAddress = [v.barangayName, v.municipality].filter(Boolean).join(", ");
       const displayAddress = volunteerAddress || "Address unavailable";
       const popupName = escapeHtml(v.name);
@@ -1276,6 +1368,14 @@ export function useLguLiveMap() {
     setDispatchSelection([]);
   }, []);
 
+  useEffect(() => {
+    if (!dispatchModalOpen) return;
+    const availableIds = new Set(
+      volunteers.filter((volunteer) => volunteer.status === "available").map((volunteer) => volunteer.id)
+    );
+    setDispatchSelection((prev) => prev.filter((id) => availableIds.has(id)));
+  }, [dispatchModalOpen, volunteers]);
+
   const toggleDispatchResponder = useCallback(
     (volunteerId: string) => {
       const v = volunteers.find((x) => x.id === volunteerId);
@@ -1336,11 +1436,6 @@ export function useLguLiveMap() {
       const merged = Array.from(new Set([...existing, ...chosen]));
       return { ...prev, [selectedEmergencyId]: merged };
     });
-
-    // Mark dispatched responders as busy (mock behavior)
-    setVolunteers((prev) =>
-      prev.map((v) => (chosen.includes(v.id) ? { ...v, status: "busy" } : v))
-    );
 
     setDispatchModalOpen(false);
     setDispatchSelection([]);
@@ -1495,9 +1590,9 @@ export function useLguLiveMap() {
     // show active hazards count in pills (matches what's shown on the map)
     hazardsCount: hazardsActiveCount,
     hazardsTotalCount,
-    volunteersCount: volunteers.length,
+    volunteersCount: showVolunteers ? availableVolunteersCount : 0,
     activeVolunteersCount,
-    emergenciesCount: activeReports.length,
+    emergenciesCount: showEmergencies ? activeReports.length : 0,
     sosCount,
     liveIncidents,
 

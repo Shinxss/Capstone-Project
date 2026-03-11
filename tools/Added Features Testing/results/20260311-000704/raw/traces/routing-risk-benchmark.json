@@ -1,0 +1,70 @@
+{
+  "singleRow": {
+    "runsMs": [
+      874.7593999999999,
+      0.1854000000000724,
+      0.28340000000002874,
+      0.1414999999999509,
+      0.2403999999999087
+    ],
+    "firstRunMs": 874.7593999999999,
+    "medianMs": 0.2403999999999087,
+    "avgMs": 175.12201999999996,
+    "p95Ms": 0.28340000000002874,
+    "riskLevelReturned": true
+  },
+  "bulk1000": {
+    "runsMs": [
+      4.457699999999932,
+      2.5386000000000877,
+      2.654800000000023,
+      2.330400000000054,
+      2.1450999999999567
+    ],
+    "avgMs": 2.8253200000000107,
+    "medianMs": 2.5386000000000877,
+    "p95Ms": 2.654800000000023,
+    "riskSet": [
+      "LOW",
+      "MEDIUM",
+      "HIGH"
+    ],
+    "speedSet": [
+      15,
+      25,
+      35,
+      45
+    ]
+  },
+  "concurrency": {
+    "requests": 20,
+    "rowsPerRequest": 100,
+    "totalMs": 4.736900000000105,
+    "avgPerRequestMs": 0.23684500000000525,
+    "success": 20,
+    "failures": 0
+  },
+  "csv": {
+    "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260311-000704\\raw\\artifacts\\routing-risk-benchmark.csv",
+    "offRunsMs": [
+      1.3226999999999407,
+      1.393199999999979,
+      3.6077999999999975,
+      2.577099999999973,
+      1.5833999999999833
+    ],
+    "onRunsMs": [
+      7.686800000000176,
+      5.266399999999976,
+      3.7872999999999593,
+      6.962500000000091,
+      4.7707000000000335
+    ],
+    "offAvgMs": 2.0968399999999745,
+    "onAvgMs": 5.694740000000047,
+    "overheadPct": 171.58676866141988,
+    "header": "timestamp,model_available,routing_cost,risk_level,recommended_speed_kph,flood_depth_5yr,rainfall_mm,is_raining,bridge,road_priority,feature_order",
+    "firstDataRow": "2026-03-10T16:07:06.918Z,1,2.300000,LOW,45,0.000000,0.000000,0,1,0,flood_depth_5yr|rainfall_mm|is_raining|bridge|road_priority",
+    "dataRows": 5000
+  }
+}

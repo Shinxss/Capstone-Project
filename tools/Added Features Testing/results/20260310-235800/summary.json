@@ -1,0 +1,573 @@
+{
+  "runId": "20260310-235800",
+  "generatedAt": "2026-03-10T15:58:00.200Z",
+  "environment": {
+    "node": "v22.19.0",
+    "platform": "win32 x64",
+    "cwd": "C:\\Projects\\Lifeline",
+    "gitCommit": "9ce99f4c05e794c87bace9a146e1929688d1550d",
+    "gitBranch": "main"
+  },
+  "scope": "performance",
+  "totals": {
+    "total": 10,
+    "pass": 10,
+    "fail": 0,
+    "error": 0
+  },
+  "results": [
+    {
+      "id": "perf_01_flood_risk_latency",
+      "session": "performance",
+      "testCase": "Flood Risk Categorization Latency (Module 11)",
+      "stepsShort": "Run predictRoutingRiskCosts on 1 segment, repeat 5 runs",
+      "expectedResult": "Risk output (routing_cost, risk_level) returns within 1.0 s per call",
+      "actualResult": "Median: 0.252 ms across 5 runs; cold-start first run: 898.001 ms; risk_level returned",
+      "passFail": "PASS",
+      "notes": "Measured with performance.now() in TSX harness under apps/server; executed 5 single-segment runs; source: raw benchmark JSON trace and harness log.",
+      "sourceFiles": [
+        "apps/server/src/features/routingRisk/routingRisk.service.ts",
+        "tools/Added Features Testing/scripts/perf/server-routing-risk-benchmark.ts"
+      ],
+      "runnerCommand": "pnpm module12:evidence:flood-risk-latency",
+      "rawEvidencePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\cases\\perf_01_flood_risk_latency.json",
+      "measurement": {
+        "singleRow": {
+          "runsMs": [
+            898.0008,
+            0.24469999999996617,
+            0.2841999999998279,
+            0.14889999999991232,
+            0.2521999999999025
+          ],
+          "firstRunMs": 898.0008,
+          "medianMs": 0.2521999999999025,
+          "avgMs": 179.78615999999994,
+          "p95Ms": 0.2841999999998279,
+          "riskLevelReturned": true
+        },
+        "bulk1000": {
+          "runsMs": [
+            4.310400000000072,
+            2.421199999999999,
+            2.6324999999999363,
+            2.2701999999999316,
+            2.156199999999899
+          ],
+          "avgMs": 2.758099999999968,
+          "medianMs": 2.421199999999999,
+          "p95Ms": 2.6324999999999363,
+          "riskSet": [
+            "LOW",
+            "MEDIUM",
+            "HIGH"
+          ],
+          "speedSet": [
+            15,
+            25,
+            35,
+            45
+          ]
+        },
+        "concurrency": {
+          "requests": 20,
+          "rowsPerRequest": 100,
+          "totalMs": 5.048999999999978,
+          "avgPerRequestMs": 0.2524499999999989,
+          "success": 20,
+          "failures": 0
+        },
+        "csv": {
+          "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\artifacts\\routing-risk-benchmark.csv",
+          "offRunsMs": [
+            1.579200000000128,
+            1.6886000000001786,
+            1.672900000000027,
+            2.152900000000045,
+            1.2198000000000775
+          ],
+          "onRunsMs": [
+            6.733300000000099,
+            4.7409000000000106,
+            3.827299999999923,
+            4.828700000000026,
+            3.3958999999999833
+          ],
+          "offAvgMs": 1.6626800000000912,
+          "onAvgMs": 4.705220000000009,
+          "overheadPct": 182.99011234872316,
+          "header": "timestamp,model_available,routing_cost,risk_level,recommended_speed_kph,flood_depth_5yr,rainfall_mm,is_raining,bridge,road_priority,feature_order",
+          "firstDataRow": "2026-03-10T15:58:02.143Z,1,2.300000,LOW,45,0.000000,0.000000,0,1,0,flood_depth_5yr|rainfall_mm|is_raining|bridge|road_priority",
+          "dataRows": 5000
+        },
+        "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\logs\\server-routing-risk-benchmark.log",
+        "tracePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\traces\\routing-risk-benchmark.json",
+        "csvPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\artifacts\\routing-risk-benchmark.csv"
+      },
+      "actualResultCompact": "0.252 ms"
+    },
+    {
+      "id": "perf_02_speed_guidance_latency",
+      "session": "performance",
+      "testCase": "Speed Guidance Generation Latency (Module 11)",
+      "stepsShort": "Run 1,000-segment prediction batch, repeat 5 runs",
+      "expectedResult": "recommended_speed_kph generated for all segments with average latency < 10 ms",
+      "actualResult": "Average: 2.758 ms across 5 runs; speed tiers observed: 15, 25, 35, 45",
+      "passFail": "PASS",
+      "notes": "Measured with performance.now() in the same server TSX benchmark on 1,000 segments; 5 repeated runs; speed tiers read from prediction output set.",
+      "sourceFiles": [
+        "apps/server/src/features/routingRisk/routingRisk.service.ts",
+        "tools/Added Features Testing/scripts/perf/server-routing-risk-benchmark.ts"
+      ],
+      "runnerCommand": "pnpm module12:evidence:speed-guidance-latency",
+      "rawEvidencePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\cases\\perf_02_speed_guidance_latency.json",
+      "measurement": {
+        "singleRow": {
+          "runsMs": [
+            898.0008,
+            0.24469999999996617,
+            0.2841999999998279,
+            0.14889999999991232,
+            0.2521999999999025
+          ],
+          "firstRunMs": 898.0008,
+          "medianMs": 0.2521999999999025,
+          "avgMs": 179.78615999999994,
+          "p95Ms": 0.2841999999998279,
+          "riskLevelReturned": true
+        },
+        "bulk1000": {
+          "runsMs": [
+            4.310400000000072,
+            2.421199999999999,
+            2.6324999999999363,
+            2.2701999999999316,
+            2.156199999999899
+          ],
+          "avgMs": 2.758099999999968,
+          "medianMs": 2.421199999999999,
+          "p95Ms": 2.6324999999999363,
+          "riskSet": [
+            "LOW",
+            "MEDIUM",
+            "HIGH"
+          ],
+          "speedSet": [
+            15,
+            25,
+            35,
+            45
+          ]
+        },
+        "concurrency": {
+          "requests": 20,
+          "rowsPerRequest": 100,
+          "totalMs": 5.048999999999978,
+          "avgPerRequestMs": 0.2524499999999989,
+          "success": 20,
+          "failures": 0
+        },
+        "csv": {
+          "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\artifacts\\routing-risk-benchmark.csv",
+          "offRunsMs": [
+            1.579200000000128,
+            1.6886000000001786,
+            1.672900000000027,
+            2.152900000000045,
+            1.2198000000000775
+          ],
+          "onRunsMs": [
+            6.733300000000099,
+            4.7409000000000106,
+            3.827299999999923,
+            4.828700000000026,
+            3.3958999999999833
+          ],
+          "offAvgMs": 1.6626800000000912,
+          "onAvgMs": 4.705220000000009,
+          "overheadPct": 182.99011234872316,
+          "header": "timestamp,model_available,routing_cost,risk_level,recommended_speed_kph,flood_depth_5yr,rainfall_mm,is_raining,bridge,road_priority,feature_order",
+          "firstDataRow": "2026-03-10T15:58:02.143Z,1,2.300000,LOW,45,0.000000,0.000000,0,1,0,flood_depth_5yr|rainfall_mm|is_raining|bridge|road_priority",
+          "dataRows": 5000
+        },
+        "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\logs\\server-routing-risk-benchmark.log",
+        "tracePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\traces\\routing-risk-benchmark.json",
+        "csvPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\artifacts\\routing-risk-benchmark.csv"
+      },
+      "actualResultCompact": "2.758 ms"
+    },
+    {
+      "id": "perf_03_csv_overhead",
+      "session": "performance",
+      "testCase": "Structured CSV Logging Overhead (Module 11)",
+      "stepsShort": "Compare prediction runtime with LOG_ROUTING_RISK=0 vs LOG_ROUTING_RISK=1",
+      "expectedResult": "CSV rows append with required fields and logging overhead stays below 3x baseline",
+      "actualResult": "Off avg: 1.663 ms; On avg: 4.705 ms; Overhead: 182.99%; CSV header verified; 5,000 rows appended",
+      "passFail": "PASS",
+      "notes": "Measured by toggling LOG_ROUTING_RISK in the TSX benchmark (5 runs each mode); durations from performance.now(); CSV evidence read from generated artifact file.",
+      "sourceFiles": [
+        "apps/server/src/features/routingRisk/routingRisk.service.ts",
+        "apps/server/src/constants/routingRisk.constants.ts",
+        "tools/Added Features Testing/scripts/perf/server-routing-risk-benchmark.ts"
+      ],
+      "runnerCommand": "pnpm module12:evidence:csv-overhead",
+      "rawEvidencePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\cases\\perf_03_csv_overhead.json",
+      "measurement": {
+        "singleRow": {
+          "runsMs": [
+            898.0008,
+            0.24469999999996617,
+            0.2841999999998279,
+            0.14889999999991232,
+            0.2521999999999025
+          ],
+          "firstRunMs": 898.0008,
+          "medianMs": 0.2521999999999025,
+          "avgMs": 179.78615999999994,
+          "p95Ms": 0.2841999999998279,
+          "riskLevelReturned": true
+        },
+        "bulk1000": {
+          "runsMs": [
+            4.310400000000072,
+            2.421199999999999,
+            2.6324999999999363,
+            2.2701999999999316,
+            2.156199999999899
+          ],
+          "avgMs": 2.758099999999968,
+          "medianMs": 2.421199999999999,
+          "p95Ms": 2.6324999999999363,
+          "riskSet": [
+            "LOW",
+            "MEDIUM",
+            "HIGH"
+          ],
+          "speedSet": [
+            15,
+            25,
+            35,
+            45
+          ]
+        },
+        "concurrency": {
+          "requests": 20,
+          "rowsPerRequest": 100,
+          "totalMs": 5.048999999999978,
+          "avgPerRequestMs": 0.2524499999999989,
+          "success": 20,
+          "failures": 0
+        },
+        "csv": {
+          "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\artifacts\\routing-risk-benchmark.csv",
+          "offRunsMs": [
+            1.579200000000128,
+            1.6886000000001786,
+            1.672900000000027,
+            2.152900000000045,
+            1.2198000000000775
+          ],
+          "onRunsMs": [
+            6.733300000000099,
+            4.7409000000000106,
+            3.827299999999923,
+            4.828700000000026,
+            3.3958999999999833
+          ],
+          "offAvgMs": 1.6626800000000912,
+          "onAvgMs": 4.705220000000009,
+          "overheadPct": 182.99011234872316,
+          "header": "timestamp,model_available,routing_cost,risk_level,recommended_speed_kph,flood_depth_5yr,rainfall_mm,is_raining,bridge,road_priority,feature_order",
+          "firstDataRow": "2026-03-10T15:58:02.143Z,1,2.300000,LOW,45,0.000000,0.000000,0,1,0,flood_depth_5yr|rainfall_mm|is_raining|bridge|road_priority",
+          "dataRows": 5000
+        },
+        "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\logs\\server-routing-risk-benchmark.log",
+        "tracePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\traces\\routing-risk-benchmark.json",
+        "csvPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\artifacts\\routing-risk-benchmark.csv"
+      },
+      "actualResultCompact": "182.99%"
+    },
+    {
+      "id": "perf_04_cold_start_trace",
+      "session": "performance",
+      "testCase": "Flood Risk + Speed Guidance Cold-Start Trace",
+      "stepsShort": "Run one 2-segment prediction request",
+      "expectedResult": "First-call inference returns risk + guidance within 1.0 s",
+      "actualResult": "Completed in 402.364 ms; outputs included LOW/45, HIGH/15",
+      "passFail": "PASS",
+      "notes": "Measured in a fresh TSX harness process calling predictRoutingRiskCosts once with two segments; elapsed time from performance.now(); single cold-start run.",
+      "sourceFiles": [
+        "apps/server/src/features/routingRisk/routingRisk.service.ts",
+        "tools/Added Features Testing/scripts/perf/server-routing-risk-cold-start.ts"
+      ],
+      "runnerCommand": "pnpm module12:evidence:cold-start-trace",
+      "rawEvidencePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\cases\\perf_04_cold_start_trace.json",
+      "measurement": {
+        "durationMs": 402.36359999999996,
+        "outputs": [
+          {
+            "routing_cost": 1.9695827960968018,
+            "risk_level": "LOW",
+            "recommended_speed_kph": 45,
+            "model_available": true
+          },
+          {
+            "routing_cost": 13.573270797729492,
+            "risk_level": "HIGH",
+            "recommended_speed_kph": 15,
+            "model_available": true
+          }
+        ],
+        "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\logs\\server-routing-risk-cold-start.log",
+        "tracePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\traces\\routing-risk-cold-start.json"
+      },
+      "actualResultCompact": "402.364 ms"
+    },
+    {
+      "id": "perf_05_ai_concurrency",
+      "session": "performance",
+      "testCase": "AI Routing Throughput Under Concurrency",
+      "stepsShort": "Execute 20 concurrent prediction calls (100 segments each)",
+      "expectedResult": "All concurrent requests complete with no failed responses",
+      "actualResult": "20 concurrent requests completed; total: 5.049 ms; average: 0.252 ms per request; failures: 0",
+      "passFail": "PASS",
+      "notes": "Measured with Promise.all in server TSX benchmark; each request contained 100 segments; one 20-request concurrency run; timing source: performance.now().",
+      "sourceFiles": [
+        "apps/server/src/features/routingRisk/routingRisk.service.ts",
+        "tools/Added Features Testing/scripts/perf/server-routing-risk-benchmark.ts"
+      ],
+      "runnerCommand": "pnpm module12:evidence:ai-concurrency",
+      "rawEvidencePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\cases\\perf_05_ai_concurrency.json",
+      "measurement": {
+        "singleRow": {
+          "runsMs": [
+            898.0008,
+            0.24469999999996617,
+            0.2841999999998279,
+            0.14889999999991232,
+            0.2521999999999025
+          ],
+          "firstRunMs": 898.0008,
+          "medianMs": 0.2521999999999025,
+          "avgMs": 179.78615999999994,
+          "p95Ms": 0.2841999999998279,
+          "riskLevelReturned": true
+        },
+        "bulk1000": {
+          "runsMs": [
+            4.310400000000072,
+            2.421199999999999,
+            2.6324999999999363,
+            2.2701999999999316,
+            2.156199999999899
+          ],
+          "avgMs": 2.758099999999968,
+          "medianMs": 2.421199999999999,
+          "p95Ms": 2.6324999999999363,
+          "riskSet": [
+            "LOW",
+            "MEDIUM",
+            "HIGH"
+          ],
+          "speedSet": [
+            15,
+            25,
+            35,
+            45
+          ]
+        },
+        "concurrency": {
+          "requests": 20,
+          "rowsPerRequest": 100,
+          "totalMs": 5.048999999999978,
+          "avgPerRequestMs": 0.2524499999999989,
+          "success": 20,
+          "failures": 0
+        },
+        "csv": {
+          "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\artifacts\\routing-risk-benchmark.csv",
+          "offRunsMs": [
+            1.579200000000128,
+            1.6886000000001786,
+            1.672900000000027,
+            2.152900000000045,
+            1.2198000000000775
+          ],
+          "onRunsMs": [
+            6.733300000000099,
+            4.7409000000000106,
+            3.827299999999923,
+            4.828700000000026,
+            3.3958999999999833
+          ],
+          "offAvgMs": 1.6626800000000912,
+          "onAvgMs": 4.705220000000009,
+          "overheadPct": 182.99011234872316,
+          "header": "timestamp,model_available,routing_cost,risk_level,recommended_speed_kph,flood_depth_5yr,rainfall_mm,is_raining,bridge,road_priority,feature_order",
+          "firstDataRow": "2026-03-10T15:58:02.143Z,1,2.300000,LOW,45,0.000000,0.000000,0,1,0,flood_depth_5yr|rainfall_mm|is_raining|bridge|road_priority",
+          "dataRows": 5000
+        },
+        "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\logs\\server-routing-risk-benchmark.log",
+        "tracePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\traces\\routing-risk-benchmark.json",
+        "csvPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\artifacts\\routing-risk-benchmark.csv"
+      },
+      "actualResultCompact": "0.252 ms"
+    },
+    {
+      "id": "perf_06_blockchain_verify_latency",
+      "session": "performance",
+      "testCase": "Blockchain verifyTask Latency",
+      "stepsShort": "Run blockchain test suite and capture verify scenario timing",
+      "expectedResult": "Local-chain verification flow completes within 2.0 s",
+      "actualResult": "Verifier can verifyTask completed in 833 ms",
+      "passFail": "PASS",
+      "notes": "Measured from Hardhat test output in apps/blockchain (`pnpm --dir apps/blockchain test`); verify scenario timing captured from reporter output; 1 suite run.",
+      "sourceFiles": [
+        "apps/blockchain/test/SecurityCases.test.ts"
+      ],
+      "runnerCommand": "pnpm module12:evidence:blockchain-verify-latency",
+      "rawEvidencePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\cases\\perf_06_blockchain_verify_latency.json",
+      "measurement": {
+        "verifyLatencyMs": 833,
+        "reverifyLatencyMs": 45,
+        "unauthorizedVerifyLatencyMs": null,
+        "unauthorizedRevokeLatencyMs": null,
+        "unauthorizedGrantLatencyMs": null,
+        "replayLatencyMs": null,
+        "hasUnauthorizedVerify": true,
+        "hasUnauthorizedAdmin": true,
+        "hasReplay": true,
+        "hasNotVerified": true,
+        "gasUsed": 49287,
+        "passingCount": 13,
+        "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\logs\\blockchain-test.log",
+        "tracePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\traces\\blockchain-test.json"
+      },
+      "actualResultCompact": "833 ms"
+    },
+    {
+      "id": "perf_07_blockchain_reverify_latency",
+      "session": "performance",
+      "testCase": "Blockchain Revoke/Reverify Latency",
+      "stepsShort": "Run admin correction flow in security suite",
+      "expectedResult": "Revoke + reverify flow completes within 500 ms",
+      "actualResult": "Admin can revoke then reverify completed in 45 ms",
+      "passFail": "PASS",
+      "notes": "Measured from the same Hardhat suite output; revoke/reverify case timing parsed from test reporter line; single observed run.",
+      "sourceFiles": [
+        "apps/blockchain/test/SecurityCases.test.ts"
+      ],
+      "runnerCommand": "pnpm module12:evidence:blockchain-reverify-latency",
+      "rawEvidencePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\cases\\perf_07_blockchain_reverify_latency.json",
+      "measurement": {
+        "verifyLatencyMs": 833,
+        "reverifyLatencyMs": 45,
+        "unauthorizedVerifyLatencyMs": null,
+        "unauthorizedRevokeLatencyMs": null,
+        "unauthorizedGrantLatencyMs": null,
+        "replayLatencyMs": null,
+        "hasUnauthorizedVerify": true,
+        "hasUnauthorizedAdmin": true,
+        "hasReplay": true,
+        "hasNotVerified": true,
+        "gasUsed": 49287,
+        "passingCount": 13,
+        "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\logs\\blockchain-test.log",
+        "tracePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\traces\\blockchain-test.json"
+      },
+      "actualResultCompact": "45 ms"
+    },
+    {
+      "id": "perf_08_blockchain_gas_budget",
+      "session": "performance",
+      "testCase": "Blockchain Gas Budget (verifyTask)",
+      "stepsShort": "Run gas snapshot test",
+      "expectedResult": "estimateGas remains within configured budget (<= 80,000)",
+      "actualResult": "Gas estimate: 49,275 (budget: 80,000)",
+      "passFail": "PASS",
+      "notes": "Taken from Hardhat gas snapshot output (`pnpm --dir apps/blockchain test:gas`); source line `[gas] verifyTask estimateGas=... budget=...`; 1 run.",
+      "sourceFiles": [
+        "apps/blockchain/test/TaskLedger.gas.test.ts"
+      ],
+      "runnerCommand": "pnpm module12:evidence:blockchain-gas-budget",
+      "rawEvidencePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\cases\\perf_08_blockchain_gas_budget.json",
+      "measurement": {
+        "estimateGas": 49275,
+        "budget": 80000,
+        "testDurationMs": 622,
+        "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\logs\\blockchain-test-gas.log",
+        "tracePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\traces\\blockchain-gas-test.json"
+      },
+      "actualResultCompact": "49,275"
+    },
+    {
+      "id": "perf_09_dispatch_chain_hashing",
+      "session": "performance",
+      "testCase": "Dispatch Chain Hashing Performance",
+      "stepsShort": "Run dispatch-chain tests in server",
+      "expectedResult": "Hashing subtests pass and each hash operation remains < 15 ms",
+      "actualResult": "Canonical hash: 6.3506 ms; proof-file hash: 0.218 ms; deterministic-order hash prep: 1.7878 ms (3/3 pass)",
+      "passFail": "PASS",
+      "notes": "Measured from TAP duration_ms in apps/server dispatch-chain test (`pnpm --dir apps/server run test:dispatch-chain`); one full run.",
+      "sourceFiles": [
+        "apps/server/src/features/dispatches/dispatch.chain.test.ts"
+      ],
+      "runnerCommand": "pnpm module12:evidence:dispatch-chain-hashing",
+      "rawEvidencePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\cases\\perf_09_dispatch_chain_hashing.json",
+      "measurement": {
+        "canonicalMs": 6.3506,
+        "proofMs": 0.218,
+        "deterministicMs": 1.7878,
+        "passCount": 3,
+        "totalMs": 1908.1554,
+        "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\logs\\dispatch-chain-test.log",
+        "tracePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\traces\\dispatch-chain-test.json"
+      },
+      "actualResultCompact": "6.3506 ms"
+    },
+    {
+      "id": "perf_10_blockchain_gas_used",
+      "session": "performance",
+      "testCase": "Blockchain verifyTask Gas Used Snapshot",
+      "stepsShort": "Run full blockchain suite and capture runtime gasUsed log",
+      "expectedResult": "gasUsed remains below 80,000 and close to estimate",
+      "actualResult": "Gas used: 49,287; delta vs estimate: 12 (0.02%)",
+      "passFail": "PASS",
+      "notes": "Gas used captured from full Hardhat suite output; compared against estimateGas from gas snapshot test; sources: blockchain test logs; one run each command.",
+      "sourceFiles": [
+        "apps/blockchain/test/TaskLedger.test.ts",
+        "apps/blockchain/test/TaskLedger.gas.test.ts"
+      ],
+      "runnerCommand": "pnpm module12:evidence:blockchain-gas-used",
+      "rawEvidencePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\cases\\perf_10_blockchain_gas_used.json",
+      "measurement": {
+        "suite": {
+          "verifyLatencyMs": 833,
+          "reverifyLatencyMs": 45,
+          "unauthorizedVerifyLatencyMs": null,
+          "unauthorizedRevokeLatencyMs": null,
+          "unauthorizedGrantLatencyMs": null,
+          "replayLatencyMs": null,
+          "hasUnauthorizedVerify": true,
+          "hasUnauthorizedAdmin": true,
+          "hasReplay": true,
+          "hasNotVerified": true,
+          "gasUsed": 49287,
+          "passingCount": 13,
+          "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\logs\\blockchain-test.log",
+          "tracePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\traces\\blockchain-test.json"
+        },
+        "gas": {
+          "estimateGas": 49275,
+          "budget": 80000,
+          "testDurationMs": 622,
+          "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\logs\\blockchain-test-gas.log",
+          "tracePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\traces\\blockchain-gas-test.json"
+        },
+        "delta": 12,
+        "deltaPct": 0.0243531202435312
+      },
+      "actualResultCompact": "49,287"
+    }
+  ]
+}

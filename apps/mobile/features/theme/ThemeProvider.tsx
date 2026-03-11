@@ -43,7 +43,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const effectiveMode: ThemeMode = mode ?? "system";
+  const effectiveMode: ThemeMode = mode ?? "light";
   const isDark = resolveIsDark(effectiveMode, systemScheme);
 
   useEffect(() => {

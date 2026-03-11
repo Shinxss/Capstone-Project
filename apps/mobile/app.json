@@ -63,7 +63,7 @@
         "expo-notifications",
         {
           "sounds": [
-            "./assets/sounds/siren.wav"
+            "./assets/sounds/alarm.wav"
           ]
         }
       ],

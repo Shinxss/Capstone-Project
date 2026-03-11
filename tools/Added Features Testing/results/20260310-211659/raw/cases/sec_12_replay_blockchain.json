@@ -1,0 +1,31 @@
+{
+  "id": "sec_12_replay_blockchain",
+  "session": "security",
+  "testCase": "Replay/Duplicate Blockchain Verification Attempt",
+  "stepsShort": "Attempt second verifyTask on same task hash",
+  "expectedResult": "Replay is rejected with ALREADY_VERIFIED",
+  "actualResult": "Test passed: duplicate verification blocked (ALREADY_VERIFIED)",
+  "passFail": "PASS",
+  "notes": "Verified replay-protection assertion from SecurityCases.test.ts and Hardhat test output for ALREADY_VERIFIED condition; one suite run.",
+  "sourceFiles": [
+    "apps/blockchain/test/SecurityCases.test.ts"
+  ],
+  "runnerCommand": "pnpm module12:evidence:replay-blockchain",
+  "rawEvidencePath": "C:\\Projects\\Lifeline\\tools\\module12-evidence\\results\\20260310-211659\\raw\\cases\\sec_12_replay_blockchain.json",
+  "measurement": {
+    "verifyLatencyMs": 1035,
+    "reverifyLatencyMs": 72,
+    "unauthorizedVerifyLatencyMs": 66,
+    "unauthorizedRevokeLatencyMs": 67,
+    "unauthorizedGrantLatencyMs": null,
+    "replayLatencyMs": null,
+    "hasUnauthorizedVerify": true,
+    "hasUnauthorizedAdmin": true,
+    "hasReplay": true,
+    "hasNotVerified": true,
+    "gasUsed": 49287,
+    "passingCount": 13,
+    "logPath": "C:\\Projects\\Lifeline\\tools\\module12-evidence\\results\\20260310-211659\\raw\\logs\\blockchain-test.log",
+    "tracePath": "C:\\Projects\\Lifeline\\tools\\module12-evidence\\results\\20260310-211659\\raw\\traces\\blockchain-test.json"
+  }
+}

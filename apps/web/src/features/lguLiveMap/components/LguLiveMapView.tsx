@@ -384,7 +384,11 @@ export default function LguLiveMapView(props: Props) {
                   <span className="h-2 w-2 rounded-full bg-orange-500" />
                   <span>Busy</span>
                 </div>
-                <div className="flex items-center gap-2 col-span-2">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-slate-500" />
+                  <span>Idle</span>
+                </div>
+                <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-red-500" />
                   <span>Offline</span>
                 </div>

@@ -141,7 +141,7 @@ function EmergencyCard({
           ? "border-l-4 border-l-red-600"
           : "border border-gray-200 dark:border-[#162544]";
 
-  const actionLabel = isSOS ? "Respond Now" : "Manage";
+  const actionLabel = "Dispatch Now";
 
   return (
     <div className={`overflow-hidden rounded-2xl bg-white text-white shadow-sm dark:bg-[#0B1220] ${cardBorder}`}>

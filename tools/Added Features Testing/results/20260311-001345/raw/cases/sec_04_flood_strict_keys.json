@@ -1,0 +1,66 @@
+{
+  "id": "sec_04_flood_strict_keys",
+  "session": "security",
+  "testCase": "Flood Risk Strict-Key Tamper Rejection",
+  "stepsShort": "Submit extra keys (admin, debug) to strict schemas",
+  "expectedResult": "Unexpected keys are blocked",
+  "actualResult": "Rejected with unrecognized_keys for admin/debug fields",
+  "passFail": "PASS",
+  "notes": "Submitted unexpected keys to strict routing-risk schemas in TSX harness; evaluated Zod unrecognized_keys output; single run.",
+  "sourceFiles": [
+    "apps/server/src/features/routingRisk/routingRisk.schema.ts",
+    "tools/Added Features Testing/scripts/sec/server-routing-risk-schema-security.ts"
+  ],
+  "runnerCommand": "pnpm test:flood-strict-keys",
+  "rawEvidencePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260311-001345\\raw\\cases\\sec_04_flood_strict_keys.json",
+  "measurement": {
+    "empty": {
+      "success": false,
+      "issues": [
+        {
+          "path": "segments",
+          "code": "too_small",
+          "message": "Too small: expected array to have >=1 items"
+        }
+      ]
+    },
+    "oversized": {
+      "success": false,
+      "issues": [
+        {
+          "path": "segments",
+          "code": "too_big",
+          "message": "Too big: expected array to have <=1000 items"
+        }
+      ]
+    },
+    "scriptType": {
+      "success": false,
+      "issues": [
+        {
+          "path": "segments.0.flood_depth_5yr",
+          "code": "invalid_type",
+          "message": "Invalid input: expected number, received string"
+        }
+      ]
+    },
+    "strictKeys": {
+      "success": false,
+      "issues": [
+        {
+          "path": "segments.0",
+          "code": "unrecognized_keys",
+          "message": "Unrecognized key: \"admin\""
+        },
+        {
+          "path": "",
+          "code": "unrecognized_keys",
+          "message": "Unrecognized key: \"debug\""
+        }
+      ]
+    },
+    "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260311-001345\\raw\\logs\\server-routing-risk-schema-security.log",
+    "tracePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260311-001345\\raw\\traces\\routing-risk-schema-security.json"
+  },
+  "actualResultCompact": "PASS 1"
+}

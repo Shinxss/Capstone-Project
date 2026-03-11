@@ -14,6 +14,7 @@ import {
   updateDispatchResponderLocation,
   verifyDispatch,
 } from "./dispatch.service";
+import { getMyDispatchFocusStats } from "./dispatch.focusStats.service";
 import type { DispatchStatus } from "./dispatch.model";
 import { AUDIT_EVENT } from "../audit/audit.constants";
 import { logAudit } from "../audit/audit.service";
@@ -60,6 +61,8 @@ export async function postDispatchOffers(req: Request, res: Response) {
         dispatchIds,
       },
     });
+
+    emitNotificationsRefresh("dispatch_created", ["LGU", "ADMIN"]);
 
     return res.status(201).json({ message: "Dispatch offers created", count: created.length });
   } catch (e: any) {
@@ -213,6 +216,18 @@ export async function getLguTasks(req: Request, res: Response) {
 
     const docs = await listDispatchTasksForLgu({ statuses, emergencyId: emergencyId || undefined });
     return res.json({ data: docs.map(toDispatchDTO), count: docs.length });
+  } catch (e: any) {
+    return res.status(400).json({ message: e?.message ?? "Failed" });
+  }
+}
+
+export async function getMyFocusStats(req: Request, res: Response) {
+  try {
+    const { role, userId } = getAuth(req);
+    if (role !== "VOLUNTEER") return res.status(403).json({ message: "Forbidden" });
+
+    const stats = await getMyDispatchFocusStats(String(userId));
+    return res.json({ data: stats });
   } catch (e: any) {
     return res.status(400).json({ message: e?.message ?? "Failed" });
   }

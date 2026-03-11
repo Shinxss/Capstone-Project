@@ -1,0 +1,66 @@
+{
+  "id": "sec_03_flood_script_type",
+  "session": "security",
+  "testCase": "Flood Risk Script-Injection Type Rejection",
+  "stepsShort": "Submit string payload in numeric field (flood_depth_5yr)",
+  "expectedResult": "Non-numeric/script-like input is rejected",
+  "actualResult": "Rejected with invalid_type: \"Invalid input: expected number, received string\" at segments.0.flood_depth_5yr",
+  "passFail": "PASS",
+  "notes": "Tested script-like string in numeric field via routingRiskPredictSchema.safeParse in TSX harness; evidence from issue path and code; 1 run.",
+  "sourceFiles": [
+    "apps/server/src/features/routingRisk/routingRisk.schema.ts",
+    "tools/Added Features Testing/scripts/sec/server-routing-risk-schema-security.ts"
+  ],
+  "runnerCommand": "pnpm module12:evidence:flood-script-type",
+  "rawEvidencePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-231735\\raw\\cases\\sec_03_flood_script_type.json",
+  "measurement": {
+    "empty": {
+      "success": false,
+      "issues": [
+        {
+          "path": "segments",
+          "code": "too_small",
+          "message": "Too small: expected array to have >=1 items"
+        }
+      ]
+    },
+    "oversized": {
+      "success": false,
+      "issues": [
+        {
+          "path": "segments",
+          "code": "too_big",
+          "message": "Too big: expected array to have <=1000 items"
+        }
+      ]
+    },
+    "scriptType": {
+      "success": false,
+      "issues": [
+        {
+          "path": "segments.0.flood_depth_5yr",
+          "code": "invalid_type",
+          "message": "Invalid input: expected number, received string"
+        }
+      ]
+    },
+    "strictKeys": {
+      "success": false,
+      "issues": [
+        {
+          "path": "segments.0",
+          "code": "unrecognized_keys",
+          "message": "Unrecognized key: \"admin\""
+        },
+        {
+          "path": "",
+          "code": "unrecognized_keys",
+          "message": "Unrecognized key: \"debug\""
+        }
+      ]
+    },
+    "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-231735\\raw\\logs\\server-routing-risk-schema-security.log",
+    "tracePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-231735\\raw\\traces\\routing-risk-schema-security.json"
+  },
+  "actualResultCompact": "PASS 1"
+}

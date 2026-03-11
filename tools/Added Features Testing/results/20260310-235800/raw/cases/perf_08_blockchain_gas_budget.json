@@ -1,0 +1,23 @@
+{
+  "id": "perf_08_blockchain_gas_budget",
+  "session": "performance",
+  "testCase": "Blockchain Gas Budget (verifyTask)",
+  "stepsShort": "Run gas snapshot test",
+  "expectedResult": "estimateGas remains within configured budget (<= 80,000)",
+  "actualResult": "Gas estimate: 49,275 (budget: 80,000)",
+  "passFail": "PASS",
+  "notes": "Taken from Hardhat gas snapshot output (`pnpm --dir apps/blockchain test:gas`); source line `[gas] verifyTask estimateGas=... budget=...`; 1 run.",
+  "sourceFiles": [
+    "apps/blockchain/test/TaskLedger.gas.test.ts"
+  ],
+  "runnerCommand": "pnpm module12:evidence:blockchain-gas-budget",
+  "rawEvidencePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\cases\\perf_08_blockchain_gas_budget.json",
+  "measurement": {
+    "estimateGas": 49275,
+    "budget": 80000,
+    "testDurationMs": 622,
+    "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\logs\\blockchain-test-gas.log",
+    "tracePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\traces\\blockchain-gas-test.json"
+  },
+  "actualResultCompact": "49,275"
+}

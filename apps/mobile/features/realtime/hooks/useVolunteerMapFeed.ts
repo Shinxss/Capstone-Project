@@ -4,7 +4,7 @@ import { connectRealtime } from "../socketClient";
 
 export type VolunteerMapPresence = {
   volunteerId: string;
-  status: "ONLINE" | "BUSY";
+  status: "ONLINE" | "BUSY" | "IDLE";
   onDuty: boolean;
   lastSeenAt?: string;
   location?: {
@@ -77,6 +77,7 @@ function normalizeStatus(raw: unknown): VolunteerMapPresence["status"] | null {
   const status = String(raw ?? "").trim().toUpperCase();
   if (status === "ONLINE") return "ONLINE";
   if (status === "BUSY") return "BUSY";
+  if (status === "IDLE") return "IDLE";
   return null;
 }
 
@@ -236,7 +237,9 @@ export function useVolunteerMapFeed(options: Options) {
 
   const volunteers = useMemo(
     () =>
-      Object.values(records).filter((entry) => entry.status === "ONLINE" || entry.status === "BUSY"),
+      Object.values(records).filter(
+        (entry) => entry.status === "ONLINE" || entry.status === "BUSY" || entry.status === "IDLE"
+      ),
     [records]
   );
 

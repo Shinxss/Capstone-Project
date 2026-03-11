@@ -16,6 +16,7 @@ import { notifyRequestTrackingUpdated } from "../services/requestRealtime.servic
 import { uploadEmergencyReportPhoto } from "../services/emergencyReportUpload.service";
 import { AUDIT_EVENT } from "../../audit/audit.constants";
 import { logAudit } from "../../audit/audit.service";
+import { emitNotificationsRefresh } from "../../../realtime/notificationsSocket";
 import type {
   CreateEmergencyReportInput,
   MyEmergencyReportsQuery,
@@ -43,6 +44,10 @@ export async function postEmergencyReport(req: MaybeAuthedRequest, res: Response
         stepOverride: report.isSos ? "Submitted" : "Verification",
       }
     ).catch(() => undefined);
+
+    if (report.isVisibleOnMap) {
+      emitNotificationsRefresh("emergency_reported", ["LGU", "ADMIN"]);
+    }
 
     return res.status(201).json({
       incidentId: report.incidentId,
@@ -222,6 +227,8 @@ export async function approveEmergencyReportController(req: MaybeAuthedRequest, 
       },
     });
 
+    emitNotificationsRefresh("emergency_reported", ["LGU", "ADMIN"]);
+
     return res.status(200).json(updated);
   } catch (error: any) {
     return res.status(500).json({ message: error?.message ?? "Failed to approve emergency report" });
@@ -256,6 +263,8 @@ export async function rejectEmergencyReportController(req: MaybeAuthedRequest, r
         isVisibleOnMap: updated.isVisibleOnMap,
       },
     });
+
+    emitNotificationsRefresh("emergency_status_updated", ["LGU", "ADMIN"]);
 
     return res.status(200).json(updated);
   } catch (error: any) {

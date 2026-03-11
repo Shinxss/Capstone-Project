@@ -1,0 +1,31 @@
+{
+  "id": "perf_07_blockchain_reverify_latency",
+  "session": "performance",
+  "testCase": "Blockchain Revoke/Reverify Latency",
+  "stepsShort": "Run admin correction flow in security suite",
+  "expectedResult": "Revoke + reverify flow completes within 500 ms",
+  "actualResult": "Admin can revoke then reverify completed in 239 ms",
+  "passFail": "PASS",
+  "notes": "Measured from the same Hardhat suite output; revoke/reverify case timing parsed from test reporter line; single observed run.",
+  "sourceFiles": [
+    "apps/blockchain/test/SecurityCases.test.ts"
+  ],
+  "runnerCommand": "pnpm module12:evidence:blockchain-reverify-latency",
+  "rawEvidencePath": "C:\\Projects\\Lifeline\\tools\\module12-evidence\\results\\20260310-204115\\raw\\cases\\perf_07_blockchain_reverify_latency.json",
+  "measurement": {
+    "verifyLatencyMs": 1368,
+    "reverifyLatencyMs": 239,
+    "unauthorizedVerifyLatencyMs": 253,
+    "unauthorizedRevokeLatencyMs": 63,
+    "unauthorizedGrantLatencyMs": 48,
+    "replayLatencyMs": 44,
+    "hasUnauthorizedVerify": true,
+    "hasUnauthorizedAdmin": true,
+    "hasReplay": true,
+    "hasNotVerified": true,
+    "gasUsed": 49287,
+    "passingCount": 13,
+    "logPath": "C:\\Projects\\Lifeline\\tools\\module12-evidence\\results\\20260310-204115\\raw\\logs\\blockchain-test.log",
+    "tracePath": "C:\\Projects\\Lifeline\\tools\\module12-evidence\\results\\20260310-204115\\raw\\traces\\blockchain-test.json"
+  }
+}

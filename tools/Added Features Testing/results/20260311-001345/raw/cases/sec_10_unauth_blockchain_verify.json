@@ -1,0 +1,32 @@
+{
+  "id": "sec_10_unauth_blockchain_verify",
+  "session": "security",
+  "testCase": "Unauthorized Blockchain Verify Attempt",
+  "stepsShort": "Run security suite case for non-verifier calling verifyTask",
+  "expectedResult": "Unauthorized account is blocked by access control",
+  "actualResult": "Test passed: \"Stranger cannot verifyTask (missing VERIFIER_ROLE)\" (4 ms)",
+  "passFail": "PASS",
+  "notes": "Verified from Hardhat security suite output and assertion coverage in apps/blockchain/test/SecurityCases.test.ts; command: pnpm --dir apps/blockchain test; 1 suite run.",
+  "sourceFiles": [
+    "apps/blockchain/test/SecurityCases.test.ts"
+  ],
+  "runnerCommand": "pnpm test:unauth-blockchain-verify",
+  "rawEvidencePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260311-001345\\raw\\cases\\sec_10_unauth_blockchain_verify.json",
+  "measurement": {
+    "verifyLatencyMs": 1215,
+    "reverifyLatencyMs": 53,
+    "unauthorizedVerifyLatencyMs": 40,
+    "unauthorizedRevokeLatencyMs": 39,
+    "unauthorizedGrantLatencyMs": null,
+    "replayLatencyMs": null,
+    "hasUnauthorizedVerify": true,
+    "hasUnauthorizedAdmin": true,
+    "hasReplay": true,
+    "hasNotVerified": true,
+    "gasUsed": 49287,
+    "passingCount": 13,
+    "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260311-001345\\raw\\logs\\blockchain-test.log",
+    "tracePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260311-001345\\raw\\traces\\blockchain-test.json"
+  },
+  "actualResultCompact": "PASS 1"
+}

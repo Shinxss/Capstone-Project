@@ -1,0 +1,19 @@
+{
+  "id": "sec_01_flood_empty",
+  "session": "security",
+  "testCase": "Flood Risk Endpoint Empty Input Rejection",
+  "stepsShort": "Validate routingRiskPredictSchema with segments: []",
+  "expectedResult": "Request is rejected for empty segments (minimum 1)",
+  "actualResult": "ERROR: Server harness failed: scripts/sec/server-routing-risk-schema-security.ts\nLog: C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-222452\\raw\\logs\\server-routing-risk-schema-security.log\nnode:internal/modules/run_main:123\r\n    triggerUncaughtException(\r\n    ^\r\nError [ERR_MODULE_NOT_FOUND]: Cannot find module 'C:\\Projects\\Lifeline\\tools\\Added' imported from C:\\Projects\\Lifeline\\apps\\server\\\r\n    at finalizeResolution (node:internal/modules/esm/resolve:274:11)\r\n    at moduleResolve (node:internal/modules/esm/resolve:859:10)\r\n    at defaultResolve (node:internal/modules/esm/resolve:983:11)\r\n    at nextResolve (node:internal/modules/esm/hooks:748:28)\r\n    at resolveBase (file:///C:/Projects/Lifeline/node_modules/tsx/dist/esm/index.mjs?1773152694021:2:3744)\r\n    at resolveDirectory (file:///C:/Projects/Lifeline/node_modules/tsx/dist/esm/index.mjs?1773152694021:2:4243)\r\n    at resolveTsPaths (file:///C:/Projects/Lifeline/node_modules/tsx/dist/esm/index.mjs?1773152694021:2:4984)\r\n    at resolve (file:///C:/Projects/Lifeline/node_modules/tsx/dist/esm/index.mjs?1773152694021:2:5361)\r\n    at nextResolve (node:internal/modules/esm/hooks:748:28)\r\n    at Hooks.resolve (node:internal/modules/esm/hooks:240:30) {\r\n  code: 'ERR_MODULE_NOT_FOUND',\r\n  url: 'file:///C:/Projects/Lifeline/tools/Added'\r\n}\r\n\r\nNode.js v22.19.0",
+  "passFail": "ERROR",
+  "notes": "Runner execution failed before metric extraction; see raw case evidence for stack/error details.",
+  "sourceFiles": [
+    "apps/server/src/features/routingRisk/routingRisk.schema.ts",
+    "tools/Added Features Testing/scripts/sec/server-routing-risk-schema-security.ts"
+  ],
+  "runnerCommand": "pnpm module12:evidence:flood-empty-input",
+  "rawEvidencePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-222452\\raw\\cases\\sec_01_flood_empty.json",
+  "measurement": {
+    "error": "Server harness failed: scripts/sec/server-routing-risk-schema-security.ts\nLog: C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-222452\\raw\\logs\\server-routing-risk-schema-security.log\nnode:internal/modules/run_main:123\r\n    triggerUncaughtException(\r\n    ^\r\nError [ERR_MODULE_NOT_FOUND]: Cannot find module 'C:\\Projects\\Lifeline\\tools\\Added' imported from C:\\Projects\\Lifeline\\apps\\server\\\r\n    at finalizeResolution (node:internal/modules/esm/resolve:274:11)\r\n    at moduleResolve (node:internal/modules/esm/resolve:859:10)\r\n    at defaultResolve (node:internal/modules/esm/resolve:983:11)\r\n    at nextResolve (node:internal/modules/esm/hooks:748:28)\r\n    at resolveBase (file:///C:/Projects/Lifeline/node_modules/tsx/dist/esm/index.mjs?1773152694021:2:3744)\r\n    at resolveDirectory (file:///C:/Projects/Lifeline/node_modules/tsx/dist/esm/index.mjs?1773152694021:2:4243)\r\n    at resolveTsPaths (file:///C:/Projects/Lifeline/node_modules/tsx/dist/esm/index.mjs?1773152694021:2:4984)\r\n    at resolve (file:///C:/Projects/Lifeline/node_modules/tsx/dist/esm/index.mjs?1773152694021:2:5361)\r\n    at nextResolve (node:internal/modules/esm/hooks:748:28)\r\n    at Hooks.resolve (node:internal/modules/esm/hooks:240:30) {\r\n  code: 'ERR_MODULE_NOT_FOUND',\r\n  url: 'file:///C:/Projects/Lifeline/tools/Added'\r\n}\r\n\r\nNode.js v22.19.0"
+  }
+}

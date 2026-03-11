@@ -4,6 +4,7 @@ import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { Siren } from "lucide-react-native";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAuth } from "../features/auth/AuthProvider";
 import { useTheme } from "../features/theme/useTheme";
 
 const ACTIVE = "#2563EB";
@@ -16,20 +17,23 @@ type Props = BottomTabBarProps & {
   onPressRegularTab: () => void;
 };
 
-type TabKey = "index" | "map" | "alert" | "more";
+type TabKey = "index" | "map" | "tasks" | "more";
 
 const TABS: { name: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { name: "index", label: "Home", icon: "home-outline" },
   { name: "map", label: "Map", icon: "map-outline" },
-  { name: "alert", label: "Tasks", icon: "clipboard-outline" },
+  { name: "tasks", label: "Tasks", icon: "clipboard-outline" },
   { name: "more", label: "Profile", icon: "person-outline" },
 ];
 
 export default function BottomNav(props: Props) {
   const { state, navigation, onPressReportAction, onPressRegularTab } = props;
   const { isDark } = useTheme();
+  const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const bottomPadding = Math.max(insets.bottom, 50);
+  const normalizedRole = String(user?.role ?? "").trim().toUpperCase();
+  const tasksLabel = normalizedRole === "COMMUNITY" ? "My Request" : "Tasks";
 
   const goTo = (name: TabKey) => {
     onPressRegularTab();
@@ -90,11 +94,11 @@ export default function BottomNav(props: Props) {
         </View>
 
         <TabButton
-          label={TABS[2].label}
+          label={tasksLabel}
           icon={TABS[2].icon}
-          focused={isFocused("alert")}
+          focused={isFocused("tasks")}
           isDark={isDark}
-          onPress={() => goTo("alert")}
+          onPress={() => goTo("tasks")}
         />
 
         <TabButton

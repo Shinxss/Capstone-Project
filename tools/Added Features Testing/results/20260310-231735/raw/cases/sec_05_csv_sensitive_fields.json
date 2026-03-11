@@ -1,0 +1,40 @@
+{
+  "id": "sec_05_csv_sensitive_fields",
+  "session": "security",
+  "testCase": "Structured CSV Log Sensitive-Field Exposure Check",
+  "stepsShort": "Inspect generated routing-risk CSV header and first data row",
+  "expectedResult": "Logs exclude secrets (no token/JWT/password/private key fields)",
+  "actualResult": "Header contained routing/model/weather fields only; sensitive columns detected: none",
+  "passFail": "PASS",
+  "notes": "Generated a fresh routing-risk CSV via TSX harness, then inspected header and first row using regex checks for token/JWT/password/secret fields; 1 run.",
+  "sourceFiles": [
+    "apps/server/src/features/routingRisk/routingRisk.service.ts",
+    "tools/Added Features Testing/scripts/sec/server-csv-sensitive-check.ts"
+  ],
+  "runnerCommand": "pnpm module12:evidence:csv-sensitive-fields",
+  "rawEvidencePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-231735\\raw\\cases\\sec_05_csv_sensitive_fields.json",
+  "measurement": {
+    "csvPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-231735\\raw\\artifacts\\routing-risk-sensitive-check.csv",
+    "header": "timestamp,model_available,routing_cost,risk_level,recommended_speed_kph,flood_depth_5yr,rainfall_mm,is_raining,bridge,road_priority,feature_order",
+    "firstDataRow": "2026-03-10T15:17:40.157Z,1,2.142810,LOW,45,0.200000,3.000000,0,0,0,flood_depth_5yr|rainfall_mm|is_raining|bridge|road_priority",
+    "headers": [
+      "timestamp",
+      "model_available",
+      "routing_cost",
+      "risk_level",
+      "recommended_speed_kph",
+      "flood_depth_5yr",
+      "rainfall_mm",
+      "is_raining",
+      "bridge",
+      "road_priority",
+      "feature_order"
+    ],
+    "sensitiveHeader": false,
+    "sensitiveHeaderColumns": [],
+    "sensitiveFirstData": false,
+    "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-231735\\raw\\logs\\server-csv-sensitive-check.log",
+    "tracePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-231735\\raw\\traces\\routing-risk-sensitive-check.json"
+  },
+  "actualResultCompact": "PASS 1"
+}

@@ -1,6 +1,7 @@
 import { api } from "../../../lib/api";
 import axios from "axios";
 import type { DispatchOffer } from "../models/dispatch";
+import type { DispatchFocusStats } from "../models/dispatchFocusStats";
 
 type ApiResponse<T> = { data: T };
 
@@ -47,6 +48,11 @@ export async function fetchMyCurrentDispatch(): Promise<DispatchOffer | null> {
     if (axios.isAxiosError(err) && err.response?.status === 404) return null;
     throw err;
   }
+}
+
+export async function fetchMyDispatchFocusStats(): Promise<DispatchFocusStats> {
+  const res = await api.get<ApiResponse<DispatchFocusStats>>("/api/dispatches/my/focus-stats");
+  return res.data.data;
 }
 
 export async function respondToDispatch(dispatchId: string, decision: "ACCEPT" | "DECLINE"): Promise<DispatchOffer> {

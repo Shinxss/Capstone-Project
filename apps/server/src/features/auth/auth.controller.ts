@@ -274,45 +274,67 @@ export async function updateMe(req: Request, res: Response) {
       user.email = normalizedEmail;
     }
 
-    const nextBirthdate = body.birthdate ?? "";
-    if ((user.birthdate ?? "") !== nextBirthdate) changedFields.push("birthdate");
-    user.birthdate = nextBirthdate;
+    const hasOwn = <K extends keyof typeof body>(key: K) => Object.prototype.hasOwnProperty.call(body, key);
 
-    const nextContactNo = body.contactNo ?? "";
-    if ((user.contactNo ?? "") !== nextContactNo) changedFields.push("contactNo");
-    user.contactNo = nextContactNo;
+    if (hasOwn("birthdate")) {
+      const nextBirthdate = body.birthdate ?? "";
+      if ((user.birthdate ?? "") !== nextBirthdate) changedFields.push("birthdate");
+      user.birthdate = nextBirthdate;
+    }
 
-    const nextGender = body.gender ?? "";
-    if ((user.gender ?? "") !== nextGender) changedFields.push("gender");
-    user.gender = nextGender;
+    if (hasOwn("contactNo")) {
+      const nextContactNo = body.contactNo ?? "";
+      if ((user.contactNo ?? "") !== nextContactNo) changedFields.push("contactNo");
+      user.contactNo = nextContactNo;
+    }
 
-    const nextSkills = body.skills ?? "";
-    if ((user.skills ?? "") !== nextSkills) changedFields.push("skills");
-    user.skills = nextSkills;
+    if (hasOwn("gender")) {
+      const nextGender = body.gender ?? "";
+      if ((user.gender ?? "") !== nextGender) changedFields.push("gender");
+      user.gender = nextGender;
+    }
 
-    const nextCountry = body.country ?? "";
-    if ((user.country ?? "") !== nextCountry) changedFields.push("country");
-    user.country = nextCountry;
+    if (hasOwn("skills")) {
+      const nextSkills = body.skills ?? "";
+      if ((user.skills ?? "") !== nextSkills) changedFields.push("skills");
+      user.skills = nextSkills;
+    }
 
-    const nextMunicipality = body.municipality ?? "";
-    if ((user.municipality ?? "") !== nextMunicipality) changedFields.push("municipality");
-    user.municipality = nextMunicipality;
+    if (hasOwn("country")) {
+      const nextCountry = body.country ?? "";
+      if ((user.country ?? "") !== nextCountry) changedFields.push("country");
+      user.country = nextCountry;
+    }
 
-    const nextBarangay = body.barangay ?? "";
-    if ((user.barangay ?? "") !== nextBarangay) changedFields.push("barangay");
-    user.barangay = nextBarangay;
+    if (hasOwn("municipality")) {
+      const nextMunicipality = body.municipality ?? "";
+      if ((user.municipality ?? "") !== nextMunicipality) changedFields.push("municipality");
+      user.municipality = nextMunicipality;
+    }
 
-    const nextPostalCode = body.postalCode ?? "";
-    if ((user.postalCode ?? "") !== nextPostalCode) changedFields.push("postalCode");
-    user.postalCode = nextPostalCode;
+    if (hasOwn("barangay")) {
+      const nextBarangay = body.barangay ?? "";
+      if ((user.barangay ?? "") !== nextBarangay) changedFields.push("barangay");
+      user.barangay = nextBarangay;
+    }
 
-    const nextLguPosition = body.lguPosition ?? "";
-    if ((user.lguPosition ?? "") !== nextLguPosition) changedFields.push("lguPosition");
-    user.lguPosition = nextLguPosition;
+    if (hasOwn("postalCode")) {
+      const nextPostalCode = body.postalCode ?? "";
+      if ((user.postalCode ?? "") !== nextPostalCode) changedFields.push("postalCode");
+      user.postalCode = nextPostalCode;
+    }
 
-    const nextAvatarUrl = body.avatarUrl ?? "";
-    if ((user.avatarUrl ?? "") !== nextAvatarUrl) changedFields.push("avatarUrl");
-    user.avatarUrl = nextAvatarUrl;
+    if (hasOwn("lguPosition")) {
+      const nextLguPosition = body.lguPosition ?? "";
+      if ((user.lguPosition ?? "") !== nextLguPosition) changedFields.push("lguPosition");
+      user.lguPosition = nextLguPosition;
+    }
+
+    if (hasOwn("avatarUrl")) {
+      const nextAvatarUrl = body.avatarUrl ?? "";
+      if ((user.avatarUrl ?? "") !== nextAvatarUrl) changedFields.push("avatarUrl");
+      user.avatarUrl = nextAvatarUrl;
+    }
 
     await user.save();
 

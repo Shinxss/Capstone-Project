@@ -7,7 +7,7 @@ const expo = new Expo({
   accessToken: process.env.EXPO_ACCESS_TOKEN,
 });
 
-const DISPATCH_CHANNEL_ID = "lifeline_dispatch_v4";
+const DISPATCH_CHANNEL_ID = "lifeline_dispatch_v6";
 const ALERTS_CHANNEL_ID = "lifeline_alerts_v2";
 
 function resolveExpoPushToken(row: { expoPushToken?: unknown; token?: unknown }) {
@@ -170,7 +170,7 @@ export async function sendTestDispatchPushToUser(userId: string) {
     to: token,
     title: "Lifeline test dispatch",
     body: "Test notification from local server. If you see this, push is working.",
-    sound: "siren.wav",
+    sound: "alarm.wav",
     channelId: DISPATCH_CHANNEL_ID,
     priority: "high",
     data: {
@@ -395,7 +395,7 @@ export async function sendDispatchOfferPush(input: DispatchPushInput) {
       to: token,
       title: "New dispatch assignment",
       body: `You have a new ${typeLabel} dispatch. Tap to respond.`,
-      sound: "siren.wav",
+      sound: "alarm.wav",
       channelId: DISPATCH_CHANNEL_ID,
       priority: "high",
       data: {

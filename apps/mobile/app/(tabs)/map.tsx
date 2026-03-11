@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StatusBar } from "expo-status-bar";
 import {
-  ActivityIndicator,
   Alert,
   View,
   Text,
@@ -37,7 +36,6 @@ import { getEffectiveLocation } from "../../features/location/utils/getEffective
 import { useVolunteerMapFeed } from "../../features/realtime/hooks/useVolunteerMapFeed";
 import { connectRealtime } from "../../features/realtime/socketClient";
 import { useTheme } from "../../features/theme/useTheme";
-import { usePullToRefresh } from "../../features/common/hooks/usePullToRefresh";
 
 type HazardZone = {
   _id: string;
@@ -566,23 +564,6 @@ export default function MapTab() {
   }, [activeDispatch?.id, isFocused, isVolunteer, myLocation]);
 
   useEffect(() => {
-    if (!isFocused || !isVolunteer || !token) return;
-    const socket = connectRealtime(token);
-    if (!socket) return;
-
-    const sendHeartbeat = () => {
-      socket.emit("volunteer:heartbeat", { onDuty: true });
-    };
-
-    sendHeartbeat();
-    const timer = setInterval(sendHeartbeat, 15_000);
-
-    return () => {
-      clearInterval(timer);
-    };
-  }, [isFocused, isVolunteer, token]);
-
-  useEffect(() => {
     if (!isFocused || !isVolunteer || !token || !myLocation) return;
 
     const now = Date.now();
@@ -644,7 +625,7 @@ export default function MapTab() {
     }
   };
 
-  const resolveStartLocation = async (): Promise<{ lng: number; lat: number } | null> => {
+  const resolveStartLocation = useCallback(async (): Promise<{ lng: number; lat: number } | null> => {
     if (devLocationEnabled) {
       const effective = getEffectiveLocation(effectiveDevLocation, gpsLocation);
       return {
@@ -698,36 +679,39 @@ export default function MapTab() {
       Alert.alert("Location needed", "Unable to read your current location right now.");
       return null;
     }
-  };
+  }, [devLocationEnabled, effectiveDevLocation, gpsLocation, myLocation]);
 
-  const emergencySheet = useEmergencyBottomSheet({
-    resolveOrigin: resolveStartLocation,
-    getWeatherContext: () =>
+  const getWeatherContext = useCallback(
+    () =>
       devWeatherEnabled
         ? {
             rainfall_mm: devWx.rainfall_mm,
             is_raining: devWx.is_raining,
           }
         : null,
+    [devWeatherEnabled, devWx.is_raining, devWx.rainfall_mm]
+  );
+
+  const emergencySheet = useEmergencyBottomSheet({
+    resolveOrigin: resolveStartLocation,
+    getWeatherContext,
   });
   const refreshSelectedEmergency = emergencySheet.refreshSelectedEmergency;
   const closeEmergencySheet = emergencySheet.closeSheet;
+  const refreshSelectedEmergencyRef = useRef(refreshSelectedEmergency);
+
+  useEffect(() => {
+    refreshSelectedEmergencyRef.current = refreshSelectedEmergency;
+  }, [refreshSelectedEmergency]);
 
   const refreshMapData = useCallback(async () => {
     await Promise.allSettled([
       loadHazardZones(),
       loadEmergencyReports(),
       refreshActiveDispatch(),
-      refreshSelectedEmergency(),
+      refreshSelectedEmergencyRef.current(),
     ]);
-  }, [
-    loadEmergencyReports,
-    loadHazardZones,
-    refreshSelectedEmergency,
-    refreshActiveDispatch,
-  ]);
-  const { refreshing: refreshingMapData, triggerRefresh: triggerRefreshMapData } =
-    usePullToRefresh(refreshMapData, { minSpinnerMs: 350 });
+  }, [loadEmergencyReports, loadHazardZones, refreshActiveDispatch]);
 
   useFocusEffect(
     useCallback(() => {
@@ -922,7 +906,11 @@ export default function MapTab() {
                 <View
                   style={[
                     styles.volunteerPin,
-                    volunteer.status === "BUSY" ? styles.volunteerPinBusy : null,
+                    volunteer.status === "BUSY"
+                      ? styles.volunteerPinBusy
+                      : volunteer.status === "IDLE"
+                        ? styles.volunteerPinIdle
+                        : null,
                   ]}
                 >
                   <Feather name="activity" size={12} color="#FFFFFF" />
@@ -930,11 +918,19 @@ export default function MapTab() {
                 <View
                   style={[
                     styles.volunteerLabel,
-                    volunteer.status === "BUSY" ? styles.volunteerLabelBusy : null,
+                    volunteer.status === "BUSY"
+                      ? styles.volunteerLabelBusy
+                      : volunteer.status === "IDLE"
+                        ? styles.volunteerLabelIdle
+                        : null,
                   ]}
                 >
                   <Text style={styles.volunteerLabelText}>
-                    {volunteer.status === "BUSY" ? "Busy" : "Online"}
+                    {volunteer.status === "BUSY"
+                      ? "Busy"
+                      : volunteer.status === "IDLE"
+                        ? "Idle"
+                        : "Online"}
                   </Text>
                 </View>
               </View>
@@ -1019,18 +1015,6 @@ export default function MapTab() {
             </ScrollView>
 
             <View style={styles.layerControlRow}>
-              <Pressable
-                onPress={triggerRefreshMapData}
-                disabled={refreshingMapData}
-                style={[styles.layerControlBtn, isDark ? styles.layerControlBtnDark : null]}
-                hitSlop={10}
-              >
-                {refreshingMapData ? (
-                  <ActivityIndicator size="small" color={isDark ? "#E2E8F0" : "#0F172A"} />
-                ) : (
-                  <Feather name="refresh-cw" size={20} color={isDark ? "#E2E8F0" : "#0F172A"} />
-                )}
-              </Pressable>
               <Pressable
                 onPress={openLayersSheet}
                 style={[styles.layerControlBtn, isDark ? styles.layerControlBtnDark : null]}
@@ -1511,6 +1495,9 @@ const styles = StyleSheet.create({
   volunteerPinBusy: {
     backgroundColor: "#1D4ED8",
   },
+  volunteerPinIdle: {
+    backgroundColor: "#64748B",
+  },
   volunteerLabel: {
     marginTop: 4,
     paddingHorizontal: 7,
@@ -1520,6 +1507,9 @@ const styles = StyleSheet.create({
   },
   volunteerLabelBusy: {
     backgroundColor: "rgba(29,78,216,0.95)",
+  },
+  volunteerLabelIdle: {
+    backgroundColor: "rgba(71,85,105,0.95)",
   },
   volunteerLabelText: {
     color: "#FFFFFF",

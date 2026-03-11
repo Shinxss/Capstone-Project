@@ -8,7 +8,34 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "turbo dev",
     "android": "expo run:android",
-    "ios": "expo run:ios"
+    "ios": "expo run:ios",
+    "test:all": "node \"tools/Added Features Testing/scripts/run-all.js\"",
+    "test:performance": "node \"tools/Added Features Testing/scripts/run-performance.js\"",
+    "test:security": "node \"tools/Added Features Testing/scripts/run-security.js\"",
+    "test:case": "node \"tools/Added Features Testing/scripts/run-case.js\"",
+    "test:flood-risk-latency": "node \"tools/Added Features Testing/scripts/run-case.js\" perf_01_flood_risk_latency",
+    "test:speed-guidance-latency": "node \"tools/Added Features Testing/scripts/run-case.js\" perf_02_speed_guidance_latency",
+    "test:csv-overhead": "node \"tools/Added Features Testing/scripts/run-case.js\" perf_03_csv_overhead",
+    "test:cold-start-trace": "node \"tools/Added Features Testing/scripts/run-case.js\" perf_04_cold_start_trace",
+    "test:ai-concurrency": "node \"tools/Added Features Testing/scripts/run-case.js\" perf_05_ai_concurrency",
+    "test:blockchain-verify-latency": "node \"tools/Added Features Testing/scripts/run-case.js\" perf_06_blockchain_verify_latency",
+    "test:blockchain-reverify-latency": "node \"tools/Added Features Testing/scripts/run-case.js\" perf_07_blockchain_reverify_latency",
+    "test:blockchain-gas-budget": "node \"tools/Added Features Testing/scripts/run-case.js\" perf_08_blockchain_gas_budget",
+    "test:dispatch-chain-hashing": "node \"tools/Added Features Testing/scripts/run-case.js\" perf_09_dispatch_chain_hashing",
+    "test:blockchain-gas-used": "node \"tools/Added Features Testing/scripts/run-case.js\" perf_10_blockchain_gas_used",
+    "test:flood-empty-input": "node \"tools/Added Features Testing/scripts/run-case.js\" sec_01_flood_empty",
+    "test:flood-oversized-payload": "node \"tools/Added Features Testing/scripts/run-case.js\" sec_02_flood_oversized",
+    "test:flood-script-type": "node \"tools/Added Features Testing/scripts/run-case.js\" sec_03_flood_script_type",
+    "test:flood-strict-keys": "node \"tools/Added Features Testing/scripts/run-case.js\" sec_04_flood_strict_keys",
+    "test:csv-sensitive-fields": "node \"tools/Added Features Testing/scripts/run-case.js\" sec_05_csv_sensitive_fields",
+    "test:missing-jwt": "node \"tools/Added Features Testing/scripts/run-case.js\" sec_06_missing_jwt",
+    "test:invalid-jwt": "node \"tools/Added Features Testing/scripts/run-case.js\" sec_07_invalid_jwt",
+    "test:rbac-enforcement": "node \"tools/Added Features Testing/scripts/run-case.js\" sec_08_rbac_enforcement",
+    "test:ai-flood-protection": "node \"tools/Added Features Testing/scripts/run-case.js\" sec_09_ai_flood_protection",
+    "test:unauth-blockchain-verify": "node \"tools/Added Features Testing/scripts/run-case.js\" sec_10_unauth_blockchain_verify",
+    "test:unauth-blockchain-admin": "node \"tools/Added Features Testing/scripts/run-case.js\" sec_11_unauth_blockchain_admin",
+    "test:replay-blockchain": "node \"tools/Added Features Testing/scripts/run-case.js\" sec_12_replay_blockchain",
+    "test:tamper-unverified-blockchain": "node \"tools/Added Features Testing/scripts/run-case.js\" sec_13_tamper_unverified_blockchain"
   },
   "keywords": [],
   "author": "",
@@ -36,3 +63,4 @@
     "react-native": "0.81.5"
   }
 }
+

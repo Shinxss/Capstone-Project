@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Sidebar from "./Sidebar";
 import Header from "../Header";
 import { useLguNotificationsUnreadCount } from "../../features/notifications/hooks/useLguNotificationsUnreadCount";
+import { useLguSidebarIndicators } from "./hooks/useLguSidebarIndicators";
 
 type Props = {
   title: string;
@@ -31,10 +32,21 @@ export default function LguShell({ title, subtitle, children }: Props) {
   }, [collapsed]);
 
   const unreadNotifications = useLguNotificationsUnreadCount();
+  const {
+    pendingApplicants,
+    forReviewTasks,
+    pendingEmergencyApprovals,
+  } = useLguSidebarIndicators();
 
   return (
     <div className="h-screen bg-[#F6F7F9] text-slate-900 flex overflow-hidden dark:bg-[#060C18] dark:text-slate-100">
-      <Sidebar collapsed={collapsed} unreadNotifications={unreadNotifications} />
+      <Sidebar
+        collapsed={collapsed}
+        unreadNotifications={unreadNotifications}
+        pendingApplicants={pendingApplicants}
+        forReviewTasks={forReviewTasks}
+        pendingEmergencyApprovals={pendingEmergencyApprovals}
+      />
 
       <div className="flex-1 min-w-0 flex flex-col">
         <Header

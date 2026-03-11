@@ -1,0 +1,36 @@
+{
+  "id": "perf_04_cold_start_trace",
+  "session": "performance",
+  "testCase": "Flood Risk + Speed Guidance Cold-Start Trace",
+  "stepsShort": "Run one 2-segment prediction request",
+  "expectedResult": "First-call inference returns risk + guidance within 1.0 s",
+  "actualResult": "Completed in 402.364 ms; outputs included LOW/45, HIGH/15",
+  "passFail": "PASS",
+  "notes": "Measured in a fresh TSX harness process calling predictRoutingRiskCosts once with two segments; elapsed time from performance.now(); single cold-start run.",
+  "sourceFiles": [
+    "apps/server/src/features/routingRisk/routingRisk.service.ts",
+    "tools/Added Features Testing/scripts/perf/server-routing-risk-cold-start.ts"
+  ],
+  "runnerCommand": "pnpm module12:evidence:cold-start-trace",
+  "rawEvidencePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\cases\\perf_04_cold_start_trace.json",
+  "measurement": {
+    "durationMs": 402.36359999999996,
+    "outputs": [
+      {
+        "routing_cost": 1.9695827960968018,
+        "risk_level": "LOW",
+        "recommended_speed_kph": 45,
+        "model_available": true
+      },
+      {
+        "routing_cost": 13.573270797729492,
+        "risk_level": "HIGH",
+        "recommended_speed_kph": 15,
+        "model_available": true
+      }
+    ],
+    "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\logs\\server-routing-risk-cold-start.log",
+    "tracePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260310-235800\\raw\\traces\\routing-risk-cold-start.json"
+  },
+  "actualResultCompact": "402.364 ms"
+}

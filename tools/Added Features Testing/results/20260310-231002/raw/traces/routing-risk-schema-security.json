@@ -1,0 +1,47 @@
+{
+  "empty": {
+    "success": false,
+    "issues": [
+      {
+        "path": "segments",
+        "code": "too_small",
+        "message": "Too small: expected array to have >=1 items"
+      }
+    ]
+  },
+  "oversized": {
+    "success": false,
+    "issues": [
+      {
+        "path": "segments",
+        "code": "too_big",
+        "message": "Too big: expected array to have <=1000 items"
+      }
+    ]
+  },
+  "scriptType": {
+    "success": false,
+    "issues": [
+      {
+        "path": "segments.0.flood_depth_5yr",
+        "code": "invalid_type",
+        "message": "Invalid input: expected number, received string"
+      }
+    ]
+  },
+  "strictKeys": {
+    "success": false,
+    "issues": [
+      {
+        "path": "segments.0",
+        "code": "unrecognized_keys",
+        "message": "Unrecognized key: \"admin\""
+      },
+      {
+        "path": "",
+        "code": "unrecognized_keys",
+        "message": "Unrecognized key: \"debug\""
+      }
+    ]
+  }
+}

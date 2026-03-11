@@ -11,9 +11,8 @@ import { useSosHold } from "../../features/emergency/hooks/useSosHold";
 import { useSosReport } from "../../features/emergency/hooks/useSosReport";
 import { DispatchOfferModal } from "../../features/dispatch/components/DispatchOfferModal";
 import { useActiveDispatch } from "../../features/dispatch/hooks/useActiveDispatch";
+import { useDispatchModal } from "../../features/dispatch/hooks/useDispatchModal";
 import { usePendingDispatch } from "../../features/dispatch/hooks/usePendingDispatch";
-import { respondToDispatch } from "../../features/dispatch/services/dispatchApi";
-import { setStoredActiveDispatch } from "../../features/dispatch/services/dispatchStorage";
 import { useWeatherSummary } from "../../features/weather/hooks/useWeatherSummary";
 import type { WeatherSeverity } from "../../features/weather/services/weatherApi";
 import { useMyActiveRequest } from "../../features/requests/hooks/useMyActiveRequest";
@@ -246,7 +245,6 @@ export default function HomeScreen() {
   const { refreshing: refreshingHome, triggerRefresh: triggerRefreshHome } = usePullToRefresh(refreshHome);
 
   const [sosConfirmVisible, setSosConfirmVisible] = useState(false);
-  const [dispatchBusy, setDispatchBusy] = useState(false);
   const [pushDebugBusy, setPushDebugBusy] = useState(false);
 
   const weatherCard = useMemo(() => {
@@ -372,55 +370,18 @@ export default function HomeScreen() {
     cancelHold();
   }, [sosSending, sosConfirmVisible, cancelHold]);
 
-  const onAcceptDispatch = useCallback(async () => {
-    if (!pendingDispatch) return;
-    try {
-      setDispatchBusy(true);
-      const updated = await respondToDispatch(pendingDispatch.id, "ACCEPT");
-      await setStoredActiveDispatch(updated);
-      clearPending();
-      await refreshActive();
+  const dispatchModal = useDispatchModal({
+    pendingDispatch,
+    clearPending,
+    refreshPending,
+    refreshActive,
+    onAcceptSuccess: () => {
       router.push("/(tabs)/map");
-    } catch (e: any) {
-      const message = String(e?.response?.data?.message ?? e?.message ?? "").trim();
-      const normalized = message.toLowerCase();
-      const isStalePendingState = normalized.includes("not pending");
-
-      if (isStalePendingState) {
-        clearPending();
-        await Promise.allSettled([refreshPending(), refreshActive()]);
-        return;
-      }
-
-      Alert.alert("Failed", message || "Unable to accept dispatch.");
-    } finally {
-      setDispatchBusy(false);
-    }
-  }, [pendingDispatch, refreshActive, clearPending, refreshPending]);
-
-  const onDeclineDispatch = useCallback(async () => {
-    if (!pendingDispatch) return;
-    try {
-      setDispatchBusy(true);
-      await respondToDispatch(pendingDispatch.id, "DECLINE");
-      clearPending();
-      await refreshPending();
-    } catch (e: any) {
-      const message = String(e?.response?.data?.message ?? e?.message ?? "").trim();
-      const normalized = message.toLowerCase();
-      const isStalePendingState = normalized.includes("not pending");
-
-      if (isStalePendingState) {
-        clearPending();
-        await Promise.allSettled([refreshPending(), refreshActive()]);
-        return;
-      }
-
-      Alert.alert("Failed", message || "Unable to decline dispatch.");
-    } finally {
-      setDispatchBusy(false);
-    }
-  }, [pendingDispatch, refreshPending, clearPending, refreshActive]);
+    },
+    onViewDetails: () => {
+      router.push("/(tabs)/tasks");
+    },
+  });
 
   const onDebugCheckToken = useCallback(async () => {
     try {
@@ -507,13 +468,21 @@ export default function HomeScreen() {
         onCancel={onCancelSosConfirm}
       />
 
-      {isVolunteer && pendingDispatch?.status === "PENDING" ? (
+      {isVolunteer ? (
         <DispatchOfferModal
-          visible
-          offer={pendingDispatch}
-          onAccept={onAcceptDispatch}
-          onDecline={onDeclineDispatch}
-          busy={dispatchBusy}
+          visible={dispatchModal.visible}
+          data={dispatchModal.data}
+          assignedByText={dispatchModal.assignedByText}
+          severityLabel={dispatchModal.severityLabel}
+          statusLabel={dispatchModal.statusLabel}
+          distanceEtaText={dispatchModal.distanceEtaText}
+          reportedTimeText={dispatchModal.reportedTimeText}
+          accepting={dispatchModal.accepting}
+          declining={dispatchModal.declining}
+          onAccept={dispatchModal.acceptDispatch}
+          onDecline={dispatchModal.declineDispatch}
+          onViewDetails={dispatchModal.viewDetails}
+          onClose={dispatchModal.dismiss}
         />
       ) : null}
 
@@ -538,6 +507,7 @@ export default function HomeScreen() {
           </View>
         </DraggableOverlay>
       ) : null}
+
     </>
   );
 }

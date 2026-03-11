@@ -1,0 +1,272 @@
+[
+  {
+    "id": "perf_01_flood_risk_latency",
+    "session": "performance",
+    "testCase": "Flood Risk Categorization Latency (Module 11)",
+    "stepsShort": "Run predictRoutingRiskCosts on 1 segment, repeat 5 runs",
+    "expectedResult": "Risk output (routing_cost, risk_level) returns within 1.0 s per call",
+    "sourceFiles": [
+      "apps/server/src/features/routingRisk/routingRisk.service.ts",
+      "tools/Added Features Testing/scripts/perf/server-routing-risk-benchmark.ts"
+    ],
+    "runnerAlias": "test:flood-risk-latency"
+  },
+  {
+    "id": "perf_02_speed_guidance_latency",
+    "session": "performance",
+    "testCase": "Speed Guidance Generation Latency (Module 11)",
+    "stepsShort": "Run 1,000-segment prediction batch, repeat 5 runs",
+    "expectedResult": "recommended_speed_kph generated for all segments with average latency < 10 ms",
+    "sourceFiles": [
+      "apps/server/src/features/routingRisk/routingRisk.service.ts",
+      "tools/Added Features Testing/scripts/perf/server-routing-risk-benchmark.ts"
+    ],
+    "runnerAlias": "test:speed-guidance-latency"
+  },
+  {
+    "id": "perf_03_csv_overhead",
+    "session": "performance",
+    "testCase": "Structured CSV Logging Overhead (Module 11)",
+    "stepsShort": "Compare prediction runtime with LOG_ROUTING_RISK=0 vs LOG_ROUTING_RISK=1",
+    "expectedResult": "CSV rows append with required fields and logging overhead stays below 3x baseline",
+    "sourceFiles": [
+      "apps/server/src/features/routingRisk/routingRisk.service.ts",
+      "apps/server/src/constants/routingRisk.constants.ts",
+      "tools/Added Features Testing/scripts/perf/server-routing-risk-benchmark.ts"
+    ],
+    "runnerAlias": "test:csv-overhead"
+  },
+  {
+    "id": "perf_04_cold_start_trace",
+    "session": "performance",
+    "testCase": "Flood Risk + Speed Guidance Cold-Start Trace",
+    "stepsShort": "Run one 2-segment prediction request",
+    "expectedResult": "First-call inference returns risk + guidance within 1.0 s",
+    "sourceFiles": [
+      "apps/server/src/features/routingRisk/routingRisk.service.ts",
+      "tools/Added Features Testing/scripts/perf/server-routing-risk-cold-start.ts"
+    ],
+    "runnerAlias": "test:cold-start-trace"
+  },
+  {
+    "id": "perf_05_ai_concurrency",
+    "session": "performance",
+    "testCase": "AI Routing Throughput Under Concurrency",
+    "stepsShort": "Execute 20 concurrent prediction calls (100 segments each)",
+    "expectedResult": "All concurrent requests complete with no failed responses",
+    "sourceFiles": [
+      "apps/server/src/features/routingRisk/routingRisk.service.ts",
+      "tools/Added Features Testing/scripts/perf/server-routing-risk-benchmark.ts"
+    ],
+    "runnerAlias": "test:ai-concurrency"
+  },
+  {
+    "id": "perf_06_blockchain_verify_latency",
+    "session": "performance",
+    "testCase": "Blockchain verifyTask Latency",
+    "stepsShort": "Run blockchain test suite and capture verify scenario timing",
+    "expectedResult": "Local-chain verification flow completes within 2.0 s",
+    "sourceFiles": [
+      "apps/blockchain/test/SecurityCases.test.ts"
+    ],
+    "runnerAlias": "test:blockchain-verify-latency"
+  },
+  {
+    "id": "perf_07_blockchain_reverify_latency",
+    "session": "performance",
+    "testCase": "Blockchain Revoke/Reverify Latency",
+    "stepsShort": "Run admin correction flow in security suite",
+    "expectedResult": "Revoke + reverify flow completes within 500 ms",
+    "sourceFiles": [
+      "apps/blockchain/test/SecurityCases.test.ts"
+    ],
+    "runnerAlias": "test:blockchain-reverify-latency"
+  },
+  {
+    "id": "perf_08_blockchain_gas_budget",
+    "session": "performance",
+    "testCase": "Blockchain Gas Budget (verifyTask)",
+    "stepsShort": "Run gas snapshot test",
+    "expectedResult": "estimateGas remains within configured budget (<= 80,000)",
+    "sourceFiles": [
+      "apps/blockchain/test/TaskLedger.gas.test.ts"
+    ],
+    "runnerAlias": "test:blockchain-gas-budget"
+  },
+  {
+    "id": "perf_09_dispatch_chain_hashing",
+    "session": "performance",
+    "testCase": "Dispatch Chain Hashing Performance",
+    "stepsShort": "Run dispatch-chain tests in server",
+    "expectedResult": "Hashing subtests pass and each hash operation remains < 15 ms",
+    "sourceFiles": [
+      "apps/server/src/features/dispatches/dispatch.chain.test.ts"
+    ],
+    "runnerAlias": "test:dispatch-chain-hashing"
+  },
+  {
+    "id": "perf_10_blockchain_gas_used",
+    "session": "performance",
+    "testCase": "Blockchain verifyTask Gas Used Snapshot",
+    "stepsShort": "Run full blockchain suite and capture runtime gasUsed log",
+    "expectedResult": "gasUsed remains below 80,000 and close to estimate",
+    "sourceFiles": [
+      "apps/blockchain/test/TaskLedger.test.ts",
+      "apps/blockchain/test/TaskLedger.gas.test.ts"
+    ],
+    "runnerAlias": "test:blockchain-gas-used"
+  },
+  {
+    "id": "sec_01_flood_empty",
+    "session": "security",
+    "testCase": "Flood Risk Endpoint Empty Input Rejection",
+    "stepsShort": "Validate routingRiskPredictSchema with segments: []",
+    "expectedResult": "Request is rejected for empty segments (minimum 1)",
+    "sourceFiles": [
+      "apps/server/src/features/routingRisk/routingRisk.schema.ts",
+      "tools/Added Features Testing/scripts/sec/server-routing-risk-schema-security.ts"
+    ],
+    "runnerAlias": "test:flood-empty-input"
+  },
+  {
+    "id": "sec_02_flood_oversized",
+    "session": "security",
+    "testCase": "Flood Risk Oversized Payload Rejection",
+    "stepsShort": "Validate schema with 1,001 segments",
+    "expectedResult": "Request is rejected for exceeding max segment count (1000)",
+    "sourceFiles": [
+      "apps/server/src/features/routingRisk/routingRisk.schema.ts",
+      "tools/Added Features Testing/scripts/sec/server-routing-risk-schema-security.ts"
+    ],
+    "runnerAlias": "test:flood-oversized-payload"
+  },
+  {
+    "id": "sec_03_flood_script_type",
+    "session": "security",
+    "testCase": "Flood Risk Script-Injection Type Rejection",
+    "stepsShort": "Submit string payload in numeric field (flood_depth_5yr)",
+    "expectedResult": "Non-numeric/script-like input is rejected",
+    "sourceFiles": [
+      "apps/server/src/features/routingRisk/routingRisk.schema.ts",
+      "tools/Added Features Testing/scripts/sec/server-routing-risk-schema-security.ts"
+    ],
+    "runnerAlias": "test:flood-script-type"
+  },
+  {
+    "id": "sec_04_flood_strict_keys",
+    "session": "security",
+    "testCase": "Flood Risk Strict-Key Tamper Rejection",
+    "stepsShort": "Submit extra keys (admin, debug) to strict schemas",
+    "expectedResult": "Unexpected keys are blocked",
+    "sourceFiles": [
+      "apps/server/src/features/routingRisk/routingRisk.schema.ts",
+      "tools/Added Features Testing/scripts/sec/server-routing-risk-schema-security.ts"
+    ],
+    "runnerAlias": "test:flood-strict-keys"
+  },
+  {
+    "id": "sec_05_csv_sensitive_fields",
+    "session": "security",
+    "testCase": "Structured CSV Log Sensitive-Field Exposure Check",
+    "stepsShort": "Inspect generated routing-risk CSV header and first data row",
+    "expectedResult": "Logs exclude secrets (no token/JWT/password/private key fields)",
+    "sourceFiles": [
+      "apps/server/src/features/routingRisk/routingRisk.service.ts",
+      "tools/Added Features Testing/scripts/sec/server-csv-sensitive-check.ts"
+    ],
+    "runnerAlias": "test:csv-sensitive-fields"
+  },
+  {
+    "id": "sec_06_missing_jwt",
+    "session": "security",
+    "testCase": "Missing JWT Handling (requireAuth)",
+    "stepsShort": "Call protected route without Authorization header",
+    "expectedResult": "Middleware returns 401 Unauthorized",
+    "sourceFiles": [
+      "apps/server/src/middlewares/requireAuth.ts",
+      "tools/Added Features Testing/scripts/sec/server-auth-rbac-limiter-security.ts"
+    ],
+    "runnerAlias": "test:missing-jwt"
+  },
+  {
+    "id": "sec_07_invalid_jwt",
+    "session": "security",
+    "testCase": "Invalid JWT Handling (requireAuth)",
+    "stepsShort": "Call protected route with malformed bearer token",
+    "expectedResult": "Middleware returns 401 Invalid token",
+    "sourceFiles": [
+      "apps/server/src/middlewares/requireAuth.ts",
+      "tools/Added Features Testing/scripts/sec/server-auth-rbac-limiter-security.ts"
+    ],
+    "runnerAlias": "test:invalid-jwt"
+  },
+  {
+    "id": "sec_08_rbac_enforcement",
+    "session": "security",
+    "testCase": "RBAC Enforcement on LGU-Only Middleware",
+    "stepsShort": "Hit role-guarded route as no-role and VOLUNTEER (control: LGU)",
+    "expectedResult": "No-role gets 401, disallowed role gets 403, allowed role gets 200",
+    "sourceFiles": [
+      "apps/server/src/middlewares/requireRole.ts",
+      "tools/Added Features Testing/scripts/sec/server-auth-rbac-limiter-security.ts"
+    ],
+    "runnerAlias": "test:rbac-enforcement"
+  },
+  {
+    "id": "sec_09_ai_flood_protection",
+    "session": "security",
+    "testCase": "AI Endpoint Abuse / Flood Protection",
+    "stepsShort": "Send 35 rapid POSTs through routingOptimizeLimiter",
+    "expectedResult": "First 30 pass, excess requests are rate-limited with 429",
+    "sourceFiles": [
+      "apps/server/src/middlewares/rateLimit.ts",
+      "tools/Added Features Testing/scripts/sec/server-auth-rbac-limiter-security.ts"
+    ],
+    "runnerAlias": "test:ai-flood-protection"
+  },
+  {
+    "id": "sec_10_unauth_blockchain_verify",
+    "session": "security",
+    "testCase": "Unauthorized Blockchain Verify Attempt",
+    "stepsShort": "Run security suite case for non-verifier calling verifyTask",
+    "expectedResult": "Unauthorized account is blocked by access control",
+    "sourceFiles": [
+      "apps/blockchain/test/SecurityCases.test.ts"
+    ],
+    "runnerAlias": "test:unauth-blockchain-verify"
+  },
+  {
+    "id": "sec_11_unauth_blockchain_admin",
+    "session": "security",
+    "testCase": "Unauthorized Blockchain Admin Actions",
+    "stepsShort": "Run non-admin revoke/reverify and grant-verifier attempts",
+    "expectedResult": "Unauthorized admin-level actions are blocked",
+    "sourceFiles": [
+      "apps/blockchain/test/SecurityCases.test.ts"
+    ],
+    "runnerAlias": "test:unauth-blockchain-admin"
+  },
+  {
+    "id": "sec_12_replay_blockchain",
+    "session": "security",
+    "testCase": "Replay/Duplicate Blockchain Verification Attempt",
+    "stepsShort": "Attempt second verifyTask on same task hash",
+    "expectedResult": "Replay is rejected with ALREADY_VERIFIED",
+    "sourceFiles": [
+      "apps/blockchain/test/SecurityCases.test.ts"
+    ],
+    "runnerAlias": "test:replay-blockchain"
+  },
+  {
+    "id": "sec_13_tamper_unverified_blockchain",
+    "session": "security",
+    "testCase": "Tamper Attempt on Unverified Record (Revoke/Reverify)",
+    "stepsShort": "Attempt revoke/reverify for task never verified",
+    "expectedResult": "Contract rejects tamper path with NOT_VERIFIED",
+    "sourceFiles": [
+      "apps/blockchain/test/SecurityCases.test.ts"
+    ],
+    "runnerAlias": "test:tamper-unverified-blockchain"
+  }
+]
+

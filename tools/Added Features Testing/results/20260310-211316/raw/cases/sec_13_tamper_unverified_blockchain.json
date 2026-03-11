@@ -1,0 +1,31 @@
+{
+  "id": "sec_13_tamper_unverified_blockchain",
+  "session": "security",
+  "testCase": "Tamper Attempt on Unverified Record (Revoke/Reverify)",
+  "stepsShort": "Attempt revoke/reverify for task never verified",
+  "expectedResult": "Contract rejects tamper path with NOT_VERIFIED",
+  "actualResult": "Test passed: \"Cannot revoke/reverify a task that was never verified (NOT_VERIFIED)\"",
+  "passFail": "PASS",
+  "notes": "Verified tamper-path rejection by matching NOT_VERIFIED test assertion and runtime output in blockchain security suite; 1 suite run.",
+  "sourceFiles": [
+    "apps/blockchain/test/SecurityCases.test.ts"
+  ],
+  "runnerCommand": "pnpm module12:evidence:tamper-unverified-blockchain",
+  "rawEvidencePath": "C:\\Projects\\Lifeline\\tools\\module12-evidence\\results\\20260310-211316\\raw\\cases\\sec_13_tamper_unverified_blockchain.json",
+  "measurement": {
+    "verifyLatencyMs": 1178,
+    "reverifyLatencyMs": 53,
+    "unauthorizedVerifyLatencyMs": 45,
+    "unauthorizedRevokeLatencyMs": 43,
+    "unauthorizedGrantLatencyMs": null,
+    "replayLatencyMs": null,
+    "hasUnauthorizedVerify": true,
+    "hasUnauthorizedAdmin": true,
+    "hasReplay": true,
+    "hasNotVerified": true,
+    "gasUsed": 49287,
+    "passingCount": 13,
+    "logPath": "C:\\Projects\\Lifeline\\tools\\module12-evidence\\results\\20260310-211316\\raw\\logs\\blockchain-test.log",
+    "tracePath": "C:\\Projects\\Lifeline\\tools\\module12-evidence\\results\\20260310-211316\\raw\\traces\\blockchain-test.json"
+  }
+}

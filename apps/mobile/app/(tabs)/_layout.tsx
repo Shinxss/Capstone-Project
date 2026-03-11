@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
-import { Tabs, useRouter } from "expo-router";
+import { Animated, BackHandler, Platform, Pressable, StyleSheet, Text, ToastAndroid, View } from "react-native";
+import { Tabs, usePathname, useRouter } from "expo-router";
 import { AlertTriangle } from "lucide-react-native";
 import { BlurView } from "expo-blur";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -14,15 +14,19 @@ import { useTheme } from "../../features/theme/useTheme";
 
 export default function TabLayout() {
   const router = useRouter();
+  const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
   const tabBarBottomPadding = Math.max(insets.bottom, 50);
   const tabBarHeight = 64 + tabBarBottomPadding;
   const { signOut } = useAuth();
   const { canAccessTasks, blockReason, role } = useTasksAccess();
+  const normalizedRole = String(role ?? "").trim().toUpperCase();
+  const isCommunityUser = normalizedRole === "COMMUNITY";
   const [showAuthRequired, setShowAuthRequired] = useState(false);
   const { visible: reportPillVisible, hide: hideReportPill, toggle: toggleReportPill } = useReportPill();
   const reportPillAnim = useRef(new Animated.Value(0)).current;
+  const lastBackPressAtRef = useRef(0);
 
   useEffect(() => {
     Animated.timing(reportPillAnim, {
@@ -31,6 +35,38 @@ export default function TabLayout() {
       useNativeDriver: true,
     }).start();
   }, [reportPillAnim, reportPillVisible]);
+
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+
+    const onHardwareBackPress = () => {
+      if (reportPillVisible) {
+        hideReportPill();
+        return true;
+      }
+
+      const isTabsRoot = pathname === "/" || pathname === "/(tabs)";
+      if (!isTabsRoot) {
+        router.replace("/(tabs)");
+        return true;
+      }
+
+      const now = Date.now();
+      if (now - lastBackPressAtRef.current < 2000) {
+        return false;
+      }
+
+      lastBackPressAtRef.current = now;
+      ToastAndroid.show("Press back again to exit", ToastAndroid.SHORT);
+      return true;
+    };
+
+    const subscription = BackHandler.addEventListener("hardwareBackPress", onHardwareBackPress);
+
+    return () => {
+      subscription.remove();
+    };
+  }, [hideReportPill, pathname, reportPillVisible, router]);
 
   const onPressReportPill = useCallback(() => {
     hideReportPill();
@@ -45,11 +81,11 @@ export default function TabLayout() {
 
   const onProtectedTabPress = useCallback(
     (e: { preventDefault: () => void }) => {
-      if (canAccessTasks) return;
+      if (isCommunityUser || canAccessTasks) return;
 
       e.preventDefault();
 
-      if (blockReason === "role" && String(role ?? "").trim().toUpperCase() === "COMMUNITY") {
+      if (blockReason === "role") {
         router.push("/volunteer-apply-modal");
         return;
       }
@@ -61,7 +97,7 @@ export default function TabLayout() {
 
       setShowAuthRequired(true);
     },
-    [blockReason, canAccessTasks, goLogin, role, router]
+    [blockReason, canAccessTasks, goLogin, isCommunityUser, router]
   );
 
   const modalTitle = blockReason === "role" ? "Access Restricted" : "Login Required";
@@ -88,7 +124,7 @@ export default function TabLayout() {
         <Tabs.Screen name="index" />
         <Tabs.Screen name="map" />
         <Tabs.Screen
-          name="alert"
+          name="tasks"
           listeners={{
             tabPress: onProtectedTabPress,
           }}

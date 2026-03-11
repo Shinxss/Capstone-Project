@@ -1,0 +1,89 @@
+{
+  "id": "sec_08_rbac_enforcement",
+  "session": "security",
+  "testCase": "RBAC Enforcement on LGU-Only Middleware",
+  "stepsShort": "Hit role-guarded route as no-role and VOLUNTEER (control: LGU)",
+  "expectedResult": "No-role gets 401, disallowed role gets 403, allowed role gets 200",
+  "actualResult": "No-role: 401; Volunteer: 403; LGU control: 200",
+  "passFail": "PASS",
+  "notes": "Measured with local Express middleware harness importing requireRole('LGU','ADMIN'); sent three role scenarios via fetch; one run per role.",
+  "sourceFiles": [
+    "apps/server/src/middlewares/requireRole.ts",
+    "tools/Added Features Testing/scripts/sec/server-auth-rbac-limiter-security.ts"
+  ],
+  "runnerCommand": "pnpm test:rbac-enforcement",
+  "rawEvidencePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260311-001345\\raw\\cases\\sec_08_rbac_enforcement.json",
+  "measurement": {
+    "missingJwt": {
+      "status": 401,
+      "body": "{\"message\":\"Unauthorized\"}"
+    },
+    "invalidJwt": {
+      "status": 401,
+      "body": "{\"message\":\"Invalid token\"}"
+    },
+    "rbac": {
+      "noRole": {
+        "status": 401,
+        "body": "{\"message\":\"Unauthorized\"}"
+      },
+      "volunteer": {
+        "status": 403,
+        "body": "{\"message\":\"Forbidden\"}"
+      },
+      "lgu": {
+        "status": 200,
+        "body": "{\"ok\":true}"
+      }
+    },
+    "limiter": {
+      "statuses": [
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        429,
+        429,
+        429,
+        429,
+        429
+      ],
+      "counts": {
+        "200": 30,
+        "429": 5
+      },
+      "first429At": 31,
+      "totalMs": 109.35459999999989,
+      "avgMs": 3.1244171428571397
+    },
+    "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260311-001345\\raw\\logs\\server-auth-rbac-limiter-security.log",
+    "tracePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260311-001345\\raw\\traces\\auth-rbac-limiter-security.json"
+  },
+  "actualResultCompact": "PASS 1"
+}

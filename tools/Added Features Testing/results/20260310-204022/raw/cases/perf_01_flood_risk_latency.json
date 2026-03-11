@@ -1,0 +1,19 @@
+{
+  "id": "perf_01_flood_risk_latency",
+  "session": "performance",
+  "testCase": "Flood Risk Categorization Latency (Module 11)",
+  "stepsShort": "Run predictRoutingRiskCosts on 1 segment, repeat 5 runs",
+  "expectedResult": "Risk output (routing_cost, risk_level) returns within 1.0 s per call",
+  "actualResult": "ERROR: Server harness failed: scripts/perf/server-routing-risk-benchmark.ts\nLog: C:\\Projects\\Lifeline\\tools\\module12-evidence\\results\\20260310-204022\\raw\\logs\\server-routing-risk-benchmark.log\n",
+  "passFail": "ERROR",
+  "notes": "Runner execution failed before metric extraction; see raw case evidence for stack/error details.",
+  "sourceFiles": [
+    "apps/server/src/features/routingRisk/routingRisk.service.ts",
+    "tools/module12-evidence/scripts/perf/server-routing-risk-benchmark.ts"
+  ],
+  "runnerCommand": "pnpm module12:evidence:flood-risk-latency",
+  "rawEvidencePath": "C:\\Projects\\Lifeline\\tools\\module12-evidence\\results\\20260310-204022\\raw\\cases\\perf_01_flood_risk_latency.json",
+  "measurement": {
+    "error": "Server harness failed: scripts/perf/server-routing-risk-benchmark.ts\nLog: C:\\Projects\\Lifeline\\tools\\module12-evidence\\results\\20260310-204022\\raw\\logs\\server-routing-risk-benchmark.log\n"
+  }
+}

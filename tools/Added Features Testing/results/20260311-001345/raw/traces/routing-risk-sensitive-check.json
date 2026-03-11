@@ -1,0 +1,21 @@
+{
+  "csvPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260311-001345\\raw\\artifacts\\routing-risk-sensitive-check.csv",
+  "header": "timestamp,model_available,routing_cost,risk_level,recommended_speed_kph,flood_depth_5yr,rainfall_mm,is_raining,bridge,road_priority,feature_order",
+  "firstDataRow": "2026-03-10T16:14:03.738Z,1,2.142810,LOW,45,0.200000,3.000000,0,0,0,flood_depth_5yr|rainfall_mm|is_raining|bridge|road_priority",
+  "headers": [
+    "timestamp",
+    "model_available",
+    "routing_cost",
+    "risk_level",
+    "recommended_speed_kph",
+    "flood_depth_5yr",
+    "rainfall_mm",
+    "is_raining",
+    "bridge",
+    "road_priority",
+    "feature_order"
+  ],
+  "sensitiveHeader": false,
+  "sensitiveHeaderColumns": [],
+  "sensitiveFirstData": false
+}

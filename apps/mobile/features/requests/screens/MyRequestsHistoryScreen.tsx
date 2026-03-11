@@ -3,11 +3,10 @@ import { ActivityIndicator, Alert, FlatList, Pressable, Text, View } from "react
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
-import { Ionicons } from "@expo/vector-icons";
 import { useSession } from "../../auth/hooks/useSession";
 import { usePullToRefresh } from "../../common/hooks/usePullToRefresh";
+import { MyRequestsHeader, type MyRequestsHeaderTabOption } from "../components/MyRequestsHeader";
 import { RequestHistoryCard } from "../components/RequestHistoryCard";
-import { RequestStatusTabs, type RequestStatusTabOption } from "../components/RequestStatusTabs";
 import { useMyRequestsHistory } from "../hooks/useMyRequestsHistory";
 import {
   MY_REQUEST_TAB_LABELS,
@@ -29,7 +28,7 @@ const STATUS_TAB_ORDER: MyRequestStatusTab[] = [
   "cancelled",
 ];
 
-const STATUS_TABS: RequestStatusTabOption[] = STATUS_TAB_ORDER.map((tab) => ({
+const STATUS_TABS: MyRequestsHeaderTabOption<MyRequestStatusTab>[] = STATUS_TAB_ORDER.map((tab) => ({
   value: tab,
   label: MY_REQUEST_TAB_LABELS[tab],
 }));
@@ -51,6 +50,7 @@ export function MyRequestsHistoryScreen() {
     [tabParam]
   );
   const [activeTab, setActiveTab] = useState<MyRequestStatusTab>(initialTab);
+  const [searchValue, setSearchValue] = useState("");
   const { items, loading, error, refresh } = useMyRequestsHistory(activeTab, { enabled: isUser });
   const refreshHistory = useCallback(async () => {
     await refresh();
@@ -103,33 +103,52 @@ export function MyRequestsHistoryScreen() {
     [openTracking]
   );
 
+  const filteredItems = useMemo(() => {
+    const needle = searchValue.trim().toLowerCase();
+    if (!needle) return items;
+
+    return items.filter((item) => {
+      const haystack = [
+        item.referenceNumber,
+        item.locationText,
+        item.type,
+        item.trackingLabel,
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(needle);
+    });
+  }, [items, searchValue]);
+
+  const onPressHeaderMenu = useCallback(() => {
+    setSearchValue("");
+    setActiveTab("all");
+  }, []);
+
   if (sessionLoading || !isUser) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-zinc-100">
+      <SafeAreaView className="flex-1 items-center justify-center bg-zinc-100" edges={["left", "right"]}>
         <ActivityIndicator size="small" color="#DC2626" />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-zinc-100" edges={["top", "left", "right"]}>
-      <View className="border-b border-zinc-200 bg-white px-4 pb-3 pt-2">
-        <View className="flex-row items-center">
-          <Pressable
-            onPress={() => router.back()}
-            hitSlop={8}
-            className="h-9 w-9 items-center justify-center rounded-full bg-zinc-100"
-          >
-            <Ionicons name="arrow-back" size={18} color="#111827" />
-          </Pressable>
-          <Text className="ml-3 text-2xl font-extrabold text-zinc-900">My Requests</Text>
-        </View>
-      </View>
-
-      <RequestStatusTabs tabs={STATUS_TABS} activeTab={activeTab} onChange={setActiveTab} />
+    <SafeAreaView className="flex-1 bg-white" edges={["left", "right"]}>
+      <MyRequestsHeader
+        tabs={STATUS_TABS}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        searchValue={searchValue}
+        onSearchValueChange={setSearchValue}
+        searchPlaceholder="Search your requests"
+        onBackPress={() => router.back()}
+        onMenuPress={onPressHeaderMenu}
+      />
 
       <FlatList
-        data={items}
+        data={filteredItems}
         keyExtractor={(item) => item.id}
         refreshing={refreshingHistory}
         onRefresh={triggerRefreshHistory}
@@ -138,7 +157,7 @@ export function MyRequestsHistoryScreen() {
           paddingTop: 14,
           paddingBottom: 40,
           gap: 12,
-          flexGrow: items.length === 0 ? 1 : 0,
+          flexGrow: filteredItems.length === 0 ? 1 : 0,
         }}
         renderItem={({ item }) => (
           <RequestHistoryCard
@@ -153,6 +172,10 @@ export function MyRequestsHistoryScreen() {
             <View className="mt-8 items-center justify-center">
               <ActivityIndicator size="small" color="#DC2626" />
               <Text className="mt-2 text-sm text-zinc-500">Loading requests...</Text>
+            </View>
+          ) : searchValue.trim() ? (
+            <View className="mt-6 rounded-2xl border border-zinc-200 bg-white p-6">
+              <Text className="text-center text-sm text-zinc-600">No requests match your search</Text>
             </View>
           ) : (
             <View className="mt-6 rounded-2xl border border-zinc-200 bg-white p-6">

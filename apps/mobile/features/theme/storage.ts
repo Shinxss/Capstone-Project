@@ -12,19 +12,24 @@ export async function getThemeMode(): Promise<ThemeMode> {
   try {
     const stored = await AsyncStorage.getItem(STORAGE_KEY);
     if (isThemeMode(stored)) {
+      if (stored === "system") {
+        await AsyncStorage.setItem(STORAGE_KEY, "light");
+        return "light";
+      }
       return stored;
     }
 
     const legacy = await AsyncStorage.getItem(LEGACY_STORAGE_KEY);
     if (isThemeMode(legacy)) {
-      await AsyncStorage.setItem(STORAGE_KEY, legacy);
-      return legacy;
+      const normalized = legacy === "system" ? "light" : legacy;
+      await AsyncStorage.setItem(STORAGE_KEY, normalized);
+      return normalized;
     }
   } catch {
-    // ignore and fall back to system
+    // ignore and fall back to light
   }
 
-  return "system";
+  return "light";
 }
 
 export async function setThemeMode(mode: ThemeMode): Promise<void> {

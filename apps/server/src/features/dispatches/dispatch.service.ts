@@ -9,6 +9,7 @@ import { EmergencyReport } from "../emergency/emergency.model";
 import { User } from "../users/user.model";
 import { DispatchOffer, DispatchStatus } from "./dispatch.model";
 import { sendDispatchOfferPush } from "../notifications/pushNotification.service";
+import { getDispatchPendingResponseCutoffDate } from "./dispatch.constants";
 import {
   emitRequestTrackingUpdate,
   emitUserNotification,
@@ -79,10 +80,12 @@ export async function createDispatchOffers(input: CreateDispatchInput) {
   }
 
   // Avoid duplicate PENDING offers for the same emergency/volunteer pair.
+  const pendingCutoff = getDispatchPendingResponseCutoffDate();
   const existingPending = await DispatchOffer.find({
     emergencyId: new Types.ObjectId(emergencyId),
     volunteerId: { $in: validVolunteerIds.map((id) => new Types.ObjectId(id)) },
     status: "PENDING",
+    createdAt: { $gte: pendingCutoff },
   }).select("volunteerId");
 
   const existingPendingVolunteerIds = new Set(existingPending.map((d) => String(d.volunteerId)));
@@ -190,9 +193,11 @@ export async function createDispatchOffers(input: CreateDispatchInput) {
 }
 
 export async function getMyPendingDispatch(volunteerUserId: string) {
+  const pendingCutoff = getDispatchPendingResponseCutoffDate();
   return DispatchOffer.findOne({
     volunteerId: new Types.ObjectId(volunteerUserId),
     status: "PENDING",
+    createdAt: { $gte: pendingCutoff },
   }).sort({ createdAt: -1 });
 }
 
@@ -230,6 +235,20 @@ export async function respondToDispatch(params: {
 
   if (String(offer.volunteerId) !== String(volunteerUserId)) {
     throw new Error("Not allowed");
+  }
+
+  const pendingCutoff = getDispatchPendingResponseCutoffDate();
+  const offerCreatedAtMs = offer.createdAt ? new Date(offer.createdAt).getTime() : Number.NaN;
+  const isExpiredPending =
+    offer.status === "PENDING" &&
+    Number.isFinite(offerCreatedAtMs) &&
+    offerCreatedAtMs < pendingCutoff.getTime();
+  if (isExpiredPending) {
+    offer.status = "CANCELLED";
+    offer.respondedAt = new Date();
+    await offer.save();
+    await syncVolunteerBusyState(String(offer.volunteerId)).catch(() => undefined);
+    throw new Error("Dispatch offer timed out");
   }
 
   if (offer.status !== "PENDING") {

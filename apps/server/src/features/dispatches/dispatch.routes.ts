@@ -6,6 +6,7 @@ import {
   getLguTasks,
   getMyActive,
   getMyCurrent,
+  getMyFocusStats,
   getMyPending,
   postReverify,
   postRevoke,
@@ -46,6 +47,9 @@ router.get("/my/active", requireAuth, requireRole("VOLUNTEER"), getMyActive);
 
 // Volunteer gets current task (ACCEPTED or DONE)
 router.get("/my/current", requireAuth, requireRole("VOLUNTEER"), getMyCurrent);
+
+// Volunteer gets daily focus stats for Tasks dashboard
+router.get("/my/focus-stats", requireAuth, requireRole("VOLUNTEER"), getMyFocusStats);
 
 // Volunteer responds to a pending offer
 router.patch("/:id/respond", requireAuth, requireRole("VOLUNTEER"), validate(dispatchIdParamsSchema, "params"), validate(respondSchema), patchRespond);

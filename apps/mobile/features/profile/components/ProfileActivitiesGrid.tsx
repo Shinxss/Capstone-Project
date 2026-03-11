@@ -110,16 +110,17 @@ export default function ProfileActivitiesGrid({
               borderColor: isDark ? "#162544" : "#E5E7EB",
             }}
           >
-            <Text className="text-[16px] font-extrabold text-slate-900 dark:text-slate-100">
+            <Text className="mb-3 text-[16px] font-extrabold text-slate-900 dark:text-slate-100">
               Volunteer Activities
             </Text>
-            <Text className="mt-2 text-[13px] leading-5 text-slate-600 dark:text-slate-300">
+            <Text className="text-[13px] leading-5 text-slate-600 dark:text-slate-300">
               This section is available for verified volunteers.
             </Text>
             <Pressable
               onPress={onPressApplyVolunteer}
               style={({ pressed }) => ({
                 marginTop: 12,
+                width: "100%",
                 minHeight: 40,
                 borderRadius: 10,
                 borderWidth: 1,
@@ -129,7 +130,6 @@ export default function ProfileActivitiesGrid({
                 backgroundColor: isDark ? "#1E3A8A" : "#DC2626",
                 borderColor: isDark ? "#3B82F6" : "#DC2626",
                 opacity: pressed ? 0.9 : 1,
-                alignSelf: "flex-start",
               })}
             >
               <Text className="text-sm font-semibold text-white">Apply as Volunteer</Text>
@@ -145,7 +145,7 @@ export default function ProfileActivitiesGrid({
                   key={card.key}
                   style={{
                     width: "48.5%",
-                    aspectRatio: 1,
+                    aspectRatio: 1.09,
                     borderRadius: 12,
                     borderWidth: 1,
                     paddingHorizontal: 16,
@@ -179,7 +179,7 @@ export default function ProfileActivitiesGrid({
                       style={{
                         width: 44,
                         height: 44,
-                        borderRadius: 14,
+                        borderRadius: 6,
                         alignItems: "center",
                         justifyContent: "center",
                         backgroundColor: isDark ? card.iconBgDark : card.iconBgLight,
@@ -195,7 +195,7 @@ export default function ProfileActivitiesGrid({
 
                   <View style={{ marginTop: 8 }}>
                     <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
-                      <Text className="text-[38px] leading-[40px] font-extrabold text-slate-900 dark:text-slate-100">
+                      <Text className="text-[38px] leading-[40px] font-semibold text-slate-900 dark:text-slate-100">
                         {card.value}
                       </Text>
                       {card.unit ? (

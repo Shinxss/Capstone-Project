@@ -9,7 +9,7 @@ import { User } from "../features/users/user.model";
 import { verifyAccessToken } from "../utils/jwt";
 
 type Role = "LGU" | "ADMIN" | "VOLUNTEER" | "COMMUNITY";
-type VolunteerPresenceStatus = "ONLINE" | "BUSY";
+type VolunteerPresenceStatus = "ONLINE" | "BUSY" | "IDLE" | "OFFLINE";
 
 type SocketUserContext = {
   userId: string;
@@ -36,6 +36,8 @@ type VolunteerPresenceRecord = {
   onDuty: boolean;
   status: VolunteerPresenceStatus;
   lastSeenAt: number;
+  lastHeartbeatAt: number;
+  lastInteractionAt: number;
   lastLocation?: VolunteerLocation;
   socketIds: Set<string>;
 };
@@ -50,7 +52,8 @@ type RequestSubscribeAck = (payload: { ok: boolean; message?: string }) => void;
 type VolunteersSubscribeAck = (payload: { ok: boolean; message?: string }) => void;
 
 const VOLUNTEERS_PUBLIC_ROOM = "volunteers:public";
-const HEARTBEAT_TTL_MS = 60_000;
+const IDLE_AFTER_MS = 5 * 60_000;
+const OFFLINE_AFTER_MS = 15 * 60_000;
 const HEARTBEAT_SWEEP_MS = 15_000;
 const DEFAULT_RADIUS_KM = 5;
 const MIN_RADIUS_KM = 1;
@@ -63,6 +66,34 @@ const presenceByVolunteerId = new Map<string, VolunteerPresenceRecord>();
 const socketIdToVolunteerId = new Map<string, string>();
 const volunteerBusyById = new Map<string, boolean>();
 const volunteerSubscriptions = new Map<string, VolunteerSubscription>();
+
+function resolveConnectedPresenceStatus(volunteerId: string): VolunteerPresenceStatus {
+  return volunteerBusyById.get(volunteerId) ? "BUSY" : "ONLINE";
+}
+
+function resolvePresenceStatus(
+  volunteerId: string,
+  record: VolunteerPresenceRecord,
+  now = Date.now()
+): VolunteerPresenceStatus {
+  if (!record.onDuty) return "OFFLINE";
+  if (now - record.lastHeartbeatAt > OFFLINE_AFTER_MS) return "OFFLINE";
+  if (record.socketIds.size <= 0) return resolveConnectedPresenceStatus(volunteerId);
+  if (now - record.lastInteractionAt > IDLE_AFTER_MS) return "IDLE";
+  return resolveConnectedPresenceStatus(volunteerId);
+}
+
+function toOfflinePresence(volunteerId: string, record?: VolunteerPresenceRecord) {
+  return {
+    volunteerId,
+    status: "OFFLINE" as const,
+    ...(record
+      ? {
+          lastSeenAt: new Date(record.lastSeenAt).toISOString(),
+        }
+      : {}),
+  };
+}
 
 function parseBearerToken(raw: string | undefined): string {
   const value = String(raw || "").trim();
@@ -125,7 +156,9 @@ function isInSubscriberRadius(
   record: VolunteerPresenceRecord
 ) {
   if (!subscription) return true;
-  if (!record.lastLocation) return false;
+  // Keep presence visible even when latest GPS is missing; map layers can still
+  // decide whether to render a marker based on coordinates.
+  if (!record.lastLocation) return true;
 
   const km = haversineKm(
     {
@@ -177,8 +210,13 @@ function getVolunteerSubscriberSocketIds() {
 
 function emitPresenceSnapshotToSocket(socket: Socket) {
   const subscription = volunteerSubscriptions.get(socket.id);
+  const now = Date.now();
   const volunteers = Array.from(presenceByVolunteerId.values())
     .filter((record) => record.onDuty)
+    .filter((record) => {
+      record.status = resolvePresenceStatus(record.volunteerId, record, now);
+      return record.status !== "OFFLINE";
+    })
     .filter((record) => isInSubscriberRadius(subscription, record))
     .map((record) => toPublicPresence(record));
 
@@ -188,10 +226,13 @@ function emitPresenceSnapshotToSocket(socket: Socket) {
   });
 }
 
-function emitPresenceChanged(volunteerId: string, reason: string) {
+function emitPresenceChanged(volunteerId: string, reason: string, fallbackRecord?: VolunteerPresenceRecord) {
   if (!io) return;
 
-  const record = presenceByVolunteerId.get(volunteerId);
+  const record = presenceByVolunteerId.get(volunteerId) ?? fallbackRecord;
+  if (record) {
+    record.status = resolvePresenceStatus(volunteerId, record);
+  }
   const subscribers = getVolunteerSubscriberSocketIds();
 
   for (const socketId of subscribers) {
@@ -201,7 +242,7 @@ function emitPresenceChanged(volunteerId: string, reason: string) {
     const subscription = volunteerSubscriptions.get(socketId);
     const inRange = record ? isInSubscriberRadius(subscription, record) : false;
 
-    if (record && inRange) {
+    if (record && inRange && record.status !== "OFFLINE") {
       subscriber.emit("volunteers:presence_changed", {
         at: nowIso(),
         reason,
@@ -213,10 +254,7 @@ function emitPresenceChanged(volunteerId: string, reason: string) {
     subscriber.emit("volunteers:presence_changed", {
       at: nowIso(),
       reason,
-      volunteer: {
-        volunteerId,
-        status: "OFFLINE",
-      },
+      volunteer: toOfflinePresence(volunteerId, record),
     });
   }
 }
@@ -225,7 +263,11 @@ function emitVolunteerLocation(volunteerId: string) {
   if (!io) return;
 
   const record = presenceByVolunteerId.get(volunteerId);
+  if (record) {
+    record.status = resolvePresenceStatus(volunteerId, record);
+  }
   if (!record || !record.lastLocation) return;
+  if (record.status === "OFFLINE") return;
 
   const subscribers = getVolunteerSubscriberSocketIds();
 
@@ -266,20 +308,29 @@ function upsertPresence(
     onDuty: boolean;
     socketId?: string;
     location?: VolunteerLocation;
+    touchHeartbeat?: boolean;
+    touchInteraction?: boolean;
+    reason?: string;
   }
 ) {
+  const now = Date.now();
   const existing = presenceByVolunteerId.get(volunteerId);
   const next: VolunteerPresenceRecord = existing ?? {
     volunteerId,
     onDuty: Boolean(input.onDuty),
-    status: volunteerBusyById.get(volunteerId) ? "BUSY" : "ONLINE",
-    lastSeenAt: Date.now(),
+    status: "OFFLINE",
+    lastSeenAt: now,
+    lastHeartbeatAt: now,
+    lastInteractionAt: now,
     socketIds: new Set<string>(),
   };
 
   next.onDuty = Boolean(input.onDuty);
-  next.status = volunteerBusyById.get(volunteerId) ? "BUSY" : "ONLINE";
-  next.lastSeenAt = Date.now();
+  next.lastHeartbeatAt = Number.isFinite(next.lastHeartbeatAt) ? next.lastHeartbeatAt : now;
+  next.lastInteractionAt = Number.isFinite(next.lastInteractionAt) ? next.lastInteractionAt : now;
+  next.lastSeenAt = Number.isFinite(next.lastSeenAt)
+    ? Math.max(next.lastSeenAt, next.lastHeartbeatAt, next.lastInteractionAt)
+    : Math.max(next.lastHeartbeatAt, next.lastInteractionAt);
 
   if (input.socketId) {
     next.socketIds.add(input.socketId);
@@ -289,14 +340,26 @@ function upsertPresence(
     next.lastLocation = input.location;
   }
 
+  if (input.touchHeartbeat) {
+    next.lastHeartbeatAt = now;
+    next.lastSeenAt = Math.max(next.lastSeenAt, now);
+  }
+
+  if (input.touchInteraction) {
+    next.lastInteractionAt = now;
+    next.lastSeenAt = Math.max(next.lastSeenAt, now);
+  }
+
+  next.status = resolvePresenceStatus(volunteerId, next, now);
+
   if (!next.onDuty) {
     presenceByVolunteerId.delete(volunteerId);
-    emitPresenceChanged(volunteerId, "duty_off");
+    emitPresenceChanged(volunteerId, input.reason ?? "duty_off", next);
     return;
   }
 
   presenceByVolunteerId.set(volunteerId, next);
-  emitPresenceChanged(volunteerId, "presence_updated");
+  emitPresenceChanged(volunteerId, input.reason ?? "presence_updated");
 }
 
 function detachVolunteerSocket(socketId: string) {
@@ -307,13 +370,16 @@ function detachVolunteerSocket(socketId: string) {
   const record = presenceByVolunteerId.get(volunteerId);
   if (!record) return;
 
+  const now = Date.now();
+  const prevStatus = record.status;
   record.socketIds.delete(socketId);
-  if (record.socketIds.size === 0) {
-    presenceByVolunteerId.delete(volunteerId);
-    emitPresenceChanged(volunteerId, "socket_disconnect");
-  } else {
-    record.lastSeenAt = Date.now();
-    presenceByVolunteerId.set(volunteerId, record);
+  record.lastSeenAt = Math.max(record.lastSeenAt, now);
+
+  record.status = resolvePresenceStatus(volunteerId, record, now);
+  presenceByVolunteerId.set(volunteerId, record);
+
+  if (record.status !== prevStatus) {
+    emitPresenceChanged(volunteerId, "socket_status_changed");
   }
 }
 
@@ -323,9 +389,30 @@ function startPresenceSweep() {
   staleSweepTimer = setInterval(() => {
     const now = Date.now();
     for (const [volunteerId, record] of presenceByVolunteerId) {
-      if (now - record.lastSeenAt <= HEARTBEAT_TTL_MS) continue;
-      presenceByVolunteerId.delete(volunteerId);
-      emitPresenceChanged(volunteerId, "stale_offline");
+      const previousStatus = record.status;
+      const nextStatus = resolvePresenceStatus(volunteerId, record, now);
+      if (previousStatus === nextStatus) continue;
+
+      record.status = nextStatus;
+      if (nextStatus === "OFFLINE") {
+        for (const socketId of record.socketIds) {
+          socketIdToVolunteerId.delete(socketId);
+        }
+        record.socketIds.clear();
+      }
+      presenceByVolunteerId.set(volunteerId, record);
+
+      if (nextStatus === "OFFLINE") {
+        emitPresenceChanged(volunteerId, "heartbeat_timeout");
+        continue;
+      }
+
+      if (nextStatus === "IDLE") {
+        emitPresenceChanged(volunteerId, "interaction_idle");
+        continue;
+      }
+
+      emitPresenceChanged(volunteerId, "presence_resumed");
     }
   }, HEARTBEAT_SWEEP_MS);
 }
@@ -466,6 +553,9 @@ export function initNotificationsSocket(server: HttpServer) {
       upsertPresence(userId, {
         onDuty: true,
         socketId: socket.id,
+        touchHeartbeat: true,
+        touchInteraction: true,
+        reason: "socket_connected",
       });
       void syncVolunteerBusyState(userId);
     }
@@ -554,14 +644,20 @@ export function initNotificationsSocket(server: HttpServer) {
       ).catch(() => undefined);
 
       if (!onDutyInput) {
+        const existing = presenceByVolunteerId.get(userId);
+        if (existing) {
+          existing.onDuty = false;
+        }
         presenceByVolunteerId.delete(userId);
-        emitPresenceChanged(userId, "heartbeat_off_duty");
+        emitPresenceChanged(userId, "heartbeat_off_duty", existing);
         return;
       }
 
       upsertPresence(userId, {
         onDuty: true,
         socketId: socket.id,
+        touchHeartbeat: true,
+        reason: "heartbeat",
       });
       await syncVolunteerBusyState(userId);
     });
@@ -594,6 +690,9 @@ export function initNotificationsSocket(server: HttpServer) {
             ...(Number.isFinite(payload?.heading) ? { heading: Number(payload.heading) } : {}),
             ...(Number.isFinite(payload?.speed) ? { speed: Number(payload.speed) } : {}),
           },
+          touchHeartbeat: true,
+          touchInteraction: true,
+          reason: "location_update",
         });
 
         emitVolunteerLocation(userId);
@@ -647,7 +746,7 @@ export async function syncVolunteerBusyState(volunteerId: string) {
 
   const hasActive = await DispatchOffer.exists({
     volunteerId: new Types.ObjectId(normalizedVolunteerId),
-    status: { $in: ["PENDING", "ACCEPTED", "DONE"] },
+    status: "ACCEPTED",
   });
 
   const busy = Boolean(hasActive);
@@ -656,12 +755,22 @@ export async function syncVolunteerBusyState(volunteerId: string) {
   const record = presenceByVolunteerId.get(normalizedVolunteerId);
   if (!record) return;
 
-  const nextStatus: VolunteerPresenceStatus = busy ? "BUSY" : "ONLINE";
+  const nextStatus: VolunteerPresenceStatus = resolvePresenceStatus(normalizedVolunteerId, record);
   if (record.status === nextStatus) return;
 
   record.status = nextStatus;
-  record.lastSeenAt = Date.now();
   presenceByVolunteerId.set(normalizedVolunteerId, record);
+
+  if (nextStatus === "OFFLINE") {
+    emitPresenceChanged(normalizedVolunteerId, "heartbeat_timeout");
+    return;
+  }
+
+  if (nextStatus === "IDLE") {
+    emitPresenceChanged(normalizedVolunteerId, "interaction_idle");
+    return;
+  }
+
   emitPresenceChanged(normalizedVolunteerId, busy ? "dispatch_assigned" : "dispatch_cleared");
 }
 
@@ -680,6 +789,19 @@ export async function emitRequestTrackingUpdate(requestId: string, reason = "tra
     at: nowIso(),
     data: snapshot,
   });
+}
+
+export function getVolunteerPresenceStatus(volunteerId: string): VolunteerPresenceStatus {
+  const normalizedVolunteerId = String(volunteerId || "").trim();
+  if (!normalizedVolunteerId) return "OFFLINE";
+
+  const record = presenceByVolunteerId.get(normalizedVolunteerId);
+  if (!record || !record.onDuty) return "OFFLINE";
+
+  const nextStatus = resolvePresenceStatus(normalizedVolunteerId, record);
+  record.status = nextStatus;
+  presenceByVolunteerId.set(normalizedVolunteerId, record);
+  return nextStatus;
 }
 
 export function emitNotificationsRefresh(reason: string, roles: Role[] = ["LGU", "ADMIN"]) {

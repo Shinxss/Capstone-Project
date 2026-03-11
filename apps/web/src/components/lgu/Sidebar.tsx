@@ -46,6 +46,7 @@ type SubItem = {
   label: string;
   to: string;
   icon?: React.ComponentType<{ size?: number; className?: string }>;
+  badgeCount?: number;
 };
 
 const navSections: NavSection[] = [
@@ -147,14 +148,19 @@ function SidebarSubmenu({
   basePath,
   collapsed,
   items,
+  badgeCount = 0,
 }: {
   label: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
   basePath: string;
   collapsed: boolean;
   items: SubItem[];
+  badgeCount?: number;
 }) {
   const location = useLocation();
+  const safeBadgeCount = Number.isFinite(badgeCount) ? Math.max(0, Math.floor(badgeCount)) : 0;
+  const showBadge = safeBadgeCount > 0;
+  const badgeLabel = safeBadgeCount > 99 ? "99+" : String(safeBadgeCount);
 
   const isInSection = location.pathname.startsWith(basePath);
   const isChildActive = items.some((i) => {
@@ -245,7 +251,14 @@ function SidebarSubmenu({
               : "",
           ].join(" ")}
         >
-          <Icon size={18} className="text-gray-900 dark:text-slate-200" />
+          <span className="relative shrink-0">
+            <Icon size={18} className="text-gray-900 dark:text-slate-200" />
+            {showBadge ? (
+              <span className="absolute -right-2 -top-2 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
+                {badgeLabel}
+              </span>
+            ) : null}
+          </span>
         </button>
 
         {flyoutOpen && pos
@@ -268,6 +281,12 @@ function SidebarSubmenu({
                 <div className="mt-1 space-y-1">
                   {items.map((s) => {
                     const SubIcon = s.icon;
+                    const safeSubBadgeCount =
+                      typeof s.badgeCount === "number" && Number.isFinite(s.badgeCount)
+                        ? Math.max(0, Math.floor(s.badgeCount))
+                        : 0;
+                    const showSubBadge = safeSubBadgeCount > 0;
+                    const subBadgeLabel = safeSubBadgeCount > 99 ? "99+" : String(safeSubBadgeCount);
                     return (
                       <NavLink
                         key={s.to}
@@ -288,6 +307,11 @@ function SidebarSubmenu({
                       >
                         {SubIcon ? <SubIcon size={16} className="text-gray-900 dark:text-slate-200" /> : null}
                         <span className="truncate">{s.label}</span>
+                        {showSubBadge ? (
+                          <span className="ml-auto inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold text-white">
+                            {subBadgeLabel}
+                          </span>
+                        ) : null}
                       </NavLink>
                     );
                   })}
@@ -320,7 +344,12 @@ function SidebarSubmenu({
       >
         <Icon size={18} className="text-gray-900 dark:text-slate-200" />
         <span className="truncate">{label}</span>
-        <span className="ml-auto">
+        {showBadge ? (
+          <span className="ml-auto inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold text-white">
+            {badgeLabel}
+          </span>
+        ) : null}
+        <span className={showBadge ? "ml-2" : "ml-auto"}>
           <ChevronDown
             size={16}
             className={["transition-transform", open ? "rotate-180" : "rotate-0"].join(" ")}
@@ -336,6 +365,12 @@ function SidebarSubmenu({
             <div className="space-y-1">
               {items.map((s) => {
                 const SubIcon = s.icon;
+                const safeSubBadgeCount =
+                  typeof s.badgeCount === "number" && Number.isFinite(s.badgeCount)
+                    ? Math.max(0, Math.floor(s.badgeCount))
+                    : 0;
+                const showSubBadge = safeSubBadgeCount > 0;
+                const subBadgeLabel = safeSubBadgeCount > 99 ? "99+" : String(safeSubBadgeCount);
 
                 return (
                   <NavLink
@@ -355,6 +390,11 @@ function SidebarSubmenu({
                     <span className="w-6 shrink-0" />
                     {SubIcon ? <SubIcon size={16} className="text-gray-800 dark:text-slate-300" /> : null}
                     <span className="truncate">{s.label}</span>
+                    {showSubBadge ? (
+                      <span className="ml-auto inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold text-white">
+                        {subBadgeLabel}
+                      </span>
+                    ) : null}
                   </NavLink>
                 );
               })}
@@ -370,9 +410,15 @@ function SidebarSubmenu({
 export default function Sidebar({
   collapsed = false,
   unreadNotifications = 0,
+  pendingApplicants = 0,
+  forReviewTasks = 0,
+  pendingEmergencyApprovals = 0,
 }: {
   collapsed?: boolean;
   unreadNotifications?: number;
+  pendingApplicants?: number;
+  forReviewTasks?: number;
+  pendingEmergencyApprovals?: number;
 }) {
   const location = useLocation();
   const w = collapsed ? "w-[78px]" : "w-[255px]";
@@ -450,13 +496,19 @@ export default function Sidebar({
                     icon={Users}
                     basePath="/lgu/volunteers"
                     collapsed={collapsed}
+                    badgeCount={pendingApplicants}
                     items={[
                       {
                         label: "Verified Volunteers",
                         to: "/lgu/volunteers/verified",
                         icon: BadgeCheck,
                       },
-                      { label: "Applicants", to: "/lgu/volunteers/applicants", icon: UserPlus },
+                      {
+                        label: "Applicants",
+                        to: "/lgu/volunteers/applicants",
+                        icon: UserPlus,
+                        badgeCount: pendingApplicants,
+                      },
                     ]}
                   />
 
@@ -465,9 +517,15 @@ export default function Sidebar({
                     icon={ClipboardList}
                     basePath="/lgu/tasks"
                     collapsed={collapsed}
+                    badgeCount={forReviewTasks}
                     items={[
                       { label: "In Progress", to: "/lgu/tasks/in-progress", icon: CircleDot },
-                      { label: "For Review", to: "/lgu/tasks/for-review", icon: Clock4 },
+                      {
+                        label: "For Review",
+                        to: "/lgu/tasks/for-review",
+                        icon: Clock4,
+                        badgeCount: forReviewTasks,
+                      },
                       { label: "Completed", to: "/lgu/tasks/completed", icon: CheckCircle2 },
                       { label: "Canceled", to: "/lgu/tasks/canceled", icon: ArchiveX },
                     ]}
@@ -480,7 +538,13 @@ export default function Sidebar({
                   key={item.to}
                   item={item}
                   collapsed={collapsed}
-                  badgeCount={item.to === "/lgu/notifications" ? unreadNotifications : 0}
+                  badgeCount={
+                    item.to === "/lgu/notifications"
+                      ? unreadNotifications
+                      : item.to === "/lgu/approvals"
+                        ? pendingEmergencyApprovals
+                        : 0
+                  }
                 />
               ))}
             </div>

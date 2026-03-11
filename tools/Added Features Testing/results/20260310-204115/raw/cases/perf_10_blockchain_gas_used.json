@@ -1,0 +1,43 @@
+{
+  "id": "perf_10_blockchain_gas_used",
+  "session": "performance",
+  "testCase": "Blockchain verifyTask Gas Used Snapshot",
+  "stepsShort": "Run full blockchain suite and capture runtime gasUsed log",
+  "expectedResult": "gasUsed remains below 80,000 and close to estimate",
+  "actualResult": "Gas used: 49,287; delta vs estimate: 12 (0.02%)",
+  "passFail": "PASS",
+  "notes": "Gas used captured from full Hardhat suite output; compared against estimateGas from gas snapshot test; sources: blockchain test logs; one run each command.",
+  "sourceFiles": [
+    "apps/blockchain/test/TaskLedger.test.ts",
+    "apps/blockchain/test/TaskLedger.gas.test.ts"
+  ],
+  "runnerCommand": "pnpm module12:evidence:blockchain-gas-used",
+  "rawEvidencePath": "C:\\Projects\\Lifeline\\tools\\module12-evidence\\results\\20260310-204115\\raw\\cases\\perf_10_blockchain_gas_used.json",
+  "measurement": {
+    "suite": {
+      "verifyLatencyMs": 1368,
+      "reverifyLatencyMs": 239,
+      "unauthorizedVerifyLatencyMs": 253,
+      "unauthorizedRevokeLatencyMs": 63,
+      "unauthorizedGrantLatencyMs": 48,
+      "replayLatencyMs": 44,
+      "hasUnauthorizedVerify": true,
+      "hasUnauthorizedAdmin": true,
+      "hasReplay": true,
+      "hasNotVerified": true,
+      "gasUsed": 49287,
+      "passingCount": 13,
+      "logPath": "C:\\Projects\\Lifeline\\tools\\module12-evidence\\results\\20260310-204115\\raw\\logs\\blockchain-test.log",
+      "tracePath": "C:\\Projects\\Lifeline\\tools\\module12-evidence\\results\\20260310-204115\\raw\\traces\\blockchain-test.json"
+    },
+    "gas": {
+      "estimateGas": 49275,
+      "budget": 80000,
+      "testDurationMs": 1912,
+      "logPath": "C:\\Projects\\Lifeline\\tools\\module12-evidence\\results\\20260310-204115\\raw\\logs\\blockchain-test-gas.log",
+      "tracePath": "C:\\Projects\\Lifeline\\tools\\module12-evidence\\results\\20260310-204115\\raw\\traces\\blockchain-gas-test.json"
+    },
+    "delta": 12,
+    "deltaPct": 0.0243531202435312
+  }
+}

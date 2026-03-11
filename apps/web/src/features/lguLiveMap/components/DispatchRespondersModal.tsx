@@ -23,12 +23,24 @@ const statusStyles: Record<Volunteer["status"], { dot: string; pill: string; lab
     pill: "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-500/15 dark:text-orange-300 dark:border-orange-500/25",
     label: "Busy",
   },
+  idle: {
+    dot: "bg-slate-500",
+    pill: "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-500/15 dark:text-slate-300 dark:border-slate-500/25",
+    label: "Idle",
+  },
   offline: {
     dot: "bg-red-500",
     pill: "bg-red-50 text-red-700 border-red-200 dark:bg-red-500/15 dark:text-red-300 dark:border-red-500/25",
     label: "Offline",
   },
 };
+
+function formatLastSeen(raw?: string) {
+  if (!raw) return "Last seen unavailable";
+  const at = new Date(raw);
+  if (Number.isNaN(at.getTime())) return "Last seen unavailable";
+  return `Last seen ${at.toLocaleString()}`;
+}
 
 export default function DispatchRespondersModal({
   open,
@@ -107,6 +119,11 @@ export default function DispatchRespondersModal({
                         <div>
                           <div className="text-sm font-bold text-gray-900 dark:text-slate-100">{v.name}</div>
                           <div className="text-xs text-gray-600 dark:text-slate-400">{v.skill}</div>
+                          {v.status === "offline" ? (
+                            <div className="text-[11px] text-gray-500 dark:text-slate-500">
+                              {formatLastSeen(v.lastSeenAt)}
+                            </div>
+                          ) : null}
                         </div>
                       </button>
 
@@ -154,7 +171,7 @@ export default function DispatchRespondersModal({
           </div>
 
           <div className="mt-3 text-[11px] text-gray-500 dark:text-slate-500">
-            Note: This is a demo dispatch flow. Dispatched responders are marked as <span className="font-semibold">Busy</span>.
+            Live availability is synced via websocket. Only <span className="font-semibold">Available</span> responders can be dispatched.
           </div>
         </div>
       </div>
