@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 import { Animated, BackHandler, Platform, Pressable, StyleSheet, Text, ToastAndroid, View } from "react-native";
 import { Tabs, usePathname, useRouter } from "expo-router";
 import { AlertTriangle } from "lucide-react-native";
@@ -7,8 +7,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import BottomNav from "../../components/BottomNav";
 import AuthRequiredModal from "../../components/AuthRequiredModal";
 import { TASKS_GUARD_MODE } from "../../features/auth/constants/accessControl";
+import { useAuthRequiredPrompt } from "../../features/auth/hooks/useAuthRequiredPrompt";
+import { useSession } from "../../features/auth/hooks/useSession";
 import { useTasksAccess } from "../../features/auth/hooks/useTasksAccess";
-import { useAuth } from "../../features/auth/AuthProvider";
 import { useReportPill } from "../../features/report/hooks/useReportPill";
 import { useTheme } from "../../features/theme/useTheme";
 
@@ -17,13 +18,13 @@ export default function TabLayout() {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
+  const authRequired = useAuthRequiredPrompt();
+  const { isUser } = useSession();
   const tabBarBottomPadding = Math.max(insets.bottom, 50);
   const tabBarHeight = 64 + tabBarBottomPadding;
-  const { signOut } = useAuth();
   const { canAccessTasks, blockReason, role } = useTasksAccess();
   const normalizedRole = String(role ?? "").trim().toUpperCase();
   const isCommunityUser = normalizedRole === "COMMUNITY";
-  const [showAuthRequired, setShowAuthRequired] = useState(false);
   const { visible: reportPillVisible, hide: hideReportPill, toggle: toggleReportPill } = useReportPill();
   const reportPillAnim = useRef(new Animated.Value(0)).current;
   const lastBackPressAtRef = useRef(0);
@@ -70,14 +71,18 @@ export default function TabLayout() {
 
   const onPressReportPill = useCallback(() => {
     hideReportPill();
+    if (!authRequired.requireAuth(isUser, { blockedAction: "report_emergency" })) return;
     router.push("/report");
-  }, [hideReportPill, router]);
+  }, [authRequired, hideReportPill, isUser, router]);
 
-  const goLogin = useCallback(async () => {
-    setShowAuthRequired(false);
-    await signOut();
-    router.replace("/(auth)/login");
-  }, [router, signOut]);
+  const onPressReportAction = useCallback(() => {
+    if (!authRequired.requireAuth(isUser, { blockedAction: "report_emergency" })) {
+      hideReportPill();
+      return;
+    }
+
+    toggleReportPill();
+  }, [authRequired, hideReportPill, isUser, toggleReportPill]);
 
   const onProtectedTabPress = useCallback(
     (e: { preventDefault: () => void }) => {
@@ -91,20 +96,14 @@ export default function TabLayout() {
       }
 
       if (TASKS_GUARD_MODE === "redirect") {
-        void goLogin();
+        void authRequired.goToLogin();
         return;
       }
 
-      setShowAuthRequired(true);
+      authRequired.openAuthRequired({ blockedAction: "access_volunteer_tools" });
     },
-    [blockReason, canAccessTasks, goLogin, isCommunityUser, router]
+    [authRequired, blockReason, canAccessTasks, isCommunityUser, router]
   );
-
-  const modalTitle = blockReason === "role" ? "Access Restricted" : "Login Required";
-  const modalMessage =
-    blockReason === "role"
-      ? "Your account role does not have permission to access Tasks."
-      : "You need to log in to access Tasks.";
 
   return (
     <>
@@ -117,7 +116,7 @@ export default function TabLayout() {
           <BottomNav
             {...props}
             onPressRegularTab={hideReportPill}
-            onPressReportAction={toggleReportPill}
+            onPressReportAction={onPressReportAction}
           />
         )}
       >
@@ -181,11 +180,7 @@ export default function TabLayout() {
       </Animated.View>
 
       <AuthRequiredModal
-        visible={showAuthRequired}
-        title={modalTitle}
-        message={modalMessage}
-        onClose={() => setShowAuthRequired(false)}
-        onLogin={goLogin}
+        {...authRequired.modalProps}
       />
     </>
   );

@@ -21,10 +21,15 @@ import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Droplets, Construction, Flame, Mountain, ShieldAlert } from "lucide-react-native";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { api } from "../../lib/api";
-import { fetchEmergencyMapReportsWithOptions } from "../../features/emergency/services/emergencyApi";
+import {
+  fetchEmergencyMapReportsWithOptions,
+  fetchMyEmergencyMapReports,
+} from "../../features/emergency/services/emergencyApi";
 import { useAuth } from "../../features/auth/AuthProvider";
 import { useActiveDispatch } from "../../features/dispatch/hooks/useActiveDispatch";
+import { usePendingDispatch } from "../../features/dispatch/hooks/usePendingDispatch";
 import { updateDispatchLocation } from "../../features/dispatch/services/dispatchApi";
+import type { DispatchOffer } from "../../features/dispatch/models/dispatch";
 import { EmergencyBottomSheetContainer } from "../../features/map/components/EmergencyBottomSheetContainer";
 import { useEmergencyBottomSheet } from "../../features/map/hooks/useEmergencyBottomSheet";
 import type { Emergency, EmergencyType } from "../../features/map/models/map.types";
@@ -154,6 +159,45 @@ function normalizeEmergencyType(raw: string): EmergencyType {
   if (normalized === "OTHER") return "Other";
   if (normalized === "SOS") return "SOS";
   return "Other";
+}
+
+function normalizeEmergencyStatus(raw?: string): string | undefined {
+  const normalized = String(raw ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+  if (!normalized) return undefined;
+  if (normalized === "acknowledged" || normalized === "accepted") return "assigned";
+  if (normalized === "inprogress") return "in_progress";
+  return normalized;
+}
+
+function mapDispatchToEmergency(dispatch: DispatchOffer | null | undefined): Emergency | null {
+  const emergency = dispatch?.emergency;
+  const incidentId = String(emergency?.id ?? "").trim();
+  if (!incidentId) return null;
+
+  const lng = Number(emergency?.lng);
+  const lat = Number(emergency?.lat);
+  if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null;
+
+  const type = normalizeEmergencyType(String(emergency?.emergencyType ?? ""));
+
+  return {
+    id: incidentId,
+    type,
+    title: `${type} Emergency`,
+    description: String(emergency?.notes ?? "").trim() || undefined,
+    images: [],
+    reportedAt: emergency?.reportedAt,
+    status: normalizeEmergencyStatus(emergency?.status),
+    location: {
+      lng,
+      lat,
+      label: emergency?.barangayName ?? undefined,
+    },
+    updatedAt: dispatch?.updatedAt || dispatch?.createdAt || emergency?.reportedAt || "just now",
+  };
 }
 
 function hexToRgba(hex: string, alpha: number) {
@@ -324,10 +368,15 @@ export default function MapTab() {
   } = useDevLocationOverride();
   const normalizedRole = useMemo(() => String(user?.role ?? "").trim().toUpperCase(), [user?.role]);
   const isVolunteer = mode === "authed" && normalizedRole === "VOLUNTEER";
-  const canViewEmergencies = mode === "authed" && normalizedRole !== "COMMUNITY";
+  const isCommunityUser = mode === "authed" && normalizedRole === "COMMUNITY";
+  const canViewEmergencies = mode === "authed";
   const canViewUnapprovedEmergencyReports =
     mode === "authed" && (normalizedRole === "LGU" || normalizedRole === "ADMIN");
   const { activeDispatch, refresh: refreshActiveDispatch } = useActiveDispatch({
+    pollMs: 10000,
+    enabled: isVolunteer,
+  });
+  const { pendingDispatch, refresh: refreshPendingDispatch } = usePendingDispatch({
     pollMs: 10000,
     enabled: isVolunteer,
   });
@@ -403,14 +452,31 @@ export default function MapTab() {
       setReports([]);
       return;
     }
+
+    if (isVolunteer) {
+      const assigned = [pendingDispatch, activeDispatch]
+        .map(mapDispatchToEmergency)
+        .filter((item): item is Emergency => Boolean(item));
+      const deduped = new Map<string, Emergency>();
+
+      assigned.forEach((item) => {
+        deduped.set(item.id, item);
+      });
+
+      setReports([...deduped.values()]);
+      return;
+    }
+
     if (emergencyRefreshInFlightRef.current) return;
 
     emergencyRefreshInFlightRef.current = true;
     try {
-      const items = await fetchEmergencyMapReportsWithOptions({
-        includeUnapproved: canViewUnapprovedEmergencyReports,
-        limit: 300,
-      });
+      const items = isCommunityUser
+        ? await fetchMyEmergencyMapReports()
+        : await fetchEmergencyMapReportsWithOptions({
+            includeUnapproved: canViewUnapprovedEmergencyReports,
+            limit: 300,
+          });
 
       setReports(
         items.map((item) => {
@@ -423,7 +489,7 @@ export default function MapTab() {
             images: [],
             referenceNumber: item.referenceNumber,
             reportedAt: item.createdAt,
-            status: item.status,
+            status: normalizeEmergencyStatus(item.status),
             location: {
               lng: item.location.coords.longitude,
               lat: item.location.coords.latitude,
@@ -438,7 +504,14 @@ export default function MapTab() {
     } finally {
       emergencyRefreshInFlightRef.current = false;
     }
-  }, [canViewEmergencies, canViewUnapprovedEmergencyReports]);
+  }, [
+    activeDispatch,
+    canViewEmergencies,
+    canViewUnapprovedEmergencyReports,
+    isCommunityUser,
+    isVolunteer,
+    pendingDispatch,
+  ]);
 
   useEffect(() => {
     void loadHazardZones();
@@ -699,24 +772,39 @@ export default function MapTab() {
   const refreshSelectedEmergency = emergencySheet.refreshSelectedEmergency;
   const closeEmergencySheet = emergencySheet.closeSheet;
   const refreshSelectedEmergencyRef = useRef(refreshSelectedEmergency);
+  const loadHazardZonesRef = useRef(loadHazardZones);
+  const loadEmergencyReportsRef = useRef(loadEmergencyReports);
+  const refreshPendingDispatchRef = useRef(refreshPendingDispatch);
+  const refreshActiveDispatchRef = useRef(refreshActiveDispatch);
 
   useEffect(() => {
     refreshSelectedEmergencyRef.current = refreshSelectedEmergency;
   }, [refreshSelectedEmergency]);
-
-  const refreshMapData = useCallback(async () => {
-    await Promise.allSettled([
-      loadHazardZones(),
-      loadEmergencyReports(),
-      refreshActiveDispatch(),
-      refreshSelectedEmergencyRef.current(),
-    ]);
-  }, [loadEmergencyReports, loadHazardZones, refreshActiveDispatch]);
+  useEffect(() => {
+    loadHazardZonesRef.current = loadHazardZones;
+  }, [loadHazardZones]);
+  useEffect(() => {
+    loadEmergencyReportsRef.current = loadEmergencyReports;
+  }, [loadEmergencyReports]);
+  useEffect(() => {
+    refreshPendingDispatchRef.current = refreshPendingDispatch;
+  }, [refreshPendingDispatch]);
+  useEffect(() => {
+    refreshActiveDispatchRef.current = refreshActiveDispatch;
+  }, [refreshActiveDispatch]);
 
   useFocusEffect(
     useCallback(() => {
-      void refreshMapData();
-    }, [refreshMapData])
+      void (async () => {
+        await Promise.allSettled([
+          loadHazardZonesRef.current(),
+          loadEmergencyReportsRef.current(),
+          refreshPendingDispatchRef.current(),
+          refreshActiveDispatchRef.current(),
+          refreshSelectedEmergencyRef.current(),
+        ]);
+      })();
+    }, [])
   );
 
   const inactiveRouteAlternatives = useMemo(

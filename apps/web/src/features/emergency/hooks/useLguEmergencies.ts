@@ -121,6 +121,47 @@ function buildDispatchCountsByEmergency(tasks: DispatchTask[]): DispatchCountsBy
   return counts;
 }
 
+function buildCompletedEmergencyIds(tasks: DispatchTask[]): Set<string> {
+  const statusByEmergency = new Map<
+    string,
+    {
+      hasPendingOrAccepted: boolean;
+      hasDoneOrVerified: boolean;
+    }
+  >();
+
+  for (const task of tasks ?? []) {
+    const emergencyId = String(task?.emergency?.id || "").trim();
+    if (!emergencyId) continue;
+
+    const status = String(task?.status || "").toUpperCase();
+    if (status === "CANCELLED" || status === "DECLINED") continue;
+
+    const current = statusByEmergency.get(emergencyId) ?? {
+      hasPendingOrAccepted: false,
+      hasDoneOrVerified: false,
+    };
+
+    if (status === "PENDING" || status === "ACCEPTED") {
+      current.hasPendingOrAccepted = true;
+    }
+    if (status === "DONE" || status === "VERIFIED") {
+      current.hasDoneOrVerified = true;
+    }
+
+    statusByEmergency.set(emergencyId, current);
+  }
+
+  const completedIds = new Set<string>();
+  for (const [emergencyId, progress] of statusByEmergency.entries()) {
+    if (progress.hasDoneOrVerified && !progress.hasPendingOrAccepted) {
+      completedIds.add(emergencyId);
+    }
+  }
+
+  return completedIds;
+}
+
 function toEmergencyItem(report: EmergencyReport, volunteerCounts?: DispatchVolunteerCounts): LguEmergencyItem {
   const isSOS = String(report.emergencyType).toUpperCase() === "SOS" || String(report.source).toUpperCase() === "SOS_BUTTON";
   const created = report.reportedAt || report.createdAt || report.updatedAt;
@@ -152,6 +193,7 @@ function toEmergencyItem(report: EmergencyReport, volunteerCounts?: DispatchVolu
 export function useLguEmergencies() {
   const [reports, setReports] = useState<EmergencyReport[]>([]);
   const [dispatchCountsByEmergency, setDispatchCountsByEmergency] = useState<DispatchCountsByEmergency>({});
+  const [completedEmergencyIds, setCompletedEmergencyIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -169,6 +211,7 @@ export function useLguEmergencies() {
 
       setReports(reportsData);
       setDispatchCountsByEmergency(buildDispatchCountsByEmergency(dispatchTasksData));
+      setCompletedEmergencyIds(buildCompletedEmergencyIds(dispatchTasksData));
     } catch (err: any) {
       setError(err?.response?.data?.message || err?.message || "Failed to load emergencies");
     } finally {
@@ -227,5 +270,6 @@ export function useLguEmergencies() {
     filtered,
     sosCount,
     stats,
+    completedEmergencyIds,
   };
 }

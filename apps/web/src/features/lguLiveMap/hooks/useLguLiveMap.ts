@@ -139,7 +139,13 @@ function emergencyCoordsFromReport(report: unknown): LngLat | null {
 
 function isResolvedEmergencyStatus(raw?: string) {
   const up = String(raw ?? "").toUpperCase();
-  return up === "RESOLVED" || up === "CANCELLED";
+  return (
+    up === "RESOLVED" ||
+    up === "CANCELLED" ||
+    up === "COMPLETED" ||
+    up === "DONE" ||
+    up === "VERIFIED"
+  );
 }
 
 function toVolunteerStatusFromPresence(raw?: string): Volunteer["status"] {
@@ -299,14 +305,18 @@ export function useLguLiveMap() {
   // data
   const {
     reports,
+    completedEmergencyIds,
     loading: emergenciesLoading,
     error: emergenciesError,
     refetch: refetchEmergencies,
   } = useLguEmergencies();
 
   const activeReports = useMemo(() => {
-    return (reports ?? []).filter((r) => !isResolvedEmergencyStatus(r.status));
-  }, [reports]);
+    return (reports ?? []).filter((report) => {
+      if (isResolvedEmergencyStatus(report.status)) return false;
+      return !completedEmergencyIds.has(String(report._id));
+    });
+  }, [reports, completedEmergencyIds]);
 
   const {
     hazardZones,

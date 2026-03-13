@@ -2,6 +2,7 @@ import { Types } from "mongoose";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import { hashTaskPayload } from "@lifeline/blockchain";
 
 import { encryptBuffer } from "../../utils/aesGcm";
 
@@ -22,6 +23,7 @@ import {
   DISPATCH_CHAIN_SCHEMA_VERSION,
   buildDispatchVerificationPayload,
   normalizeStringArray,
+  readDispatchTaskVerificationOnChain,
   reverifyDispatchTaskOnChain,
   revokeDispatchTaskOnChain,
   verifyDispatchTaskOnChain,
@@ -460,36 +462,82 @@ export async function verifyDispatch(
   // Blockchain write (hash-only) BEFORE we mark VERIFIED in DB.
   // If chain write fails, we keep the task in DONE state so LGU can retry.
   const payload = buildVerificationPayloadFromOffer(offer);
-  const chain = await verifyDispatchTaskOnChain({
-    taskId: String(offer._id),
-    payload,
-  });
+  const expectedPayloadHash = normalizeHashValue(hashTaskPayload(payload));
+  const taskId = String(offer._id);
+  let chainState = await readDispatchTaskVerificationOnChain({ taskId });
+  let chainWrite: Awaited<ReturnType<typeof verifyDispatchTaskOnChain>> | null = null;
+
+  if (!chainState.verified) {
+    try {
+      chainWrite = await verifyDispatchTaskOnChain({
+        taskId,
+        payload,
+      });
+      chainState = {
+        taskIdHash: chainWrite.taskIdHash,
+        payloadHash: chainWrite.payloadHash,
+        verified: true,
+        revoked: false,
+        network: chainWrite.network,
+        contractAddress: chainWrite.contractAddress,
+      };
+    } catch (error: any) {
+      if (!isAlreadyVerifiedChainError(error)) throw error;
+      chainState = await readDispatchTaskVerificationOnChain({ taskId });
+      if (!chainState.verified) throw error;
+    }
+  }
+
+  const onChainPayloadHash = normalizeHashValue(chainState.payloadHash);
+  if (!onChainPayloadHash) {
+    throw new Error("Failed to read on-chain task payload hash");
+  }
+  if (onChainPayloadHash !== expectedPayloadHash) {
+    throw new Error("Task already verified on-chain with a different payload. Use admin reverify.");
+  }
+
+  const existingBlockchain = ((offer as any).blockchain ?? {}) as any;
+  const existingChainRecord = ((offer as any).chainRecord ?? {}) as any;
+  const resolvedNetwork = chainWrite?.network || chainState.network;
+  const resolvedContractAddress = chainWrite?.contractAddress || chainState.contractAddress;
+  const resolvedTaskIdHash = chainWrite?.taskIdHash || chainState.taskIdHash;
+  const resolvedPayloadHash = onChainPayloadHash;
+  const existingVerifiedTxHash = String(existingBlockchain.verifiedTxHash || existingChainRecord.txHash || "").trim();
+  const resolvedTxHash = String(chainWrite?.txHash || existingVerifiedTxHash || "already-on-chain");
+  const resolvedBlockTime =
+    (chainWrite ? toDateFromBlockTimestamp(chainWrite.blockTimestamp) : undefined) ??
+    existingBlockchain.verifiedAtBlockTime;
+  const resolvedRecordedAt =
+    (chainWrite ? toDateFromBlockTimestamp(chainWrite.blockTimestamp) : undefined) ??
+    existingChainRecord.recordedAt ??
+    new Date();
+  const alreadyVerifiedOnChain = chainWrite === null;
 
   offer.status = "VERIFIED";
   offer.verifiedAt = new Date();
   offer.verifiedBy = new Types.ObjectId(verifierUserId);
   (offer as any).proofFileHashes = payload.proofFileHashes;
   (offer as any).blockchain = {
-    network: chain.network,
-    contractAddress: chain.contractAddress,
+    network: resolvedNetwork,
+    contractAddress: resolvedContractAddress,
     schemaVersion: payload.schemaVersion,
     domain: payload.domain,
-    taskIdHash: chain.taskIdHash,
-    payloadHash: chain.payloadHash,
-    verifiedTxHash: chain.txHash,
-    verifiedAtBlockTime: toDateFromBlockTimestamp(chain.blockTimestamp),
-    verifierAddress: chain.signerAddress || undefined,
+    taskIdHash: resolvedTaskIdHash,
+    payloadHash: resolvedPayloadHash,
+    ...(resolvedTxHash ? { verifiedTxHash: resolvedTxHash } : {}),
+    ...(resolvedBlockTime ? { verifiedAtBlockTime: resolvedBlockTime } : {}),
+    verifierAddress: chainWrite?.signerAddress || existingBlockchain.verifierAddress || undefined,
     revoked: false,
   };
   (offer as any).chainRecord = {
-    network: chain.network,
-    contractAddress: chain.contractAddress,
-    txHash: chain.txHash,
-    blockNumber: chain.blockNumber,
-    taskIdHash: chain.taskIdHash,
-    payloadHash: chain.payloadHash,
-    recordHash: chain.payloadHash,
-    recordedAt: toDateFromBlockTimestamp(chain.blockTimestamp) ?? new Date(),
+    network: resolvedNetwork,
+    contractAddress: resolvedContractAddress,
+    ...(resolvedTxHash ? { txHash: resolvedTxHash } : {}),
+    ...(typeof chainWrite?.blockNumber === "number" ? { blockNumber: chainWrite.blockNumber } : {}),
+    taskIdHash: resolvedTaskIdHash,
+    payloadHash: resolvedPayloadHash,
+    recordHash: resolvedPayloadHash,
+    recordedAt: resolvedRecordedAt,
     revoked: false,
   };
   await offer.save();
@@ -507,14 +555,15 @@ export async function verifyDispatch(
   }).catch(() => undefined);
 
   return {
-    txHash: chain.txHash,
+    txHash: resolvedTxHash,
     dispatchId: String(offer._id),
     emergencyId: String(offer.emergencyId),
     volunteerId: String(offer.volunteerId),
     completedAt: offer.completedAt ? new Date(offer.completedAt).toISOString() : null,
-    taskIdHash: chain.taskIdHash,
-    payloadHash: chain.payloadHash,
+    taskIdHash: resolvedTaskIdHash,
+    payloadHash: resolvedPayloadHash,
     revoked: false,
+    ...(alreadyVerifiedOnChain ? { alreadyVerified: true } : {}),
   };
 }
 
@@ -812,6 +861,15 @@ function normalizeCompletedAt(value: string | null | undefined) {
 function toDateFromBlockTimestamp(timestamp: number | null) {
   if (typeof timestamp !== "number" || !Number.isFinite(timestamp)) return undefined;
   return new Date(timestamp * 1000);
+}
+
+function normalizeHashValue(value: unknown) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function isAlreadyVerifiedChainError(error: unknown) {
+  const message = String((error as any)?.message ?? "").toLowerCase();
+  return message.includes("already_verified") || message.includes("already verified");
 }
 
 function parseAndValidateProof(input: { base64: string; mimeType?: string; fileName?: string }) {

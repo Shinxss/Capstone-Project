@@ -29,11 +29,11 @@ const TABS: { name: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap 
 export default function BottomNav(props: Props) {
   const { state, navigation, onPressReportAction, onPressRegularTab } = props;
   const { isDark } = useTheme();
-  const { user } = useAuth();
+  const { user, isGuest } = useAuth();
   const insets = useSafeAreaInsets();
   const bottomPadding = Math.max(insets.bottom, 50);
   const normalizedRole = String(user?.role ?? "").trim().toUpperCase();
-  const tasksLabel = normalizedRole === "COMMUNITY" ? "My Request" : "Tasks";
+  const tasksLabel = isGuest || normalizedRole === "COMMUNITY" ? "My Request" : "Tasks";
 
   const goTo = (name: TabKey) => {
     onPressRegularTab();

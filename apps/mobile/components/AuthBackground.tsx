@@ -1,8 +1,8 @@
 import React from "react";
-import { View, Dimensions, StyleSheet} from "react-native";
-import Svg, { Defs, RadialGradient, Stop, Circle } from "react-native-svg";
-import LoginBg from "../assets/login_lightbg.svg"; // adjust path
+import { Dimensions, StyleSheet, View } from "react-native";
 import { BlurView } from "expo-blur";
+import Svg, { Circle, Defs, RadialGradient, Stop } from "react-native-svg";
+import LoginBg from "../assets/login_lightbg.svg";
 
 const { width, height } = Dimensions.get("window");
 
@@ -12,22 +12,22 @@ function SirenGlow({
   y,
   size,
 }: {
-  color: "red" | "blue";
+  color: "red" | "soft";
   x: number;
   y: number;
   size: number;
 }) {
-  const id = `${color}-grad-${Math.random().toString(16).slice(2)}`;
-  const main = color === "red" ? "#EF4444" : "#3B82F6";
+  const id = `${color}-grad-${x}-${y}-${size}`;
+  const glowColor = color === "red" ? "#EF4444" : "#CBD5E1";
 
   return (
     <View pointerEvents="none" style={{ position: "absolute", left: x, top: y }}>
       <Svg width={size} height={size}>
         <Defs>
           <RadialGradient id={id} cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor={main} stopOpacity={2} />
-            <Stop offset="55%" stopColor={main} stopOpacity={0.60} />
-            <Stop offset="100%" stopColor={main} stopOpacity={0} />
+            <Stop offset="0%" stopColor={glowColor} stopOpacity={0.7} />
+            <Stop offset="55%" stopColor={glowColor} stopOpacity={0.35} />
+            <Stop offset="100%" stopColor={glowColor} stopOpacity={0} />
           </RadialGradient>
         </Defs>
         <Circle cx={size / 2} cy={size / 2} r={size / 2} fill={`url(#${id})`} />
@@ -38,32 +38,29 @@ function SirenGlow({
 
 export default function AuthBackground({ children }: { children: React.ReactNode }) {
   return (
-    <View style={{ flex: 1, backgroundColor: "white", position: "relative" }}>
-      {/* Background */}
+    <View style={{ flex: 1, backgroundColor: "#FFFFFF", position: "relative" }}>
       <View pointerEvents="none" style={{ position: "absolute", inset: 0, zIndex: 0 }}>
         <LoginBg width={width} height={height} preserveAspectRatio="xMidYMid slice" />
       </View>
 
-      {/* Siren glows */}
       <View pointerEvents="none" style={{ position: "absolute", inset: 0, zIndex: 1 }}>
-        <SirenGlow color="blue" size={240} x={-40} y={150} />
-        <SirenGlow color="red" size={240} x={width - 180} y={30} />
+        <SirenGlow color="soft" size={250} x={-70} y={width > 390 ? 160 : 120} />
+        <SirenGlow color="red" size={240} x={width - 180} y={40} />
+        <SirenGlow color="red" size={180} x={width - 120} y={height - 220} />
       </View>
 
-      {/* ✅ White blur overlay */}
       <BlurView
         pointerEvents="none"
-        intensity={90}
+        intensity={86}
         tint="light"
         style={[StyleSheet.absoluteFill, { zIndex: 2 }]}
       />
-      {/* ✅ Extra white wash (optional, makes it brighter) */}
+
       <View
         pointerEvents="none"
-        style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(255,255,255,0.25)", zIndex: 3 }]}
+        style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(255,255,255,0.26)", zIndex: 3 }]}
       />
 
-      {/* Content */}
       <View style={{ flex: 1, zIndex: 5 }}>{children}</View>
     </View>
   );

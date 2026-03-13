@@ -695,6 +695,45 @@ export async function listMapEmergencyReports(limit = 300): Promise<MapEmergency
   }));
 }
 
+export async function listMyMapEmergencyReports(
+  reporterUserId: string,
+  limit = 300
+): Promise<MapEmergencyReport[]> {
+  if (!Types.ObjectId.isValid(reporterUserId)) return [];
+
+  const docs = await EmergencyReportModel.find({
+    reportedBy: new Types.ObjectId(reporterUserId),
+    status: { $nin: ["RESOLVED", "CANCELLED"] },
+    "visibility.isVisibleOnMap": true,
+    $or: [{ isSos: true }, { "verification.status": "approved" }],
+  })
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .select(
+      "isSos emergencyType status verification visibility referenceNumber location locationLabel notes createdAt"
+    )
+    .lean();
+
+  return docs.map((report) => ({
+    incidentId: report._id.toString(),
+    referenceNumber: String(report.referenceNumber ?? ""),
+    isSos: Boolean(report.isSos),
+    type: String(report.emergencyType ?? "OTHER").toLowerCase(),
+    status: fromDbEmergencyStatus(report.status),
+    verificationStatus: report.verification?.status ?? (report.isSos ? "not_required" : "pending"),
+    isVisibleOnMap: Boolean(report.visibility?.isVisibleOnMap),
+    location: {
+      coords: {
+        latitude: report.location.coordinates[1],
+        longitude: report.location.coordinates[0],
+      },
+      label: report.locationLabel,
+    },
+    description: report.notes,
+    createdAt: report.createdAt ?? new Date(),
+  }));
+}
+
 export async function listPendingEmergencyApprovals(): Promise<PendingApprovalItem[]> {
   const docs = await EmergencyReportModel.find({
     isSos: false,

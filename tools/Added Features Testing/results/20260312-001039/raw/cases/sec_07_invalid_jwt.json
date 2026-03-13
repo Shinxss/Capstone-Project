@@ -1,0 +1,89 @@
+{
+  "id": "sec_07_invalid_jwt",
+  "session": "security",
+  "testCase": "Invalid JWT Handling (requireAuth)",
+  "stepsShort": "Call protected route with malformed bearer token",
+  "expectedResult": "Middleware returns 401 Invalid token",
+  "actualResult": "401 with body {\"message\":\"Invalid token\"}",
+  "passFail": "PASS",
+  "notes": "Executed same Express harness with malformed bearer token against requireAuth route; measured response status/body from fetch; 1 run.",
+  "sourceFiles": [
+    "apps/server/src/middlewares/requireAuth.ts",
+    "tools/Added Features Testing/scripts/sec/server-auth-rbac-limiter-security.ts"
+  ],
+  "runnerCommand": "pnpm test:invalid-jwt",
+  "rawEvidencePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260312-001039\\raw\\cases\\sec_07_invalid_jwt.json",
+  "measurement": {
+    "missingJwt": {
+      "status": 401,
+      "body": "{\"message\":\"Unauthorized\"}"
+    },
+    "invalidJwt": {
+      "status": 401,
+      "body": "{\"message\":\"Invalid token\"}"
+    },
+    "rbac": {
+      "noRole": {
+        "status": 401,
+        "body": "{\"message\":\"Unauthorized\"}"
+      },
+      "volunteer": {
+        "status": 403,
+        "body": "{\"message\":\"Forbidden\"}"
+      },
+      "lgu": {
+        "status": 200,
+        "body": "{\"ok\":true}"
+      }
+    },
+    "limiter": {
+      "statuses": [
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        429,
+        429,
+        429,
+        429,
+        429
+      ],
+      "counts": {
+        "200": 30,
+        "429": 5
+      },
+      "first429At": 31,
+      "totalMs": 90.30240000000003,
+      "avgMs": 2.5800685714285723
+    },
+    "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260312-001039\\raw\\logs\\server-auth-rbac-limiter-security.log",
+    "tracePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260312-001039\\raw\\traces\\auth-rbac-limiter-security.json"
+  },
+  "actualResultCompact": "PASS 1"
+}

@@ -31,9 +31,13 @@ function toSeverityLabel(typeRaw: string): "High" | "Medium" {
 }
 
 function toStatusLabel(statusRaw?: string) {
-  const normalized = String(statusRaw ?? "open").trim().toLowerCase();
+  const normalized = String(statusRaw ?? "open")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
   if (!normalized) return "Open";
-  return normalized
+  const canonical = normalized === "acknowledged" ? "assigned" : normalized;
+  return canonical
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");

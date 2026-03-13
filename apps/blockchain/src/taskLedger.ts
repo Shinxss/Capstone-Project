@@ -1,4 +1,4 @@
-import { Contract, JsonRpcProvider, Wallet, getAddress, id, isAddress } from "ethers";
+import { Contract, JsonRpcProvider, Wallet, ZeroHash, getAddress, id, isAddress } from "ethers";
 import TaskLedgerAbiJson from "./abi/TaskLedger.abi.json";
 import { canonicalHash } from "./hash";
 
@@ -168,6 +168,36 @@ export async function reverifyTaskOnChain(input: ReverifyTaskInput): Promise<Rev
   return { txHash: tx.hash, blockNumber, taskIdHash, payloadHash, signerAddress, blockTimestamp };
 }
 
+export type ReadTaskVerificationInput = TaskLedgerConnection & {
+  taskId: string;
+};
+
+export type ReadTaskVerificationOutput = {
+  taskIdHash: string;
+  payloadHash: string;
+  verified: boolean;
+  revoked: boolean;
+};
+
+export async function readTaskVerificationOnChain(input: ReadTaskVerificationInput): Promise<ReadTaskVerificationOutput> {
+  const taskId = String(input.taskId || "");
+  if (!taskId) throw new Error("readTaskVerificationOnChain: taskId is required");
+
+  const taskIdHash = id(taskId);
+  const contract = getTaskLedgerContract(input);
+
+  const [payloadHashRaw, revokedRaw] = await Promise.all([
+    contract.verifiedPayloadByTask(taskIdHash),
+    contract.revokedTask(taskIdHash),
+  ]);
+
+  const payloadHash = String(payloadHashRaw || "");
+  const verified = normalizeHash(payloadHash) !== normalizeHash(ZeroHash);
+  const revoked = Boolean(revokedRaw);
+
+  return { taskIdHash, payloadHash, verified, revoked };
+}
+
 export function hashTaskId(taskId: string): string {
   const normalizedTaskId = String(taskId || "");
   if (!normalizedTaskId) throw new Error("hashTaskId: taskId is required");
@@ -191,6 +221,14 @@ function tryDecodeRevert(e: any, contract: Contract): string | null {
 
   try {
     const parsed = contract.interface.parseError(revertData);
+    if (parsed?.name === "Error") {
+      const reason = String((parsed as any).args?.[0] ?? "").trim();
+      if (reason === "ALREADY_VERIFIED") return "task already verified (ALREADY_VERIFIED).";
+      if (reason === "NOT_VERIFIED") return "task is not verified yet (NOT_VERIFIED).";
+      if (reason) return `execution reverted (${reason}).`;
+      return "execution reverted (Error).";
+    }
+
     if (parsed?.name === "AccessControlUnauthorizedAccount") {
       const account = String((parsed as any).args?.[0] ?? "");
       const neededRole = String((parsed as any).args?.[1] ?? "");
@@ -243,4 +281,8 @@ async function resolveBlockTimestamp(contract: Contract, blockNumber: number): P
   } catch {
     return null;
   }
+}
+
+function normalizeHash(value: string) {
+  return String(value || "").trim().toLowerCase();
 }

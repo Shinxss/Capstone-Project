@@ -3,7 +3,9 @@ import { Alert } from "react-native";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import GradientScreen from "../../src/components/GradientScreen";
+import AuthRequiredModal from "../../components/AuthRequiredModal";
 import { useAuth } from "../../features/auth/AuthProvider";
+import { useAuthRequiredPrompt } from "../../features/auth/hooks/useAuthRequiredPrompt";
 import { useSession } from "../../features/auth/hooks/useSession";
 import { useGoogleLogin } from "../../features/auth/hooks/useGoogleLogin";
 import { linkGoogleAccount } from "../../features/auth/services/authApi";
@@ -32,6 +34,7 @@ import {
 export default function MoreScreen() {
   const router = useRouter();
   const { signOut } = useAuth();
+  const { openAuthRequired, goToLogin, modalProps: authRequiredModalProps } = useAuthRequiredPrompt();
   const { displayName, isUser, session, updateUser } = useSession();
   const { mode, isDark, setMode } = useTheme();
 
@@ -143,20 +146,12 @@ export default function MoreScreen() {
     if (avatarUploading) return;
 
     if (!isUser) {
-      Alert.alert("Sign in required", "Please sign in to upload your profile photo.", [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Sign In",
-          onPress: () => {
-            onLogout();
-          },
-        },
-      ]);
+      openAuthRequired({ blockedAction: "upload_profile_photo" });
       return;
     }
 
     setAvatarSheetVisible(true);
-  }, [avatarUploading, isUser, onLogout]);
+  }, [avatarUploading, isUser, openAuthRequired]);
 
   const onTakeAvatarPhoto = useCallback(() => {
     setAvatarSheetVisible(false);
@@ -194,7 +189,7 @@ export default function MoreScreen() {
 
   const onPressProfileSettings = useCallback(() => {
     if (!isUser) {
-      onLogout();
+      openAuthRequired({ blockedAction: "manage_profile" });
       return;
     }
 
@@ -228,22 +223,31 @@ export default function MoreScreen() {
     actions.push({ text: "Cancel", style: "cancel" });
 
     Alert.alert("Profile Settings", "Manage your account credentials.", actions);
-  }, [hasPassword, isGoogleLinked, isUser, linkingGoogle, onCreatePassword, onLinkGoogle, onLogout, onResetPassword]);
+  }, [hasPassword, isGoogleLinked, isUser, linkingGoogle, onCreatePassword, onLinkGoogle, onResetPassword, openAuthRequired]);
 
   const onPressEditProfile = useCallback(() => {
     if (!isUser) {
-      onLogout();
+      openAuthRequired({ blockedAction: "manage_profile" });
       return;
     }
 
     router.push("/profile/edit");
-  }, [isUser, onLogout, router]);
+  }, [isUser, openAuthRequired, router]);
+
+  const onPressHeaderCta = useCallback(() => {
+    if (!isUser) {
+      void goToLogin();
+      return;
+    }
+
+    router.push("/profile/edit");
+  }, [goToLogin, isUser, router]);
 
   const onPressPersonalInfoRow = useCallback(
     (rowKey: "email" | "number" | "barangay" | "gender" | "skills") => {
       if (rowKey === "skills") {
         if (!isUser) {
-          onLogout();
+          openAuthRequired({ blockedAction: "manage_profile" });
           return;
         }
         router.push("/profile/skills");
@@ -252,7 +256,7 @@ export default function MoreScreen() {
 
       onPressEditProfile();
     },
-    [isUser, onLogout, onPressEditProfile, router]
+    [isUser, onPressEditProfile, openAuthRequired, router]
   );
 
   const onComingSoon = useCallback((title: string) => {
@@ -260,16 +264,8 @@ export default function MoreScreen() {
   }, []);
 
   const promptSignInForRequests = useCallback(() => {
-    Alert.alert("Sign in required", "Please sign in to view your request history.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Sign In",
-        onPress: () => {
-          onLogout();
-        },
-      },
-    ]);
-  }, [onLogout]);
+    openAuthRequired({ blockedAction: "view_request_history" });
+  }, [openAuthRequired]);
 
   const onPressRequestHistory = useCallback(() => {
     if (!isUser) {
@@ -296,20 +292,12 @@ export default function MoreScreen() {
 
   const onPressApplyVolunteer = useCallback(() => {
     if (!isUser) {
-      Alert.alert("Sign in required", "Please sign in to apply as volunteer.", [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Sign In",
-          onPress: () => {
-            onLogout();
-          },
-        },
-      ]);
+      openAuthRequired({ blockedAction: "access_volunteer_tools" });
       return;
     }
 
     router.push("/volunteer-apply-modal");
-  }, [isUser, onLogout, router]);
+  }, [isUser, openAuthRequired, router]);
   const refreshProfilePage = useCallback(async () => {
     if (!isUser) return;
 
@@ -361,7 +349,7 @@ export default function MoreScreen() {
           isGuest={!isUser}
           showVerified={showVerified}
           onPressAvatar={onPressAvatar}
-          onPressEdit={onPressEditProfile}
+          onPressEdit={onPressHeaderCta}
           onPressMenu={() => setDrawerVisible(true)}
         />
 
@@ -416,6 +404,8 @@ export default function MoreScreen() {
         authToken={user?.accessToken}
         onClose={() => setAvatarViewerVisible(false)}
       />
+
+      <AuthRequiredModal {...authRequiredModalProps} />
     </GradientScreen>
   );
 }

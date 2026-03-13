@@ -34,6 +34,7 @@ export default function ProfileHeader({
 }: ProfileHeaderProps) {
   const { isDark } = useTheme();
   const lifelineIdValue = String(lifelineId ?? "").trim() || "LF-2026-xxxxxx";
+  const actionLabel = isGuest ? "Sign in" : "Edit";
 
   const onCopyLifelineId = useCallback(async () => {
     try {
@@ -146,16 +147,16 @@ export default function ProfileHeader({
               borderWidth: 1,
               alignItems: "center",
               justifyContent: "center",
-              backgroundColor: isDark ? "#0E1626" : "#FFFFFF",
-              borderColor: isDark ? "#3B82F6" : "#DC2626",
+              backgroundColor: isGuest ? "#DC2626" : isDark ? "#0E1626" : "#FFFFFF",
+              borderColor: isGuest ? "#DC2626" : isDark ? "#3B82F6" : "#DC2626",
               opacity: pressed ? 0.85 : 1,
             })}
           >
             <Text
-              className="text-sm font-semibold text-slate-900 dark:text-slate-100"
-              style={{ lineHeight: 18 }}
+              className="text-sm font-semibold"
+              style={{ lineHeight: 18, color: isGuest ? "#FFFFFF" : isDark ? "#F8FAFC" : "#0F172A" }}
             >
-              Edit
+              {actionLabel}
             </Text>
           </Pressable>
 

@@ -1,0 +1,25 @@
+{
+  "id": "perf_09_dispatch_chain_hashing",
+  "session": "performance",
+  "testCase": "Dispatch Chain Hashing Performance",
+  "stepsShort": "Run dispatch-chain tests in server",
+  "expectedResult": "Hashing subtests pass and each hash operation remains < 15 ms",
+  "actualResult": "Canonical hash: 8.1899 ms; proof-file hash: 0.3012 ms; deterministic-order hash prep: 2.4997 ms (3/3 pass)",
+  "passFail": "PASS",
+  "notes": "Measured from TAP duration_ms in apps/server dispatch-chain test (`pnpm --dir apps/server run test:dispatch-chain`); one full run.",
+  "sourceFiles": [
+    "apps/server/src/features/dispatches/dispatch.chain.test.ts"
+  ],
+  "runnerCommand": "pnpm test:dispatch-chain-hashing",
+  "rawEvidencePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260312-000830\\raw\\cases\\perf_09_dispatch_chain_hashing.json",
+  "measurement": {
+    "canonicalMs": 8.1899,
+    "proofMs": 0.3012,
+    "deterministicMs": 2.4997,
+    "passCount": 3,
+    "totalMs": 2233.4378,
+    "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260312-000830\\raw\\logs\\dispatch-chain-test.log",
+    "tracePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260312-000830\\raw\\traces\\dispatch-chain-test.json"
+  },
+  "actualResultCompact": "8.1899 ms"
+}

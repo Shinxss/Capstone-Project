@@ -8,6 +8,7 @@ import {
   getMyEmergencyReportCounts,
   getMyEmergencyRequestTracking,
   listMapEmergencyReports,
+  listMyMapEmergencyReports,
   listMyEmergencyReports,
   listPendingEmergencyApprovals,
   rejectEmergencyReport,
@@ -122,6 +123,17 @@ export async function getEmergencyReportsMapFeed(_req: Request, res: Response) {
     return res.status(200).json({ data: items });
   } catch (error: any) {
     return res.status(500).json({ message: error?.message ?? "Failed to fetch map feed" });
+  }
+}
+
+export async function getMyEmergencyReportsMapFeed(req: MaybeAuthedRequest, res: Response) {
+  try {
+    if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+
+    const items = await listMyMapEmergencyReports(String(req.user.id));
+    return res.status(200).json({ data: items });
+  } catch (error: any) {
+    return res.status(500).json({ message: error?.message ?? "Failed to fetch my map feed" });
   }
 }
 

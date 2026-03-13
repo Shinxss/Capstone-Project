@@ -1,0 +1,91 @@
+{
+  "id": "perf_03_csv_overhead",
+  "session": "performance",
+  "testCase": "Structured CSV Logging Overhead (Module 11)",
+  "stepsShort": "Compare prediction runtime with LOG_ROUTING_RISK=0 vs LOG_ROUTING_RISK=1",
+  "expectedResult": "CSV rows append with required fields and logging overhead stays below 3x baseline",
+  "actualResult": "Off avg: 2.345 ms; On avg: 6.637 ms; Overhead: 183.08%; CSV header verified; 5,000 rows appended",
+  "passFail": "PASS",
+  "notes": "Measured by toggling LOG_ROUTING_RISK in the TSX benchmark (5 runs each mode); durations from performance.now(); CSV evidence read from generated artifact file.",
+  "sourceFiles": [
+    "apps/server/src/features/routingRisk/routingRisk.service.ts",
+    "apps/server/src/constants/routingRisk.constants.ts",
+    "tools/Added Features Testing/scripts/perf/server-routing-risk-benchmark.ts"
+  ],
+  "runnerCommand": "pnpm test:csv-overhead",
+  "rawEvidencePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260312-000931\\raw\\cases\\perf_03_csv_overhead.json",
+  "measurement": {
+    "singleRow": {
+      "runsMs": [
+        785.9216000000001,
+        0.31899999999996,
+        0.3326000000001841,
+        0.16039999999998145,
+        0.2644999999999982
+      ],
+      "firstRunMs": 785.9216000000001,
+      "medianMs": 0.31899999999996,
+      "avgMs": 157.39962000000006,
+      "p95Ms": 0.3326000000001841,
+      "riskLevelReturned": true
+    },
+    "bulk1000": {
+      "runsMs": [
+        4.945699999999988,
+        2.502999999999929,
+        3.076300000000174,
+        2.839599999999791,
+        2.528099999999995
+      ],
+      "avgMs": 3.1785399999999755,
+      "medianMs": 2.839599999999791,
+      "p95Ms": 3.076300000000174,
+      "riskSet": [
+        "LOW",
+        "MEDIUM",
+        "HIGH"
+      ],
+      "speedSet": [
+        15,
+        25,
+        35,
+        45
+      ]
+    },
+    "concurrency": {
+      "requests": 20,
+      "rowsPerRequest": 100,
+      "totalMs": 6.907699999999977,
+      "avgPerRequestMs": 0.34538499999999883,
+      "success": 20,
+      "failures": 0
+    },
+    "csv": {
+      "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260312-000931\\raw\\artifacts\\routing-risk-benchmark.csv",
+      "offRunsMs": [
+        2.5061000000000604,
+        2.1408000000001266,
+        2.2478000000000975,
+        2.697400000000016,
+        2.1308000000001357
+      ],
+      "onRunsMs": [
+        10.884600000000091,
+        6.716499999999996,
+        6.153500000000122,
+        5.391999999999825,
+        4.038300000000163
+      ],
+      "offAvgMs": 2.344580000000087,
+      "onAvgMs": 6.636980000000039,
+      "overheadPct": 183.07756613123857,
+      "header": "timestamp,model_available,routing_cost,risk_level,recommended_speed_kph,flood_depth_5yr,rainfall_mm,is_raining,bridge,road_priority,feature_order",
+      "firstDataRow": "2026-03-11T16:09:33.562Z,1,2.300000,LOW,45,0.000000,0.000000,0,1,0,flood_depth_5yr|rainfall_mm|is_raining|bridge|road_priority",
+      "dataRows": 5000
+    },
+    "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260312-000931\\raw\\logs\\server-routing-risk-benchmark.log",
+    "tracePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260312-000931\\raw\\traces\\routing-risk-benchmark.json",
+    "csvPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260312-000931\\raw\\artifacts\\routing-risk-benchmark.csv"
+  },
+  "actualResultCompact": "183.08%"
+}

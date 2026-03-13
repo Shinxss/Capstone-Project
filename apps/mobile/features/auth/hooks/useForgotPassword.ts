@@ -1,24 +1,29 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "expo-router";
 import { requestPasswordOtp } from "../services/otpAuth.api";
 import { getErrorMessage } from "../utils/authErrors";
-
-function isEmailValid(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
-}
+import { isEmailValid, normalizeEmail } from "../utils/authValidators";
 
 export function useForgotPassword(initialEmail = "") {
   const router = useRouter();
-  const [email, setEmail] = useState(initialEmail);
+  const [email, setEmail] = useState(() => normalizeEmail(initialEmail));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const normalizedEmail = useMemo(() => normalizeEmail(email), [email]);
+  const emailLooksValid = useMemo(() => isEmailValid(normalizedEmail), [normalizedEmail]);
+  const canSubmit = emailLooksValid && !loading;
+
+  const onChangeEmail = useCallback((value: string) => {
+    setEmail(value.replace(/\s+/g, "").toLowerCase());
+    setError(null);
+  }, []);
 
   const submit = useCallback(async () => {
     if (loading) return;
     setError(null);
 
-    const normalizedEmail = email.trim().toLowerCase();
-    if (!isEmailValid(normalizedEmail)) {
+    if (!emailLooksValid) {
       setError("Please enter a valid email.");
       return;
     }
@@ -35,14 +40,17 @@ export function useForgotPassword(initialEmail = "") {
     } finally {
       setLoading(false);
     }
-  }, [email, loading, router]);
+  }, [emailLooksValid, loading, normalizedEmail, router]);
 
   return {
     email,
     loading,
     error,
-    setEmail,
+    isEmailValid: emailLooksValid,
+    canSubmit,
+    setEmail: onChangeEmail,
     submit,
     goBack: () => router.back(),
+    goToLogin: () => router.replace("/(auth)/login"),
   };
 }

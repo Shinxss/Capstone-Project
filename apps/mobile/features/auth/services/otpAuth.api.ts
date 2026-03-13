@@ -1,4 +1,5 @@
 import { api } from "../../../lib/api";
+import { normalizeEmail } from "../utils/authValidators";
 
 export type SignupRequestOtpPayload = {
   firstName: string;
@@ -32,41 +33,75 @@ export type SignupVerifyOtpResult = {
   user?: OtpUserPayload;
 };
 
-export async function signupRequestOtp(payload: SignupRequestOtpPayload) {
-  const res = await api.post("/api/auth/signup", payload);
+type ApiEnvelope<TData = unknown> = {
+  success?: boolean;
+  message?: string;
+  data?: TData;
+  resetToken?: string;
+};
+
+type SignupVerifyOtpData = {
+  accessToken?: unknown;
+  user?: unknown;
+};
+
+type OtpStatusResult = {
+  success: boolean;
+  message: string;
+};
+
+function parseOtpStatus(data: unknown, fallbackMessage: string): OtpStatusResult {
+  const payload = (data ?? {}) as ApiEnvelope;
   return {
-    success: Boolean(res.data?.success),
-    message: String(res.data?.message ?? "OTP sent"),
+    success: Boolean(payload.success),
+    message: typeof payload.message === "string" ? payload.message : fallbackMessage,
   };
 }
 
+function normalizeOtp(otp: string) {
+  return otp.replace(/\D/g, "").slice(0, 6);
+}
+
+export async function signupRequestOtp(payload: SignupRequestOtpPayload) {
+  const res = await api.post<ApiEnvelope>("/api/auth/signup", {
+    ...payload,
+    email: normalizeEmail(payload.email),
+  });
+  return parseOtpStatus(res.data, "OTP sent");
+}
+
 export async function signupVerifyOtp(email: string, otp: string): Promise<SignupVerifyOtpResult> {
-  const res = await api.post("/api/auth/signup/verify-otp", { email, otp });
+  const res = await api.post<ApiEnvelope<SignupVerifyOtpData>>("/api/auth/signup/verify-otp", {
+    email: normalizeEmail(email),
+    otp: normalizeOtp(otp),
+  });
+
+  const accessToken = res.data?.data?.accessToken;
+  const user = res.data?.data?.user;
+
   return {
-    accessToken: typeof res.data?.data?.accessToken === "string" ? res.data.data.accessToken : undefined,
-    user: res.data?.data?.user as OtpUserPayload | undefined,
+    accessToken: typeof accessToken === "string" ? accessToken : undefined,
+    user: (user as OtpUserPayload | undefined) ?? undefined,
   };
 }
 
 export async function signupResendOtp(email: string) {
-  const res = await api.post("/api/auth/signup/resend-otp", { email });
-  return {
-    success: Boolean(res.data?.success),
-    message: String(res.data?.message ?? "OTP sent"),
-  };
+  const res = await api.post<ApiEnvelope>("/api/auth/signup/resend-otp", { email: normalizeEmail(email) });
+  return parseOtpStatus(res.data, "OTP sent");
 }
 
 export async function requestPasswordOtp(email: string) {
-  const res = await api.post("/api/auth/password/forgot", { email });
-  return {
-    success: Boolean(res.data?.success),
-    message: String(res.data?.message ?? "OTP sent"),
-  };
+  const res = await api.post<ApiEnvelope>("/api/auth/password/forgot", { email: normalizeEmail(email) });
+  return parseOtpStatus(res.data, "OTP sent");
 }
 
 export async function verifyPasswordOtp(email: string, otp: string) {
-  const res = await api.post("/api/auth/password/verify-otp", { email, otp });
-  const resetToken = res.data?.resetToken;
+  const res = await api.post<ApiEnvelope<{ resetToken?: unknown }>>("/api/auth/password/verify-otp", {
+    email: normalizeEmail(email),
+    otp: normalizeOtp(otp),
+  });
+
+  const resetToken = res.data?.resetToken ?? res.data?.data?.resetToken;
   if (!resetToken || typeof resetToken !== "string") {
     throw new Error("No reset token returned.");
   }
@@ -80,14 +115,11 @@ export async function resetPassword(
   newPassword: string,
   confirmPassword: string
 ) {
-  const res = await api.post("/api/auth/password/reset", {
-    email,
+  const res = await api.post<ApiEnvelope>("/api/auth/password/reset", {
+    email: normalizeEmail(email),
     resetToken,
     newPassword,
     confirmPassword,
   });
-  return {
-    success: Boolean(res.data?.success),
-    message: String(res.data?.message ?? "Password reset successful"),
-  };
+  return parseOtpStatus(res.data, "Password reset successful");
 }

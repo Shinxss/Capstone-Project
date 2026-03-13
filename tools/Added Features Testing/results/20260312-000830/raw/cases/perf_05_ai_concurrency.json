@@ -1,0 +1,90 @@
+{
+  "id": "perf_05_ai_concurrency",
+  "session": "performance",
+  "testCase": "AI Routing Throughput Under Concurrency",
+  "stepsShort": "Execute 20 concurrent prediction calls (100 segments each)",
+  "expectedResult": "All concurrent requests complete with no failed responses",
+  "actualResult": "20 concurrent requests completed; total: 5.96 ms; average: 0.298 ms per request; failures: 0",
+  "passFail": "PASS",
+  "notes": "Measured with Promise.all in server TSX benchmark; each request contained 100 segments; one 20-request concurrency run; timing source: performance.now().",
+  "sourceFiles": [
+    "apps/server/src/features/routingRisk/routingRisk.service.ts",
+    "tools/Added Features Testing/scripts/perf/server-routing-risk-benchmark.ts"
+  ],
+  "runnerCommand": "pnpm test:ai-concurrency",
+  "rawEvidencePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260312-000830\\raw\\cases\\perf_05_ai_concurrency.json",
+  "measurement": {
+    "singleRow": {
+      "runsMs": [
+        965.9141,
+        0.19060000000013133,
+        0.26480000000015025,
+        0.14039999999999964,
+        0.23649999999997817
+      ],
+      "firstRunMs": 965.9141,
+      "medianMs": 0.23649999999997817,
+      "avgMs": 193.34928000000005,
+      "p95Ms": 0.26480000000015025,
+      "riskLevelReturned": true
+    },
+    "bulk1000": {
+      "runsMs": [
+        3.822300000000041,
+        1.95900000000006,
+        2.1482999999998356,
+        2.992300000000114,
+        2.693599999999833
+      ],
+      "avgMs": 2.7230999999999765,
+      "medianMs": 2.693599999999833,
+      "p95Ms": 2.992300000000114,
+      "riskSet": [
+        "LOW",
+        "MEDIUM",
+        "HIGH"
+      ],
+      "speedSet": [
+        15,
+        25,
+        35,
+        45
+      ]
+    },
+    "concurrency": {
+      "requests": 20,
+      "rowsPerRequest": 100,
+      "totalMs": 5.960199999999986,
+      "avgPerRequestMs": 0.29800999999999933,
+      "success": 20,
+      "failures": 0
+    },
+    "csv": {
+      "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260312-000830\\raw\\artifacts\\routing-risk-benchmark.csv",
+      "offRunsMs": [
+        1.3922999999999774,
+        1.383199999999988,
+        1.525899999999865,
+        2.457800000000134,
+        1.604799999999841
+      ],
+      "onRunsMs": [
+        8.676799999999957,
+        6.51480000000015,
+        4.632200000000012,
+        6.338700000000017,
+        5.272799999999961
+      ],
+      "offAvgMs": 1.672799999999961,
+      "onAvgMs": 6.28706000000002,
+      "overheadPct": 275.84050693449103,
+      "header": "timestamp,model_available,routing_cost,risk_level,recommended_speed_kph,flood_depth_5yr,rainfall_mm,is_raining,bridge,road_priority,feature_order",
+      "firstDataRow": "2026-03-11T16:08:32.840Z,1,2.300000,LOW,45,0.000000,0.000000,0,1,0,flood_depth_5yr|rainfall_mm|is_raining|bridge|road_priority",
+      "dataRows": 5000
+    },
+    "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260312-000830\\raw\\logs\\server-routing-risk-benchmark.log",
+    "tracePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260312-000830\\raw\\traces\\routing-risk-benchmark.json",
+    "csvPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260312-000830\\raw\\artifacts\\routing-risk-benchmark.csv"
+  },
+  "actualResultCompact": "0.298 ms"
+}

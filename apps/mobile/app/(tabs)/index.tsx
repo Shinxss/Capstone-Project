@@ -1,11 +1,11 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { Alert, Pressable, Text, View } from "react-native";
+import { Alert } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import * as Device from "expo-device";
-import * as Notifications from "expo-notifications";
+import AuthRequiredModal from "../../components/AuthRequiredModal";
 import { HomeView } from "../../features/home/components/HomeView";
 import { SosConfirmationModal } from "../../features/home/components/SosConfirmationModal";
+import { useAuthRequiredPrompt } from "../../features/auth/hooks/useAuthRequiredPrompt";
 import { useSession } from "../../features/auth/hooks/useSession";
 import { useSosHold } from "../../features/emergency/hooks/useSosHold";
 import { useSosReport } from "../../features/emergency/hooks/useSosReport";
@@ -22,8 +22,6 @@ import {
   formatRelativeTime,
   formatTrackingHeadline,
 } from "../../features/requests/utils/formatters";
-import { api } from "../../lib/api";
-import DraggableOverlay from "../../src/components/DraggableOverlay";
 
 type AlertIconName = React.ComponentProps<typeof Ionicons>["name"];
 type AlertTheme = {
@@ -214,6 +212,7 @@ function weatherVisualFromSummary(
 
 export default function HomeScreen() {
   const { displayName, session, isUser } = useSession();
+  const authRequired = useAuthRequiredPrompt();
   const { sendSos, sending: sosSending } = useSosReport();
   const isVolunteer = useMemo(() => session?.mode === "user" && String(session.user.role ?? "").toUpperCase() === "VOLUNTEER", [session]);
   const { activeRequest: myActiveRequest, refresh: refreshMyActiveRequest } = useMyActiveRequest({
@@ -245,7 +244,6 @@ export default function HomeScreen() {
   const { refreshing: refreshingHome, triggerRefresh: triggerRefreshHome } = usePullToRefresh(refreshHome);
 
   const [sosConfirmVisible, setSosConfirmVisible] = useState(false);
-  const [pushDebugBusy, setPushDebugBusy] = useState(false);
 
   const weatherCard = useMemo(() => {
     if (locationMessage) {
@@ -330,10 +328,16 @@ export default function HomeScreen() {
   }, [homeActiveRequest?.id]);
 
   const onSosTriggered = useCallback(() => {
+    if (!authRequired.requireAuth(isUser, { blockedAction: "report_emergency" })) return;
     setSosConfirmVisible(true);
-  }, []);
+  }, [authRequired, isUser]);
 
   const onConfirmSos = useCallback(async () => {
+    if (!authRequired.requireAuth(isUser, { blockedAction: "report_emergency" })) {
+      setSosConfirmVisible(false);
+      return;
+    }
+
     try {
       const result = await sendSos();
       setSosConfirmVisible(false);
@@ -348,7 +352,7 @@ export default function HomeScreen() {
     } catch (e: any) {
       Alert.alert("SOS failed", e?.message ?? "Please try again.");
     }
-  }, [sendSos]);
+  }, [authRequired, isUser, sendSos]);
 
   const onCancelSosConfirm = useCallback(() => {
     if (sosSending) return;
@@ -361,14 +365,20 @@ export default function HomeScreen() {
   });
 
   const onStartSosHold = useCallback(() => {
+    if (!authRequired.requireAuth(isUser, { blockedAction: "report_emergency" })) return;
     if (sosSending || sosConfirmVisible) return;
     startHold();
-  }, [sosSending, sosConfirmVisible, startHold]);
+  }, [authRequired, isUser, sosSending, sosConfirmVisible, startHold]);
 
   const onCancelSosHold = useCallback(() => {
     if (sosSending || sosConfirmVisible) return;
     cancelHold();
   }, [sosSending, sosConfirmVisible, cancelHold]);
+
+  const onPressApplyVolunteer = useCallback(() => {
+    if (!authRequired.requireAuth(isUser, { blockedAction: "access_volunteer_tools" })) return;
+    router.push("/volunteer-apply-modal");
+  }, [authRequired, isUser]);
 
   const dispatchModal = useDispatchModal({
     pendingDispatch,
@@ -382,57 +392,6 @@ export default function HomeScreen() {
       router.push("/(tabs)/tasks");
     },
   });
-
-  const onDebugCheckToken = useCallback(async () => {
-    try {
-      setPushDebugBusy(true);
-      const permission = await Notifications.getPermissionsAsync();
-      const res = await api.get<{
-        count: number;
-        activeCount: number;
-        tokens: { expoPushToken: string; isActive: boolean }[];
-      }>("/api/notifications/push-token/me");
-
-      const payload = res.data;
-      const firstToken = payload.tokens?.[0]?.expoPushToken;
-      const tokenPreview = firstToken
-        ? `${firstToken.slice(0, 18)}...${firstToken.slice(-8)}`
-        : "none";
-
-      Alert.alert(
-        "Push Token Status",
-        `device=${Device.isDevice ? "physical" : "emulator/simulator"}, perm=${permission.status}, active=${payload.activeCount}, total=${payload.count}, first=${tokenPreview}`
-      );
-    } catch (e: any) {
-      Alert.alert(
-        "Push Debug Failed",
-        e?.response?.data?.message ?? e?.message ?? "Unable to check token status."
-      );
-    } finally {
-      setPushDebugBusy(false);
-    }
-  }, []);
-
-  const onDebugSendTest = useCallback(async () => {
-    try {
-      setPushDebugBusy(true);
-      const res = await api.post<{ attempted: number; sent: number; errors?: string[] }>(
-        "/api/notifications/push-test/me"
-      );
-      const errors = res.data.errors ?? [];
-      Alert.alert(
-        "Push Test",
-        `attempted=${res.data.attempted}, sent=${res.data.sent}${errors.length ? `\nerror=${errors[0]}` : ""}`
-      );
-    } catch (e: any) {
-      Alert.alert(
-        "Push Debug Failed",
-        e?.response?.data?.message ?? e?.message ?? "Unable to send test push."
-      );
-    } finally {
-      setPushDebugBusy(false);
-    }
-  }, []);
 
   return (
     <>
@@ -458,7 +417,8 @@ export default function HomeScreen() {
         onCancelHold={onCancelSosHold}
         onPressNotifications={() => {}}
         onPressViewAll={() => {}}
-        onPressApplyVolunteer={() => router.push("/volunteer-apply-modal")}
+        showVolunteerCta={!isVolunteer}
+        onPressApplyVolunteer={onPressApplyVolunteer}
       />
 
       <SosConfirmationModal
@@ -466,6 +426,10 @@ export default function HomeScreen() {
         busy={sosSending}
         onConfirm={onConfirmSos}
         onCancel={onCancelSosConfirm}
+      />
+
+      <AuthRequiredModal
+        {...authRequired.modalProps}
       />
 
       {isVolunteer ? (
@@ -484,28 +448,6 @@ export default function HomeScreen() {
           onViewDetails={dispatchModal.viewDetails}
           onClose={dispatchModal.dismiss}
         />
-      ) : null}
-
-      {__DEV__ && session?.mode === "user" ? (
-        <DraggableOverlay initialTop={160} initialRight={12} zIndex={45}>
-          <View className="rounded-xl border border-gray-300 bg-white/95 p-2 dark:border-lgu-border dark:bg-lgu-card/95">
-            <Text className="mb-1 text-[11px] font-semibold text-slate-700 dark:text-slate-200">Push Debug</Text>
-            <Pressable
-              disabled={pushDebugBusy}
-              onPress={onDebugCheckToken}
-              className="mb-1 rounded-md border border-gray-300 px-2 py-1 dark:border-lgu-border"
-            >
-              <Text className="text-xs font-semibold text-slate-800 dark:text-slate-100">Check token</Text>
-            </Pressable>
-            <Pressable
-              disabled={pushDebugBusy}
-              onPress={onDebugSendTest}
-              className="rounded-md bg-red-500 px-2 py-1"
-            >
-              <Text className="text-xs font-semibold text-white">Send test</Text>
-            </Pressable>
-          </View>
-        </DraggableOverlay>
       ) : null}
 
     </>

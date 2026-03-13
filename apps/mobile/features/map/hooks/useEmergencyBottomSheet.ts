@@ -69,6 +69,17 @@ function parseApiError(error: unknown): { status?: number; message: string } {
   return { status, message };
 }
 
+function normalizeEmergencyStatus(raw?: string): string | undefined {
+  const normalized = String(raw ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+  if (!normalized) return undefined;
+  if (normalized === "acknowledged" || normalized === "accepted") return "assigned";
+  if (normalized === "inprogress") return "in_progress";
+  return normalized;
+}
+
 function toFiniteNumber(value: unknown, fallback = Number.POSITIVE_INFINITY) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -199,7 +210,10 @@ export function useEmergencyBottomSheet(
   }, []);
 
   const openEmergency = useCallback((emergency: Emergency) => {
-    setSelectedEmergency(emergency);
+    setSelectedEmergency({
+      ...emergency,
+      status: normalizeEmergencyStatus(emergency.status),
+    });
     setSheetMode("overview");
     setIsMinimized(false);
     setTravelModeState("drive");
@@ -300,21 +314,38 @@ export function useEmergencyBottomSheet(
         setEmergencyDetail(detail);
         setSelectedEmergency((current) => {
           if (!current || current.id !== activeEmergency.id) return current;
+          const nextReferenceNumber =
+            current.referenceNumber || String(detail.referenceNumber ?? "").trim() || current.referenceNumber;
+          const nextReportedAt =
+            current.reportedAt ||
+            String(detail.reportedAt ?? detail.createdAt ?? "").trim() ||
+            current.reportedAt;
+          const nextStatus =
+            normalizeEmergencyStatus(current.status) ||
+            normalizeEmergencyStatus(String(detail.status ?? "").trim()) ||
+            current.status;
+          const nextLocationLabel =
+            current.location.label ||
+            String(detail.location?.label ?? "").trim() ||
+            current.location.label;
+
+          if (
+            nextReferenceNumber === current.referenceNumber &&
+            nextReportedAt === current.reportedAt &&
+            nextStatus === current.status &&
+            nextLocationLabel === current.location.label
+          ) {
+            return current;
+          }
+
           return {
             ...current,
-            referenceNumber:
-              current.referenceNumber || String(detail.referenceNumber ?? "").trim() || current.referenceNumber,
-            reportedAt:
-              current.reportedAt ||
-              String(detail.reportedAt ?? detail.createdAt ?? "").trim() ||
-              current.reportedAt,
-            status: current.status || String(detail.status ?? "").trim() || current.status,
+            referenceNumber: nextReferenceNumber,
+            reportedAt: nextReportedAt,
+            status: nextStatus,
             location: {
               ...current.location,
-              label:
-                current.location.label ||
-                String(detail.location?.label ?? "").trim() ||
-                current.location.label,
+              label: nextLocationLabel,
             },
           };
         });
@@ -449,7 +480,56 @@ export function useEmergencyBottomSheet(
     const contextWeather = getWeatherContext?.() ?? undefined;
     const raining = isRainingWeather(contextWeather);
     if (!raining) {
-      await fetchRouteByMode(travelMode);
+      setLoadingRoute(true);
+      try {
+        const evaluated = await getRouteAlternativesWithEvaluation({
+          from: origin,
+          to: {
+            lat: selectedEmergency.location.lat,
+            lng: selectedEmergency.location.lng,
+          },
+          mode: travelMode,
+          contextWeather,
+        });
+        const selectedIndex = pickNearestRouteIndex(evaluated.routes);
+        const nearestRoute = evaluated.routes[selectedIndex] ?? evaluated.routes[0] ?? null;
+        const nearestRisk = evaluated.riskByIndex[selectedIndex] ?? null;
+
+        if (nearestRoute) {
+          setRoute(nearestRoute);
+          setRouteAlternatives([nearestRoute]);
+          setRouteRiskByIndex(nearestRisk ? { 0: nearestRisk } : {});
+          setSelectedRouteIndex(0);
+          setRisk(nearestRisk);
+          return;
+        }
+      } catch {
+        try {
+          const fallbackRoutes = await getRouteAlternatives({
+            from: origin,
+            to: {
+              lat: selectedEmergency.location.lat,
+              lng: selectedEmergency.location.lng,
+            },
+            mode: travelMode,
+          });
+          const selectedIndex = pickNearestRouteIndex(fallbackRoutes);
+          const nearestRoute = fallbackRoutes[selectedIndex] ?? fallbackRoutes[0] ?? null;
+
+          if (nearestRoute) {
+            setRoute(nearestRoute);
+            setRouteAlternatives([nearestRoute]);
+            setRouteRiskByIndex({});
+            setSelectedRouteIndex(0);
+            setRisk(null);
+            return;
+          }
+        } catch {
+          Alert.alert("Directions unavailable", "Unable to fetch route. Try again.");
+        }
+      } finally {
+        setLoadingRoute(false);
+      }
       return;
     }
 
@@ -570,7 +650,7 @@ export function useEmergencyBottomSheet(
     } finally {
       setLoadingRoute(false);
     }
-  }, [fetchRouteByMode, getWeatherContext, resolveOrigin, selectedEmergency, travelMode]);
+  }, [getWeatherContext, resolveOrigin, selectedEmergency, travelMode]);
   const refreshSelectedEmergency = useCallback(async () => {
     if (!selectedEmergency) return;
 

@@ -1,0 +1,52 @@
+{
+  "runId": "20260311-171749",
+  "generatedAt": "2026-03-11T09:17:49.729Z",
+  "environment": {
+    "node": "v22.19.0",
+    "platform": "win32 x64",
+    "cwd": "C:\\Projects\\Lifeline",
+    "gitCommit": "d5d171cf91b24e63d5dbe35d79333706a5afada1",
+    "gitBranch": "main"
+  },
+  "scope": "all",
+  "totals": {
+    "total": 1,
+    "pass": 1,
+    "fail": 0,
+    "error": 0
+  },
+  "results": [
+    {
+      "id": "perf_06_blockchain_verify_latency",
+      "session": "performance",
+      "testCase": "Blockchain verifyTask Latency",
+      "stepsShort": "Run blockchain test suite and capture verify scenario timing",
+      "expectedResult": "Local-chain verification flow completes within 2.0 s",
+      "actualResult": "Verifier can verifyTask completed in 88 ms",
+      "passFail": "PASS",
+      "notes": "Measured from Hardhat test output in apps/blockchain (`pnpm --dir apps/blockchain test`); verify scenario timing captured from reporter output; 1 suite run.",
+      "sourceFiles": [
+        "apps/blockchain/test/SecurityCases.test.ts"
+      ],
+      "runnerCommand": "pnpm test:blockchain-verify-latency",
+      "rawEvidencePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260311-171749\\raw\\cases\\perf_06_blockchain_verify_latency.json",
+      "measurement": {
+        "verifyLatencyMs": 880,
+        "reverifyLatencyMs": 54,
+        "unauthorizedVerifyLatencyMs": 41,
+        "unauthorizedRevokeLatencyMs": null,
+        "unauthorizedGrantLatencyMs": null,
+        "replayLatencyMs": null,
+        "hasUnauthorizedVerify": true,
+        "hasUnauthorizedAdmin": true,
+        "hasReplay": true,
+        "hasNotVerified": true,
+        "gasUsed": 49287,
+        "passingCount": 13,
+        "logPath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260311-171749\\raw\\logs\\blockchain-test.log",
+        "tracePath": "C:\\Projects\\Lifeline\\tools\\Added Features Testing\\results\\20260311-171749\\raw\\traces\\blockchain-test.json"
+      },
+      "actualResultCompact": "88 ms"
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 import {
   TASK_PAYLOAD_DOMAIN,
   TASK_PAYLOAD_SCHEMA_VERSION,
+  readTaskVerificationOnChain,
   reverifyTaskOnChain,
   revokeTaskVerificationOnChain,
   verifyTaskOnChain,
@@ -60,6 +61,23 @@ export async function verifyDispatchTaskOnChain(input: VerifyDispatchTaskOnChain
     ...connection,
     taskId: normalizeRequired(input.taskId, "taskId"),
     payload: input.payload,
+  });
+  return {
+    ...chain,
+    network: getTaskLedgerNetwork(),
+    contractAddress: connection.contractAddress,
+  };
+}
+
+export type ReadDispatchTaskVerificationOnChainInput = {
+  taskId: string;
+};
+
+export async function readDispatchTaskVerificationOnChain(input: ReadDispatchTaskVerificationOnChainInput) {
+  const connection = getTaskLedgerConnection();
+  const chain = await readTaskVerificationOnChain({
+    ...connection,
+    taskId: normalizeRequired(input.taskId, "taskId"),
   });
   return {
     ...chain,

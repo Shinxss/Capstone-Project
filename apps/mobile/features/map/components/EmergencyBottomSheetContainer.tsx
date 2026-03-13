@@ -24,6 +24,9 @@ export function EmergencyBottomSheetContainer({
   authToken,
 }: EmergencyBottomSheetContainerProps) {
   const sheetRef = useRef<BottomSheet>(null);
+  const pendingSnapIndexRef = useRef<number | null>(null);
+  const lastSheetIndexRef = useRef(-1);
+  const selectedEmergencyId = controller.selectedEmergency?.id ?? null;
 
   const snapPoints = useMemo(
     () => [
@@ -36,24 +39,35 @@ export function EmergencyBottomSheetContainer({
   );
 
   useEffect(() => {
-    if (!controller.selectedEmergency) {
-      sheetRef.current?.close();
+    if (!selectedEmergencyId) {
+      pendingSnapIndexRef.current = -1;
+      if (lastSheetIndexRef.current !== -1) {
+        lastSheetIndexRef.current = -1;
+        sheetRef.current?.close();
+      }
       return;
     }
 
-    requestAnimationFrame(() => {
-      if (controller.isMinimized) {
-        sheetRef.current?.snapToIndex(0);
-        return;
-      }
+    const targetIndex = controller.isMinimized
+      ? 0
+      : controller.sheetMode === "directions"
+        ? 2
+        : 1;
 
-      if (controller.sheetMode === "directions") {
-        sheetRef.current?.snapToIndex(2);
-      } else {
-        sheetRef.current?.snapToIndex(1);
-      }
+    if (lastSheetIndexRef.current === targetIndex) {
+      pendingSnapIndexRef.current = null;
+      return;
+    }
+
+    const frame = requestAnimationFrame(() => {
+      pendingSnapIndexRef.current = targetIndex;
+      sheetRef.current?.snapToIndex(targetIndex);
     });
-  }, [controller.selectedEmergency, controller.sheetMode, controller.isMinimized, snapPoints]);
+
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [selectedEmergencyId, controller.sheetMode, controller.isMinimized]);
 
   return (
     <BottomSheet
@@ -62,15 +76,22 @@ export function EmergencyBottomSheetContainer({
       snapPoints={snapPoints}
       enablePanDownToClose={false}
       onChange={(index) => {
+        lastSheetIndexRef.current = index;
+
+        if (pendingSnapIndexRef.current !== null) {
+          if (index === pendingSnapIndexRef.current) {
+            pendingSnapIndexRef.current = null;
+          }
+          return;
+        }
+
         if (!controller.selectedEmergency) return;
         if (index <= 0) {
           controller.minimizeSheet();
           return;
         }
 
-        if (controller.isMinimized) {
-          controller.expandSheet();
-        }
+        controller.expandSheet();
       }}
       backgroundStyle={styles.background}
       handleIndicatorStyle={styles.handle}

@@ -119,6 +119,7 @@ type Props = {
   onPressNotifications?: () => void;
   onPressViewAll?: () => void;
   onPressApplyVolunteer?: () => void;
+  showVolunteerCta?: boolean;
 };
 
 export function HomeView({
@@ -144,6 +145,7 @@ export function HomeView({
   onPressNotifications,
   onPressViewAll,
   onPressApplyVolunteer,
+  showVolunteerCta = true,
 }: Props) {
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
@@ -374,26 +376,27 @@ export function HomeView({
           </Pressable>
         ) : null}
 
-        {/* Volunteer CTA */}
-        <View style={styles.volunteer}>
-          <View style={styles.volCircle1} />
-          <View style={styles.volCircle2} />
+        {showVolunteerCta ? (
+          <View style={styles.volunteer}>
+            <View style={styles.volCircle1} />
+            <View style={styles.volCircle2} />
 
-          <View style={styles.volRow}>
-            <View style={styles.volBadge}>
-              <Ionicons name="shield-outline" size={30} color="#fff" />
+            <View style={styles.volRow}>
+              <View style={styles.volBadge}>
+                <Ionicons name="shield-outline" size={30} color="#fff" />
+              </View>
+              <Text style={styles.volTitle}>Become a Volunteer</Text>
             </View>
-            <Text style={styles.volTitle}>Become a Volunteer</Text>
+
+            <Text style={styles.volSub}>
+              Join our community responders and help{"\n"}save lives in your barangays
+            </Text>
+
+            <Pressable style={styles.applyBtn} onPress={onPressApplyVolunteer}>
+              <Text style={styles.applyText}>Apply Now</Text>
+            </Pressable>
           </View>
-
-          <Text style={styles.volSub}>
-            Join our community responders and help{"\n"}save lives in your barangays
-          </Text>
-
-          <Pressable style={styles.applyBtn} onPress={onPressApplyVolunteer}>
-            <Text style={styles.applyText}>Apply Now</Text>
-          </Pressable>
-        </View>
+        ) : null}
       </RefreshableScrollScreen>
     </SafeAreaView>
   );

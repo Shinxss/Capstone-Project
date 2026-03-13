@@ -76,6 +76,12 @@ export async function fetchEmergencyMapReports(): Promise<MapEmergencyReport[]> 
   return fetchEmergencyMapReportsWithOptions();
 }
 
+export async function fetchMyEmergencyMapReports(): Promise<MapEmergencyReport[]> {
+  const res = await api.get<{ data?: MapEmergencyReport[] }>(`${EMERGENCY_REPORTS_BASE}/my/map`);
+  const rows = Array.isArray(res.data?.data) ? res.data.data : [];
+  return normalizeMapRows(rows);
+}
+
 type FetchEmergencyMapReportsOptions = {
   includeUnapproved?: boolean;
   limit?: number;
