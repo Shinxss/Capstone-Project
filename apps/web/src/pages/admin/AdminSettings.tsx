@@ -7,7 +7,7 @@ export default function AdminSettings() {
 
   return (
     <AdminShell title="Settings" subtitle="Notification and account preferences">
-      <LguSettingsView {...vm} loading={vm.loading} error={vm.error} onRefresh={vm.refresh} />
+      <LguSettingsView {...vm} loading={vm.loading} error={vm.error} onRefresh={vm.refresh} showRefreshButton={false} />
     </AdminShell>
   );
 }

@@ -1,4 +1,4 @@
-import { History } from "lucide-react";
+import { History, Search } from "lucide-react";
 import EmptyState from "../../../components/ui/EmptyState";
 import { useLguActivityLog } from "../hooks/useLguActivityLog";
 
@@ -76,44 +76,43 @@ export default function LguActivityLogView(props: Props) {
       </div>
 
       <div className="mt-4 rounded-lg border border-gray-200 bg-white p-3 dark:bg-[#0B1220] dark:border-[#162544]">
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
-          <div className="lg:col-span-4">
-            <div className="text-xs font-semibold text-gray-500 uppercase dark:text-slate-400">Search</div>
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+          <div className="relative xl:min-w-0 xl:flex-1">
+            <Search
+              size={18}
+              className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500"
+            />
             <input
               type="text"
               value={search}
               placeholder="Search actor, action, entity, time..."
               onChange={(e) => setSearch(e.target.value)}
-              className="mt-2 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-gray-300 dark:bg-[#0E1626] dark:border-[#162544] dark:text-slate-100"
+              className="h-11 w-full rounded-xl border border-gray-200 bg-white pl-11 pr-4 text-sm outline-none focus:border-gray-300 dark:border-[#162544] dark:bg-[#0E1626] dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-[#2B4A7A]"
             />
           </div>
 
-          <div className="lg:col-span-2">
-            <div className="text-xs font-semibold text-gray-500 uppercase dark:text-slate-400">Date from</div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:flex xl:items-center">
             <input
               type="date"
+              aria-label="Date from"
               value={filters.dateFrom}
               onChange={(e) => setFilters((prev) => ({ ...prev, dateFrom: e.target.value }))}
-              className="mt-2 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-gray-300 dark:bg-[#0E1626] dark:border-[#162544] dark:text-slate-100"
+              className="h-11 min-w-[150px] rounded-xl border border-gray-200 bg-white px-3 text-sm outline-none focus:border-gray-300 dark:border-[#162544] dark:bg-[#0E1626] dark:text-slate-100 dark:focus:border-[#2B4A7A]"
             />
-          </div>
 
-          <div className="lg:col-span-2">
-            <div className="text-xs font-semibold text-gray-500 uppercase dark:text-slate-400">Date to</div>
             <input
               type="date"
+              aria-label="Date to"
               value={filters.dateTo}
               onChange={(e) => setFilters((prev) => ({ ...prev, dateTo: e.target.value }))}
-              className="mt-2 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-gray-300 dark:bg-[#0E1626] dark:border-[#162544] dark:text-slate-100"
+              className="h-11 min-w-[150px] rounded-xl border border-gray-200 bg-white px-3 text-sm outline-none focus:border-gray-300 dark:border-[#162544] dark:bg-[#0E1626] dark:text-slate-100 dark:focus:border-[#2B4A7A]"
             />
-          </div>
 
-          <div className="lg:col-span-2">
-            <div className="text-xs font-semibold text-gray-500 uppercase dark:text-slate-400">Action</div>
             <select
+              aria-label="Action"
               value={filters.action}
               onChange={(e) => setFilters((prev) => ({ ...prev, action: e.target.value }))}
-              className="mt-2 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-gray-300 dark:bg-[#0E1626] dark:border-[#162544] dark:text-slate-100"
+              className="h-11 min-w-[160px] rounded-xl border border-gray-200 bg-white px-3 text-sm outline-none focus:border-gray-300 dark:border-[#162544] dark:bg-[#0E1626] dark:text-slate-100 dark:focus:border-[#2B4A7A]"
             >
               <option value="">All actions</option>
               {actionOptions.map((action) => (
@@ -122,14 +121,12 @@ export default function LguActivityLogView(props: Props) {
                 </option>
               ))}
             </select>
-          </div>
 
-          <div className="lg:col-span-2">
-            <div className="text-xs font-semibold text-gray-500 uppercase dark:text-slate-400">Actor</div>
             <select
+              aria-label="Actor"
               value={filters.actor}
               onChange={(e) => setFilters((prev) => ({ ...prev, actor: e.target.value }))}
-              className="mt-2 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-gray-300 dark:bg-[#0E1626] dark:border-[#162544] dark:text-slate-100"
+              className="h-11 min-w-[160px] rounded-xl border border-gray-200 bg-white px-3 text-sm outline-none focus:border-gray-300 dark:border-[#162544] dark:bg-[#0E1626] dark:text-slate-100 dark:focus:border-[#2B4A7A]"
             >
               <option value="">All actors</option>
               {actorOptions.map((actor) => (

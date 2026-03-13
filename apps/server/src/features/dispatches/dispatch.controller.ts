@@ -44,6 +44,7 @@ export async function postDispatchOffers(req: Request, res: Response) {
       emergencyId: String(emergencyId ?? ""),
       volunteerIds: requestedVolunteerIds,
       createdByUserId: String(userId),
+      createdByRole: String(role),
     });
     const dispatchedVolunteerIds = created.map((item: any) => String(item?.volunteerId ?? "")).filter(Boolean);
     const dispatchIds = created.map((item: any) => String(item?._id ?? "")).filter(Boolean);

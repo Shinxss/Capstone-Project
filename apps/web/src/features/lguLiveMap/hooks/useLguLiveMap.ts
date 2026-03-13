@@ -148,6 +148,21 @@ function isResolvedEmergencyStatus(raw?: string) {
   );
 }
 
+function isRejectedEmergencyReport(report: unknown) {
+  const verificationStatus = String(
+    (report as { verification?: { status?: string } } | null | undefined)?.verification?.status ?? ""
+  )
+    .trim()
+    .toLowerCase();
+  return verificationStatus === "rejected";
+}
+
+function isHiddenEmergencyReport(report: unknown) {
+  const visibility = (report as { visibility?: { isVisibleOnMap?: boolean } } | null | undefined)?.visibility
+    ?.isVisibleOnMap;
+  return visibility === false;
+}
+
 function toVolunteerStatusFromPresence(raw?: string): Volunteer["status"] {
   const status = String(raw ?? "").trim().toUpperCase();
   if (status === "BUSY") return "busy";
@@ -194,9 +209,10 @@ function ensureVolunteerPinStyles() {
       height: 32px;
       border-radius: 999px;
       transform: translate(-50%, -50%);
-      border: 3px solid rgba(255, 255, 255, 0.97);
-      background: rgba(255, 255, 255, 0.98);
-      box-shadow: 0 0 0 2px var(--ll-vol-color), 0 8px 18px rgba(0, 0, 0, 0.24);
+      border: 0;
+      background: transparent;
+      overflow: hidden;
+      box-shadow: 0 0 0 2px var(--ll-vol-color), 0 6px 14px rgba(0, 0, 0, 0.24);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -204,12 +220,33 @@ function ensureVolunteerPinStyles() {
     }
 
     .ll-vol-pin-center {
-      width: 16px;
-      height: 16px;
+      width: 100%;
+      height: 100%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: inherit;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    .ll-vol-pin-avatar {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      border-radius: inherit;
+    }
+
+    .ll-vol-pin-fallback {
+      width: 100%;
+      height: 100%;
       color: var(--ll-vol-color);
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.96);
     }
 
     .ll-vol-pin-icon {
@@ -314,6 +351,8 @@ export function useLguLiveMap() {
   const activeReports = useMemo(() => {
     return (reports ?? []).filter((report) => {
       if (isResolvedEmergencyStatus(report.status)) return false;
+      if (isRejectedEmergencyReport(report)) return false;
+      if (isHiddenEmergencyReport(report)) return false;
       return !completedEmergencyIds.has(String(report._id));
     });
   }, [reports, completedEmergencyIds]);
@@ -885,6 +924,9 @@ export function useLguLiveMap() {
       const popupAddress = escapeHtml(displayAddress);
       const popupSkill = escapeHtml(v.skill || "General Volunteer");
       const popupStatus = escapeHtml(v.status.toUpperCase());
+      const avatarUrl = String(v.avatarUrl ?? "").trim();
+      const hasAvatar = avatarUrl.length > 0;
+      const safeAvatarUrl = escapeHtml(avatarUrl);
 
       el.className = "ll-vol-pin-wrap";
       el.dataset.status = String(v.status ?? "").toLowerCase();
@@ -894,13 +936,35 @@ export function useLguLiveMap() {
         <div class="ll-vol-pin-chip">${statusText}</div>
         <div class="ll-vol-pin-core">
           <span class="ll-vol-pin-center" aria-hidden="true">
-            <svg class="ll-vol-pin-icon" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="2"></circle>
-              <path d="M5 19c1.2-3 3.8-4.5 7-4.5s5.8 1.5 7 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
-            </svg>
+            ${
+              hasAvatar
+                ? `<img class="ll-vol-pin-avatar" src="${safeAvatarUrl}" alt="" loading="lazy" />`
+                : ""
+            }
+            <span class="ll-vol-pin-fallback"${hasAvatar ? ' style="display:none;"' : ""}>
+              <svg class="ll-vol-pin-icon" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="2"></circle>
+                <path d="M5 19c1.2-3 3.8-4.5 7-4.5s5.8 1.5 7 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+              </svg>
+            </span>
           </span>
         </div>
       `;
+
+      if (hasAvatar) {
+        const avatarImage = el.querySelector<HTMLImageElement>(".ll-vol-pin-avatar");
+        const fallbackIcon = el.querySelector<HTMLElement>(".ll-vol-pin-fallback");
+        if (avatarImage && fallbackIcon) {
+          avatarImage.addEventListener(
+            "error",
+            () => {
+              avatarImage.style.display = "none";
+              fallbackIcon.style.display = "inline-flex";
+            },
+            { once: true }
+          );
+        }
+      }
 
       const popup = new mapboxgl.Popup({ offset: 14, closeButton: false }).setHTML(`
         <div style="font-family: ui-sans-serif; min-width: 220px;">

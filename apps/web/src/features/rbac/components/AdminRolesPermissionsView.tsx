@@ -15,7 +15,7 @@ function groupPermissionsByCategory(perms: string[]) {
   return Array.from(grouped.entries()).sort(([a], [b]) => a.localeCompare(b));
 }
 
-export default function AdminRolesPermissionsView({ roles, catalog, loading, error, busyRole, refresh, saveRolePermissions }: Props) {
+export default function AdminRolesPermissionsView({ roles, catalog, loading, error, busyRole, saveRolePermissions }: Props) {
   const [selectedRole, setSelectedRole] = useState<RoleKey>("SUPER_ADMIN");
   const currentRole = useMemo(() => roles.find((role) => role.key === selectedRole), [roles, selectedRole]);
   const [draftPermissions, setDraftPermissions] = useState<string[]>([]);
@@ -49,14 +49,6 @@ export default function AdminRolesPermissionsView({ roles, catalog, loading, err
             {role.label}
           </button>
         ))}
-
-        <button
-          type="button"
-          onClick={() => void refresh()}
-          className="ml-auto rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 dark:border-[#162544] dark:bg-[#0E1626] dark:text-slate-200 dark:hover:bg-[#122036]"
-        >
-          Refresh
-        </button>
       </div>
 
       {loading ? (

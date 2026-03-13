@@ -187,7 +187,6 @@ app.get(
 
 app.get(
   "/uploads/profile-avatars/:filename",
-  requireAuth,
   (req, res) => {
     try {
       const requested = String(req.params.filename || "");

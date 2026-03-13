@@ -412,12 +412,14 @@ export default function Sidebar({
   unreadNotifications = 0,
   pendingApplicants = 0,
   forReviewTasks = 0,
+  pendingEmergencies = 0,
   pendingEmergencyApprovals = 0,
 }: {
   collapsed?: boolean;
   unreadNotifications?: number;
   pendingApplicants?: number;
   forReviewTasks?: number;
+  pendingEmergencies?: number;
   pendingEmergencyApprovals?: number;
 }) {
   const location = useLocation();
@@ -541,6 +543,8 @@ export default function Sidebar({
                   badgeCount={
                     item.to === "/lgu/notifications"
                       ? unreadNotifications
+                      : item.to === "/lgu/emergencies"
+                        ? pendingEmergencies
                       : item.to === "/lgu/approvals"
                         ? pendingEmergencyApprovals
                         : 0

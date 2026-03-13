@@ -1,6 +1,7 @@
 import { useCallback, useEffect } from "react";
 import { useRouter } from "expo-router";
-import { View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../../auth/AuthProvider";
 import { useTasksAccess } from "../../auth/hooks/useTasksAccess";
 import { RefreshableScrollScreen } from "../../common/components/RefreshableScrollScreen";
@@ -13,7 +14,6 @@ import { DailyFocusStatsCard } from "../components/DailyFocusStatsCard";
 import { PendingDispatchCard } from "../components/PendingDispatchCard";
 import { TaskSection } from "../components/TaskSection";
 import { TaskSearchBar } from "../components/TaskSearchBar";
-import { TasksHeader } from "../components/TasksHeader";
 import { TasksTabs } from "../components/TasksTabs";
 
 export function TasksScreen() {
@@ -81,13 +81,16 @@ export function TasksScreen() {
 
   return (
     <View className="flex-1 bg-white">
-      <TasksHeader />
-      <View className="px-5">
-        <DailyFocusStatsCard stats={tasks.focusStats} />
-        <View className="mt-3">
+      <SafeAreaView edges={["top"]} style={styles.topSafeArea}>
+        <View style={styles.topContent}>
+          <View style={styles.searchSection}>
           <TaskSearchBar value={tasks.searchQuery} onChangeText={tasks.setSearchQuery} />
+          </View>
+          <View style={styles.focusSection}>
+            <DailyFocusStatsCard stats={tasks.focusStats} />
+          </View>
         </View>
-      </View>
+      </SafeAreaView>
 
       <TasksTabs tabs={tasks.tabs} activeTab={tasks.activeTab} onChange={tasks.setActiveTab} />
 
@@ -108,3 +111,19 @@ export function TasksScreen() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  topSafeArea: {
+    backgroundColor: "#FFFFFF",
+  },
+  topContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  searchSection: {
+    paddingTop: 8,
+  },
+  focusSection: {
+    marginTop: 12,
+  },
+});

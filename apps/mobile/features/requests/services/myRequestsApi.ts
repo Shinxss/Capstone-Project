@@ -21,8 +21,23 @@ function normalizeTrackingLabel(raw: unknown): TrackingLabel {
   if (normalized === "arrived") return "Arrived";
   if (normalized === "review") return "Review";
   if (normalized === "resolved") return "Resolved";
-  if (normalized === "cancelled") return "Cancelled";
+  if (normalized === "cancelled" || normalized === "canceled" || normalized === "rejected") {
+    return "Cancelled";
+  }
   return "Submitted";
+}
+
+function isCancelledLike(raw: unknown): boolean {
+  const normalized = String(raw ?? "").trim().toLowerCase();
+  return normalized === "cancelled" || normalized === "canceled" || normalized === "rejected";
+}
+
+function isCancelledLikeSummary(raw: any): boolean {
+  return (
+    isCancelledLike(raw?.trackingLabel) ||
+    isCancelledLike(raw?.trackingStatus) ||
+    isCancelledLike(raw?.status)
+  );
 }
 
 function normalizeLocation(raw: any) {
@@ -52,9 +67,10 @@ function normalizeLocationText(raw: any, location: { lng: number; lat: number })
 
 function normalizeSummary(raw: any): MyRequestSummary {
   const location = normalizeLocation(raw);
-  const trackingLabel = normalizeTrackingLabel(raw?.trackingLabel ?? raw?.trackingStatus);
+  const trackingLabel = normalizeTrackingLabel(raw?.trackingLabel ?? raw?.trackingStatus ?? raw?.status);
   const etaValue = Number(raw?.etaSeconds);
   const etaSeconds = Number.isFinite(etaValue) ? Math.max(0, Math.round(etaValue)) : null;
+  const rejectionReason = String(raw?.rejectionReason ?? "").trim();
 
   return {
     id: String(raw?.id ?? ""),
@@ -66,6 +82,7 @@ function normalizeSummary(raw: any): MyRequestSummary {
     createdAt: String(raw?.createdAt ?? new Date().toISOString()),
     location,
     locationText: normalizeLocationText(raw, location),
+    ...(rejectionReason ? { rejectionReason } : {}),
     etaSeconds,
     lastUpdatedAt:
       raw?.lastUpdatedAt === null || raw?.lastUpdatedAt === undefined
@@ -95,17 +112,24 @@ export async function getCountsByStatus(): Promise<MyRequestCountsByStatus> {
 
 export async function getMyRequests(params: { tab: MyRequestStatusTab }): Promise<MyRequestSummary[]> {
   const tab = normalizeMyRequestStatusTab(params.tab, "all");
+  const requestTab: MyRequestStatusTab = tab === "cancelled" ? "all" : tab;
   const res = await api.get<MyRequestSummary[]>(`${MY_REQUESTS_BASE}/my`, {
-    params: { tab },
+    params: { tab: requestTab },
   });
   if (!Array.isArray(res.data)) return [];
-  return res.data.map(normalizeSummary);
+  const normalized = res.data.map(normalizeSummary);
+  if (tab === "cancelled") {
+    return normalized.filter((item) => isCancelledLikeSummary(item));
+  }
+  return normalized;
 }
 
 export async function fetchMyActiveRequest(): Promise<MyRequestSummary | null> {
   try {
     const res = await api.get<MyRequestSummary>(`${MY_REQUESTS_BASE}/my/active`);
-    return normalizeSummary(res.data);
+    const normalized = normalizeSummary(res.data);
+    if (isCancelledLikeSummary(normalized)) return null;
+    return normalized;
   } catch (error) {
     if (axios.isAxiosError(error) && error.response?.status === 404) return null;
     throw error;
@@ -125,5 +149,15 @@ export async function fetchMyRequestTracking(id: string): Promise<MyRequestTrack
   if (!requestId) throw new Error("Request id is required");
 
   const res = await api.get<MyRequestTrackingDTO>(`${MY_REQUESTS_BASE}/my/${requestId}/tracking`);
+  return res.data;
+}
+
+export async function cancelMyRequest(id: string): Promise<{ incidentId: string; referenceNumber: string; status: string }> {
+  const requestId = String(id ?? "").trim();
+  if (!requestId) throw new Error("Request id is required");
+
+  const res = await api.patch<{ incidentId: string; referenceNumber: string; status: string }>(
+    `${MY_REQUESTS_BASE}/my/${requestId}/cancel`
+  );
   return res.data;
 }

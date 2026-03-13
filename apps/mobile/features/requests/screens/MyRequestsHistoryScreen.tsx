@@ -8,10 +8,10 @@ import { usePullToRefresh } from "../../common/hooks/usePullToRefresh";
 import { MyRequestsHeader, type MyRequestsHeaderTabOption } from "../components/MyRequestsHeader";
 import { RequestHistoryCard } from "../components/RequestHistoryCard";
 import { useMyRequestsHistory } from "../hooks/useMyRequestsHistory";
+import { cancelMyRequest } from "../services/myRequestsApi";
 import {
   MY_REQUEST_TAB_LABELS,
   normalizeMyRequestStatusTab,
-  toMyRequestStatusTabFromLabel,
   type MyRequestStatusTab,
   type MyRequestSummary,
 } from "../models/myRequests";
@@ -33,12 +33,8 @@ const STATUS_TABS: MyRequestsHeaderTabOption<MyRequestStatusTab>[] = STATUS_TAB_
   label: MY_REQUEST_TAB_LABELS[tab],
 }));
 
-function actionLabelForStatus(item: MyRequestSummary): string | null {
-  const tab = toMyRequestStatusTabFromLabel(item.trackingLabel);
-  if (tab === "assigned" || tab === "en_route" || tab === "arrived") return "Track";
-  if (tab === "review") return "Rate";
-  if (tab === "resolved" || tab === "cancelled") return "View Details";
-  return null;
+function actionLabelForStatus(): string {
+  return "View Tracking Details";
 }
 
 export function MyRequestsHistoryScreen() {
@@ -51,6 +47,7 @@ export function MyRequestsHistoryScreen() {
   );
   const [activeTab, setActiveTab] = useState<MyRequestStatusTab>(initialTab);
   const [searchValue, setSearchValue] = useState("");
+  const [cancellingRequestId, setCancellingRequestId] = useState<string | null>(null);
   const { items, loading, error, refresh } = useMyRequestsHistory(activeTab, { enabled: isUser });
   const refreshHistory = useCallback(async () => {
     await refresh();
@@ -91,16 +88,49 @@ export function MyRequestsHistoryScreen() {
   );
 
   const onPressAction = useCallback(
-    (item: MyRequestSummary) => {
-      const action = actionLabelForStatus(item);
-      if (action === "Rate") {
-        Alert.alert("Rate Request", "Rating flow will be available soon.");
-        return;
-      }
-
+    (item: { id: string }) => {
       openTracking(item.id);
     },
     [openTracking]
+  );
+
+  const onPressCancel = useCallback(
+    (item: MyRequestSummary) => {
+      if (item.trackingLabel !== "Submitted") return;
+      const requestId = String(item.id ?? "").trim();
+      if (!requestId) return;
+
+      Alert.alert(
+        "Cancel request?",
+        "This will mark your emergency request as cancelled.",
+        [
+          { text: "Keep request", style: "cancel" },
+          {
+            text: "Cancel request",
+            style: "destructive",
+            onPress: () => {
+              void (async () => {
+                setCancellingRequestId(requestId);
+                try {
+                  await cancelMyRequest(requestId);
+                  await refreshHistory();
+                  Alert.alert("Request cancelled", "Your emergency request has been cancelled.");
+                } catch (e: any) {
+                  const message =
+                    e?.response?.data?.message ??
+                    e?.message ??
+                    "Unable to cancel this request right now.";
+                  Alert.alert("Unable to cancel", String(message));
+                } finally {
+                  setCancellingRequestId((prev) => (prev === requestId ? null : prev));
+                }
+              })();
+            },
+          },
+        ]
+      );
+    },
+    [refreshHistory]
   );
 
   const filteredItems = useMemo(() => {
@@ -162,9 +192,18 @@ export function MyRequestsHistoryScreen() {
         renderItem={({ item }) => (
           <RequestHistoryCard
             item={item}
-            actionLabel={actionLabelForStatus(item)}
+            actionLabel={actionLabelForStatus()}
             onPress={() => onPressCard(item)}
             onPressAction={() => onPressAction(item)}
+            cancelLabel={
+              item.trackingLabel === "Submitted" || item.trackingLabel === "Assigned"
+                ? cancellingRequestId === item.id
+                  ? "Cancelling..."
+                  : "Cancel Request"
+                : null
+            }
+            onPressCancel={() => onPressCancel(item)}
+            cancelDisabled={cancellingRequestId === item.id || item.trackingLabel !== "Submitted"}
           />
         )}
         ListEmptyComponent={

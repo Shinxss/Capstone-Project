@@ -7,7 +7,7 @@ export default function AdminNotifications() {
 
   return (
     <AdminShell title="Notifications" subtitle="Task updates, emergencies, and verification activity">
-      <LguNotificationsView {...vm} loading={vm.loading} error={vm.error} onRefresh={vm.refresh} />
+      <LguNotificationsView {...vm} loading={vm.loading} error={vm.error} onRefresh={vm.refresh} showRefreshButton={false} />
     </AdminShell>
   );
 }

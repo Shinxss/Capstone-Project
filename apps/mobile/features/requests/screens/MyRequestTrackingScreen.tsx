@@ -3,7 +3,9 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
+  Platform,
   Pressable,
+  StatusBar,
   StyleSheet,
   Text,
   View,
@@ -11,12 +13,12 @@ import {
 import MapboxGL from "@rnmapbox/maps";
 import { useLocalSearchParams, router } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useSession } from "../../auth/hooks/useSession";
 import { usePullToRefresh } from "../../common/hooks/usePullToRefresh";
 import { RefreshableScrollScreen } from "../../common/components/RefreshableScrollScreen";
 import { useRequestLiveTracking } from "../hooks/useRequestLiveTracking";
+import type { TrackingLabel } from "../models/myRequests";
 import { formatEtaText, formatTrackingHeadline } from "../utils/formatters";
 
 const TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? "";
@@ -67,10 +69,25 @@ function statusPillStyles(label: string) {
   if (normalized === "EN ROUTE") {
     return { bg: "#FEF3C7", border: "#FCD34D", text: "#B45309" };
   }
-  if (normalized === "CANCELLED") {
+  if (normalized === "CANCELLED" || normalized === "CANCELED" || normalized === "REJECTED") {
     return { bg: "#FEE2E2", border: "#FCA5A5", text: "#B91C1C" };
   }
   return { bg: "#E0E7FF", border: "#A5B4FC", text: "#3730A3" };
+}
+
+function normalizeTrackingLabel(raw: unknown): TrackingLabel {
+  const normalized = String(raw ?? "").trim().toLowerCase();
+  if (normalized === "submitted") return "Submitted";
+  if (normalized === "verification") return "Verification";
+  if (normalized === "assigned") return "Assigned";
+  if (normalized === "en route") return "En Route";
+  if (normalized === "arrived") return "Arrived";
+  if (normalized === "review") return "Review";
+  if (normalized === "resolved") return "Resolved";
+  if (normalized === "cancelled" || normalized === "canceled" || normalized === "rejected") {
+    return "Cancelled";
+  }
+  return "Submitted";
 }
 
 export function MyRequestTrackingScreen() {
@@ -100,14 +117,43 @@ export function MyRequestTrackingScreen() {
     [data?.tracking?.responderLocation]
   );
   const routeGeometry = data?.tracking?.routeGeometry ?? null;
-  const trackingLabel = data?.tracking?.label ?? "Submitted";
-  const etaText = formatEtaText(data?.tracking?.etaSeconds, trackingLabel);
-  const headline = formatTrackingHeadline(trackingLabel);
+  const trackingLabel = useMemo(
+    () => normalizeTrackingLabel(data?.tracking?.label),
+    [data?.tracking?.label]
+  );
+  const requestStatus = useMemo(
+    () => String(data?.request?.status ?? "").trim().toUpperCase(),
+    [data?.request?.status]
+  );
+  const rejectionReason = useMemo(
+    () => String(data?.request?.rejectionReason ?? "").trim(),
+    [data?.request?.rejectionReason]
+  );
+  const isClosedRequest = trackingLabel === "Resolved" || trackingLabel === "Cancelled";
+  const isCancelledRequest = trackingLabel === "Cancelled";
+  const isRejectedRequest = isCancelledRequest && requestStatus !== "CANCELLED";
+  const statusMessage = useMemo(() => {
+    if (isRejectedRequest) return "Request rejected by LGU.";
+    if (isCancelledRequest) return "Request cancelled.";
+    return formatEtaText(data?.tracking?.etaSeconds, trackingLabel);
+  }, [data?.tracking?.etaSeconds, isCancelledRequest, isRejectedRequest, trackingLabel]);
+  const headline = useMemo(() => {
+    if (isRejectedRequest) return "Request Rejected";
+    if (isCancelledRequest) return "Request Cancelled";
+    return formatTrackingHeadline(trackingLabel);
+  }, [isCancelledRequest, isRejectedRequest, trackingLabel]);
+  const statusLabelText = useMemo(() => (isRejectedRequest ? "Rejected" : trackingLabel), [isRejectedRequest, trackingLabel]);
+  const reasonText = useMemo(() => {
+    if (!isRejectedRequest) return "";
+    return rejectionReason || "No rejection reason provided by LGU.";
+  }, [isRejectedRequest, rejectionReason]);
   const pillColors = useMemo(() => statusPillStyles(trackingLabel), [trackingLabel]);
   const responderName = useMemo(() => {
     const name = String(data?.tracking?.responder?.name ?? "").trim();
     if (name) return name;
     if (trackingLabel === "Submitted" || trackingLabel === "Assigned") return "Waiting for responder";
+    if (trackingLabel === "Cancelled") return "No active responder";
+    if (trackingLabel === "Resolved") return "Response completed";
     return "Responder details unavailable";
   }, [data?.tracking?.responder?.name, trackingLabel]);
   const locationText = useMemo(() => toLocationText(emergencyCoordinate), [emergencyCoordinate]);
@@ -180,7 +226,7 @@ export function MyRequestTrackingScreen() {
 
   if (!isUser) {
     return (
-      <SafeAreaView style={styles.safe}>
+      <View style={styles.safe}>
         <View style={styles.stateWrap}>
           <Text style={styles.stateTitle}>Sign in required</Text>
           <Text style={styles.stateSub}>Please sign in to access request tracking.</Text>
@@ -188,13 +234,13 @@ export function MyRequestTrackingScreen() {
             <Text style={styles.actionBtnText}>Go to Login</Text>
           </Pressable>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (!requestId) {
     return (
-      <SafeAreaView style={styles.safe}>
+      <View style={styles.safe}>
         <View style={styles.stateWrap}>
           <Text style={styles.stateTitle}>Invalid request</Text>
           <Text style={styles.stateSub}>Missing request id.</Text>
@@ -202,24 +248,24 @@ export function MyRequestTrackingScreen() {
             <Text style={styles.actionBtnText}>Go Back</Text>
           </Pressable>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (loading && !data) {
     return (
-      <SafeAreaView style={styles.safe}>
+      <View style={styles.safe}>
         <View style={styles.stateWrap}>
           <ActivityIndicator size="small" color="#DC2626" />
           <Text style={styles.stateSub}>Loading tracking details...</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (!data) {
     return (
-      <SafeAreaView style={styles.safe}>
+      <View style={styles.safe}>
         <View style={styles.stateWrap}>
           <Text style={styles.stateTitle}>Tracking unavailable</Text>
           <Text style={styles.stateSub}>{error ?? "Unable to load tracking details."}</Text>
@@ -227,17 +273,25 @@ export function MyRequestTrackingScreen() {
             <Text style={styles.actionBtnText}>Retry</Text>
           </Pressable>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
-      <View style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={8}>
-          <Ionicons name="arrow-back" size={20} color="#111827" />
-        </Pressable>
-        <Text style={styles.headerTitle}>Request Tracking</Text>
+    <View style={styles.safe}>
+      <View style={styles.headerSection}>
+        <View style={styles.headerRow}>
+          <Pressable
+            style={styles.headerBackButton}
+            onPress={() => router.back()}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+          >
+            <Ionicons name="arrow-back" size={22} color="#18181B" />
+          </Pressable>
+          <Text style={styles.headerTitle}>Request Tracking</Text>
+        </View>
       </View>
 
       <RefreshableScrollScreen
@@ -255,7 +309,7 @@ export function MyRequestTrackingScreen() {
               },
             ]}
           >
-            <Text style={[styles.statusPillText, { color: pillColors.text }]}>{trackingLabel}</Text>
+            <Text style={[styles.statusPillText, { color: pillColors.text }]}>{statusLabelText}</Text>
           </View>
 
           <Text style={styles.summaryHeadline}>{headline}</Text>
@@ -267,9 +321,27 @@ export function MyRequestTrackingScreen() {
           </View>
 
           <View style={styles.infoRow}>
-            <Ionicons name="time-outline" size={18} color="#D97706" />
-            <Text style={[styles.infoRowText, styles.infoRowTextAccent]}>{etaText}</Text>
+            <Ionicons
+              name={isCancelledRequest || isRejectedRequest ? "alert-circle-outline" : "time-outline"}
+              size={18}
+              color={isCancelledRequest || isRejectedRequest ? "#B91C1C" : "#D97706"}
+            />
+            <Text
+              style={[
+                styles.infoRowText,
+                isCancelledRequest || isRejectedRequest ? styles.infoRowTextDanger : styles.infoRowTextAccent,
+              ]}
+            >
+              {statusMessage}
+            </Text>
           </View>
+
+          {isRejectedRequest ? (
+            <View style={styles.rejectionReasonWrap}>
+              <Text style={styles.rejectionReasonTitle}>Reason from LGU</Text>
+              <Text style={styles.rejectionReasonText}>{reasonText}</Text>
+            </View>
+          ) : null}
 
           <View style={styles.infoRow}>
             <Ionicons name="person-outline" size={18} color="#6B7280" />
@@ -291,9 +363,11 @@ export function MyRequestTrackingScreen() {
 
           <Text style={styles.metaText}>Reference {data.request.referenceNumber}</Text>
           <Text style={styles.metaText}>Created {createdAtText}</Text>
-          <Text style={styles.liveText}>LIVE updated {lastUpdatedAgoText}</Text>
+          <Text style={[styles.liveText, isClosedRequest ? styles.liveTextClosed : null]}>
+            {isClosedRequest ? `Updated ${lastUpdatedAgoText}` : `LIVE updated ${lastUpdatedAgoText}`}
+          </Text>
 
-          {responderPhone ? (
+          {responderPhone && !isClosedRequest ? (
             <Pressable style={styles.callBtn} onPress={() => void onCallResponder()}>
               <Ionicons name="call" size={15} color="#FFFFFF" />
               <Text style={styles.callBtnText}>Call Responder</Text>
@@ -357,26 +431,30 @@ export function MyRequestTrackingScreen() {
 
             {!responderCoordinate ? (
               <View style={styles.mapHint}>
-                <Text style={styles.mapHintText}>Waiting for responder location...</Text>
+                <Text style={styles.mapHintText}>
+                  {isCancelledRequest ? "Request was cancelled." : "Waiting for responder location..."}
+                </Text>
               </View>
             ) : null}
           </View>
         </View>
 
-        <View style={styles.timelineCard}>
-          <Text style={styles.timelineTitle}>Progress</Text>
-          {data.timeline.steps.map((step, index) => {
-            const isActive = index <= data.timeline.activeStepIndex;
-            return (
-              <View key={`${step}-${index}`} style={styles.timelineRow}>
-                <View style={[styles.timelineDot, isActive ? styles.timelineDotActive : null]} />
-                <Text style={[styles.timelineText, isActive ? styles.timelineTextActive : null]}>{step}</Text>
-              </View>
-            );
-          })}
-        </View>
+        {!isCancelledRequest ? (
+          <View style={styles.timelineCard}>
+            <Text style={styles.timelineTitle}>Progress</Text>
+            {data.timeline.steps.map((step, index) => {
+              const isActive = index <= data.timeline.activeStepIndex;
+              return (
+                <View key={`${step}-${index}`} style={styles.timelineRow}>
+                  <View style={[styles.timelineDot, isActive ? styles.timelineDotActive : null]} />
+                  <Text style={[styles.timelineText, isActive ? styles.timelineTextActive : null]}>{step}</Text>
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
       </RefreshableScrollScreen>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -385,26 +463,29 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F5F5F5",
   },
-  header: {
-    height: 56,
-    paddingHorizontal: 16,
-    flexDirection: "row",
-    alignItems: "center",
+  headerSection: {
+    paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight ?? 0) : 0,
     borderBottomWidth: 1,
     borderBottomColor: "#E5E7EB",
-    backgroundColor: "#F5F5F5",
+    backgroundColor: "#FFFFFF",
   },
-  backBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+  headerRow: {
+    minHeight: 56,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+  },
+  headerBackButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
+    marginRight: 8,
   },
   headerTitle: {
-    marginLeft: 8,
-    fontSize: 28,
-    fontWeight: "800",
+    fontSize: 24,
+    fontWeight: "900",
     color: "#111827",
   },
   content: {
@@ -460,6 +541,31 @@ const styles = StyleSheet.create({
     color: "#D97706",
     fontWeight: "800",
   },
+  infoRowTextDanger: {
+    color: "#B91C1C",
+    fontWeight: "800",
+  },
+  rejectionReasonWrap: {
+    marginTop: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    backgroundColor: "#FEF2F2",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  rejectionReasonTitle: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#991B1B",
+  },
+  rejectionReasonText: {
+    marginTop: 4,
+    fontSize: 12,
+    lineHeight: 17,
+    color: "#7F1D1D",
+    fontWeight: "600",
+  },
   detailsText: {
     marginTop: 10,
     fontSize: 13,
@@ -476,6 +582,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#DC2626",
     fontWeight: "800",
+  },
+  liveTextClosed: {
+    color: "#6B7280",
   },
   callBtn: {
     marginTop: 12,

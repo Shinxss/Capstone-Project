@@ -52,10 +52,17 @@ export async function listAdminAnnouncements(params?: {
   status?: AdminAnnouncementStatus | "";
   q?: string;
 }) {
+  const query = {
+    page: params?.page,
+    limit: params?.limit,
+    status: params?.status || undefined,
+    q: params?.q?.trim() ? params.q.trim() : undefined,
+  };
+
   const res = await api.get<{
     items: AnnouncementDto[];
     pagination: { page: number; limit: number; total: number; totalPages: number };
-  }>("/api/admin/announcements", { params });
+  }>("/api/admin/announcements", { params: query });
 
   return {
     items: (res.data.items ?? []).map(mapAnnouncement),

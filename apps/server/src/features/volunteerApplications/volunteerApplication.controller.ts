@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { AUDIT_EVENT } from "../audit/audit.constants";
 import { logAudit } from "../audit/audit.service";
+import { emitNotificationsRefresh } from "../../realtime/notificationsSocket";
 import {
   getMyLatestApplication,
   getVolunteerApplicationByIdForReviewer,
@@ -47,6 +48,9 @@ export async function postVolunteerApplication(req: Request, res: Response) {
       },
       metadata: { status: (created as any)?.status ?? "pending_verification" },
     });
+
+    // Notify LGU/Admin dashboards so sidebar applicant badges refresh immediately.
+    emitNotificationsRefresh("volunteer_application_submitted", ["LGU", "ADMIN"]);
 
     return res.status(201).json(created);
   } catch (e: any) {
@@ -103,6 +107,8 @@ export async function postReview(req: Request<IdParams>, res: Response) {
     },
     metadata: { action: parsed.data.action },
   });
+
+  emitNotificationsRefresh("volunteer_application_reviewed", ["LGU", "ADMIN"]);
 
   return res.json(updated);
 }

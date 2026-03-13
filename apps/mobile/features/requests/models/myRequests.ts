@@ -52,6 +52,7 @@ export type MyRequestSummary = {
   trackingLabel: TrackingLabel;
   trackingStatus: TrackingLabel;
   status: string;
+  rejectionReason?: string;
   createdAt: string;
   locationText: string;
   etaSeconds?: number | null;
@@ -81,6 +82,7 @@ export type MyRequestTrackingDTO = {
     type: string;
     createdAt: string;
     status: string;
+    rejectionReason?: string;
     location: {
       lng: number;
       lat: number;
@@ -117,6 +119,9 @@ export function normalizeMyRequestStatusTab(
     .trim()
     .toLowerCase()
     .replace("-", "_");
+  if (normalized === "canceled" || normalized === "rejected") {
+    return "cancelled";
+  }
   if (MY_REQUEST_STATUS_TABS.includes(normalized as MyRequestStatusTab)) {
     return normalized as MyRequestStatusTab;
   }
@@ -132,6 +137,8 @@ export function toMyRequestStatusTabFromLabel(label: unknown): Exclude<MyRequest
   if (normalized === "arrived") return "arrived";
   if (normalized === "review") return "review";
   if (normalized === "resolved") return "resolved";
-  if (normalized === "cancelled") return "cancelled";
+  if (normalized === "cancelled" || normalized === "canceled" || normalized === "rejected") {
+    return "cancelled";
+  }
   return "submitted";
 }

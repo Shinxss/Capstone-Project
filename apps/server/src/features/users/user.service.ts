@@ -11,6 +11,7 @@ export type DispatchVolunteer = {
   skill: string;
   barangay?: string;
   municipality?: string;
+  avatarUrl?: string;
 };
 
 export type ListDispatchVolunteersParams = {
@@ -80,7 +81,7 @@ export async function listDispatchVolunteers(
   if (!includeInactive) match.isActive = true;
 
   const users = await User.find(match)
-    .select("_id firstName lastName isActive barangay municipality")
+    .select("_id firstName lastName isActive barangay municipality avatarUrl")
     .sort({ createdAt: -1 })
     .lean();
 
@@ -120,6 +121,7 @@ export async function listDispatchVolunteers(
       skill,
       barangay,
       municipality,
+      avatarUrl: safeStr(u.avatarUrl) || undefined,
     };
   });
 }

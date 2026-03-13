@@ -1,11 +1,17 @@
-import { Text, View } from "react-native";
+import { useRouter } from "expo-router";
 import { TASKS_SCREEN_COPY } from "../constants/dispatchUi.constants";
+import { ReportEmergencyHeader } from "../../report/components/ReportEmergencyHeader";
 
 export function TasksHeader() {
+  const router = useRouter();
+
   return (
-    <View className="px-5 pb-3 pt-6">
-      <Text className="text-3xl font-extrabold text-slate-900">{TASKS_SCREEN_COPY.title}</Text>
-      <Text className="mt-1 text-sm font-medium text-red-700">{TASKS_SCREEN_COPY.subtitle}</Text>
-    </View>
+    <ReportEmergencyHeader
+      title={TASKS_SCREEN_COPY.title}
+      subtitle={TASKS_SCREEN_COPY.subtitle}
+      onBack={() => router.back()}
+      showProgressBar={false}
+      backgroundColor="#FFFFFF"
+    />
   );
 }

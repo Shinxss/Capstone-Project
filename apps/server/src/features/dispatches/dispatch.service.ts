@@ -43,6 +43,7 @@ export type CreateDispatchInput = {
   emergencyId: string;
   volunteerIds: string[];
   createdByUserId: string;
+  createdByRole?: string;
 };
 
 export async function createDispatchOffers(input: CreateDispatchInput) {
@@ -54,6 +55,18 @@ export async function createDispatchOffers(input: CreateDispatchInput) {
   const emergency = await EmergencyReport.findById(emergencyId);
   if (!emergency) {
     throw new Error("Emergency not found");
+  }
+
+  const createdByUserId = String(input.createdByUserId ?? "").trim();
+  const createdByRole = String(input.createdByRole ?? "").trim().toUpperCase();
+  const reporterUserId = String(emergency.reportedBy ?? "").trim();
+  if (
+    createdByRole === "LGU" &&
+    Types.ObjectId.isValid(createdByUserId) &&
+    Types.ObjectId.isValid(reporterUserId) &&
+    createdByUserId === reporterUserId
+  ) {
+    throw new Error("LGU cannot dispatch volunteers to their own emergency report.");
   }
 
   // Once responders are dispatched, treat the incident as acknowledged.
@@ -79,6 +92,10 @@ export async function createDispatchOffers(input: CreateDispatchInput) {
   const validVolunteerIds = volunteers.map((v) => String(v._id));
   if (validVolunteerIds.length === 0) {
     throw new Error("No valid approved volunteers found");
+  }
+
+  if (Types.ObjectId.isValid(reporterUserId) && validVolunteerIds.includes(reporterUserId)) {
+    throw new Error("Reporter cannot be dispatched to their own emergency report.");
   }
 
   // Avoid duplicate PENDING offers for the same emergency/volunteer pair.
@@ -117,7 +134,7 @@ export async function createDispatchOffers(input: CreateDispatchInput) {
     snapshot.barangayName = barangay?.name ? String(barangay.name) : null;
   }
 
-  const createdBy = new Types.ObjectId(input.createdByUserId);
+  const createdBy = new Types.ObjectId(createdByUserId);
 
   const docs = dispatchableVolunteerIds.map((volunteerId) => ({
     emergencyId: new Types.ObjectId(emergencyId),
@@ -258,6 +275,19 @@ export async function respondToDispatch(params: {
   }
 
   if (decision === "ACCEPT") {
+    const emergency = await EmergencyReport.findById(offer.emergencyId).select("reportedBy").lean();
+    const reporterUserId = String(emergency?.reportedBy ?? "").trim();
+    if (
+      Types.ObjectId.isValid(reporterUserId) &&
+      reporterUserId === String(volunteerUserId).trim()
+    ) {
+      offer.status = "CANCELLED";
+      offer.respondedAt = new Date();
+      await offer.save();
+      await syncVolunteerBusyState(String(offer.volunteerId)).catch(() => undefined);
+      throw new Error("Reporter cannot accept dispatch for their own emergency report.");
+    }
+
     offer.status = "ACCEPTED";
   } else {
     offer.status = "DECLINED";

@@ -79,7 +79,7 @@ export async function fetchEmergencyMapReports(): Promise<MapEmergencyReport[]> 
 export async function fetchMyEmergencyMapReports(): Promise<MapEmergencyReport[]> {
   const res = await api.get<{ data?: MapEmergencyReport[] }>(`${EMERGENCY_REPORTS_BASE}/my/map`);
   const rows = Array.isArray(res.data?.data) ? res.data.data : [];
-  return normalizeMapRows(rows);
+  return normalizeMapRows(rows, { includeHidden: true });
 }
 
 type FetchEmergencyMapReportsOptions = {
@@ -129,17 +129,27 @@ function isClosedMapFeedStatus(raw?: string) {
   return normalized === "resolved" || normalized === "cancelled";
 }
 
-function normalizeMapRows(rows: MapEmergencyReport[]) {
+function isRejectedVerificationStatus(raw?: string) {
+  return String(raw ?? "").trim().toLowerCase() === "rejected";
+}
+
+function toTimestamp(value?: string) {
+  const ts = new Date(String(value ?? "")).getTime();
+  return Number.isFinite(ts) ? ts : 0;
+}
+
+function normalizeMapRows(
+  rows: MapEmergencyReport[],
+  options?: {
+    includeHidden?: boolean;
+  }
+) {
+  const includeHidden = Boolean(options?.includeHidden);
   const byId = new Map<string, MapEmergencyReport>();
 
   rows.forEach((item) => {
     const incidentId = String(item?.incidentId ?? "").trim();
     if (!incidentId) return;
-    if (isClosedMapFeedStatus(item?.status)) return;
-
-    const lng = Number(item?.location?.coords?.longitude);
-    const lat = Number(item?.location?.coords?.latitude);
-    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return;
 
     const current = byId.get(incidentId);
     if (!current) {
@@ -147,18 +157,24 @@ function normalizeMapRows(rows: MapEmergencyReport[]) {
       return;
     }
 
-    const currentTs = new Date(String(current.createdAt ?? "")).getTime();
-    const nextTs = new Date(String(item.createdAt ?? "")).getTime();
+    const currentTs = toTimestamp(current.createdAt);
+    const nextTs = toTimestamp(item.createdAt);
     if (nextTs > currentTs) {
       byId.set(incidentId, item);
     }
   });
 
-  return [...byId.values()].sort((a, b) => {
-    const ta = new Date(String(a.createdAt ?? "")).getTime();
-    const tb = new Date(String(b.createdAt ?? "")).getTime();
-    return (Number.isFinite(tb) ? tb : 0) - (Number.isFinite(ta) ? ta : 0);
-  });
+  return [...byId.values()]
+    .filter((item) => {
+      if (isClosedMapFeedStatus(item?.status)) return false;
+      if (isRejectedVerificationStatus(item?.verificationStatus)) return false;
+      if (!includeHidden && item?.isVisibleOnMap === false) return false;
+
+      const lng = Number(item?.location?.coords?.longitude);
+      const lat = Number(item?.location?.coords?.latitude);
+      return Number.isFinite(lng) && Number.isFinite(lat);
+    })
+    .sort((a, b) => toTimestamp(b.createdAt) - toTimestamp(a.createdAt));
 }
 
 function mapLegacyReportToMapFeed(raw: LegacyEmergencyReport): MapEmergencyReport | null {

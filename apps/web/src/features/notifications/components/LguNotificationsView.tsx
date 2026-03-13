@@ -24,6 +24,7 @@ type Props = ReturnType<typeof useLguNotifications> & {
   loading: boolean;
   error: string | null;
   onRefresh: () => void;
+  showRefreshButton?: boolean;
 };
 
 function isSosNotification(notification: LguNotification) {
@@ -161,6 +162,7 @@ export default function LguNotificationsView(props: Props) {
     detailsOpen,
     selected,
     closeDetails,
+    showRefreshButton = true,
   } = props;
 
   const viewingArchived = filters.scope === "ARCHIVED";
@@ -208,14 +210,16 @@ export default function LguNotificationsView(props: Props) {
               {viewingArchived ? <ArchiveRestore size={16} /> : <Archive size={16} />}
               {viewingArchived ? "Unarchive all" : "Archive all"}
             </button>
-            <button
-              type="button"
-              onClick={onRefresh}
-              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50 dark:border-[#162544] dark:bg-[#0E1626] dark:text-slate-300 dark:hover:bg-[#122036]"
-            >
-              <RefreshCw size={16} />
-              Refresh
-            </button>
+            {showRefreshButton ? (
+              <button
+                type="button"
+                onClick={onRefresh}
+                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50 dark:border-[#162544] dark:bg-[#0E1626] dark:text-slate-300 dark:hover:bg-[#122036]"
+              >
+                <RefreshCw size={16} />
+                Refresh
+              </button>
+            ) : null}
           </div>
         </div>
 

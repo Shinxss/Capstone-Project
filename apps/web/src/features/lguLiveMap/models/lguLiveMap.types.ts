@@ -14,6 +14,7 @@ export type Volunteer = {
   skill: string;
   barangayName?: string;
   municipality?: string;
+  avatarUrl?: string;
 };
 
 export type MapStyleKey = "satellite-streets-v12" | "streets-v12" | "dark-v11";

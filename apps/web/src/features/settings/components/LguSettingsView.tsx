@@ -7,6 +7,7 @@ type Props = ReturnType<typeof useLguSettings> & {
   error: string | null;
   onRefresh: () => void;
   mode?: "full" | "notifications";
+  showRefreshButton?: boolean;
 };
 
 function ChannelCheckbox({
@@ -121,7 +122,7 @@ function ErrorPanel({ error, onRetry }: { error: string; onRetry: () => void }) 
 
 export default function LguSettingsView(props: Props) {
   const confirm = useConfirm();
-  const { loading, error, onRefresh, save, saving, savedAt, settings, update, reset, mode = "full" } = props;
+  const { loading, error, onRefresh, save, saving, savedAt, settings, update, reset, mode = "full", showRefreshButton = true } = props;
   const notificationsOnly = mode === "notifications";
 
   const setNotificationChannel = (
@@ -168,12 +169,14 @@ export default function LguSettingsView(props: Props) {
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={onRefresh}
-            className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-800 hover:bg-gray-50 dark:bg-[#0E1626] dark:border-[#162544] dark:text-slate-200 dark:hover:bg-[#122036]"
-          >
-            Refresh
-          </button>
+          {showRefreshButton ? (
+            <button
+              onClick={onRefresh}
+              className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-800 hover:bg-gray-50 dark:bg-[#0E1626] dark:border-[#162544] dark:text-slate-200 dark:hover:bg-[#122036]"
+            >
+              Refresh
+            </button>
+          ) : null}
           <button
             onClick={() => void save()}
             disabled={saving}

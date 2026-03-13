@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import {
   approveEmergencyReport,
+  cancelMyEmergencyReport,
   createEmergencyReport,
   getEmergencyReportById,
   getEmergencyReportByReference,
@@ -46,9 +47,7 @@ export async function postEmergencyReport(req: MaybeAuthedRequest, res: Response
       }
     ).catch(() => undefined);
 
-    if (report.isVisibleOnMap) {
-      emitNotificationsRefresh("emergency_reported", ["LGU", "ADMIN"]);
-    }
+    emitNotificationsRefresh("emergency_reported", ["LGU", "ADMIN"]);
 
     return res.status(201).json({
       incidentId: report.incidentId,
@@ -199,6 +198,38 @@ export async function getMyEmergencyTrackingController(req: MaybeAuthedRequest, 
   }
 }
 
+export async function patchMyEmergencyReportCancelController(req: MaybeAuthedRequest, res: Response) {
+  try {
+    if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+
+    const reportId = String(req.params.id ?? "").trim();
+    const result = await cancelMyEmergencyReport(reportId, String(req.user.id));
+
+    if (!result) {
+      return res.status(404).json({ message: "Emergency request not found" });
+    }
+    if (result === "FORBIDDEN") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    if (result === "ALREADY_ASSIGNED") {
+      return res.status(409).json({ message: "Cancellation is disabled once a responder is assigned." });
+    }
+    if (result === "NOT_CANCELLABLE") {
+      return res.status(409).json({ message: "Cancellation is only available while request is submitted." });
+    }
+
+    await notifyRequestTrackingUpdated(result.incidentId, "request_cancelled", {
+      stepOverride: "Cancelled",
+    }).catch(() => undefined);
+
+    emitNotificationsRefresh("emergency_status_updated", ["LGU", "ADMIN"]);
+
+    return res.status(200).json(result);
+  } catch (error: any) {
+    return res.status(500).json({ message: error?.message ?? "Failed to cancel emergency request" });
+  }
+}
+
 export async function listPendingEmergencyApprovalsController(_req: Request, res: Response) {
   try {
     const status = String(_req.query.status ?? "pending");
@@ -255,6 +286,10 @@ export async function rejectEmergencyReportController(req: MaybeAuthedRequest, r
     const updated = await rejectEmergencyReport(String(req.params.id || "").trim(), req.user.id, body.reason);
 
     if (!updated) return res.status(404).json({ message: "Emergency report not found" });
+
+    await notifyRequestTrackingUpdated(updated.incidentId, "verification_rejected", {
+      stepOverride: "Cancelled",
+    }).catch(() => undefined);
 
     await logAudit(req, {
       eventType: AUDIT_EVENT.EMERGENCY_REPORT_APPROVAL,

@@ -52,7 +52,7 @@ function requestUpdateCopy(step: string) {
       body: "Your emergency request has been marked resolved. Please leave a review.",
     };
   }
-  if (normalizedStep === "CANCELLED") {
+  if (normalizedStep === "CANCELLED" || normalizedStep === "CANCELED" || normalizedStep === "REJECTED") {
     return {
       title: "Request cancelled",
       body: "Your emergency request has been cancelled.",

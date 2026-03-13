@@ -9,7 +9,27 @@ type DispatchVolunteerDTO = {
   skill: string;
   barangay?: string;
   municipality?: string;
+  avatarUrl?: string;
 };
+
+function resolveAvatarUrl(value?: string) {
+  const avatar = String(value ?? "").trim();
+  if (!avatar) return undefined;
+  if (/^https?:\/\//i.test(avatar)) return avatar;
+
+  const base = String(api.defaults.baseURL ?? "").trim();
+  if (!base) return avatar;
+
+  try {
+    const baseUrl = new URL(base);
+    const origin = `${baseUrl.protocol}//${baseUrl.host}`;
+    return new URL(avatar, origin).toString();
+  } catch {
+    const normalizedBase = base.endsWith("/") ? base.slice(0, -1) : base;
+    const normalizedPath = avatar.startsWith("/") ? avatar : `/${avatar}`;
+    return `${normalizedBase}${normalizedPath}`;
+  }
+}
 
 export async function fetchDispatchVolunteers(): Promise<Volunteer[]> {
   const res = await api.get<{ data: DispatchVolunteerDTO[] }>("/api/users/volunteers", {
@@ -24,6 +44,7 @@ export async function fetchDispatchVolunteers(): Promise<Volunteer[]> {
     skill: v.skill ?? "General Volunteer",
     barangayName: v.barangay,
     municipality: v.municipality,
+    avatarUrl: resolveAvatarUrl(v.avatarUrl),
     // lng/lat intentionally missing until mobile location is wired
   }));
 }

@@ -113,7 +113,7 @@ function hydrateForm(tab: MasterDataTab, record: MasterDataRecord): FormState {
   };
 }
 
-export default function AdminMasterDataView({ tab, setTab, items, loading, error, busyId, refresh, create, update }: Props) {
+export default function AdminMasterDataView({ tab, setTab, items, loading, error, busyId, create, update }: Props) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<MasterDataRecord | null>(null);
   const [form, setForm] = useState<FormState>(defaultForm());
@@ -164,15 +164,8 @@ export default function AdminMasterDataView({ tab, setTab, items, loading, error
 
           <button
             type="button"
-            onClick={() => void refresh()}
-            className="ml-auto rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 dark:border-[#162544] dark:bg-[#0E1626] dark:text-slate-200 dark:hover:bg-[#122036]"
-          >
-            Refresh
-          </button>
-          <button
-            type="button"
             onClick={openCreate}
-            className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+            className="ml-auto rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
           >
             New record
           </button>

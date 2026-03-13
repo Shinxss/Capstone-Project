@@ -111,6 +111,7 @@ export type MyRequestSummary = {
   locationText: string;
   trackingLabel: MyRequestListTrackingLabel;
   trackingStatus: MyRequestListTrackingLabel;
+  rejectionReason?: string;
   etaSeconds?: number | null;
   lastUpdatedAt?: string | null;
 };
@@ -131,6 +132,7 @@ export type MyRequestTrackingDTO = {
     status: IEmergencyReport["status"];
     location: LocationPoint;
     notes?: string;
+    rejectionReason?: string;
   };
   timeline: {
     steps: TrackingTimelineStep[];
@@ -153,6 +155,17 @@ export type MyRequestTrackingDTO = {
     routeGeometry?: LineStringRouteGeometry | null;
   };
 };
+
+type CancelMyEmergencyReportOutcome =
+  | {
+      incidentId: string;
+      referenceNumber: string;
+      status: IEmergencyReport["status"];
+    }
+  | "FORBIDDEN"
+  | "NOT_CANCELLABLE"
+  | "ALREADY_ASSIGNED"
+  | null;
 
 function toDbEmergencyType(type: CreateEmergencyReportInput["type"]): IEmergencyReport["emergencyType"] {
   switch (type) {
@@ -263,11 +276,13 @@ function pickResponderOffer(offers: any[]) {
 
 function deriveTrackingLabel(
   emergencyStatusRaw: unknown,
-  offers: any[]
+  offers: any[],
+  verificationStatusRaw?: unknown
 ): TrackingLabel {
   const emergencyStatus = String(emergencyStatusRaw ?? "").trim().toUpperCase();
+  const verificationStatus = String(verificationStatusRaw ?? "").trim().toLowerCase();
 
-  if (emergencyStatus === "CANCELLED") return "Cancelled";
+  if (emergencyStatus === "CANCELLED" || verificationStatus === "rejected") return "Cancelled";
   if (emergencyStatus === "RESOLVED" || hasOfferStatus(offers, "VERIFIED")) return "Resolved";
   if (hasOfferStatus(offers, "DONE")) return "Arrived";
   if (hasOfferStatus(offers, "ACCEPTED")) return "En Route";
@@ -304,7 +319,7 @@ function deriveMyRequestStatusTab(report: any, offers: any[]): MappedMyRequestSt
   if (offers.length > 0) {
     return "assigned";
   }
-  if (!Boolean(report?.isSos) && (verificationStatus === "pending" || verificationStatus === "approved")) {
+  if (!Boolean(report?.isSos) && verificationStatus === "pending") {
     return "verification";
   }
   return "submitted";
@@ -450,6 +465,9 @@ async function buildMyRequestSummaryFromReport(
 ): Promise<MyRequestSummary> {
   const includeEta = options?.includeEta === true;
   const mappedTab = options?.mappedTab ?? deriveMyRequestStatusTab(report, offers);
+  const verificationStatus = String(report?.verification?.status ?? "").trim().toLowerCase();
+  const rejectionReason =
+    verificationStatus === "rejected" ? String(report?.verification?.reason ?? "").trim() : "";
   const location = toPointCoordinates(report?.location?.coordinates);
   const safeLocation = location ?? { lng: 0, lat: 0 };
   const label = toMyRequestTrackingLabel(mappedTab, options?.requestedTab);
@@ -479,6 +497,7 @@ async function buildMyRequestSummaryFromReport(
     locationText: toLocationText(report, location),
     trackingLabel: label,
     trackingStatus: label,
+    ...(rejectionReason ? { rejectionReason } : {}),
     etaSeconds: includeEta && mappedTab === "en_route" ? (etaPayload?.etaSeconds ?? null) : null,
     lastUpdatedAt: toIsoString(lastUpdatedAt),
   };
@@ -704,8 +723,7 @@ export async function listMyMapEmergencyReports(
   const docs = await EmergencyReportModel.find({
     reportedBy: new Types.ObjectId(reporterUserId),
     status: { $nin: ["RESOLVED", "CANCELLED"] },
-    "visibility.isVisibleOnMap": true,
-    $or: [{ isSos: true }, { "verification.status": "approved" }],
+    "verification.status": { $ne: "rejected" },
   })
     .sort({ createdAt: -1 })
     .limit(limit)
@@ -855,12 +873,77 @@ export async function rejectEmergencyReport(reportId: string, reviewerUserId: st
   };
 }
 
+export async function cancelMyEmergencyReport(
+  reportId: string,
+  reporterUserId: string
+): Promise<CancelMyEmergencyReportOutcome> {
+  if (!isValidObjectId(reportId) || !Types.ObjectId.isValid(reporterUserId)) return null;
+
+  const report = await EmergencyReportModel.findById(reportId)
+    .select("_id reportedBy referenceNumber status verification")
+    .lean();
+  if (!report) return null;
+
+  if (String(report.reportedBy ?? "") !== reporterUserId) {
+    return "FORBIDDEN";
+  }
+
+  const status = String(report.status ?? "").trim().toUpperCase();
+  if (status === "CANCELLED" || status === "RESOLVED") {
+    return "NOT_CANCELLABLE";
+  }
+
+  const verificationStatus = String(report.verification?.status ?? "").trim().toLowerCase();
+  if (verificationStatus === "rejected") {
+    return "NOT_CANCELLABLE";
+  }
+
+  const offers = await DispatchOffer.find({ emergencyId: report._id })
+    .select("status")
+    .sort({ updatedAt: -1, _id: -1 })
+    .lean();
+
+  const trackingLabel = deriveTrackingLabel(report.status, offers, report.verification?.status);
+  if (trackingLabel !== "Submitted") {
+    if (trackingLabel === "Assigned" || trackingLabel === "En Route" || trackingLabel === "Arrived") {
+      return "ALREADY_ASSIGNED";
+    }
+    return "NOT_CANCELLABLE";
+  }
+
+  const updated = await EmergencyReportModel.findOneAndUpdate(
+    {
+      _id: report._id,
+      reportedBy: new Types.ObjectId(reporterUserId),
+      status: "OPEN",
+    },
+    {
+      $set: {
+        status: "CANCELLED",
+        "visibility.isVisibleOnMap": false,
+      },
+    },
+    { new: true }
+  )
+    .select("_id referenceNumber status")
+    .lean();
+
+  if (!updated) return "NOT_CANCELLABLE";
+
+  return {
+    incidentId: updated._id.toString(),
+    referenceNumber: String(updated.referenceNumber ?? ""),
+    status: updated.status,
+  };
+}
+
 export async function getMyActiveEmergencyReport(reporterUserId: string): Promise<MyRequestSummary | null> {
   if (!Types.ObjectId.isValid(reporterUserId)) return null;
 
   const report = await EmergencyReportModel.findOne({
     reportedBy: new Types.ObjectId(reporterUserId),
     status: { $nin: ["RESOLVED", "CANCELLED"] },
+    "verification.status": { $ne: "rejected" },
   })
     .sort({ createdAt: -1 })
     .select("_id referenceNumber emergencyType status isSos verification createdAt updatedAt location locationLabel")
@@ -898,7 +981,7 @@ export async function listMyEmergencyReports(
   };
 
   if (normalizedOptions.tab === "cancelled") {
-    reportQuery.status = "CANCELLED";
+    reportQuery.$or = [{ status: "CANCELLED" }, { "verification.status": "rejected" }];
   } else if (normalizedOptions.tab === "resolved" || normalizedOptions.tab === "review") {
     reportQuery.status = "RESOLVED";
   }
@@ -1013,7 +1096,7 @@ export async function getMyEmergencyRequestTracking(
   if (!Types.ObjectId.isValid(reportId) || !Types.ObjectId.isValid(reporterUserId)) return null;
 
   const report = await EmergencyReportModel.findById(reportId)
-    .select("_id reportedBy referenceNumber emergencyType status createdAt updatedAt location notes")
+    .select("_id reportedBy referenceNumber emergencyType status verification createdAt updatedAt location notes")
     .lean();
 
   if (!report) return null;
@@ -1031,7 +1114,7 @@ export async function getEmergencyRequestTrackingSnapshot(
   if (!Types.ObjectId.isValid(reportId)) return null;
 
   const report = await EmergencyReportModel.findById(reportId)
-    .select("_id reportedBy referenceNumber emergencyType status createdAt updatedAt location notes")
+    .select("_id reportedBy referenceNumber emergencyType status verification createdAt updatedAt location notes")
     .lean();
 
   if (!report) return null;
@@ -1051,7 +1134,7 @@ async function buildEmergencyRequestTrackingDto(report: any): Promise<MyRequestT
     .populate({ path: "volunteerId", select: "firstName lastName contactNo" })
     .lean();
 
-  const label = deriveTrackingLabel(report.status, offers);
+  const label = deriveTrackingLabel(report.status, offers, report?.verification?.status);
   const activeStepIndex = toTimelineActiveStepIndex(label, report.status, offers);
   const requestLocation = toPointCoordinates(report.location?.coordinates) ?? { lng: 0, lat: 0 };
   const relevantOffer = pickRelevantOffer(offers);
@@ -1082,6 +1165,9 @@ async function buildEmergencyRequestTrackingDto(report: any): Promise<MyRequestT
     report.updatedAt ??
     report.createdAt ??
     new Date();
+  const rejectionReasonRaw = String(report?.verification?.reason ?? "").trim();
+  const verificationStatus = String(report?.verification?.status ?? "").trim().toLowerCase();
+  const rejectionReason = verificationStatus === "rejected" ? rejectionReasonRaw : "";
 
   return {
     request: {
@@ -1092,6 +1178,7 @@ async function buildEmergencyRequestTrackingDto(report: any): Promise<MyRequestT
       status: String(report.status ?? "OPEN").toUpperCase() as IEmergencyReport["status"],
       location: requestLocation,
       ...(String(report.notes ?? "").trim() ? { notes: String(report.notes ?? "").trim() } : {}),
+      ...(rejectionReason ? { rejectionReason } : {}),
     },
     timeline: {
       steps: [...TRACKING_TIMELINE_STEPS],

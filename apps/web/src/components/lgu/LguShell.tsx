@@ -35,6 +35,7 @@ export default function LguShell({ title, subtitle, children }: Props) {
   const {
     pendingApplicants,
     forReviewTasks,
+    pendingEmergencies,
     pendingEmergencyApprovals,
   } = useLguSidebarIndicators();
 
@@ -45,6 +46,7 @@ export default function LguShell({ title, subtitle, children }: Props) {
         unreadNotifications={unreadNotifications}
         pendingApplicants={pendingApplicants}
         forReviewTasks={forReviewTasks}
+        pendingEmergencies={pendingEmergencies}
         pendingEmergencyApprovals={pendingEmergencyApprovals}
       />
 

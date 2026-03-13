@@ -9,7 +9,6 @@ export default function AdminAuditTrailsView({
   query,
   setQuery,
   pagination,
-  refresh,
   canExport,
   exporting,
   onExport,
@@ -65,13 +64,6 @@ export default function AdminAuditTrailsView({
       </div>
 
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => void refresh()}
-          className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 dark:border-[#162544] dark:bg-[#0E1626] dark:text-slate-200 dark:hover:bg-[#122036]"
-        >
-          Refresh
-        </button>
         {canExport ? (
           <button
             type="button"

@@ -3,10 +3,15 @@ import { Animated, Easing, Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 type ReportEmergencyHeaderProps = {
-  step: number;
+  step?: number;
   totalSteps?: number;
   title?: string;
+  subtitle?: string;
+  progress?: number;
   onBack?: () => void;
+  showBackButton?: boolean;
+  showProgressBar?: boolean;
+  backgroundColor?: string;
 };
 
 function clampProgress(value: number) {
@@ -18,10 +23,22 @@ export function ReportEmergencyHeader({
   step,
   totalSteps = 3,
   title = "Report Emergency",
+  subtitle,
+  progress,
   onBack,
+  showBackButton = true,
+  showProgressBar = true,
+  backgroundColor,
 }: ReportEmergencyHeaderProps) {
+  const hasStep = typeof step === "number" && Number.isFinite(step);
+  const safeStep = hasStep ? Math.max(1, Math.round(step)) : 1;
   const safeTotal = Math.max(1, totalSteps);
-  const toProgress = useMemo(() => clampProgress(step / safeTotal), [safeTotal, step]);
+  const helperText = hasStep ? `Step ${safeStep} of ${safeTotal}` : subtitle;
+  const toProgress = useMemo(() => {
+    if (hasStep) return clampProgress(safeStep / safeTotal);
+    if (typeof progress === "number") return clampProgress(progress);
+    return 1;
+  }, [hasStep, progress, safeStep, safeTotal]);
   const progressAnim = useRef(new Animated.Value(toProgress)).current;
   const initialized = useRef(false);
 
@@ -51,29 +68,42 @@ export function ReportEmergencyHeader({
   );
 
   return (
-    <View className="px-4 pb-4 pt-2">
+    <View
+      className="px-4 pb-4 pt-2"
+      style={backgroundColor ? { backgroundColor } : undefined}
+    >
       <View className="flex-row items-center pb-1">
-        <Pressable onPress={onBack} className="h-10 w-10 items-center justify-center">
-          <Ionicons name="arrow-back" size={20} color="#18181b" />
-        </Pressable>
+        {showBackButton ? (
+          <Pressable
+            onPress={onBack}
+            className="h-10 w-10 items-center justify-center"
+            disabled={!onBack}
+          >
+            <Ionicons name="arrow-back" size={20} color={onBack ? "#18181b" : "#a1a1aa"} />
+          </Pressable>
+        ) : (
+          <View className="h-10 w-10" />
+        )}
         <Text className="ml-3 text-2xl font-bold text-zinc-900">{title}</Text>
       </View>
 
-      <View style={{ marginLeft: 52 }}>
-        <Text className="text-sm font-medium text-zinc-500">
-          Step {step} of {safeTotal}
-        </Text>
-      </View>
+      {helperText ? (
+        <View style={{ marginLeft: 52 }}>
+          <Text className="text-sm font-medium text-zinc-500">{helperText}</Text>
+        </View>
+      ) : null}
 
-      <View className="mt-3 -mx-4 h-2 overflow-hidden bg-zinc-300">
-        <Animated.View
-          style={{
-            width: progressWidth,
-            height: "100%",
-            backgroundColor: "#ef4444",
-          }}
-        />
-      </View>
+      {showProgressBar ? (
+        <View className="mt-3 -mx-4 h-2 overflow-hidden bg-zinc-300">
+          <Animated.View
+            style={{
+              width: progressWidth,
+              height: "100%",
+              backgroundColor: "#ef4444",
+            }}
+          />
+        </View>
+      ) : null}
     </View>
   );
 }

@@ -11,7 +11,7 @@ function metricCard(label: string, value: number, accent: string) {
   );
 }
 
-export default function AdminAnalyticsView({ range, setRange, data, loading, error, refresh }: Props) {
+export default function AdminAnalyticsView({ range, setRange, data, loading, error }: Props) {
   return (
     <div className="space-y-4 p-4 md:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -27,13 +27,6 @@ export default function AdminAnalyticsView({ range, setRange, data, loading, err
             <option value="7d">Last 7 days</option>
             <option value="30d">Last 30 days</option>
           </select>
-          <button
-            type="button"
-            onClick={() => void refresh()}
-            className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 dark:border-[#162544] dark:bg-[#0E1626] dark:text-slate-200 dark:hover:bg-[#122036]"
-          >
-            Refresh
-          </button>
         </div>
       </div>
 

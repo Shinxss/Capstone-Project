@@ -32,7 +32,7 @@ const announcementIdParamSchema = z.object({
 });
 
 function buildAnnouncementFilter(query: z.infer<typeof listQuerySchema>) {
-  const filter: Record<string, unknown> = {};
+  const filter: Record<string, unknown> = { deletedAt: null };
   if (query.status) filter.status = query.status;
   if (query.audience) filter.audience = query.audience;
 
@@ -128,8 +128,8 @@ adminAnnouncementsRouter.patch(
   async (req, res) => {
     const announcementId = String(req.params.id);
     const payload = req.body as z.infer<typeof updateAnnouncementSchema>;
-    const updated = await AnnouncementModel.findByIdAndUpdate(
-      announcementId,
+    const updated = await AnnouncementModel.findOneAndUpdate(
+      { _id: announcementId, deletedAt: null },
       {
         $set: payload,
       },
@@ -167,8 +167,8 @@ adminAnnouncementsRouter.post(
   validate(announcementIdParamSchema, "params"),
   async (req, res) => {
     const announcementId = String(req.params.id);
-    const updated = await AnnouncementModel.findByIdAndUpdate(
-      announcementId,
+    const updated = await AnnouncementModel.findOneAndUpdate(
+      { _id: announcementId, deletedAt: null },
       {
         $set: {
           status: "PUBLISHED",
@@ -208,8 +208,8 @@ adminAnnouncementsRouter.post(
   validate(announcementIdParamSchema, "params"),
   async (req, res) => {
     const announcementId = String(req.params.id);
-    const updated = await AnnouncementModel.findByIdAndUpdate(
-      announcementId,
+    const updated = await AnnouncementModel.findOneAndUpdate(
+      { _id: announcementId, deletedAt: null },
       {
         $set: {
           status: "DRAFT",
@@ -249,7 +249,17 @@ adminAnnouncementsRouter.delete(
   validate(announcementIdParamSchema, "params"),
   async (req, res) => {
     const announcementId = String(req.params.id);
-    const deleted = await AnnouncementModel.findByIdAndDelete(announcementId).lean();
+    const deletePatch: Record<string, unknown> = {
+      deletedAt: new Date(),
+      deletedBy: req.userId ? new Types.ObjectId(req.userId) : null,
+      status: "DRAFT",
+      publishedAt: null,
+    };
+    const deleted = await AnnouncementModel.findOneAndUpdate(
+      { _id: announcementId, deletedAt: null },
+      { $set: deletePatch },
+      { new: true }
+    ).lean();
     if (!deleted) {
       return res.status(404).json({ message: "Announcement not found" });
     }
@@ -275,7 +285,7 @@ adminAnnouncementsRouter.delete(
 const publicAnnouncementsRouter = Router();
 
 publicAnnouncementsRouter.get("/feed", async (_req, res) => {
-  const items = await AnnouncementModel.find({ status: "PUBLISHED" })
+  const items = await AnnouncementModel.find({ status: "PUBLISHED", deletedAt: null })
     .sort({ publishedAt: -1, _id: -1 })
     .lean();
 

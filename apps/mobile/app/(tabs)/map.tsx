@@ -16,6 +16,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import MapboxGL, { Logger } from "@rnmapbox/maps";
 import * as Location from "expo-location";
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
+import { router } from "expo-router";
 import { useMapStyle } from "../../features/map/hooks/useMapStyle";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Droplets, Construction, Flame, Mountain, ShieldAlert } from "lucide-react-native";
@@ -170,6 +171,18 @@ function normalizeEmergencyStatus(raw?: string): string | undefined {
   if (normalized === "acknowledged" || normalized === "accepted") return "assigned";
   if (normalized === "inprogress") return "in_progress";
   return normalized;
+}
+
+function formatEmergencyStatusLabel(raw?: string) {
+  const normalized = String(raw ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+  if (normalized === "assigned") return "Assigned";
+  if (normalized === "in_progress") return "En Route";
+  if (normalized === "resolved") return "Resolved";
+  if (normalized === "cancelled") return "Cancelled";
+  return "Submitted";
 }
 
 function mapDispatchToEmergency(dispatch: DispatchOffer | null | undefined): Emergency | null {
@@ -384,6 +397,8 @@ export default function MapTab() {
   const [myLocation, setMyLocation] = useState<[number, number] | null>(null);
   const [hazardZones, setHazardZones] = useState<HazardZone[]>([]);
   const [reports, setReports] = useState<Emergency[]>([]);
+  const [selectedCommunityMarker, setSelectedCommunityMarker] =
+    useState<EmergencyMarkerPlacement | null>(null);
   const devLocationEnabled = __DEV__ && devLoc.enabled;
   const devWeatherEnabled = __DEV__ && devWx.enabled;
   const effectiveDevLocation = useMemo(
@@ -817,6 +832,7 @@ export default function MapTab() {
 
   useEffect(() => {
     if (canViewEmergencies) return;
+    setSelectedCommunityMarker(null);
     closeEmergencySheet();
   }, [canViewEmergencies, closeEmergencySheet]);
 
@@ -830,11 +846,49 @@ export default function MapTab() {
 
   const openSheet = (emergency: Emergency) => {
     if (!canViewEmergencies) return;
+    setSelectedCommunityMarker(null);
     layersSheetRef.current?.close();
     emergencySheet.openEmergency(emergency);
   };
 
+  const onPressCommunityMarker = useCallback(
+    (entry: EmergencyMarkerPlacement) => {
+      layersSheetRef.current?.close();
+      closeEmergencySheet();
+      setSelectedCommunityMarker(entry);
+    },
+    [closeEmergencySheet]
+  );
+
+  const onPressCommunityViewDetails = useCallback(() => {
+    const emergencyId = String(selectedCommunityMarker?.emergency?.id ?? "").trim();
+    if (!emergencyId) return;
+    setSelectedCommunityMarker(null);
+    router.push({
+      pathname: "/my-request-tracking",
+      params: { id: emergencyId },
+    });
+  }, [selectedCommunityMarker?.emergency?.id]);
+
+  useEffect(() => {
+    if (!selectedCommunityMarker) return;
+    const matched = visibleEmergencyMarkers.find(
+      (entry) => entry.emergency.id === selectedCommunityMarker.emergency.id
+    );
+    if (!matched) {
+      setSelectedCommunityMarker(null);
+      return;
+    }
+
+    const [currentLng, currentLat] = selectedCommunityMarker.coordinate;
+    const [nextLng, nextLat] = matched.coordinate;
+    if (currentLng !== nextLng || currentLat !== nextLat) {
+      setSelectedCommunityMarker(matched);
+    }
+  }, [selectedCommunityMarker, visibleEmergencyMarkers]);
+
   const openLayersSheet = () => {
+    setSelectedCommunityMarker(null);
     if (emergencySheet.selectedEmergency) {
       emergencySheet.minimizeSheet();
     }
@@ -854,6 +908,17 @@ export default function MapTab() {
   );
 
   const [activeChip, setActiveChip] = useState<string>("home");
+  const topUiPaddingTop = Math.max(10, insets.top + 8);
+  const devOverrideTopBase =
+    topUiPaddingTop +
+    50 + // search bar height
+    10 + // chips top spacing
+    40 + // chip height
+    8 + // layer row top margin
+    46 + // layers button size
+    10; // space below layers button
+  const weatherOverrideTop = Math.max(176, devOverrideTopBase);
+  const locationOverrideTop = weatherOverrideTop + 54;
 
   return (
     <SafeAreaView
@@ -871,6 +936,7 @@ export default function MapTab() {
           compassEnabled={false}
           scaleBarEnabled={false}
           onPress={() => {
+            setSelectedCommunityMarker(null);
             if (emergencySheet.selectedEmergency) {
               emergencySheet.minimizeSheet();
             }
@@ -1032,17 +1098,93 @@ export default function MapTab() {
                   coordinate={entry.coordinate}
                   anchor={{ x: 0.5, y: 0.5 }}
                 >
-                  <Pressable onPress={() => openSheet(entry.emergency)} style={{ padding: 2 }}>
+                  <Pressable
+                    onPress={() => {
+                      if (isCommunityUser) {
+                        onPressCommunityMarker(entry);
+                        return;
+                      }
+                      openSheet(entry.emergency);
+                    }}
+                    style={{ padding: 2 }}
+                  >
                     <PulseMarker type={entry.emergency.type} />
                   </Pressable>
                 </MapboxGL.MarkerView>
               ))
             : null}
+
+          {isCommunityUser && selectedCommunityMarker ? (
+            <MapboxGL.MarkerView
+              key={`community-card-${selectedCommunityMarker.emergency.id}`}
+              coordinate={selectedCommunityMarker.coordinate}
+              anchor={{ x: 0.5, y: 1.12 }}
+            >
+              <View style={styles.communityEmergencyCardWrap} pointerEvents="box-none">
+                <View style={[styles.communityEmergencyCard, isDark ? styles.communityEmergencyCardDark : null]}>
+                  <View style={styles.communityEmergencyCardHeader}>
+                    <Text
+                      style={[styles.communityEmergencyCardTitle, isDark ? styles.communityEmergencyCardTitleDark : null]}
+                      numberOfLines={1}
+                    >
+                      {selectedCommunityMarker.emergency.title}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.communityEmergencyCardStatus,
+                        isDark ? styles.communityEmergencyCardStatusDark : null,
+                      ]}
+                    >
+                      {formatEmergencyStatusLabel(selectedCommunityMarker.emergency.status)}
+                    </Text>
+                  </View>
+
+                  {selectedCommunityMarker.emergency.referenceNumber ? (
+                    <Text
+                      style={[
+                        styles.communityEmergencyCardRef,
+                        isDark ? styles.communityEmergencyCardRefDark : null,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {selectedCommunityMarker.emergency.referenceNumber}
+                    </Text>
+                  ) : null}
+
+                  <Text
+                    style={[styles.communityEmergencyCardLocation, isDark ? styles.communityEmergencyCardLocationDark : null]}
+                    numberOfLines={1}
+                  >
+                    {selectedCommunityMarker.emergency.location.label ||
+                      `${selectedCommunityMarker.emergency.location.lat.toFixed(5)}, ${selectedCommunityMarker.emergency.location.lng.toFixed(5)}`}
+                  </Text>
+
+                  <Pressable
+                    onPress={onPressCommunityViewDetails}
+                    style={[
+                      styles.communityEmergencyCardButton,
+                      isDark ? styles.communityEmergencyCardButtonDark : null,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.communityEmergencyCardButtonText,
+                        isDark ? styles.communityEmergencyCardButtonTextDark : null,
+                      ]}
+                    >
+                      View details
+                    </Text>
+                  </Pressable>
+                </View>
+                <View style={[styles.communityEmergencyCardPointer, isDark ? styles.communityEmergencyCardPointerDark : null]} />
+              </View>
+            </MapboxGL.MarkerView>
+          ) : null}
         </MapboxGL.MapView>
 
         {/* Google-Maps-like top UI */}
         <View pointerEvents="box-none" style={styles.overlay}>
-          <View style={[styles.topUi, { paddingTop: Math.max(10, insets.top + 8) }]}>
+          <View style={[styles.topUi, { paddingTop: topUiPaddingTop }]}>
             <View style={[styles.searchBar, isDark ? styles.searchBarDark : null]}>
               <Feather name="search" size={18} color={isDark ? "#94A3B8" : "#777"} />
 
@@ -1119,14 +1261,14 @@ export default function MapTab() {
           onPatch={patchDevWx}
           onClear={clearDevWx}
           lastUsed={emergencySheet.risk?.usedWeather ?? null}
-          top={Math.max(110, insets.top + 86)}
+          top={weatherOverrideTop}
         />
 
         <DevLocationOverrideOverlay
           override={devLoc}
           onPatch={patchDevLoc}
           onClear={clearDevLoc}
-          top={Math.max(164, insets.top + 140)}
+          top={locationOverrideTop}
         />
 
         <EmergencyBottomSheetContainer controller={emergencySheet} authToken={token} />
@@ -1603,6 +1745,102 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 10,
     fontWeight: "700",
+  },
+  communityEmergencyCardWrap: {
+    alignItems: "center",
+  },
+  communityEmergencyCard: {
+    width: 230,
+    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "rgba(15,23,42,0.08)",
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+  },
+  communityEmergencyCardDark: {
+    backgroundColor: "#0E1626",
+    borderColor: "#1F2A44",
+  },
+  communityEmergencyCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  communityEmergencyCardTitle: {
+    flex: 1,
+    color: "#0F172A",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  communityEmergencyCardTitleDark: {
+    color: "#E2E8F0",
+  },
+  communityEmergencyCardStatus: {
+    color: "#1D4ED8",
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  communityEmergencyCardStatusDark: {
+    color: "#93C5FD",
+  },
+  communityEmergencyCardRef: {
+    marginTop: 4,
+    color: "#334155",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  communityEmergencyCardRefDark: {
+    color: "#94A3B8",
+  },
+  communityEmergencyCardLocation: {
+    marginTop: 4,
+    color: "#475569",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  communityEmergencyCardLocationDark: {
+    color: "#CBD5E1",
+  },
+  communityEmergencyCardButton: {
+    marginTop: 9,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: "#0F172A",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  communityEmergencyCardButtonDark: {
+    backgroundColor: "#E2E8F0",
+  },
+  communityEmergencyCardButtonText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  communityEmergencyCardButtonTextDark: {
+    color: "#0F172A",
+  },
+  communityEmergencyCardPointer: {
+    marginTop: -1,
+    width: 14,
+    height: 14,
+    backgroundColor: "#FFFFFF",
+    borderLeftWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: "rgba(15,23,42,0.08)",
+    transform: [{ rotate: "-45deg" }],
+  },
+  communityEmergencyCardPointerDark: {
+    backgroundColor: "#0E1626",
+    borderColor: "#1F2A44",
   },
 
   actionsRow: { marginTop: 12, flexDirection: "row", alignItems: "center", gap: 10 },

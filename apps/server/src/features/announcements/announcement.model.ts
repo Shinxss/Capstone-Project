@@ -9,7 +9,9 @@ export type AnnouncementDoc = {
   audience: AnnouncementAudience;
   status: AnnouncementStatus;
   createdBy?: Types.ObjectId;
+  deletedBy?: Types.ObjectId;
   publishedAt?: Date | null;
+  deletedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -32,7 +34,9 @@ const AnnouncementSchema = new Schema<AnnouncementDoc>(
       index: true,
     },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", index: true },
+    deletedBy: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true },
     publishedAt: { type: Date, default: null },
+    deletedAt: { type: Date, default: null, index: true },
   },
   {
     strict: "throw",
@@ -42,6 +46,7 @@ const AnnouncementSchema = new Schema<AnnouncementDoc>(
 );
 
 AnnouncementSchema.index({ status: 1, audience: 1, publishedAt: -1 });
+AnnouncementSchema.index({ deletedAt: 1, status: 1, audience: 1, publishedAt: -1 });
 
 export const AnnouncementModel =
   models.Announcement || model<AnnouncementDoc>("Announcement", AnnouncementSchema, "announcements");
