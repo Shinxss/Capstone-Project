@@ -131,6 +131,8 @@ export type MyRequestTrackingDTO = {
     createdAt: string;
     status: IEmergencyReport["status"];
     location: LocationPoint;
+    locationText: string;
+    barangay?: string;
     notes?: string;
     rejectionReason?: string;
   };
@@ -383,6 +385,30 @@ function toLocationText(report: any, location: LocationPoint | null) {
   if (label) return label;
   if (!location) return "Location unavailable";
   return `${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}`;
+}
+
+function toBarangayFromLabel(raw: unknown) {
+  const label = String(raw ?? "").trim();
+  if (!label) return "";
+  const firstSegment = label
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)[0];
+  return firstSegment ?? "";
+}
+
+async function resolveRequestBarangay(report: any, location: LocationPoint | null) {
+  if (location && Number.isFinite(location.lng) && Number.isFinite(location.lat)) {
+    try {
+      const found = await findBarangayByPoint(location.lng, location.lat);
+      const name = String(found?.name ?? "").trim();
+      if (name) return name;
+    } catch {
+      // Ignore lookup failures and fall back to stored location label.
+    }
+  }
+
+  return toBarangayFromLabel(report?.locationLabel);
 }
 
 function toTimelineActiveStepIndex(
@@ -1096,7 +1122,7 @@ export async function getMyEmergencyRequestTracking(
   if (!Types.ObjectId.isValid(reportId) || !Types.ObjectId.isValid(reporterUserId)) return null;
 
   const report = await EmergencyReportModel.findById(reportId)
-    .select("_id reportedBy referenceNumber emergencyType status verification createdAt updatedAt location notes")
+    .select("_id reportedBy referenceNumber emergencyType status verification createdAt updatedAt location locationLabel notes")
     .lean();
 
   if (!report) return null;
@@ -1114,7 +1140,7 @@ export async function getEmergencyRequestTrackingSnapshot(
   if (!Types.ObjectId.isValid(reportId)) return null;
 
   const report = await EmergencyReportModel.findById(reportId)
-    .select("_id reportedBy referenceNumber emergencyType status verification createdAt updatedAt location notes")
+    .select("_id reportedBy referenceNumber emergencyType status verification createdAt updatedAt location locationLabel notes")
     .lean();
 
   if (!report) return null;
@@ -1168,6 +1194,8 @@ async function buildEmergencyRequestTrackingDto(report: any): Promise<MyRequestT
   const rejectionReasonRaw = String(report?.verification?.reason ?? "").trim();
   const verificationStatus = String(report?.verification?.status ?? "").trim().toLowerCase();
   const rejectionReason = verificationStatus === "rejected" ? rejectionReasonRaw : "";
+  const locationText = toLocationText(report, requestLocation);
+  const barangay = await resolveRequestBarangay(report, requestLocation);
 
   return {
     request: {
@@ -1177,6 +1205,8 @@ async function buildEmergencyRequestTrackingDto(report: any): Promise<MyRequestT
       createdAt: toIsoString(report.createdAt),
       status: String(report.status ?? "OPEN").toUpperCase() as IEmergencyReport["status"],
       location: requestLocation,
+      locationText,
+      ...(barangay ? { barangay } : {}),
       ...(String(report.notes ?? "").trim() ? { notes: String(report.notes ?? "").trim() } : {}),
       ...(rejectionReason ? { rejectionReason } : {}),
     },

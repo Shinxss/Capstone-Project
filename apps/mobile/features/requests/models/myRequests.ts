@@ -87,6 +87,8 @@ export type MyRequestTrackingDTO = {
       lng: number;
       lat: number;
     };
+    locationText: string;
+    barangay?: string;
     notes?: string;
   };
   timeline: TrackingTimeline;

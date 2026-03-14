@@ -5,18 +5,19 @@ import {
   Linking,
   Platform,
   Pressable,
+  RefreshControl,
   StatusBar,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import MapboxGL from "@rnmapbox/maps";
+import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import { useLocalSearchParams, router } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSession } from "../../auth/hooks/useSession";
 import { usePullToRefresh } from "../../common/hooks/usePullToRefresh";
-import { RefreshableScrollScreen } from "../../common/components/RefreshableScrollScreen";
 import { useRequestLiveTracking } from "../hooks/useRequestLiveTracking";
 import type { TrackingLabel } from "../models/myRequests";
 import { formatEtaText, formatTrackingHeadline } from "../utils/formatters";
@@ -56,6 +57,27 @@ function formatCreatedAt(iso: string) {
 function toLocationText(coord: [number, number] | null) {
   if (!coord) return "Location unavailable";
   return `${coord[1].toFixed(5)}, ${coord[0].toFixed(5)}`;
+}
+
+function toBarangayText(rawBarangay: unknown, rawLocationText: unknown) {
+  const barangay = String(rawBarangay ?? "").trim();
+  if (barangay) return barangay;
+
+  const locationText = String(rawLocationText ?? "").trim();
+  if (!locationText) return "";
+
+  const segments = locationText
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (segments.length === 0) return "";
+
+  const looksNumeric = (value: string) => /^-?\d+(?:\.\d+)?$/.test(value);
+  if (segments.length >= 2 && looksNumeric(segments[0]) && looksNumeric(segments[1])) {
+    return "";
+  }
+
+  return segments[0] ?? locationText;
 }
 
 function statusPillStyles(label: string) {
@@ -107,6 +129,7 @@ export function MyRequestTrackingScreen() {
   }, [refresh]);
   const { refreshing: refreshingTracking, triggerRefresh: triggerRefreshTracking } =
     usePullToRefresh(refreshTracking);
+  const sheetSnapPoints = useMemo(() => ["34%", "62%", "88%"], []);
 
   const emergencyCoordinate = useMemo(
     () => toCoordinate(data?.request?.location),
@@ -156,7 +179,11 @@ export function MyRequestTrackingScreen() {
     if (trackingLabel === "Resolved") return "Response completed";
     return "Responder details unavailable";
   }, [data?.tracking?.responder?.name, trackingLabel]);
-  const locationText = useMemo(() => toLocationText(emergencyCoordinate), [emergencyCoordinate]);
+  const locationText = useMemo(() => {
+    const barangayText = toBarangayText(data?.request?.barangay, data?.request?.locationText);
+    if (barangayText) return barangayText;
+    return toLocationText(emergencyCoordinate);
+  }, [data?.request?.barangay, data?.request?.locationText, emergencyCoordinate]);
   const createdAtText = useMemo(() => formatCreatedAt(data?.request?.createdAt ?? ""), [data?.request?.createdAt]);
   const detailsText = useMemo(() => String(data?.request?.notes ?? "").trim(), [data?.request?.notes]);
   const requestTypeText = useMemo(() => formatRequestType(data?.request?.type ?? ""), [data?.request?.type]);
@@ -294,166 +321,179 @@ export function MyRequestTrackingScreen() {
         </View>
       </View>
 
-      <RefreshableScrollScreen
-        refreshing={refreshingTracking}
-        onRefresh={triggerRefreshTracking}
-        contentContainerStyle={styles.content}
-      >
-        <View style={styles.summaryCard}>
-          <View
-            style={[
-              styles.statusPill,
-              {
-                backgroundColor: pillColors.bg,
-                borderColor: pillColors.border,
-              },
-            ]}
-          >
-            <Text style={[styles.statusPillText, { color: pillColors.text }]}>{statusLabelText}</Text>
-          </View>
+      <View style={styles.mapStage}>
+        <MapboxGL.MapView
+          style={styles.map}
+          styleURL={MapboxGL.StyleURL.Street}
+          scaleBarEnabled={false}
+          attributionEnabled={false}
+          logoEnabled={false}
+        >
+          <MapboxGL.Camera
+            ref={cameraRef}
+            centerCoordinate={emergencyCoordinate ?? DAGUPAN}
+            zoomLevel={13}
+          />
 
-          <Text style={styles.summaryHeadline}>{headline}</Text>
-          <Text style={styles.summaryType}>{requestTypeText}</Text>
-
-          <View style={styles.infoRow}>
-            <Ionicons name="location-outline" size={18} color="#6B7280" />
-            <Text style={styles.infoRowText}>{locationText}</Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Ionicons
-              name={isCancelledRequest || isRejectedRequest ? "alert-circle-outline" : "time-outline"}
-              size={18}
-              color={isCancelledRequest || isRejectedRequest ? "#B91C1C" : "#D97706"}
-            />
-            <Text
-              style={[
-                styles.infoRowText,
-                isCancelledRequest || isRejectedRequest ? styles.infoRowTextDanger : styles.infoRowTextAccent,
-              ]}
+          {routeGeometry &&
+          Array.isArray(routeGeometry.coordinates) &&
+          routeGeometry.coordinates.length >= 2 ? (
+            <MapboxGL.ShapeSource
+              id="trackingRouteSource"
+              shape={{
+                type: "Feature",
+                properties: {},
+                geometry: routeGeometry as any,
+              }}
             >
-              {statusMessage}
-            </Text>
-          </View>
-
-          {isRejectedRequest ? (
-            <View style={styles.rejectionReasonWrap}>
-              <Text style={styles.rejectionReasonTitle}>Reason from LGU</Text>
-              <Text style={styles.rejectionReasonText}>{reasonText}</Text>
-            </View>
-          ) : null}
-
-          <View style={styles.infoRow}>
-            <Ionicons name="person-outline" size={18} color="#6B7280" />
-            <Text style={styles.infoRowText}>Responder: {responderName}</Text>
-          </View>
-
-          {responderPhone ? (
-            <View style={styles.infoRow}>
-              <Ionicons name="call-outline" size={18} color="#6B7280" />
-              <Text style={styles.infoRowText}>{responderPhone}</Text>
-            </View>
-          ) : null}
-
-          {detailsText ? (
-            <Text style={styles.detailsText} numberOfLines={3}>
-              {detailsText}
-            </Text>
-          ) : null}
-
-          <Text style={styles.metaText}>Reference {data.request.referenceNumber}</Text>
-          <Text style={styles.metaText}>Created {createdAtText}</Text>
-          <Text style={[styles.liveText, isClosedRequest ? styles.liveTextClosed : null]}>
-            {isClosedRequest ? `Updated ${lastUpdatedAgoText}` : `LIVE updated ${lastUpdatedAgoText}`}
-          </Text>
-
-          {responderPhone && !isClosedRequest ? (
-            <Pressable style={styles.callBtn} onPress={() => void onCallResponder()}>
-              <Ionicons name="call" size={15} color="#FFFFFF" />
-              <Text style={styles.callBtnText}>Call Responder</Text>
-            </Pressable>
-          ) : null}
-        </View>
-
-        <View style={styles.mapCard}>
-          <View style={styles.mapContainer}>
-            <MapboxGL.MapView
-              style={styles.map}
-              styleURL={MapboxGL.StyleURL.Street}
-              scaleBarEnabled={false}
-              attributionEnabled={false}
-              logoEnabled={false}
-            >
-              <MapboxGL.Camera
-                ref={cameraRef}
-                centerCoordinate={emergencyCoordinate ?? DAGUPAN}
-                zoomLevel={13}
+              <MapboxGL.LineLayer
+                id="trackingRouteLine"
+                style={{
+                  lineColor: "#2563EB",
+                  lineWidth: 5,
+                  lineOpacity: 0.85,
+                }}
               />
+            </MapboxGL.ShapeSource>
+          ) : null}
 
-              {routeGeometry &&
-              Array.isArray(routeGeometry.coordinates) &&
-              routeGeometry.coordinates.length >= 2 ? (
-                <MapboxGL.ShapeSource
-                  id="trackingRouteSource"
-                  shape={{
-                    type: "Feature",
-                    properties: {},
-                    geometry: routeGeometry as any,
-                  }}
-                >
-                  <MapboxGL.LineLayer
-                    id="trackingRouteLine"
-                    style={{
-                      lineColor: "#2563EB",
-                      lineWidth: 5,
-                      lineOpacity: 0.85,
-                    }}
-                  />
-                </MapboxGL.ShapeSource>
-              ) : null}
-
-              {emergencyCoordinate ? (
-                <MapboxGL.MarkerView coordinate={emergencyCoordinate} anchor={{ x: 0.5, y: 1 }}>
-                  <View style={styles.emergencyPin}>
-                    <Ionicons name="warning" size={14} color="#FFFFFF" />
-                  </View>
-                </MapboxGL.MarkerView>
-              ) : null}
-
-              {responderCoordinate ? (
-                <MapboxGL.MarkerView coordinate={responderCoordinate} anchor={{ x: 0.5, y: 1 }}>
-                  <View style={styles.responderPin}>
-                    <Ionicons name="person" size={14} color="#FFFFFF" />
-                  </View>
-                </MapboxGL.MarkerView>
-              ) : null}
-            </MapboxGL.MapView>
-
-            {!responderCoordinate ? (
-              <View style={styles.mapHint}>
-                <Text style={styles.mapHintText}>
-                  {isCancelledRequest ? "Request was cancelled." : "Waiting for responder location..."}
-                </Text>
+          {emergencyCoordinate ? (
+            <MapboxGL.MarkerView coordinate={emergencyCoordinate} anchor={{ x: 0.5, y: 1 }}>
+              <View style={styles.emergencyPin}>
+                <Ionicons name="warning" size={14} color="#FFFFFF" />
               </View>
-            ) : null}
-          </View>
-        </View>
+            </MapboxGL.MarkerView>
+          ) : null}
 
-        {!isCancelledRequest ? (
-          <View style={styles.timelineCard}>
-            <Text style={styles.timelineTitle}>Progress</Text>
-            {data.timeline.steps.map((step, index) => {
-              const isActive = index <= data.timeline.activeStepIndex;
-              return (
-                <View key={`${step}-${index}`} style={styles.timelineRow}>
-                  <View style={[styles.timelineDot, isActive ? styles.timelineDotActive : null]} />
-                  <Text style={[styles.timelineText, isActive ? styles.timelineTextActive : null]}>{step}</Text>
-                </View>
-              );
-            })}
+          {responderCoordinate ? (
+            <MapboxGL.MarkerView coordinate={responderCoordinate} anchor={{ x: 0.5, y: 1 }}>
+              <View style={styles.responderPin}>
+                <Ionicons name="person" size={14} color="#FFFFFF" />
+              </View>
+            </MapboxGL.MarkerView>
+          ) : null}
+        </MapboxGL.MapView>
+
+        {!responderCoordinate ? (
+          <View style={styles.mapHint}>
+            <Text style={styles.mapHintText}>
+              {isCancelledRequest ? "Request was cancelled." : "Waiting for responder location..."}
+            </Text>
           </View>
         ) : null}
-      </RefreshableScrollScreen>
+
+        <BottomSheet
+          index={0}
+          snapPoints={sheetSnapPoints}
+          enablePanDownToClose={false}
+          backgroundStyle={styles.sheetBg}
+          handleIndicatorStyle={styles.sheetHandle}
+        >
+          <BottomSheetScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.sheetContent}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshingTracking}
+                onRefresh={triggerRefreshTracking}
+                tintColor="#DC2626"
+              />
+            }
+          >
+            <View style={styles.summaryCard}>
+              <View
+                style={[
+                  styles.statusPill,
+                  {
+                    backgroundColor: pillColors.bg,
+                    borderColor: pillColors.border,
+                  },
+                ]}
+              >
+                <Text style={[styles.statusPillText, { color: pillColors.text }]}>{statusLabelText}</Text>
+              </View>
+
+              <Text style={styles.summaryHeadline}>{headline}</Text>
+              <Text style={styles.summaryType}>{requestTypeText}</Text>
+
+              <View style={styles.infoRow}>
+                <Ionicons name="location-outline" size={18} color="#6B7280" />
+                <Text style={styles.infoRowText}>{locationText}</Text>
+              </View>
+
+              <View style={styles.infoRow}>
+                <Ionicons
+                  name={isCancelledRequest || isRejectedRequest ? "alert-circle-outline" : "time-outline"}
+                  size={18}
+                  color={isCancelledRequest || isRejectedRequest ? "#B91C1C" : "#D97706"}
+                />
+                <Text
+                  style={[
+                    styles.infoRowText,
+                    isCancelledRequest || isRejectedRequest ? styles.infoRowTextDanger : styles.infoRowTextAccent,
+                  ]}
+                >
+                  {statusMessage}
+                </Text>
+              </View>
+
+              {isRejectedRequest ? (
+                <View style={styles.rejectionReasonWrap}>
+                  <Text style={styles.rejectionReasonTitle}>Reason from LGU</Text>
+                  <Text style={styles.rejectionReasonText}>{reasonText}</Text>
+                </View>
+              ) : null}
+
+              <View style={styles.infoRow}>
+                <Ionicons name="person-outline" size={18} color="#6B7280" />
+                <Text style={styles.infoRowText}>Responder: {responderName}</Text>
+              </View>
+
+              {responderPhone ? (
+                <View style={styles.infoRow}>
+                  <Ionicons name="call-outline" size={18} color="#6B7280" />
+                  <Text style={styles.infoRowText}>{responderPhone}</Text>
+                </View>
+              ) : null}
+
+              {detailsText ? (
+                <Text style={styles.detailsText} numberOfLines={3}>
+                  {detailsText}
+                </Text>
+              ) : null}
+
+              <Text style={styles.metaText}>Reference {data.request.referenceNumber}</Text>
+              <Text style={styles.metaText}>Created {createdAtText}</Text>
+              <Text style={[styles.liveText, isClosedRequest ? styles.liveTextClosed : null]}>
+                {isClosedRequest ? `Updated ${lastUpdatedAgoText}` : `LIVE updated ${lastUpdatedAgoText}`}
+              </Text>
+
+              {responderPhone && !isClosedRequest ? (
+                <Pressable style={styles.callBtn} onPress={() => void onCallResponder()}>
+                  <Ionicons name="call" size={15} color="#FFFFFF" />
+                  <Text style={styles.callBtnText}>Call Responder</Text>
+                </Pressable>
+              ) : null}
+            </View>
+
+            {!isCancelledRequest ? (
+              <View style={styles.timelineCard}>
+                <Text style={styles.timelineTitle}>Progress</Text>
+                {data.timeline.steps.map((step, index) => {
+                  const isActive = index <= data.timeline.activeStepIndex;
+                  return (
+                    <View key={`${step}-${index}`} style={styles.timelineRow}>
+                      <View style={[styles.timelineDot, isActive ? styles.timelineDotActive : null]} />
+                      <Text style={[styles.timelineText, isActive ? styles.timelineTextActive : null]}>{step}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            ) : null}
+          </BottomSheetScrollView>
+        </BottomSheet>
+      </View>
     </View>
   );
 }
@@ -461,7 +501,7 @@ export function MyRequestTrackingScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: "#FFFFFF",
   },
   headerSection: {
     paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight ?? 0) : 0,
@@ -484,14 +524,25 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "900",
     color: "#111827",
   },
-  content: {
+  mapStage: {
+    flex: 1,
+    position: "relative",
+    backgroundColor: "#E5E7EB",
+  },
+  sheetBg: {
+    backgroundColor: "rgba(255,255,255,0.98)",
+  },
+  sheetHandle: {
+    backgroundColor: "rgba(0,0,0,0.22)",
+    width: 42,
+  },
+  sheetContent: {
     paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 24,
+    paddingBottom: 28,
     gap: 14,
   },
   summaryCard: {
@@ -603,19 +654,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "800",
   },
-  mapCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    padding: 12,
-  },
-  mapContainer: {
-    height: 240,
-    borderRadius: 12,
-    overflow: "hidden",
-    backgroundColor: "#E5E7EB",
-  },
   map: {
     flex: 1,
   },
@@ -623,7 +661,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 10,
     right: 10,
-    bottom: 10,
+    bottom: 260,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 7,
