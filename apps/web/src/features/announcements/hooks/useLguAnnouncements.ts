@@ -6,7 +6,6 @@ import {
   deleteAnnouncement,
   listAnnouncements,
   publishAnnouncement,
-  seedAnnouncementsIfEmpty,
   unpublishAnnouncement,
   updateAnnouncement,
 } from "../services/announcements.service";
@@ -15,10 +14,15 @@ import { toastError, toastSuccess, toastWarning } from "@/services/feedback/toas
 const announcementSchema = z.object({
   title: z.string().trim().min(3, "Title must be at least 3 characters"),
   body: z.string().trim().min(10, "Body must be at least 10 characters"),
-  audience: z.enum(["ALL", "VOLUNTEERS", "LGU", "BARANGAY"]),
+  audience: z.enum(["ALL", "VOLUNTEER", "LGU", "PUBLIC"]),
 });
 
 export type AnnouncementFormErrors = Partial<Record<keyof AnnouncementDraftInput, string>>;
+
+function resolveErrorMessage(error: unknown, fallback: string) {
+  const typed = error as { response?: { data?: { message?: string } }; message?: string };
+  return typed?.response?.data?.message || typed?.message || fallback;
+}
 
 export function useLguAnnouncements() {
   const [items, setItems] = useState<Announcement[]>([]);
@@ -26,29 +30,32 @@ export function useLguAnnouncements() {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const refresh = useCallback(() => {
+  const refresh = useCallback(async () => {
     setLoading(true);
     try {
       setError(null);
-      seedAnnouncementsIfEmpty();
-      setItems(listAnnouncements());
-    } catch (e: any) {
-      setError(e?.message || "Failed to load announcements");
+      const { items: nextItems } = await listAnnouncements({
+        page: 1,
+        limit: 100,
+      });
+      setItems(nextItems);
+    } catch (error) {
+      setError(resolveErrorMessage(error, "Failed to load announcements"));
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    refresh();
+    void refresh();
   }, [refresh]);
 
   const audiences: { value: AnnouncementAudience; label: string }[] = useMemo(
     () => [
       { value: "LGU", label: "LGU Staff" },
       { value: "ALL", label: "All" },
-      { value: "VOLUNTEERS", label: "Volunteers" },
-      { value: "BARANGAY", label: "Barangay" },
+      { value: "VOLUNTEER", label: "Volunteers" },
+      { value: "PUBLIC", label: "Public" },
     ],
     []
   );
@@ -65,7 +72,7 @@ export function useLguAnnouncements() {
     return { ok: false as const, value: input, errors };
   }, []);
 
-  const create = useCallback((input: AnnouncementDraftInput) => {
+  const create = useCallback(async (input: AnnouncementDraftInput) => {
     const v = validate(input);
     if (!v.ok) {
       toastWarning("Please fix the form errors before saving.");
@@ -73,19 +80,19 @@ export function useLguAnnouncements() {
     }
     try {
       setError(null);
-      createAnnouncement(v.value);
-      refresh();
+      await createAnnouncement(v.value);
+      await refresh();
       toastSuccess("Announcement saved.");
       return { ok: true as const, errors: {} as AnnouncementFormErrors };
-    } catch (e: any) {
-      const message = e?.message || "Failed to create announcement";
+    } catch (error) {
+      const message = resolveErrorMessage(error, "Failed to create announcement");
       setError(message);
       toastError(message);
       return { ok: false as const, errors: {} as AnnouncementFormErrors };
     }
   }, [refresh, validate]);
 
-  const update = useCallback((id: string, patch: AnnouncementDraftInput) => {
+  const update = useCallback(async (id: string, patch: AnnouncementDraftInput) => {
     const v = validate(patch);
     if (!v.ok) {
       toastWarning("Please fix the form errors before saving.");
@@ -93,12 +100,12 @@ export function useLguAnnouncements() {
     }
     try {
       setError(null);
-      updateAnnouncement(id, v.value);
-      refresh();
+      await updateAnnouncement(id, v.value);
+      await refresh();
       toastSuccess("Announcement updated.");
       return { ok: true as const, errors: {} as AnnouncementFormErrors };
-    } catch (e: any) {
-      const message = e?.message || "Failed to update announcement";
+    } catch (error) {
+      const message = resolveErrorMessage(error, "Failed to update announcement");
       setError(message);
       toastError(message);
       return { ok: false as const, errors: {} as AnnouncementFormErrors };
@@ -109,11 +116,11 @@ export function useLguAnnouncements() {
     try {
       setError(null);
       setBusyId(id);
-      publishAnnouncement(id);
-      refresh();
+      await publishAnnouncement(id);
+      await refresh();
       toastSuccess("Announcement published.");
-    } catch (e: any) {
-      const message = e?.message || "Failed to publish";
+    } catch (error) {
+      const message = resolveErrorMessage(error, "Failed to publish");
       setError(message);
       toastError(message);
     } finally {
@@ -125,11 +132,11 @@ export function useLguAnnouncements() {
     try {
       setError(null);
       setBusyId(id);
-      unpublishAnnouncement(id);
-      refresh();
+      await unpublishAnnouncement(id);
+      await refresh();
       toastSuccess("Announcement unpublished.");
-    } catch (e: any) {
-      const message = e?.message || "Failed to unpublish";
+    } catch (error) {
+      const message = resolveErrorMessage(error, "Failed to unpublish");
       setError(message);
       toastError(message);
     } finally {
@@ -141,11 +148,11 @@ export function useLguAnnouncements() {
     try {
       setError(null);
       setBusyId(id);
-      deleteAnnouncement(id);
-      refresh();
+      await deleteAnnouncement(id);
+      await refresh();
       toastSuccess("Announcement deleted.");
-    } catch (e: any) {
-      const message = e?.message || "Failed to delete";
+    } catch (error) {
+      const message = resolveErrorMessage(error, "Failed to delete");
       setError(message);
       toastError(message);
     } finally {

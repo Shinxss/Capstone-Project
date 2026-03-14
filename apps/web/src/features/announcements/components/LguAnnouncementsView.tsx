@@ -30,10 +30,10 @@ function audienceLabel(audience: AnnouncementAudience) {
   switch (audience) {
     case "LGU":
       return "LGU Staff";
-    case "VOLUNTEERS":
+    case "VOLUNTEER":
       return "Volunteers";
-    case "BARANGAY":
-      return "Barangay";
+    case "PUBLIC":
+      return "Public";
     case "ALL":
       return "All";
     default:
@@ -78,6 +78,7 @@ export default function LguAnnouncementsView(props: Props) {
     audience: "LGU",
   });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
 
   const rows = useMemo(() => announcements, [announcements]);
 
@@ -249,17 +250,25 @@ export default function LguAnnouncementsView(props: Props) {
             <button
               type="button"
               onClick={() => {
-                setFieldErrors({});
-                const result = editing ? update(editing.id, form) : create(form);
-                if (!result.ok) {
-                  setFieldErrors((result.errors || {}) as Record<string, string>);
-                  return;
-                }
-                setEditorOpen(false);
+                void (async () => {
+                  setSaving(true);
+                  setFieldErrors({});
+                  try {
+                    const result = editing ? await update(editing.id, form) : await create(form);
+                    if (!result.ok) {
+                      setFieldErrors((result.errors || {}) as Record<string, string>);
+                      return;
+                    }
+                    setEditorOpen(false);
+                  } finally {
+                    setSaving(false);
+                  }
+                })();
               }}
+              disabled={saving}
               className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
             >
-              Save
+              {saving ? "Saving..." : "Save"}
             </button>
           </div>
         }

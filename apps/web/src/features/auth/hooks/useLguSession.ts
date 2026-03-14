@@ -1,6 +1,5 @@
 import { useMemo, useSyncExternalStore } from "react";
-import { AUTH_STORAGE_KEYS } from "../constants/auth.constants";
-import type { StoredPortalUser } from "../services/authStorage";
+import { getLguSessionSnapshot, type StoredPortalUser } from "../services/authStorage";
 
 const SEP = "\u0000"; // very unlikely to appear in JSON
 
@@ -18,8 +17,7 @@ function subscribe(callback: () => void) {
 
 // ✅ IMPORTANT: return a STABLE primitive snapshot (string), not a new object
 function getSnapshot() {
-  const token = localStorage.getItem(AUTH_STORAGE_KEYS.lguToken) || "";
-  const userRaw = localStorage.getItem(AUTH_STORAGE_KEYS.lguUser) || "";
+  const { token, userRaw } = getLguSessionSnapshot();
   return token + SEP + userRaw;
 }
 

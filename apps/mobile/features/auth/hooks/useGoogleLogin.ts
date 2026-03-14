@@ -20,6 +20,8 @@ export function useGoogleLogin(options: UseGoogleLoginOptions = {}) {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const allowAndroidBrowserFallback =
+    process.env.EXPO_PUBLIC_GOOGLE_ANDROID_BROWSER_FALLBACK === "true";
 
   const androidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
   const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
@@ -28,7 +30,6 @@ export function useGoogleLogin(options: UseGoogleLoginOptions = {}) {
     scopes: ["openid", "profile", "email"],
     androidClientId,
     webClientId,
-    clientId: webClientId,
   });
 
   useEffect(() => {
@@ -133,15 +134,37 @@ export function useGoogleLogin(options: UseGoogleLoginOptions = {}) {
         }
 
         if (err.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+          if (Platform.OS === "android" && allowAndroidBrowserFallback) {
+            await startAuthSessionFallback();
+            return;
+          }
+
           setError("Google Play Services is unavailable on this device.");
+          return;
+        }
+
+        if (String(err.code).toUpperCase() === "DEVELOPER_ERROR") {
+          if (Platform.OS === "android" && allowAndroidBrowserFallback) {
+            await startAuthSessionFallback();
+            return;
+          }
+
+          setError(
+            "Google sign-in config mismatch. Ensure apps/mobile/.env (EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID, EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID) and apps/server/.env (GOOGLE_ANDROID_CLIENT_ID, GOOGLE_WEB_CLIENT_ID) are from the same OAuth project, then add this app package + Android SHA-1 to the Android OAuth client."
+          );
           return;
         }
       }
 
       const message = err instanceof Error ? err.message : "";
       if (/non-recoverable sign in failure/i.test(message)) {
+        if (Platform.OS === "android" && allowAndroidBrowserFallback) {
+          await startAuthSessionFallback();
+          return;
+        }
+
         setError(
-          "Google sign-in failed due to OAuth configuration. Verify Android package/SHA-1 and Web client ID."
+          "Google sign-in config mismatch. Ensure apps/mobile/.env (EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID, EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID) and apps/server/.env (GOOGLE_ANDROID_CLIENT_ID, GOOGLE_WEB_CLIENT_ID) are from the same OAuth project, then add this app package + Android SHA-1 to the Android OAuth client."
         );
         return;
       }
@@ -150,7 +173,7 @@ export function useGoogleLogin(options: UseGoogleLoginOptions = {}) {
     } finally {
       setLoading(false);
     }
-  }, [loading, startNativeAndroid, startAuthSessionFallback]);
+  }, [allowAndroidBrowserFallback, loading, startNativeAndroid, startAuthSessionFallback]);
 
   return {
     start,

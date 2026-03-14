@@ -32,6 +32,26 @@ pnpm start
 - `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` (required for Google auth flow)
 - `EXPO_PUBLIC_MAPBOX_TOKEN` (required for map tab)
 
+## Google OAuth Verification
+
+Run this before testing Google sign-in:
+
+```bash
+pnpm verify:google-oauth
+```
+
+The verifier checks:
+
+- `app.json` package name vs `android/app/build.gradle` and `google-services.json`
+- Android/Web OAuth client ID format and project-number consistency
+- `google-services.json` OAuth entries (missing entries usually means missing SHA-1/SHA-256 in Firebase)
+- Local debug keystore SHA-1 (`android/app/debug.keystore`) against OAuth certificate hashes
+
+Notes:
+
+- Using separate projects is supported (e.g., Google Cloud project for login + Firebase project for push).
+- In that setup, keep `EXPO_PUBLIC_GOOGLE_*_CLIENT_ID` and server `GOOGLE_*_CLIENT_ID` on the same OAuth project, and register the app package + SHA-1 there.
+
 ## API Base URL Configuration
 
 - API client is configured in `lib/api.ts`.

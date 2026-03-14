@@ -79,6 +79,32 @@ const safeUnmount = (root: Root) => {
   else setTimeout(run, 0);
 };
 
+function disableMapboxTelemetryAndClearEventStorage() {
+  try {
+    (mapboxgl as { setTelemetryEnabled?: (enabled: boolean) => void }).setTelemetryEnabled?.(false);
+  } catch {
+    // ignore if unavailable
+  }
+
+  try {
+    const localStore = window.localStorage;
+    const staleKeys: string[] = [];
+
+    for (let i = 0; i < localStore.length; i += 1) {
+      const key = localStore.key(i);
+      if (key && key.startsWith("mapbox.eventData")) {
+        staleKeys.push(key);
+      }
+    }
+
+    for (const key of staleKeys) {
+      localStore.removeItem(key);
+    }
+  } catch {
+    // ignore storage errors
+  }
+}
+
 export default function EmergencyMap({
   reports,
   heightClassName = "h-[420px]",
@@ -155,6 +181,8 @@ export default function EmergencyMap({
       console.warn("Missing VITE_MAPBOX_TOKEN in .env");
       return;
     }
+
+    disableMapboxTelemetryAndClearEventStorage();
     mapboxgl.accessToken = token;
 
     const el = mapElRef.current;
@@ -170,6 +198,20 @@ export default function EmergencyMap({
       ...(maxBounds ? { maxBounds } : {}),
     });
 
+    let disposed = false;
+    let initialResizeTimer: ReturnType<typeof setTimeout> | null = null;
+    let initialResizeFrame: number | null = null;
+
+    const safeResize = () => {
+      if (disposed) return;
+      if (mapRef.current !== map) return;
+      try {
+        map.resize();
+      } catch {
+        // map may already be in teardown, ignore
+      }
+    };
+
     // baseline style (so we won't setStyle again on mount)
     lastStyleRef.current = mapStyle;
 
@@ -180,20 +222,34 @@ export default function EmergencyMap({
     map.addControl(new mapboxgl.AttributionControl({ compact: true }), attributionPosition);
 
     map.on("load", () => {
+      if (disposed) return;
       setLoaded(true);
-      map.resize();
+      safeResize();
     });
 
     mapRef.current = map;
     onMapReady?.(map);
 
-    requestAnimationFrame(() => map.resize());
-    setTimeout(() => map.resize(), 150);
+    initialResizeFrame = requestAnimationFrame(() => {
+      safeResize();
+    });
+    initialResizeTimer = setTimeout(() => {
+      safeResize();
+    }, 150);
 
-    const ro = new ResizeObserver(() => map.resize());
+    const ro = new ResizeObserver(() => {
+      safeResize();
+    });
     ro.observe(el);
 
     return () => {
+      disposed = true;
+      if (initialResizeFrame !== null) {
+        cancelAnimationFrame(initialResizeFrame);
+      }
+      if (initialResizeTimer !== null) {
+        clearTimeout(initialResizeTimer);
+      }
       ro.disconnect();
       markersRef.current.forEach(({ marker, root }) => {
         marker.remove();
@@ -256,7 +312,7 @@ export default function EmergencyMap({
       popupRef.current.popup.setLngLat([popup.lng, popup.lat]);
       // offset can change
       try {
-        popupRef.current.popup.setOffset(popupOffset as any);
+        popupRef.current.popup.setOffset(popupOffset);
       } catch {
         // ignore
       }

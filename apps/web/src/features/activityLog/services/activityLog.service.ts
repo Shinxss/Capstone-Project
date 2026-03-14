@@ -2,6 +2,7 @@ import type { ActivityEntityType, ActivityLogEntry } from "../models/activityLog
 import { getLguUser } from "../../auth/services/authStorage";
 
 const STORAGE_KEY = "lifeline_lgu_activity_log_v1";
+let inMemoryEntries: ActivityLogEntry[] = [];
 
 function safeJsonParse<T>(raw: string | null): T | null {
   if (!raw) return null;
@@ -28,16 +29,70 @@ function actorLabelFromSession() {
   return name || u.username || u.email || u.role || "User";
 }
 
-function readAll(): ActivityLogEntry[] {
-  const raw = safeJsonParse<ActivityLogEntry[]>(localStorage.getItem(STORAGE_KEY));
+function getSessionStore(): Storage | null {
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
+function getLocalStore(): Storage | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeEntries(raw: ActivityLogEntry[] | null): ActivityLogEntry[] {
   const arr = Array.isArray(raw) ? raw : [];
   return arr
     .filter((x) => x && typeof x.id === "string" && typeof x.timestamp === "string")
     .sort((a, b) => String(b.timestamp).localeCompare(String(a.timestamp)));
 }
 
+function readAll(): ActivityLogEntry[] {
+  const sessionStore = getSessionStore();
+  const localStore = getLocalStore();
+
+  const fromSession = normalizeEntries(
+    safeJsonParse<ActivityLogEntry[]>(sessionStore?.getItem(STORAGE_KEY) ?? null)
+  );
+  if (fromSession.length > 0) {
+    localStore?.removeItem(STORAGE_KEY);
+    inMemoryEntries = fromSession;
+    return fromSession;
+  }
+
+  const fromLegacyLocal = normalizeEntries(
+    safeJsonParse<ActivityLogEntry[]>(localStore?.getItem(STORAGE_KEY) ?? null)
+  );
+  if (fromLegacyLocal.length > 0) {
+    if (sessionStore) {
+      sessionStore.setItem(STORAGE_KEY, JSON.stringify(fromLegacyLocal));
+    }
+    localStore?.removeItem(STORAGE_KEY);
+    inMemoryEntries = fromLegacyLocal;
+    return fromLegacyLocal;
+  }
+
+  return normalizeEntries(inMemoryEntries);
+}
+
 function writeAll(entries: ActivityLogEntry[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+  const next = normalizeEntries(entries);
+  const sessionStore = getSessionStore();
+  const localStore = getLocalStore();
+
+  if (sessionStore) {
+    sessionStore.setItem(STORAGE_KEY, JSON.stringify(next));
+  } else {
+    inMemoryEntries = next;
+  }
+
+  localStore?.removeItem(STORAGE_KEY);
+  inMemoryEntries = next;
 }
 
 export function listActivityLogEntries(): ActivityLogEntry[] {
@@ -86,4 +141,3 @@ export function seedActivityLogIfEmpty() {
 
   writeAll(seed);
 }
-

@@ -61,6 +61,8 @@ export type EmergencyReportDetail = {
   photos?: string[];
   reporter?: {
     isGuest?: boolean;
+    lifelineId?: string;
+    avatarUrl?: string;
     firstName?: string;
     lastName?: string;
     contactNo?: string;

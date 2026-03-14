@@ -1,7 +1,7 @@
 import type { DispatchTask } from "../../tasks/models/tasks.types";
 import { fetchLguTasksByStatus } from "../../tasks/services/tasksApi";
 import { fetchEmergencyReports } from "../../emergency/services/emergency.service";
-import { listAnnouncements } from "../../announcements/services/announcements.service";
+import { listPublishedAnnouncements } from "../../announcements/services/announcements.service";
 import { api } from "../../../lib/api";
 import type { LguNotification, NotificationType } from "../models/notifications.types";
 
@@ -167,12 +167,11 @@ function normalizeTypeKey(t: NotificationType | "ALL") {
 
 export async function fetchLguNotifications(): Promise<LguNotification[]> {
   // Derived feed: dispatches, emergencies, announcements. Read/archive state comes from DB.
-  const [dispatches, emergencies] = await Promise.all([
+  const [dispatches, emergencies, announcements] = await Promise.all([
     fetchLguTasksByStatus("ACCEPTED,DONE,VERIFIED"),
     fetchEmergencyReports(120),
+    listPublishedAnnouncements(),
   ]);
-
-  const announcements = listAnnouncements().filter((a) => a.status === "PUBLISHED");
 
   const items: Array<Omit<LguNotification, "read" | "archived">> = [];
 

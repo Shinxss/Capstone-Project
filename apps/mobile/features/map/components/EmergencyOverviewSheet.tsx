@@ -80,7 +80,7 @@ function extractBarangay(label?: string) {
   return match ? match[0].trim() : "-";
 }
 
-function toAbsolutePhotoUrl(raw: string) {
+function toAbsoluteAssetUrl(raw: string) {
   const value = String(raw ?? "").trim();
   if (!value) return "";
   if (/^https?:\/\//i.test(value)) return value;
@@ -143,6 +143,11 @@ export function EmergencyOverviewSheet({
     return "Guest Reporter";
   }, [reporter?.firstName, reporter?.isGuest, reporter?.lastName]);
   const reporterContact = maskContact(reporter?.contactNo);
+  const reporterLifelineId = String(reporter?.lifelineId ?? "").trim() || "-";
+  const reporterAvatarUri = useMemo(
+    () => toAbsoluteAssetUrl(String(reporter?.avatarUrl ?? "")),
+    [reporter?.avatarUrl]
+  );
   const reporterAddress = useMemo(() => {
     const parts = [
       String(reporter?.barangay ?? "").trim(),
@@ -236,7 +241,7 @@ export function EmergencyOverviewSheet({
               contentContainerStyle={{ paddingTop: 10, paddingRight: 16, gap: 10 }}
             >
               {photos.map((photo, index) => {
-                const uri = toAbsolutePhotoUrl(photo);
+                const uri = toAbsoluteAssetUrl(photo);
                 if (!uri) return null;
                 return (
                   <View key={`${emergency.id}-thumb-${index}`} className="relative">
@@ -267,10 +272,29 @@ export function EmergencyOverviewSheet({
         <Text className="text-[12px] font-semibold uppercase tracking-wide text-slate-500">
           Reporter
         </Text>
-        <Text className="mt-1 text-[14px] font-semibold text-slate-900">
-          {loadingDetail ? "Loading..." : reporterName}
-        </Text>
-        <Text className="mt-1 text-[12px] text-slate-600">Contact: {reporterContact}</Text>
+        <View className="mt-2 flex-row items-center gap-3">
+          <View className="h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100">
+            {reporterAvatarUri ? (
+              <Image
+                source={imageHeaders ? { uri: reporterAvatarUri, headers: imageHeaders } : { uri: reporterAvatarUri }}
+                style={{ width: "100%", height: "100%" }}
+                resizeMode="cover"
+              />
+            ) : (
+              <Feather name="user" size={18} color="#64748B" />
+            )}
+          </View>
+
+          <View className="flex-1">
+            <Text className="text-[14px] font-semibold text-slate-900" numberOfLines={1}>
+              {loadingDetail ? "Loading..." : reporterName}
+            </Text>
+            <Text className="mt-1 text-[12px] text-slate-500" numberOfLines={1}>
+              Lifeline ID: {loadingDetail ? "Loading..." : reporterLifelineId}
+            </Text>
+          </View>
+        </View>
+        <Text className="mt-2 text-[12px] text-slate-600">Contact: {reporterContact}</Text>
         <Text className="mt-1 text-[12px] text-slate-500">Address: {reporterAddress}</Text>
       </View>
     </View>

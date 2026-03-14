@@ -641,7 +641,10 @@ export async function getEmergencyReportById(id: string) {
     .select(
       "isSos referenceNumber emergencyType status verification visibility location locationLabel notes photos reportedBy reporterIsGuest reportedAt createdAt updatedAt"
     )
-    .populate("reportedBy", "firstName lastName contactNo barangay municipality country postalCode")
+    .populate(
+      "reportedBy",
+      "firstName lastName lifelineId avatarUrl contactNo barangay municipality country postalCode"
+    )
     .lean();
 
   if (!report) return null;
@@ -653,6 +656,8 @@ export async function getEmergencyReportById(id: string) {
           isGuest: Boolean(report.reporterIsGuest),
           firstName: String((reporterRaw as any).firstName ?? "").trim() || undefined,
           lastName: String((reporterRaw as any).lastName ?? "").trim() || undefined,
+          lifelineId: String((reporterRaw as any).lifelineId ?? "").trim() || undefined,
+          avatarUrl: String((reporterRaw as any).avatarUrl ?? "").trim() || undefined,
           contactNo: String((reporterRaw as any).contactNo ?? "").trim() || undefined,
           barangay: String((reporterRaw as any).barangay ?? "").trim() || undefined,
           municipality: String((reporterRaw as any).municipality ?? "").trim() || undefined,

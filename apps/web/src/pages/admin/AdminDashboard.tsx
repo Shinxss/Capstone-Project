@@ -16,6 +16,13 @@ const DASHBOARD_MAX_BOUNDS: [[number, number], [number, number]] = [
 function toActiveIncidentPin(report: EmergencyReport): MapEmergencyPin | null {
   const status = String(report.status || "").toUpperCase();
   if (status !== "OPEN" && status !== "ACKNOWLEDGED") return null;
+  const reportWithVerification = report as EmergencyReport & {
+    verification?: { status?: string };
+  };
+  const verificationStatus = String(reportWithVerification.verification?.status ?? "")
+    .trim()
+    .toLowerCase();
+  if (verificationStatus === "rejected") return null;
 
   const coords = report.location?.coordinates;
   const lng = Array.isArray(coords) ? Number(coords[0]) : Number.NaN;
@@ -42,8 +49,9 @@ export default function AdminDashboard() {
     try {
       const reports = await fetchEmergencyReports(300);
       setMapPins(reports.map(toActiveIncidentPin).filter((pin): pin is MapEmergencyPin => pin !== null));
-    } catch (err: any) {
-      setMapError(err?.response?.data?.message ?? err?.message ?? "Failed to load map incidents");
+    } catch (err: unknown) {
+      const parsed = err as { response?: { data?: { message?: string } }; message?: string };
+      setMapError(parsed?.response?.data?.message ?? parsed?.message ?? "Failed to load map incidents");
     } finally {
       setMapLoading(false);
     }

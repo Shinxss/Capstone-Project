@@ -33,6 +33,18 @@ function isActiveEmergencyStatus(raw?: string) {
   return status !== "RESOLVED" && status !== "CANCELLED";
 }
 
+function isRejectedEmergencyReport(report: EmergencyReport) {
+  const reportWithVerification = report as EmergencyReport & {
+    verification?: {
+      status?: string;
+    };
+  };
+  const verificationStatus = String(reportWithVerification.verification?.status ?? "")
+    .trim()
+    .toLowerCase();
+  return verificationStatus === "rejected";
+}
+
 export function useLguDashboard() {
   const { reports, loading, error, refetch } = useLguEmergencies();
   const {
@@ -71,6 +83,7 @@ export function useLguDashboard() {
 
   const items: DashboardEmergencyItem[] = useMemo(() => {
     return (reports ?? [])
+      .filter((report) => !isRejectedEmergencyReport(report))
       .map((r) => {
         const coords = r.location?.coordinates;
         const lng = Array.isArray(coords) ? coords[0] : NaN;

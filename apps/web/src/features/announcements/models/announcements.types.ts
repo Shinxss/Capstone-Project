@@ -1,6 +1,6 @@
 export type AnnouncementStatus = "DRAFT" | "PUBLISHED";
 
-export type AnnouncementAudience = "ALL" | "VOLUNTEERS" | "LGU" | "BARANGAY";
+export type AnnouncementAudience = "ALL" | "VOLUNTEER" | "LGU" | "PUBLIC";
 
 export type Announcement = {
   id: string;
@@ -18,4 +18,3 @@ export type AnnouncementDraftInput = {
   body: string;
   audience: AnnouncementAudience;
 };
-
