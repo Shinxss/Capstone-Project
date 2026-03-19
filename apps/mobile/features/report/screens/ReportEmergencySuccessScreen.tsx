@@ -9,12 +9,19 @@ type SearchParams = {
   incidentId?: string;
   referenceNumber?: string;
   isSos?: string;
+  reportLng?: string;
+  reportLat?: string;
 };
 
 export function ReportEmergencySuccessScreen() {
-  const { incidentId, referenceNumber, isSos } = useLocalSearchParams<SearchParams>();
+  const { incidentId, referenceNumber, isSos, reportLng, reportLat } = useLocalSearchParams<SearchParams>();
   const { reset } = useReportDraft();
   const sosMode = String(isSos ?? "") === "1";
+  const viewOnMapParams: Record<string, string> = {};
+
+  if (incidentId) viewOnMapParams.incidentId = String(incidentId);
+  if (reportLng) viewOnMapParams.reportLng = String(reportLng);
+  if (reportLat) viewOnMapParams.reportLat = String(reportLat);
 
   const onBackHome = () => {
     reset();
@@ -57,7 +64,7 @@ export function ReportEmergencySuccessScreen() {
           onPress={() =>
             router.push({
               pathname: "/(tabs)/map",
-              params: incidentId ? { incidentId } : undefined,
+              params: Object.keys(viewOnMapParams).length ? viewOnMapParams : undefined,
             })
           }
           style={styles.primaryBtn}

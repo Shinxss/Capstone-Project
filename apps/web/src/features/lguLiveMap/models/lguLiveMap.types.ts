@@ -5,6 +5,7 @@ export type VolunteerStatus = "available" | "busy" | "idle" | "offline";
 
 export type Volunteer = {
   id: string;
+  lifelineId?: string;
   name: string;
   status: VolunteerStatus;
   lastSeenAt?: string;

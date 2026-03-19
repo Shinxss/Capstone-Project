@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert } from "react-native";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
@@ -34,13 +34,25 @@ import {
 export default function MoreScreen() {
   const router = useRouter();
   const { signOut } = useAuth();
-  const { openAuthRequired, goToLogin, modalProps: authRequiredModalProps } = useAuthRequiredPrompt();
+  const { openAuthRequired, closeAuthRequired, goToLogin, modalProps: authRequiredModalProps } = useAuthRequiredPrompt();
   const { displayName, isUser, session, updateUser } = useSession();
   const { mode, isDark, setMode } = useTheme();
 
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [avatarSheetVisible, setAvatarSheetVisible] = useState(false);
   const [avatarViewerVisible, setAvatarViewerVisible] = useState(false);
+
+  const closeTransientUi = useCallback(() => {
+    setDrawerVisible(false);
+    setAvatarSheetVisible(false);
+    setAvatarViewerVisible(false);
+    closeAuthRequired();
+  }, [closeAuthRequired]);
+
+  useEffect(() => {
+    if (isUser) return;
+    closeTransientUi();
+  }, [closeTransientUi, isUser]);
 
   const user = session?.mode === "user" ? session.user : null;
   const hasPassword =
@@ -103,10 +115,8 @@ export default function MoreScreen() {
 
   const onLogout = useCallback(() => {
     if (!isUser) {
-      void (async () => {
-        await signOut();
-        router.replace("/(auth)/login");
-      })();
+      closeTransientUi();
+      void goToLogin();
       return;
     }
 
@@ -117,6 +127,7 @@ export default function MoreScreen() {
         style: "destructive",
         onPress: async () => {
           try {
+            closeTransientUi();
             await signOut();
             router.replace("/(auth)/login");
           } catch {
@@ -125,7 +136,7 @@ export default function MoreScreen() {
         },
       },
     ]);
-  }, [isUser, router, signOut]);
+  }, [closeTransientUi, goToLogin, isUser, router, signOut]);
 
   const {
     avatarUrl: profileAvatarUrl,

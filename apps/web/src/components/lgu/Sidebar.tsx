@@ -475,7 +475,7 @@ export default function Sidebar({
       />
 
       {/* IMPORTANT: overflow-x-visible so flyout won't get clipped */}
-     <nav className="px-3 pt-1 flex-1 overflow-y-auto overflow-x-visible">
+     <nav className="sidebar-scroll-hidden px-3 pt-1 flex-1 overflow-y-auto overflow-x-visible">
         {navSections.map((section, idx) => (
           <div key={section.title} className={idx === 0 ? "" : "mt-3"}>
             {idx !== 0 && (

@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, Pressable, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
 import { useSession } from "../../auth/hooks/useSession";
 import { usePullToRefresh } from "../../common/hooks/usePullToRefresh";
 import { MyRequestsHeader, type MyRequestsHeaderTabOption } from "../components/MyRequestsHeader";
@@ -37,9 +38,22 @@ function actionLabelForStatus(): string {
   return "View Tracking Details";
 }
 
+function emptyMessageForTab(tab: MyRequestStatusTab) {
+  if (tab === "all") return "No Request submitted";
+  if (tab === "submitted") return "No Request submitted";
+  if (tab === "verification") return "No Request for verification";
+  if (tab === "assigned") return "No Request assigned";
+  if (tab === "en_route") return "No Request en route";
+  if (tab === "arrived") return "No Request arrived";
+  if (tab === "review") return "No Request for review";
+  if (tab === "resolved") return "No Request resolved";
+  return "No Request cancelled";
+}
+
 export function MyRequestsHistoryScreen() {
   const params = useLocalSearchParams<{ tab?: string | string[] }>();
   const { isUser, loading: sessionLoading } = useSession();
+  const insets = useSafeAreaInsets();
   const tabParam = Array.isArray(params.tab) ? params.tab[0] : params.tab;
   const initialTab = useMemo(
     () => normalizeMyRequestStatusTab(tabParam, "all"),
@@ -156,16 +170,21 @@ export function MyRequestsHistoryScreen() {
     setActiveTab("all");
   }, []);
 
+  const emptyTabMessage = useMemo(() => emptyMessageForTab(activeTab), [activeTab]);
+
   if (sessionLoading || !isUser) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-zinc-100" edges={["left", "right"]}>
+      <SafeAreaView
+        style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#F4F4F5" }}
+        edges={["left", "right"]}
+      >
         <ActivityIndicator size="small" color="#DC2626" />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={["left", "right"]}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#FFFFFF" }} edges={["left", "right"]}>
       <MyRequestsHeader
         tabs={STATUS_TABS}
         activeTab={activeTab}
@@ -178,14 +197,19 @@ export function MyRequestsHistoryScreen() {
       />
 
       <FlatList
+        style={{ flex: 1 }}
         data={filteredItems}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) =>
+          String(item.id ?? "").trim() || `${item.referenceNumber}-${item.createdAt}-${index}`
+        }
         refreshing={refreshingHistory}
         onRefresh={triggerRefreshHistory}
+        showsVerticalScrollIndicator={false}
+        scrollEnabled
         contentContainerStyle={{
           paddingHorizontal: 16,
           paddingTop: 14,
-          paddingBottom: 40,
+          paddingBottom: Math.max(120, insets.bottom + 92),
           gap: 12,
           flexGrow: filteredItems.length === 0 ? 1 : 0,
         }}
@@ -213,12 +237,19 @@ export function MyRequestsHistoryScreen() {
               <Text className="mt-2 text-sm text-zinc-500">Loading requests...</Text>
             </View>
           ) : searchValue.trim() ? (
-            <View className="mt-6 rounded-2xl border border-zinc-200 bg-white p-6">
+            <View className="mt-6 rounded-2xl bg-white p-6">
               <Text className="text-center text-sm text-zinc-600">No requests match your search</Text>
             </View>
           ) : (
-            <View className="mt-6 rounded-2xl border border-zinc-200 bg-white p-6">
-              <Text className="text-center text-sm text-zinc-600">No requests in this category</Text>
+            <View style={{ flex: 1, justifyContent: "center" }}>
+              <View className="items-center rounded-2xl bg-white p-10">
+                <View className="h-20 w-20 items-center justify-center rounded-full bg-zinc-100">
+                  <Ionicons name="document-text-outline" size={34} color="#71717A" />
+                </View>
+                <Text className="mt-3 text-center text-sm font-semibold text-zinc-700">
+                  {emptyTabMessage}
+                </Text>
+              </View>
             </View>
           )
         }

@@ -11,6 +11,8 @@ export type Reporter = {
   username?: string;
   email?: string;
   role?: string;
+  lifelineId?: string;
+  avatarUrl?: string;
   contactNo?: string;
   barangay?: string;
   municipality?: string;

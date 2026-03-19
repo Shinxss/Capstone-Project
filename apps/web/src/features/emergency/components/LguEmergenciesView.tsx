@@ -7,6 +7,7 @@ import {
   Wind,
   Zap,
   Building2,
+  HeartPulse,
   Phone,
   ShieldCheck,
   AlertTriangle,
@@ -34,29 +35,23 @@ const typeChips: { key: LguEmergencyTypeFilter; label: string; icon: LucideIcon 
   { key: "Typhoon", label: "Typhoon", icon: Wind },
   { key: "Earthquake", label: "Earthquake", icon: Zap },
   { key: "Collapse", label: "Collapse", icon: Building2 },
+  { key: "Medical", label: "Medical", icon: HeartPulse },
+  { key: "Other", label: "Other", icon: AlertTriangle },
 ];
+
+const TYPE_ICONS: Record<EmergencyType, LucideIcon> = {
+  SOS: Siren,
+  Flood: Droplet,
+  Fire: Flame,
+  Typhoon: Wind,
+  Earthquake: Zap,
+  Collapse: Building2,
+  Medical: HeartPulse,
+  Other: AlertTriangle,
+};
 
 function Pill({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${className}`}>{children}</span>;
-}
-
-function iconForType(type: EmergencyType): LucideIcon {
-  switch (type) {
-    case "SOS":
-      return Siren;
-    case "Flood":
-      return Droplet;
-    case "Fire":
-      return Flame;
-    case "Typhoon":
-      return Wind;
-    case "Earthquake":
-      return Zap;
-    case "Collapse":
-      return Building2;
-    default:
-      return AlertTriangle;
-  }
 }
 
 function bgForType(type: EmergencyType) {
@@ -71,6 +66,10 @@ function bgForType(type: EmergencyType) {
       return "bg-red-100";
     case "Earthquake":
       return "bg-purple-100";
+    case "Medical":
+      return "bg-emerald-100";
+    case "Other":
+      return "bg-gray-100";
     case "SOS":
       return "bg-red-100";
     default:
@@ -128,7 +127,7 @@ function EmergencyCard({
   item: LguEmergencyItem;
   onActionClick: (item: LguEmergencyItem) => void;
 }) {
-  const Icon = iconForType(item.type);
+  const Icon = TYPE_ICONS[item.type];
   const isSOS = !!item.isSOS;
 
   const cardBorder = isSOS
@@ -281,12 +280,14 @@ export default function LguEmergenciesView(props: Props) {
   const navigate = useNavigate();
   const { loading, error, onRefresh, query, setQuery, typeFilter, setTypeFilter, items, stats, filtered } = props;
 
-  const activeItems = items.filter((item) => item.status === "active");
+  const isOperational = (status: LguEmergencyItem["status"]) =>
+    status === "active" || status === "in_progress" || status === "pending";
+  const activeItems = items.filter((item) => isOperational(item.status));
   const activeSosItems = activeItems.filter((item) => item.isSOS);
   const activeSosCount = activeSosItems.length;
   const activeSosVolunteersAssigned = activeSosItems.reduce((sum, item) => sum + item.volunteersAssigned, 0);
   const activeSosVolunteersNeeded = activeSosItems.reduce((sum, item) => sum + item.volunteersNeeded, 0);
-  const visibleItems = filtered.filter((item) => item.status === "active");
+  const visibleItems = filtered.filter((item) => isOperational(item.status));
 
   const handleEmergencyAction = (item: LguEmergencyItem) => {
     const emergencyId = String(item.id || "").trim();
@@ -336,8 +337,8 @@ export default function LguEmergenciesView(props: Props) {
         </div>
       ) : null}
 
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-        <div className="relative max-w-[600px] flex-1">
+      <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
+        <div className="relative w-full lg:basis-full">
           <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             value={query}
@@ -347,7 +348,8 @@ export default function LguEmergenciesView(props: Props) {
           />
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="w-full lg:flex-1">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
           {typeChips.map((chip) => {
             const Icon = chip.icon;
             const active = typeFilter === chip.key;
@@ -356,7 +358,7 @@ export default function LguEmergenciesView(props: Props) {
                 key={chip.key}
                 onClick={() => setTypeFilter(chip.key)}
                 className={[
-                  "inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold",
+                  "inline-flex shrink-0 items-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold",
                   active
                     ? "border-red-600 bg-red-600 text-white"
                     : "border-gray-200 bg-white text-gray-800 hover:bg-gray-50 dark:border-[#162544] dark:bg-[#0E1626] dark:text-slate-200 dark:hover:bg-[#122036]",
@@ -367,6 +369,7 @@ export default function LguEmergenciesView(props: Props) {
               </button>
             );
           })}
+          </div>
         </div>
       </div>
 

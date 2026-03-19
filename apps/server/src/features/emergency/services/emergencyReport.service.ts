@@ -14,6 +14,7 @@ import { findBarangayByPoint } from "../../barangays/barangay.service";
 import { DispatchOffer } from "../../dispatches/dispatch.model";
 
 const EMERGENCY_REPORT_PHOTO_URL_PREFIX = "/uploads/emergency-report-photos/";
+const DISPATCH_PROOF_URL_PREFIX = "/uploads/dispatch-proofs/";
 
 type PublicEmergencyReport = {
   referenceNumber: string;
@@ -144,9 +145,16 @@ export type MyRequestTrackingDTO = {
     label: TrackingLabel;
     etaSeconds: number | null;
     lastUpdatedAt: string;
+    proofs?: Array<{
+      url: string;
+      uploadedAt: string;
+      mimeType?: string;
+      fileName?: string;
+    }>;
     responder?: {
       id: string;
       name: string;
+      lifelineId?: string;
       phone?: string;
     };
     responderLocation?: {
@@ -190,6 +198,8 @@ function toDbEmergencyType(type: CreateEmergencyReportInput["type"]): IEmergency
 
 function fromDbEmergencyType(type: IEmergencyReport["emergencyType"]): CreateEmergencyReportInput["type"] {
   switch (type) {
+    case "SOS":
+      return "sos" as CreateEmergencyReportInput["type"];
     case "FIRE":
       return "fire";
     case "FLOOD":
@@ -286,7 +296,7 @@ function deriveTrackingLabel(
 
   if (emergencyStatus === "CANCELLED" || verificationStatus === "rejected") return "Cancelled";
   if (emergencyStatus === "RESOLVED" || hasOfferStatus(offers, "VERIFIED")) return "Resolved";
-  if (hasOfferStatus(offers, "DONE")) return "Arrived";
+  if (hasOfferStatus(offers, "DONE")) return "Resolved";
   if (hasOfferStatus(offers, "ACCEPTED")) return "En Route";
   if (offers.length > 0) return "Assigned";
   return "Submitted";
@@ -313,7 +323,7 @@ function deriveMyRequestStatusTab(report: any, offers: any[]): MappedMyRequestSt
     return "resolved";
   }
   if (hasOfferStatus(offers, "DONE")) {
-    return "arrived";
+    return "resolved";
   }
   if (hasOfferStatus(offers, "ACCEPTED")) {
     return "en_route";
@@ -545,6 +555,40 @@ function sanitizeEmergencyPhotoUrls(photoUrls?: string[]) {
   return sanitized.slice(0, 5);
 }
 
+function toTrackingProofs(rawProofs: unknown, fallbackDate: unknown) {
+  if (!Array.isArray(rawProofs) || rawProofs.length === 0) return [];
+
+  const fallback = fallbackDate instanceof Date ? fallbackDate : new Date(String(fallbackDate ?? ""));
+  const safeFallback = Number.isNaN(fallback.getTime()) ? new Date() : fallback;
+
+  return rawProofs
+    .map((proof) => {
+      const url = String((proof as any)?.url ?? "").trim();
+      if (!url || !url.startsWith(DISPATCH_PROOF_URL_PREFIX)) return null;
+
+      const mimeType = String((proof as any)?.mimeType ?? "").trim();
+      const fileName = String((proof as any)?.fileName ?? "").trim();
+
+      return {
+        url,
+        uploadedAt: toIsoString((proof as any)?.uploadedAt, safeFallback),
+        ...(mimeType ? { mimeType } : {}),
+        ...(fileName ? { fileName } : {}),
+      };
+    })
+    .filter(
+      (
+        proof
+      ): proof is {
+        url: string;
+        uploadedAt: string;
+        mimeType?: string;
+        fileName?: string;
+      } => Boolean(proof)
+    )
+    .slice(0, 10);
+}
+
 export async function createEmergencyReport(
   input: CreateEmergencyReportInput,
   reporterUserId?: string
@@ -753,7 +797,6 @@ export async function listMyMapEmergencyReports(
 
   const docs = await EmergencyReportModel.find({
     reportedBy: new Types.ObjectId(reporterUserId),
-    status: { $nin: ["RESOLVED", "CANCELLED"] },
     "verification.status": { $ne: "rejected" },
   })
     .sort({ createdAt: -1 })
@@ -763,7 +806,30 @@ export async function listMyMapEmergencyReports(
     )
     .lean();
 
-  return docs.map((report) => ({
+  if (!docs.length) return [];
+
+  const emergencyIds = docs.map((report) => report._id);
+  const offers = await DispatchOffer.find({ emergencyId: { $in: emergencyIds } })
+    .sort({ updatedAt: -1, _id: -1 })
+    .select("emergencyId status")
+    .lean();
+
+  const offersByEmergencyId = new Map<string, any[]>();
+  for (const offer of offers) {
+    const key = String(offer.emergencyId ?? "");
+    if (!offersByEmergencyId.has(key)) {
+      offersByEmergencyId.set(key, []);
+    }
+    offersByEmergencyId.get(key)!.push(offer);
+  }
+
+  return docs
+    .filter((report) => {
+      const reportOffers = offersByEmergencyId.get(String(report._id)) ?? [];
+      const mappedTab = deriveMyRequestStatusTab(report, reportOffers);
+      return mappedTab !== "resolved" && mappedTab !== "cancelled";
+    })
+    .map((report) => ({
     incidentId: report._id.toString(),
     referenceNumber: String(report.referenceNumber ?? ""),
     isSos: Boolean(report.isSos),
@@ -1161,8 +1227,8 @@ async function buildEmergencyRequestTrackingDto(report: any): Promise<MyRequestT
 
   const offers = await DispatchOffer.find({ emergencyId: reportId })
     .sort({ updatedAt: -1, _id: -1 })
-    .select("status updatedAt volunteerId lastKnownLocation lastKnownLocationAt")
-    .populate({ path: "volunteerId", select: "firstName lastName contactNo" })
+    .select("status updatedAt volunteerId lastKnownLocation lastKnownLocationAt proofs")
+    .populate({ path: "volunteerId", select: "firstName lastName lifelineId contactNo" })
     .lean();
 
   const label = deriveTrackingLabel(report.status, offers, report?.verification?.status);
@@ -1187,6 +1253,8 @@ async function buildEmergencyRequestTrackingDto(report: any): Promise<MyRequestT
   const responderId = responderOffer?.volunteerId?._id
     ? String(responderOffer.volunteerId._id)
     : String(responderOffer?.volunteerId ?? "");
+  const responderLifelineIdRaw = String(responderOffer?.volunteerId?.lifelineId ?? "").trim();
+  const responderLifelineId = responderLifelineIdRaw || undefined;
   const responderPhoneRaw = String(responderOffer?.volunteerId?.contactNo ?? "").trim();
   const responderPhone = responderPhoneRaw || undefined;
 
@@ -1196,6 +1264,8 @@ async function buildEmergencyRequestTrackingDto(report: any): Promise<MyRequestT
     report.updatedAt ??
     report.createdAt ??
     new Date();
+  const proofOffer = relevantOffer ?? responderOffer;
+  const proofs = toTrackingProofs(proofOffer?.proofs, trackingUpdatedAt);
   const rejectionReasonRaw = String(report?.verification?.reason ?? "").trim();
   const verificationStatus = String(report?.verification?.status ?? "").trim().toLowerCase();
   const rejectionReason = verificationStatus === "rejected" ? rejectionReasonRaw : "";
@@ -1223,11 +1293,13 @@ async function buildEmergencyRequestTrackingDto(report: any): Promise<MyRequestT
       label,
       etaSeconds: etaPayload.etaSeconds,
       lastUpdatedAt: toIsoString(trackingUpdatedAt),
+      ...(proofs.length ? { proofs } : {}),
       ...(hasResponder && responderId
         ? {
             responder: {
               id: responderId,
               name: toResponderName(responderOffer),
+              ...(responderLifelineId ? { lifelineId: responderLifelineId } : {}),
               ...(responderPhone ? { phone: responderPhone } : {}),
             },
           }

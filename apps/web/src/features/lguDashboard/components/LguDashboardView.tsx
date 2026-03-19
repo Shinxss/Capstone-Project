@@ -4,6 +4,7 @@ import { useThemeMode } from "../../theme/hooks/useThemeMode";
 import {
   Activity,
   AlertTriangle,
+  ArrowRight,
   ClipboardList,
   LocateFixed,
   Users,
@@ -65,11 +66,11 @@ function timeAgo(iso?: string) {
 
 function severityForStatus(status: string) {
   const s = String(status || "").toUpperCase();
-  if (s === "OPEN") return { label: "critical", cls: "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300" };
-  if (s === "ACKNOWLEDGED") return { label: "high", cls: "bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300" };
-  if (s === "RESOLVED") return { label: "moderate", cls: "bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300" };
-  if (s === "CANCELLED") return { label: "cancelled", cls: "bg-gray-200 text-gray-700 dark:bg-white/10 dark:text-slate-300" };
-  return { label: s.toLowerCase() || "unknown", cls: "bg-gray-200 text-gray-700 dark:bg-white/10 dark:text-slate-300" };
+  if (s === "OPEN") return { label: "critical", cls: "border-1 border-red-300 bg-red-100 text-red-700 dark:border-red-400/60 dark:bg-red-500/15 dark:text-red-300" };
+  if (s === "ACKNOWLEDGED") return { label: "high", cls: "border-1 border-orange-300 bg-orange-100 text-orange-700 dark:border-orange-400/60 dark:bg-orange-500/15 dark:text-orange-300" };
+  if (s === "RESOLVED") return { label: "moderate", cls: "border-1 border-green-300 bg-green-100 text-green-700 dark:border-green-400/60 dark:bg-green-500/15 dark:text-green-300" };
+  if (s === "CANCELLED") return { label: "cancelled", cls: "border-1 border-gray-300 bg-gray-200 text-gray-700 dark:border-white/35 dark:bg-white/10 dark:text-slate-300" };
+  return { label: s.toLowerCase() || "unknown", cls: "border-1 border-gray-300 bg-gray-200 text-gray-700 dark:border-white/35 dark:bg-white/10 dark:text-slate-300" };
 }
 
 function progressForStatus(status: string) {
@@ -123,12 +124,12 @@ function ProgressRing({ percent, isDark }: { percent: number; isDark: boolean })
   const p = Math.max(0, Math.min(100, percent));
   return (
     <div
-      className="h-10 w-10 rounded-full flex items-center justify-center text-[11px] font-bold text-gray-700 dark:text-slate-200"
+      className="h-16 w-16 shrink-0 rounded-full flex items-center justify-center text-base font-bold text-gray-700 dark:text-slate-200"
       style={{
         background: `conic-gradient(#ef4444 ${p * 3.6}deg, ${isDark ? "#0B1324" : "#f3f4f6"} 0deg)`,
       }}
     >
-      <div className="h-8 w-8 rounded-full bg-white flex items-center justify-center dark:bg-[#0E1626]">{p}%</div>
+      <div className="h-14 w-14 rounded-full bg-white flex items-center justify-center dark:bg-[#0E1626]">{p}%</div>
     </div>
   );
 }
@@ -342,8 +343,7 @@ export default function LguDashboardView({
     .filter((e) => {
       const s = String(e.status || "").toUpperCase();
       return s === "OPEN" || s === "ACKNOWLEDGED";
-    })
-    .slice(0, 6);
+    });
 
   const activity = safeRecent.slice(0, 5).map((e) => {
     const type = EMERGENCY_TYPE_LABEL[e.type] ?? e.type;
@@ -402,7 +402,7 @@ export default function LguDashboardView({
   }
 
   return (
-    <div className="p-4">
+    <div className="px-6 py-4">
       {/* Stats (keeps old design, but Active Emergencies is real) */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
         <StatCard
@@ -570,15 +570,22 @@ export default function LguDashboardView({
       */}
       <div className="relative z-120 grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 bg-white border border-gray-200 rounded-lg shadow-sm dark:bg-[#0E1626] dark:border-[#162544]">
-          <div className="px-4 py-3 flex items-center justify-between border-b border-gray-200 dark:border-[#162544]">
+          <div className="px-6 py-3 flex items-center justify-between border-b border-gray-200 dark:border-[#162544]">
             <div>
-              <div className="text-sm font-bold text-gray-900 dark:text-slate-100">Active Emergencies</div>
-              <div className="text-xs text-gray-500 dark:text-slate-400">Current incidents requiring response</div>
+              <div className="text-2xl font-bold text-gray-900 dark:text-slate-100">Active Emergencies</div>
+              <div className="text-base text-gray-500 dark:text-slate-400">Current incidents requiring response</div>
             </div>
-            <div className="text-xs text-gray-400 dark:text-slate-500">{loading ? "Loading…" : `${activeEmergencies.length} shown`}</div>
+            <button
+              type="button"
+              onClick={() => navigate("/lgu/emergencies")}
+              className="inline-flex items-center gap-2 text-lg font-semibold text-gray-900 hover:text-gray-700 dark:text-slate-100 dark:hover:text-slate-300"
+            >
+              View All
+              <ArrowRight size={18} />
+            </button>
           </div>
 
-          <div className="p-3 space-y-3">
+          <div className="max-h-[22rem] overflow-y-auto px-6 py-3 pr-2 space-y-3">
             {!loading && activeEmergencies.length === 0 ? (
               <div className="text-sm text-gray-500 p-2 dark:text-slate-400">No emergency reports yet.</div>
             ) : null}
@@ -603,7 +610,7 @@ export default function LguDashboardView({
                     <div className="leading-tight min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <div className="text-base font-bold text-gray-900 truncate dark:text-slate-100">{typeLabel}</div>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${sev.cls}`}>
+                        <span className={`text-sm px-3 py-0.5 rounded-full font-semibold ${sev.cls}`}>
                           {sev.label}
                         </span>
                       </div>
@@ -633,8 +640,8 @@ export default function LguDashboardView({
         <div className="bg-white border border-gray-200 rounded-lg shadow-sm dark:bg-[#0E1626] dark:border-[#162544]">
           <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between dark:border-[#162544]">
             <div>
-              <div className="text-sm font-bold text-gray-900 dark:text-slate-100">Activity Feed</div>
-              <div className="text-xs text-gray-500 dark:text-slate-400">Real-time updates</div>
+              <div className="text-base font-bold text-gray-900 dark:text-slate-100">Activity Feed</div>
+              <div className="text-sm text-gray-500 dark:text-slate-400">Real-time updates</div>
             </div>
             <button className="text-xs font-semibold text-gray-700 hover:text-gray-900 dark:text-slate-300 dark:hover:text-slate-100">↗</button>
           </div>

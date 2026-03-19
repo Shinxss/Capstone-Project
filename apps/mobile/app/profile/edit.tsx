@@ -92,9 +92,8 @@ export default function EditProfileScreen() {
             You need an account to edit your profile.
           </Text>
           <Pressable
-            onPress={async () => {
-              await signOut();
-              router.replace("/(auth)/login");
+            onPress={() => {
+              void signOut();
             }}
             style={({ pressed }) => ({
               marginTop: 16,

@@ -29,13 +29,18 @@ export function RequestProgressTracker({
     () => clampActiveIndex(activeIndex, Math.max(0, steps.length - 1)),
     [activeIndex, steps.length]
   );
+  const isResolvedCurrent = useMemo(() => {
+    const activeStep = steps[safeActiveIndex];
+    return activeStep === "Resolved";
+  }, [safeActiveIndex, steps]);
 
-  const currentColor = "#DC2626";
   const completedColor = "#22C55E";
   const mutedColor = "#D4D4D8";
-  const currentTextColor = "#B91C1C";
   const completedTextColor = "#15803D";
   const mutedTextColor = "#71717A";
+  const currentColor = isResolvedCurrent ? completedColor : "#DC2626";
+  const currentBorderColor = isResolvedCurrent ? "#86EFAC" : "#FCA5A5";
+  const currentTextColor = isResolvedCurrent ? completedTextColor : "#B91C1C";
 
   return (
     <View style={styles.container}>
@@ -55,7 +60,7 @@ export function RequestProgressTracker({
                     isCurrent ? styles.currentDot : styles.smallDot,
                     {
                       backgroundColor: dotColor,
-                      borderColor: isCurrent ? "#FCA5A5" : "transparent",
+                      borderColor: isCurrent ? currentBorderColor : "transparent",
                     },
                   ]}
                 />

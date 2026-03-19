@@ -13,9 +13,10 @@ import { fetchCsrfToken } from "./lib/api";
 const MOVE_TO_SESSION_KEYS = [
   "lifeline_lgu_token",
   "lifeline_lgu_user",
-  "lifeline_lgu_activity_log_v1",
   "lifeline_lgu_announcements_v1",
 ] as const;
+
+const REMOVE_BROWSER_STORAGE_KEYS = ["lifeline_lgu_activity_log_v1"] as const;
 
 function hardenBrowserStorage() {
   try {
@@ -37,6 +38,11 @@ function hardenBrowserStorage() {
         sessionStore.setItem(key, existing);
       }
       localStore.removeItem(key);
+    }
+
+    for (const key of REMOVE_BROWSER_STORAGE_KEYS) {
+      localStore.removeItem(key);
+      sessionStore.removeItem(key);
     }
 
     for (let i = 0; i < localStore.length; i += 1) {

@@ -30,6 +30,7 @@ import {
 } from "../blockchain/taskLedger";
 
 const MAX_PROOF_BYTES = 3 * 1024 * 1024; // 3MB
+const MIN_PROOFS_REQUIRED_TO_COMPLETE = 3;
 const ALLOWED_PROOF_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/heic"]);
 const PROOF_HASH_ALGO = "sha256";
 
@@ -382,13 +383,20 @@ export async function completeDispatch(params: { dispatchId: string; volunteerUs
     throw new Error("Only accepted tasks can be marked as done");
   }
 
+  const proofCount = Array.isArray(offer.proofs) ? offer.proofs.length : 0;
+  if (proofCount < MIN_PROOFS_REQUIRED_TO_COMPLETE) {
+    throw new Error(
+      `Upload at least ${MIN_PROOFS_REQUIRED_TO_COMPLETE} proof images before marking task as done`
+    );
+  }
+
   offer.status = "DONE";
   offer.completedAt = new Date();
   await offer.save();
 
   await syncVolunteerBusyState(String(offer.volunteerId)).catch(() => undefined);
-  await notifyRequestTrackingUpdated(String(offer.emergencyId), "responder_arrived", {
-    stepOverride: "Arrived",
+  await notifyRequestTrackingUpdated(String(offer.emergencyId), "request_resolved", {
+    stepOverride: "Resolved",
   }).catch(() => undefined);
 
   return offer;
@@ -735,7 +743,7 @@ export async function listDispatchTasksForLgu(params: { statuses: DispatchStatus
   }
 
   return DispatchOffer.find(query)
-    .populate({ path: "volunteerId", select: "firstName lastName email" })
+    .populate({ path: "volunteerId", select: "firstName lastName email lifelineId avatarUrl" })
     .sort({ updatedAt: -1 })
     .lean();
 }
@@ -750,7 +758,9 @@ export function toDispatchDTO(doc: any) {
   const volunteer = vol
     ? {
         id: String(vol._id ?? vol),
+        lifelineId: String(vol.lifelineId ?? "").trim() || undefined,
         name: [vol.firstName, vol.lastName].filter(Boolean).join(" ").trim() || vol.email || "Volunteer",
+        avatarUrl: String(vol.avatarUrl ?? "").trim() || undefined,
       }
     : null;
 

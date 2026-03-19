@@ -14,6 +14,8 @@ export const DAILY_FOCUS_GOALS = {
   completedGoal: 5,
 } as const;
 
+export const MIN_DISPATCH_PROOFS_REQUIRED = 3;
+
 export const TASKS_TAB_CONFIG: TasksTabConfig[] = [
   {
     key: "new_dispatch",

@@ -18,6 +18,7 @@ import { useMyRequests } from "../hooks/useMyRequests";
 function formatRequestType(raw: string) {
   const normalized = String(raw ?? "").trim().toLowerCase();
   if (!normalized) return "Other";
+  if (normalized === "sos" || normalized === "sos emergency") return "SOS Emergency";
   return normalized.replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 

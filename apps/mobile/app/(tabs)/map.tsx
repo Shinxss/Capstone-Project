@@ -16,7 +16,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import MapboxGL, { Logger } from "@rnmapbox/maps";
 import * as Location from "expo-location";
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useMapStyle } from "../../features/map/hooks/useMapStyle";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Droplets, Construction, Flame, Mountain, ShieldAlert } from "lucide-react-native";
@@ -52,6 +52,12 @@ type HazardZone = {
     type: "Polygon" | "MultiPolygon";
     coordinates: any;
   };
+};
+
+type MapRouteSearchParams = {
+  incidentId?: string | string[];
+  reportLng?: string | string[];
+  reportLat?: string | string[];
 };
 
 const DAGUPAN: [number, number] = [120.34, 16.043];
@@ -169,8 +175,15 @@ function normalizeEmergencyStatus(raw?: string): string | undefined {
     .replace(/[\s-]+/g, "_");
   if (!normalized) return undefined;
   if (normalized === "acknowledged" || normalized === "accepted") return "assigned";
+  if (normalized === "done" || normalized === "verified" || normalized === "closed") return "resolved";
+  if (normalized === "rejected" || normalized === "declined") return "cancelled";
   if (normalized === "inprogress") return "in_progress";
   return normalized;
+}
+
+function isClosedEmergencyStatus(raw?: string) {
+  const normalized = normalizeEmergencyStatus(raw);
+  return normalized === "resolved" || normalized === "cancelled";
 }
 
 function formatEmergencyStatusLabel(raw?: string) {
@@ -227,6 +240,17 @@ function clampToDagupan([lng, lat]: [number, number]): [number, number] {
   const clampedLng = Math.min(DAGUPAN_BOUNDS.ne[0], Math.max(DAGUPAN_BOUNDS.sw[0], lng));
   const clampedLat = Math.min(DAGUPAN_BOUNDS.ne[1], Math.max(DAGUPAN_BOUNDS.sw[1], lat));
   return [clampedLng, clampedLat];
+}
+
+function readRouteParam(value?: string | string[]) {
+  if (Array.isArray(value)) return value[0];
+  return value;
+}
+
+function readRouteNumber(value?: string | string[]) {
+  const parsed = Number(readRouteParam(value));
+  if (!Number.isFinite(parsed)) return null;
+  return parsed;
 }
 
 type EmergencyMarkerPlacement = {
@@ -367,6 +391,7 @@ export default function MapTab() {
   const { isDark } = useTheme();
   const isFocused = useIsFocused();
   const { mode, user, token } = useAuth();
+  const mapRouteParams = useLocalSearchParams<MapRouteSearchParams>();
   const [query, setQuery] = useState("");
   const { key: styleKey, styleURL, setKey } = useMapStyle("streets");
   const {
@@ -385,6 +410,16 @@ export default function MapTab() {
   const canViewEmergencies = mode === "authed";
   const canViewUnapprovedEmergencyReports =
     mode === "authed" && (normalizedRole === "LGU" || normalizedRole === "ADMIN");
+  const focusIncidentId = useMemo(
+    () => String(readRouteParam(mapRouteParams.incidentId) ?? "").trim(),
+    [mapRouteParams.incidentId]
+  );
+  const focusReportCoordinate = useMemo<[number, number] | null>(() => {
+    const lng = readRouteNumber(mapRouteParams.reportLng);
+    const lat = readRouteNumber(mapRouteParams.reportLat);
+    if (lng === null || lat === null) return null;
+    return clampToDagupan([lng, lat]);
+  }, [mapRouteParams.reportLat, mapRouteParams.reportLng]);
   const { activeDispatch, refresh: refreshActiveDispatch } = useActiveDispatch({
     pollMs: 10000,
     enabled: isVolunteer,
@@ -494,7 +529,9 @@ export default function MapTab() {
           });
 
       setReports(
-        items.map((item) => {
+        items
+          .filter((item) => !isClosedEmergencyStatus(item.status))
+          .map((item) => {
           const emergencyType = normalizeEmergencyType(item.type);
           return {
             id: item.incidentId,
@@ -512,7 +549,7 @@ export default function MapTab() {
             },
             updatedAt: item.createdAt ? new Date(item.createdAt).toLocaleString() : "just now",
           };
-        })
+          })
       );
     } catch {
       setReports([]);
@@ -635,6 +672,10 @@ export default function MapTab() {
   const cameraRef = useRef<MapboxGL.Camera>(null);
   const lastLocationUpdateAtRef = useRef(0);
   const lastSocketLocationUpdateAtRef = useRef(0);
+  const lastAutoFocusedDispatchIdRef = useRef<string>("");
+  const lastRouteFocusedKeyRef = useRef<string>("");
+  const zoomInTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isMapReady, setIsMapReady] = useState(false);
 
   useEffect(() => {
     if (!isFocused || !isVolunteer) return;
@@ -793,6 +834,66 @@ export default function MapTab() {
   const refreshActiveDispatchRef = useRef(refreshActiveDispatch);
 
   useEffect(() => {
+    if (!isFocused || !isVolunteer || !isMapReady) return;
+    if (emergencySheet.sheetMode === "directions") return;
+
+    const dispatchId = String(activeDispatch?.id ?? "").trim();
+    if (!dispatchId) {
+      lastAutoFocusedDispatchIdRef.current = "";
+      if (zoomInTimerRef.current) {
+        clearTimeout(zoomInTimerRef.current);
+        zoomInTimerRef.current = null;
+      }
+      return;
+    }
+    if (dispatchId === lastAutoFocusedDispatchIdRef.current) return;
+
+    const emergencyLng = Number(activeDispatch?.emergency?.lng);
+    const emergencyLat = Number(activeDispatch?.emergency?.lat);
+    if (!Number.isFinite(emergencyLng) || !Number.isFinite(emergencyLat)) return;
+
+    lastAutoFocusedDispatchIdRef.current = dispatchId;
+    const target = clampToDagupan([emergencyLng, emergencyLat]);
+
+    // Step 1: move camera to incident location.
+    cameraRef.current?.setCamera({
+      centerCoordinate: target,
+      zoomLevel: 12.8,
+      animationDuration: 750,
+    });
+
+    // Step 2: zoom in after routing/centering animation.
+    if (zoomInTimerRef.current) {
+      clearTimeout(zoomInTimerRef.current);
+    }
+    zoomInTimerRef.current = setTimeout(() => {
+      cameraRef.current?.setCamera({
+        centerCoordinate: target,
+        zoomLevel: 15,
+        animationDuration: 950,
+      });
+      zoomInTimerRef.current = null;
+    }, 780);
+  }, [
+    activeDispatch?.emergency?.lat,
+    activeDispatch?.emergency?.lng,
+    activeDispatch?.id,
+    emergencySheet.sheetMode,
+    isFocused,
+    isMapReady,
+    isVolunteer,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      if (zoomInTimerRef.current) {
+        clearTimeout(zoomInTimerRef.current);
+        zoomInTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     refreshSelectedEmergencyRef.current = refreshSelectedEmergency;
   }, [refreshSelectedEmergency]);
   useEffect(() => {
@@ -821,6 +922,57 @@ export default function MapTab() {
       })();
     }, [])
   );
+
+  useEffect(() => {
+    if (!isFocused || !isMapReady || !canViewEmergencies) return;
+    if (emergencySheet.sheetMode === "directions") return;
+
+    const hasIncidentId = Boolean(focusIncidentId);
+    const hasRoutePoint = Boolean(focusReportCoordinate);
+    if (!hasIncidentId && !hasRoutePoint) return;
+
+    const focusKey = [
+      focusIncidentId,
+      focusReportCoordinate?.[0] ?? "",
+      focusReportCoordinate?.[1] ?? "",
+    ].join("|");
+    if (lastRouteFocusedKeyRef.current === focusKey) return;
+
+    const matchedMarker = hasIncidentId
+      ? visibleEmergencyMarkers.find((entry) => entry.emergency.id === focusIncidentId)
+      : undefined;
+    const targetCoordinate = matchedMarker?.coordinate ?? focusReportCoordinate;
+    if (!targetCoordinate) return;
+
+    lastRouteFocusedKeyRef.current = focusKey;
+    layersSheetRef.current?.close();
+    if (emergencySheet.selectedEmergency) {
+      emergencySheet.minimizeSheet();
+    }
+
+    cameraRef.current?.setCamera({
+      centerCoordinate: targetCoordinate,
+      zoomLevel: 15,
+      animationDuration: 900,
+    });
+
+    if (isCommunityUser && matchedMarker) {
+      setSelectedCommunityMarker(matchedMarker);
+      return;
+    }
+    setSelectedCommunityMarker(null);
+  }, [
+    canViewEmergencies,
+    emergencySheet.minimizeSheet,
+    emergencySheet.selectedEmergency,
+    emergencySheet.sheetMode,
+    focusIncidentId,
+    focusReportCoordinate,
+    isCommunityUser,
+    isFocused,
+    isMapReady,
+    visibleEmergencyMarkers,
+  ]);
 
   const inactiveRouteAlternatives = useMemo(
     () =>
@@ -942,6 +1094,9 @@ export default function MapTab() {
             }
           }}
           onDidFinishLoadingStyle={() => console.log("[Mapbox] style loaded", styleKey)}
+          onDidFinishLoadingMap={() => {
+            setIsMapReady(true);
+          }}
            onMapLoadingError={() => {
             console.log("[Mapbox] map loading error");
            }}

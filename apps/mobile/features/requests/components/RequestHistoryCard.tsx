@@ -23,6 +23,7 @@ type PillStyle = {
 
 function iconByEmergencyType(type: string): React.ComponentProps<typeof Ionicons>["name"] {
   const normalized = String(type ?? "").trim().toLowerCase();
+  if (normalized === "sos") return "warning-outline";
   if (normalized === "fire") return "flame-outline";
   if (normalized === "flood") return "water-outline";
   if (normalized === "medical") return "medkit-outline";
@@ -55,6 +56,14 @@ function formatCreatedAt(value: string) {
   });
 }
 
+function formatRequestType(raw: string) {
+  const normalized = String(raw ?? "").trim().toLowerCase();
+  if (!normalized) return "Emergency";
+  if (normalized === "sos" || normalized === "sos emergency") return "SOS Emergency";
+  const title = normalized.replace(/\b\w/g, (letter) => letter.toUpperCase());
+  return normalized.includes("emergency") ? title : `${title} Emergency`;
+}
+
 function progressIndexForLabel(label: TrackingLabel): number {
   if (label === "Resolved" || label === "Review") return 4;
   if (label === "Arrived") return 3;
@@ -75,6 +84,7 @@ export function RequestHistoryCard({
   const iconName = useMemo(() => iconByEmergencyType(item.type), [item.type]);
   const pillStyle = useMemo(() => pillStyleForLabel(item.trackingLabel), [item.trackingLabel]);
   const createdAtText = useMemo(() => formatCreatedAt(item.createdAt), [item.createdAt]);
+  const requestTypeText = useMemo(() => formatRequestType(item.type), [item.type]);
   const showEta = item.trackingLabel === "En Route";
   const etaText = showEta ? formatEtaText(item.etaSeconds ?? null, item.trackingLabel) : null;
   const isCancelledLike = item.trackingLabel === "Cancelled";
@@ -111,7 +121,7 @@ export function RequestHistoryCard({
 
           <View style={styles.textWrap}>
             <Text style={styles.referenceText} numberOfLines={1}>
-              REF#{item.referenceNumber}
+              {requestTypeText}
             </Text>
             <Text style={styles.locationText} numberOfLines={1}>
               {item.locationText}
@@ -215,7 +225,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   referenceText: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: "800",
     color: "#18181B",
   },

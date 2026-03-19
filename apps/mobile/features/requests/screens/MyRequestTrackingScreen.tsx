@@ -2,10 +2,12 @@ import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Linking,
   Platform,
   Pressable,
   RefreshControl,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -20,10 +22,14 @@ import { useSession } from "../../auth/hooks/useSession";
 import { usePullToRefresh } from "../../common/hooks/usePullToRefresh";
 import { useRequestLiveTracking } from "../hooks/useRequestLiveTracking";
 import type { TrackingLabel } from "../models/myRequests";
-import { formatEtaText, formatTrackingHeadline } from "../utils/formatters";
+import { formatEtaText } from "../utils/formatters";
 
 const TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? "";
 const DAGUPAN: [number, number] = [120.34, 16.043];
+const DAGUPAN_BOUNDS = {
+  sw: [120.25, 15.98] as [number, number],
+  ne: [120.43, 16.12] as [number, number],
+} as const;
 
 if (TOKEN) {
   MapboxGL.setAccessToken(TOKEN);
@@ -39,6 +45,7 @@ function toCoordinate(point?: { lng: number; lat: number } | null): [number, num
 function formatRequestType(raw: string) {
   const normalized = String(raw ?? "").trim().toLowerCase();
   if (!normalized) return "Emergency Request";
+  if (normalized === "sos" || normalized === "sos emergency") return "SOS";
   return normalized.replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
@@ -59,25 +66,14 @@ function toLocationText(coord: [number, number] | null) {
   return `${coord[1].toFixed(5)}, ${coord[0].toFixed(5)}`;
 }
 
-function toBarangayText(rawBarangay: unknown, rawLocationText: unknown) {
-  const barangay = String(rawBarangay ?? "").trim();
-  if (barangay) return barangay;
+function toAbsoluteAssetUrl(raw: string) {
+  const value = String(raw ?? "").trim();
+  if (!value) return "";
+  if (/^https?:\/\//i.test(value)) return value;
 
-  const locationText = String(rawLocationText ?? "").trim();
-  if (!locationText) return "";
-
-  const segments = locationText
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean);
-  if (segments.length === 0) return "";
-
-  const looksNumeric = (value: string) => /^-?\d+(?:\.\d+)?$/.test(value);
-  if (segments.length >= 2 && looksNumeric(segments[0]) && looksNumeric(segments[1])) {
-    return "";
-  }
-
-  return segments[0] ?? locationText;
+  const apiBase = String(process.env.EXPO_PUBLIC_API_URL ?? "").trim();
+  if (!apiBase) return value;
+  return `${apiBase.replace(/\/+$/, "")}/${value.replace(/^\/+/, "")}`;
 }
 
 function statusPillStyles(label: string) {
@@ -116,7 +112,7 @@ export function MyRequestTrackingScreen() {
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const rawId = params.id;
   const requestId = Array.isArray(rawId) ? String(rawId[0] ?? "") : String(rawId ?? "");
-  const { isUser } = useSession();
+  const { isUser, session } = useSession();
   const isFocused = useIsFocused();
   const cameraRef = useRef<MapboxGL.Camera>(null);
 
@@ -160,11 +156,6 @@ export function MyRequestTrackingScreen() {
     if (isCancelledRequest) return "Request cancelled.";
     return formatEtaText(data?.tracking?.etaSeconds, trackingLabel);
   }, [data?.tracking?.etaSeconds, isCancelledRequest, isRejectedRequest, trackingLabel]);
-  const headline = useMemo(() => {
-    if (isRejectedRequest) return "Request Rejected";
-    if (isCancelledRequest) return "Request Cancelled";
-    return formatTrackingHeadline(trackingLabel);
-  }, [isCancelledRequest, isRejectedRequest, trackingLabel]);
   const statusLabelText = useMemo(() => (isRejectedRequest ? "Rejected" : trackingLabel), [isRejectedRequest, trackingLabel]);
   const reasonText = useMemo(() => {
     if (!isRejectedRequest) return "";
@@ -179,17 +170,64 @@ export function MyRequestTrackingScreen() {
     if (trackingLabel === "Resolved") return "Response completed";
     return "Responder details unavailable";
   }, [data?.tracking?.responder?.name, trackingLabel]);
+  const responderLifelineId = useMemo(() => {
+    const value = String(data?.tracking?.responder?.lifelineId ?? "").trim();
+    if (value) return value;
+    if (trackingLabel === "Submitted" || trackingLabel === "Assigned") return "Waiting for assignment";
+    if (trackingLabel === "Cancelled") return "No active responder";
+    if (trackingLabel === "Resolved") return "Response completed";
+    return "Lifeline ID unavailable";
+  }, [data?.tracking?.responder?.lifelineId, trackingLabel]);
   const locationText = useMemo(() => {
-    const barangayText = toBarangayText(data?.request?.barangay, data?.request?.locationText);
-    if (barangayText) return barangayText;
+    const fullLocation = String(data?.request?.locationText ?? "").trim();
+    if (fullLocation) return fullLocation;
     return toLocationText(emergencyCoordinate);
-  }, [data?.request?.barangay, data?.request?.locationText, emergencyCoordinate]);
+  }, [data?.request?.locationText, emergencyCoordinate]);
   const createdAtText = useMemo(() => formatCreatedAt(data?.request?.createdAt ?? ""), [data?.request?.createdAt]);
   const detailsText = useMemo(() => String(data?.request?.notes ?? "").trim(), [data?.request?.notes]);
   const requestTypeText = useMemo(() => formatRequestType(data?.request?.type ?? ""), [data?.request?.type]);
+  const requestTypeDisplayText = useMemo(() => {
+    const normalized = requestTypeText.trim().toLowerCase();
+    if (!normalized) return "Emergency";
+    return normalized.includes("emergency") ? requestTypeText : `${requestTypeText} Emergency`;
+  }, [requestTypeText]);
   const responderPhone = useMemo(
     () => String(data?.tracking?.responder?.phone ?? "").trim(),
     [data?.tracking?.responder?.phone]
+  );
+  const authToken = useMemo(() => {
+    if (!isUser || session?.mode !== "user") return "";
+    return String(session.user.accessToken ?? "").trim();
+  }, [isUser, session]);
+  const proofImageHeaders = useMemo(
+    () => (authToken ? { Authorization: `Bearer ${authToken}` } : undefined),
+    [authToken]
+  );
+  const proofImages = useMemo(() => {
+    const proofs = Array.isArray(data?.tracking?.proofs) ? data.tracking.proofs : [];
+    return proofs
+      .map((proof, index) => {
+        const uri = toAbsoluteAssetUrl(String(proof?.url ?? "").trim());
+        if (!uri) return null;
+        return {
+          key: `${uri}-${index}`,
+          uri,
+          uploadedAt: String(proof?.uploadedAt ?? "").trim(),
+        };
+      })
+      .filter(
+        (
+          item
+        ): item is {
+          key: string;
+          uri: string;
+          uploadedAt: string;
+        } => Boolean(item)
+      );
+  }, [data?.tracking?.proofs]);
+  const shouldShowProofSection = useMemo(
+    () => trackingLabel === "Resolved" || proofImages.length > 0,
+    [proofImages.length, trackingLabel]
   );
 
   useEffect(() => {
@@ -317,7 +355,6 @@ export function MyRequestTrackingScreen() {
           >
             <Ionicons name="arrow-back" size={22} color="#18181B" />
           </Pressable>
-          <Text style={styles.headerTitle}>Request Tracking</Text>
         </View>
       </View>
 
@@ -333,6 +370,7 @@ export function MyRequestTrackingScreen() {
             ref={cameraRef}
             centerCoordinate={emergencyCoordinate ?? DAGUPAN}
             zoomLevel={13}
+            maxBounds={DAGUPAN_BOUNDS}
           />
 
           {routeGeometry &&
@@ -383,7 +421,7 @@ export function MyRequestTrackingScreen() {
         ) : null}
 
         <BottomSheet
-          index={0}
+          index={1}
           snapPoints={sheetSnapPoints}
           enablePanDownToClose={false}
           backgroundStyle={styles.sheetBg}
@@ -401,21 +439,36 @@ export function MyRequestTrackingScreen() {
               />
             }
           >
-            <View style={styles.summaryCard}>
-              <View
-                style={[
-                  styles.statusPill,
-                  {
-                    backgroundColor: pillColors.bg,
-                    borderColor: pillColors.border,
-                  },
-                ]}
-              >
-                <Text style={[styles.statusPillText, { color: pillColors.text }]}>{statusLabelText}</Text>
+            <View style={styles.responderCard}>
+              <Text style={styles.responderCardTitle}>Your Responder</Text>
+              <View style={styles.responderCardRow}>
+                <View style={styles.responderAvatar}>
+                  <Ionicons name="person" size={18} color="#374151" />
+                </View>
+                <View style={styles.responderMeta}>
+                  <Text style={styles.responderNameText}>{responderName}</Text>
+                  <Text style={styles.responderLifelineText}>Lifeline ID: {responderLifelineId}</Text>
+                </View>
               </View>
+            </View>
 
-              <Text style={styles.summaryHeadline}>{headline}</Text>
-              <Text style={styles.summaryType}>{requestTypeText}</Text>
+            <View style={styles.summaryCard}>
+              <View style={styles.summaryTopRow}>
+                <Text style={styles.summaryType} numberOfLines={2}>
+                  {requestTypeDisplayText}
+                </Text>
+                <View
+                  style={[
+                    styles.statusPill,
+                    {
+                      backgroundColor: pillColors.bg,
+                      borderColor: pillColors.border,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.statusPillText, { color: pillColors.text }]}>{statusLabelText}</Text>
+                </View>
+              </View>
 
               <View style={styles.infoRow}>
                 <Ionicons name="location-outline" size={18} color="#6B7280" />
@@ -445,11 +498,6 @@ export function MyRequestTrackingScreen() {
                 </View>
               ) : null}
 
-              <View style={styles.infoRow}>
-                <Ionicons name="person-outline" size={18} color="#6B7280" />
-                <Text style={styles.infoRowText}>Responder: {responderName}</Text>
-              </View>
-
               {responderPhone ? (
                 <View style={styles.infoRow}>
                   <Ionicons name="call-outline" size={18} color="#6B7280" />
@@ -464,7 +512,7 @@ export function MyRequestTrackingScreen() {
               ) : null}
 
               <Text style={styles.metaText}>Reference {data.request.referenceNumber}</Text>
-              <Text style={styles.metaText}>Created {createdAtText}</Text>
+              <Text style={styles.metaText}>Reported {createdAtText}</Text>
               <Text style={[styles.liveText, isClosedRequest ? styles.liveTextClosed : null]}>
                 {isClosedRequest ? `Updated ${lastUpdatedAgoText}` : `LIVE updated ${lastUpdatedAgoText}`}
               </Text>
@@ -491,6 +539,34 @@ export function MyRequestTrackingScreen() {
                 })}
               </View>
             ) : null}
+
+            {shouldShowProofSection ? (
+              <View style={styles.proofCard}>
+                <Text style={styles.proofTitle}>Volunteer Proof</Text>
+                {proofImages.length ? (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.proofList}
+                  >
+                    {proofImages.map((proof) => (
+                      <View key={proof.key} style={styles.proofTile}>
+                        <Image
+                          source={proofImageHeaders ? { uri: proof.uri, headers: proofImageHeaders } : { uri: proof.uri }}
+                          style={styles.proofImage}
+                          resizeMode="cover"
+                        />
+                        {proof.uploadedAt ? (
+                          <Text style={styles.proofMetaText}>Uploaded {formatCreatedAt(proof.uploadedAt)}</Text>
+                        ) : null}
+                      </View>
+                    ))}
+                  </ScrollView>
+                ) : (
+                  <Text style={styles.proofEmptyText}>No uploaded volunteer proof yet.</Text>
+                )}
+              </View>
+            ) : null}
           </BottomSheetScrollView>
         </BottomSheet>
       </View>
@@ -504,10 +580,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   headerSection: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 20,
     paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight ?? 0) : 0,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
-    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 0,
+    backgroundColor: "transparent",
   },
   headerRow: {
     minHeight: 56,
@@ -535,6 +615,9 @@ const styles = StyleSheet.create({
   },
   sheetBg: {
     backgroundColor: "rgba(255,255,255,0.98)",
+    borderRadius: 0,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
   },
   sheetHandle: {
     backgroundColor: "rgba(0,0,0,0.22)",
@@ -545,6 +628,49 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
     gap: 14,
   },
+  responderCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  responderCardTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#111827",
+  },
+  responderCardRow: {
+    marginTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  responderAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    backgroundColor: "#F9FAFB",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  responderMeta: {
+    marginLeft: 10,
+    flex: 1,
+  },
+  responderNameText: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#111827",
+  },
+  responderLifelineText: {
+    marginTop: 2,
+    fontSize: 13,
+    color: "#6B7280",
+    fontWeight: "600",
+  },
   summaryCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
@@ -553,15 +679,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 14,
   },
+  summaryTopRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 10,
+  },
   statusPill: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
     borderWidth: 1,
     borderRadius: 999,
   },
   statusPillText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "800",
   },
   summaryHeadline: {
@@ -571,10 +702,11 @@ const styles = StyleSheet.create({
     color: "#111827",
   },
   summaryType: {
-    marginTop: 4,
-    fontSize: 31,
+    marginTop: -2,
+    fontSize: 24,
     fontWeight: "500",
     color: "#111827",
+    flex: 1,
   },
   infoRow: {
     marginTop: 9,
@@ -733,6 +865,46 @@ const styles = StyleSheet.create({
   timelineTextActive: {
     color: "#111827",
     fontWeight: "800",
+  },
+  proofCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  proofTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#111827",
+  },
+  proofList: {
+    gap: 10,
+    paddingTop: 10,
+    paddingBottom: 2,
+    paddingRight: 4,
+  },
+  proofTile: {
+    width: 170,
+  },
+  proofImage: {
+    width: "100%",
+    height: 126,
+    borderRadius: 12,
+    backgroundColor: "#F3F4F6",
+  },
+  proofMetaText: {
+    marginTop: 6,
+    fontSize: 11,
+    color: "#6B7280",
+    fontWeight: "600",
+  },
+  proofEmptyText: {
+    marginTop: 8,
+    fontSize: 13,
+    color: "#6B7280",
+    fontWeight: "600",
   },
   stateWrap: {
     flex: 1,

@@ -71,7 +71,7 @@ export type MyRequestCountsByStatus = {
 };
 
 export type TrackingTimeline = {
-  steps: Array<"Submitted" | "Assigned" | "En Route" | "Arrived" | "Resolved">;
+  steps: ("Submitted" | "Assigned" | "En Route" | "Arrived" | "Resolved")[];
   activeStepIndex: number;
 };
 
@@ -96,9 +96,16 @@ export type MyRequestTrackingDTO = {
     label: TrackingLabel;
     etaSeconds: number | null;
     lastUpdatedAt: string;
+    proofs?: {
+      url: string;
+      uploadedAt: string;
+      mimeType?: string;
+      fileName?: string;
+    }[];
     responder?: {
       id: string;
       name: string;
+      lifelineId?: string;
       phone?: string;
     };
     responderLocation?: {

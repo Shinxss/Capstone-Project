@@ -1,9 +1,12 @@
-import { Activity, ChevronDown, CircleCheck, Clock3, MapPin, Plus, Search, ShieldCheck, Star } from "lucide-react";
+import { Activity, ChevronDown, CircleCheck, Clock3, MapPin, Search, ShieldCheck, Star } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import VerifiedVolunteerDetailsModal from "./VerifiedVolunteerDetailsModal";
 import EmptyState from "../../../components/ui/EmptyState";
 import type { VolunteerApplication } from "../models/volunteerApplication.types";
-import { useLguVerifiedVolunteers } from "../hooks/useLguVerifiedVolunteers";
+import {
+  useLguVerifiedVolunteers,
+  type VerifiedVolunteerPresence,
+} from "../hooks/useLguVerifiedVolunteers";
 
 type Props = ReturnType<typeof useLguVerifiedVolunteers> & {
   loading: boolean;
@@ -12,7 +15,7 @@ type Props = ReturnType<typeof useLguVerifiedVolunteers> & {
 };
 
 type SkillFilterKey = "all" | "medical" | "search_rescue" | "logistics" | "communication" | "driving";
-type AvailabilityStatus = "available" | "deployed";
+type AvailabilityStatus = "available" | "deployed" | "offline";
 
 type VolunteerExtras = VolunteerApplication & {
   skills?: string[] | string;
@@ -53,7 +56,15 @@ const statusStyles: Record<
       "border-sky-200 bg-sky-100 text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/15 dark:text-sky-300",
     actionLabel: "View",
     actionClass:
-      "rounded-xl border border-gray-300 bg-white px-5 py-2.5 text-sm font-black text-gray-700 hover:bg-gray-50 dark:border-[#22365D] dark:bg-[#0E1626] dark:text-slate-200 dark:hover:bg-[#122036]",
+      "rounded-xl border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-[#22365D] dark:bg-[#0E1626] dark:text-slate-200 dark:hover:bg-[#122036]",
+  },
+  offline: {
+    label: "offline",
+    pillClass:
+      "border-gray-200 bg-gray-100 text-gray-700 dark:border-slate-600/30 dark:bg-slate-700/20 dark:text-slate-300",
+    actionLabel: "View",
+    actionClass:
+      "rounded-xl border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-[#22365D] dark:bg-[#0E1626] dark:text-slate-200 dark:hover:bg-[#122036]",
   },
 };
 
@@ -80,10 +91,10 @@ function initialsFromName(fullName: string) {
 }
 
 function formatTimeAgo(iso?: string) {
-  if (!iso) return "Recently verified";
+  if (!iso) return "Last online unavailable";
 
   const ts = new Date(iso).getTime();
-  if (!Number.isFinite(ts)) return "Recently verified";
+  if (!Number.isFinite(ts)) return "Last online unavailable";
 
   const diffMs = Math.max(0, Date.now() - ts);
   const mins = Math.floor(diffMs / 60000);
@@ -98,6 +109,24 @@ function formatTimeAgo(iso?: string) {
   return `${days} day${days > 1 ? "s" : ""} ago`;
 }
 
+function getLastOnlineLabel(
+  volunteer: VolunteerApplication,
+  presenceByVolunteerId: Record<string, VerifiedVolunteerPresence>,
+  presenceReady: boolean
+) {
+  const volunteerId = String(volunteer.userId ?? "").trim();
+  if (volunteerId) {
+    const presence = presenceByVolunteerId[volunteerId];
+    if (presence?.lastSeenAt) return formatTimeAgo(presence.lastSeenAt);
+    if (presenceReady && presence?.status && presence.status !== "OFFLINE") return "Active now";
+    if (presenceReady) return "Last online unavailable";
+  } else if (presenceReady) {
+    return "Last online unavailable";
+  }
+
+  return formatTimeAgo(volunteer.updatedAt || volunteer.createdAt);
+}
+
 function getLocationLabel(volunteer: VolunteerApplication) {
   const city = volunteer.city?.trim();
   const barangay = volunteer.barangay?.trim();
@@ -109,12 +138,8 @@ function getLocationLabel(volunteer: VolunteerApplication) {
   return "Location unavailable";
 }
 
-function getRoleLabel(volunteer: VolunteerApplication) {
-  return (
-    volunteer.preferredAssignmentText?.trim() ||
-    volunteer.certificationsText?.trim() ||
-    "Verified Volunteer"
-  );
+function getRoleLabel() {
+  return "Verified Volunteer";
 }
 
 function getSkillTags(volunteer: VolunteerApplication) {
@@ -143,7 +168,7 @@ function getSkillTags(volunteer: VolunteerApplication) {
   });
 }
 
-function getAvailabilityStatus(volunteer: VolunteerApplication): AvailabilityStatus {
+function getFallbackAvailabilityStatus(volunteer: VolunteerApplication): AvailabilityStatus {
   const v = volunteer as VolunteerExtras;
   const source = normalizeText(
     v.deploymentStatus,
@@ -165,6 +190,25 @@ function getAvailabilityStatus(volunteer: VolunteerApplication): AvailabilitySta
 
   if (deployedTerms.some((term) => source.includes(term))) return "deployed";
   return "available";
+}
+
+function getAvailabilityStatus(
+  volunteer: VolunteerApplication,
+  presenceByVolunteerId: Record<string, VerifiedVolunteerPresence>,
+  presenceReady: boolean
+): AvailabilityStatus {
+  const volunteerId = String(volunteer.userId ?? "").trim();
+  if (volunteerId) {
+    const presence = presenceByVolunteerId[volunteerId]?.status;
+    if (presence === "ONLINE" || presence === "IDLE") return "available";
+    if (presence === "BUSY") return "deployed";
+    if (presence === "OFFLINE") return "offline";
+    if (presenceReady) return "offline";
+  } else if (presenceReady) {
+    return "offline";
+  }
+
+  return getFallbackAvailabilityStatus(volunteer);
 }
 
 function matchesSkillFilter(volunteer: VolunteerApplication, tags: string[], filterKey: SkillFilterKey) {
@@ -221,7 +265,7 @@ function SummaryCard({
         {icon}
       </div>
       <div className="leading-tight">
-        <div className="text-4xl font-black text-gray-900 dark:text-slate-100">{value}</div>
+        <div className="text-3xl font-bold text-gray-900 dark:text-slate-100">{value}</div>
         <div className="text-sm text-gray-700 dark:text-slate-300">{label}</div>
       </div>
     </div>
@@ -268,6 +312,8 @@ export default function LguVerifiedVolunteersView(props: Props) {
     detailsError,
     openDetails,
     closeDetails,
+    presenceReady,
+    presenceByVolunteerId,
   } = props;
 
   const [skillFilter, setSkillFilter] = useState<SkillFilterKey>("all");
@@ -276,21 +322,22 @@ export default function LguVerifiedVolunteersView(props: Props) {
   const cards = useMemo(
     () =>
       items.map((volunteer) => {
-        const availability = getAvailabilityStatus(volunteer);
+        const availability = getAvailabilityStatus(volunteer, presenceByVolunteerId, presenceReady);
         return {
           volunteer,
           availability,
           statusUI: statusStyles[availability],
-          roleLabel: getRoleLabel(volunteer),
+          roleLabel: getRoleLabel(),
           locationLabel: getLocationLabel(volunteer),
-          timeAgo: formatTimeAgo(volunteer.reviewedAt || volunteer.updatedAt || volunteer.createdAt),
+          timeAgo: getLastOnlineLabel(volunteer, presenceByVolunteerId, presenceReady),
           initials: initialsFromName(volunteer.fullName),
+          avatarUrl: String(volunteer.avatarUrl ?? "").trim() || undefined,
           skillTags: getSkillTags(volunteer),
           taskCount: getTaskCount(volunteer),
           rating: getRating(volunteer),
         };
       }),
-    [items]
+    [items, presenceByVolunteerId, presenceReady]
   );
 
   const filteredCards = useMemo(
@@ -309,7 +356,7 @@ export default function LguVerifiedVolunteersView(props: Props) {
     const avgRating =
       ratingValues.length > 0
         ? (ratingValues.reduce((sum, value) => sum + value, 0) / ratingValues.length).toFixed(1)
-        : "N/A";
+        : "0";
 
     const verifiedCount = skillFilter === "all" ? total : filteredCards.length;
     const deployedCount = base.filter((card) => card.availability === "deployed").length;
@@ -333,16 +380,6 @@ export default function LguVerifiedVolunteersView(props: Props) {
   return (
     <>
       <div className="space-y-5 p-6">
-        <div className="flex justify-end">
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 rounded-xl bg-[#DC2626] px-4 py-2.5 text-sm font-black text-white hover:bg-[#c81e1e]"
-          >
-            <Plus size={16} />
-            Register Volunteer
-          </button>
-        </div>
-
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           <SummaryCard
             value={summary.verified}
@@ -468,12 +505,23 @@ export default function LguVerifiedVolunteersView(props: Props) {
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex min-w-0 items-start gap-3">
-                    <div className="grid h-16 w-16 shrink-0 place-items-center rounded-full border border-rose-200 bg-rose-100 text-lg font-black text-red-600 dark:border-rose-500/25 dark:bg-rose-500/10 dark:text-rose-300">
-                      {card.initials}
+                    <div className="relative grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-full border border-rose-200 bg-rose-100 text-lg font-black text-red-600 ring-2 ring-red-500 dark:border-rose-500/25 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-red-400">
+                      <span>{card.initials}</span>
+                      {card.avatarUrl ? (
+                        <img
+                          src={card.avatarUrl}
+                          alt={`${card.volunteer.fullName} avatar`}
+                          loading="lazy"
+                          className="absolute inset-0 h-full w-full object-cover"
+                          onError={(event) => {
+                            event.currentTarget.style.display = "none";
+                          }}
+                        />
+                      ) : null}
                     </div>
 
                     <div className="min-w-0">
-                      <div className="truncate text-2xl font-black leading-none text-gray-900 dark:text-slate-100">
+                      <div className="truncate text-xl font-bold leading-none text-gray-900 dark:text-slate-100">
                         {card.volunteer.fullName}
                       </div>
                       <div className="mt-1 truncate text-sm text-gray-600 dark:text-slate-400">
@@ -501,11 +549,11 @@ export default function LguVerifiedVolunteersView(props: Props) {
                   </div>
                 </div>
 
-                <div className="mt-4 flex flex-wrap gap-2">
+                <div className="mt-4 flex flex-nowrap gap-2 overflow-hidden pb-1">
                   {card.skillTags.slice(0, 4).map((skill) => (
                     <span
                       key={`${card.volunteer._id}-${skill}`}
-                      className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-800 dark:border-[#22365D] dark:bg-[#0E1626] dark:text-slate-300"
+                      className="shrink-0 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-800 dark:border-[#22365D] dark:bg-[#0E1626] dark:text-slate-300"
                     >
                       {skill}
                     </span>
@@ -514,17 +562,17 @@ export default function LguVerifiedVolunteersView(props: Props) {
 
                 <div className="mt-5 flex items-end justify-between border-t border-gray-200 pt-4 dark:border-[#162544]">
                   <div className="flex items-end gap-6">
-                    <div className="leading-none">
-                      <div className="text-4xl font-black text-gray-900 dark:text-slate-100">
+                    <div className="leading-none text-center">
+                      <div className="text-xl font-bold text-gray-900 dark:text-slate-100">
                         {card.taskCount ?? "--"}
                       </div>
                       <div className="mt-1 text-sm text-gray-600 dark:text-slate-400">Tasks</div>
                     </div>
 
                     <div className="leading-none">
-                      <div className="flex items-center gap-1 text-4xl font-black text-gray-900 dark:text-slate-100">
+                      <div className="flex items-center gap-1 text-xl font-bold text-gray-900 dark:text-slate-100">
                         <Star size={18} className="fill-blue-600 text-blue-600" />
-                        {card.rating != null ? card.rating.toFixed(1) : "--"}
+                        {card.rating != null ? card.rating.toFixed(1) : "0"}
                       </div>
                       <div className="mt-1 text-sm text-gray-600 dark:text-slate-400">Rating</div>
                     </div>

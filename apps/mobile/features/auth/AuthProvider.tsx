@@ -84,10 +84,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     const unsubscribe = subscribeUnauthorized(async () => {
       Alert.alert("Session expired", "Your session has expired. Please log in again.");
-      await signOutSession();
-      await GoogleSignin.revokeAccess().catch(() => undefined);
-      await GoogleSignin.signOut().catch(() => undefined);
       applyAnonymous();
+      try {
+        await signOutSession();
+      } finally {
+        await GoogleSignin.revokeAccess().catch(() => undefined);
+        await GoogleSignin.signOut().catch(() => undefined);
+      }
     });
 
     return unsubscribe;
@@ -158,10 +161,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const signOut = useCallback(async () => {
-    await signOutSession();
-    await GoogleSignin.revokeAccess().catch(() => undefined);
-    await GoogleSignin.signOut().catch(() => undefined);
     applyAnonymous();
+    try {
+      await signOutSession();
+    } finally {
+      await GoogleSignin.revokeAccess().catch(() => undefined);
+      await GoogleSignin.signOut().catch(() => undefined);
+    }
   }, [applyAnonymous]);
 
   const value = useMemo<AuthContextValue>(

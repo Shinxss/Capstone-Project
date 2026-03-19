@@ -30,6 +30,7 @@ export function useGoogleLogin(options: UseGoogleLoginOptions = {}) {
     scopes: ["openid", "profile", "email"],
     androidClientId,
     webClientId,
+    selectAccount: true,
   });
 
   useEffect(() => {
@@ -70,6 +71,8 @@ export function useGoogleLogin(options: UseGoogleLoginOptions = {}) {
     }
 
     await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+    // Force account chooser instead of silently reusing the previous Google account.
+    await GoogleSignin.signOut().catch(() => undefined);
 
     const response = await GoogleSignin.signIn();
     if (isCancelledResponse(response)) {

@@ -9,6 +9,8 @@ export type Sex = "Male" | "Female" | "Prefer not to say";
 export type VolunteerApplication = {
   _id: string;
   userId: string;
+  avatarUrl?: string;
+  completedTasks?: number;
 
   fullName: string;
   sex: Sex;

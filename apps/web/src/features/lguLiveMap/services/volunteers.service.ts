@@ -4,6 +4,7 @@ import type { Volunteer } from "../models/lguLiveMap.types";
 // Response shape from the backend
 type DispatchVolunteerDTO = {
   id: string;
+  lifelineId?: string;
   name: string;
   status: "available" | "offline";
   skill: string;
@@ -38,6 +39,7 @@ export async function fetchDispatchVolunteers(): Promise<Volunteer[]> {
 
   return (res.data.data ?? []).map((v) => ({
     id: v.id,
+    lifelineId: v.lifelineId,
     name: v.name,
     // backend has no BUSY state (busy is per-task), keep it as available/offline
     status: v.status,

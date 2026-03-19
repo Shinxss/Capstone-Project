@@ -8,6 +8,27 @@ import type { EmergencyType, ReportLocation, ReportSubmitResult } from "../../re
 
 const EMERGENCY_REPORTS_BASE = "/api/emergency/reports";
 
+function unwrapData(payload: unknown): unknown {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return payload;
+  }
+
+  const data = (payload as any).data;
+  return data === undefined ? payload : data;
+}
+
+function extractRows<T>(payload: unknown): T[] {
+  const unwrapped = unwrapData(payload);
+  if (Array.isArray(unwrapped)) return unwrapped as T[];
+  if (!unwrapped || typeof unwrapped !== "object") return [];
+
+  const record = unwrapped as Record<string, unknown>;
+  if (Array.isArray(record.items)) return record.items as T[];
+  if (Array.isArray(record.results)) return record.results as T[];
+  if (Array.isArray(record.rows)) return record.rows as T[];
+  return [];
+}
+
 export async function createSosReport(payload: SosCreateRequest): Promise<ReportSubmitResult> {
   const locationLabel = String(payload.locationLabel ?? "").trim();
 
@@ -77,8 +98,10 @@ export async function fetchEmergencyMapReports(): Promise<MapEmergencyReport[]> 
 }
 
 export async function fetchMyEmergencyMapReports(): Promise<MapEmergencyReport[]> {
-  const res = await api.get<{ data?: MapEmergencyReport[] }>(`${EMERGENCY_REPORTS_BASE}/my/map`);
-  const rows = Array.isArray(res.data?.data) ? res.data.data : [];
+  const res = await api.get<unknown>(`${EMERGENCY_REPORTS_BASE}/my/map`);
+  const rows = extractRows<any>(res.data)
+    .map(toMapFeedRow)
+    .filter((item): item is MapEmergencyReport => Boolean(item));
   return normalizeMapRows(rows, { includeHidden: true });
 }
 
@@ -112,6 +135,8 @@ type LegacyEmergencyReport = {
 
 function toMapStatus(raw?: string): MapEmergencyReport["status"] {
   const normalized = String(raw ?? "").trim().toUpperCase();
+  if (normalized === "DONE" || normalized === "VERIFIED" || normalized === "CLOSED") return "resolved";
+  if (normalized === "REJECTED" || normalized === "DECLINED") return "cancelled";
   if (normalized === "ACKNOWLEDGED") return "assigned";
   if (normalized === "IN_PROGRESS") return "in_progress";
   if (normalized === "RESOLVED") return "resolved";
@@ -126,7 +151,14 @@ function isClosedEmergencyStatus(raw?: string) {
 
 function isClosedMapFeedStatus(raw?: string) {
   const normalized = String(raw ?? "").trim().toLowerCase();
-  return normalized === "resolved" || normalized === "cancelled";
+  return (
+    normalized === "resolved" ||
+    normalized === "cancelled" ||
+    normalized === "done" ||
+    normalized === "verified" ||
+    normalized === "closed" ||
+    normalized === "rejected"
+  );
 }
 
 function isRejectedVerificationStatus(raw?: string) {
@@ -223,14 +255,83 @@ function mapLegacyReportToMapFeed(raw: LegacyEmergencyReport): MapEmergencyRepor
   };
 }
 
+function normalizeVerificationStatus(raw: unknown, isSos: boolean): MapEmergencyReport["verificationStatus"] {
+  const normalized = String(raw ?? "").trim().toLowerCase();
+  if (normalized === "approved" || normalized === "pending" || normalized === "rejected") {
+    return normalized;
+  }
+  return isSos ? "not_required" : "pending";
+}
+
+function toMapFeedRow(raw: any): MapEmergencyReport | null {
+  if (!raw || typeof raw !== "object") return null;
+
+  const explicitIncidentId = String(raw?.incidentId ?? raw?.id ?? "").trim();
+  if (!explicitIncidentId && raw?._id) {
+    return mapLegacyReportToMapFeed(raw as LegacyEmergencyReport);
+  }
+  if (!explicitIncidentId) return null;
+
+  const lng = Number(
+    raw?.location?.coords?.longitude ??
+      raw?.location?.lng ??
+      raw?.location?.longitude ??
+      raw?.location?.coordinates?.[0]
+  );
+  const lat = Number(
+    raw?.location?.coords?.latitude ??
+      raw?.location?.lat ??
+      raw?.location?.latitude ??
+      raw?.location?.coordinates?.[1]
+  );
+  if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null;
+
+  const type = String(raw?.type ?? raw?.emergencyType ?? "other").trim().toLowerCase();
+  const source = String(raw?.source ?? "").trim().toUpperCase();
+  const isSos = Boolean(raw?.isSos) || type === "sos" || source === "SOS_BUTTON";
+  const verificationStatus = normalizeVerificationStatus(
+    raw?.verificationStatus ?? raw?.verification?.status,
+    isSos
+  );
+  const isVisibleOnMap =
+    typeof raw?.isVisibleOnMap === "boolean"
+      ? raw.isVisibleOnMap
+      : typeof raw?.visibility?.isVisibleOnMap === "boolean"
+        ? raw.visibility.isVisibleOnMap
+        : isSos || verificationStatus === "approved";
+  const locationLabel = String(raw?.location?.label ?? raw?.locationLabel ?? "").trim();
+  const description = String(raw?.description ?? raw?.notes ?? "").trim();
+
+  return {
+    incidentId: explicitIncidentId,
+    referenceNumber: String(raw?.referenceNumber ?? "").trim(),
+    isSos,
+    type,
+    status: toMapStatus(raw?.status ?? raw?.trackingStatus ?? raw?.trackingLabel),
+    verificationStatus,
+    isVisibleOnMap,
+    createdAt: String(raw?.createdAt ?? raw?.reportedAt ?? raw?.updatedAt ?? new Date().toISOString()),
+    location: {
+      coords: {
+        latitude: lat,
+        longitude: lng,
+      },
+      ...(locationLabel ? { label: locationLabel } : {}),
+    },
+    ...(description ? { description } : {}),
+  };
+}
+
 export async function fetchEmergencyMapReportsWithOptions(
   options?: FetchEmergencyMapReportsOptions
 ): Promise<MapEmergencyReport[]> {
   const limit = Number.isFinite(options?.limit) ? Number(options?.limit) : 300;
 
   const loadMapFeed = async () => {
-    const res = await api.get<{ data?: MapEmergencyReport[] }>(`${EMERGENCY_REPORTS_BASE}/map`);
-    return Array.isArray(res.data?.data) ? res.data.data : [];
+    const res = await api.get<unknown>(`${EMERGENCY_REPORTS_BASE}/map`);
+    return extractRows<any>(res.data)
+      .map(toMapFeedRow)
+      .filter((item): item is MapEmergencyReport => Boolean(item));
   };
 
   if (!options?.includeUnapproved) {
@@ -238,10 +339,10 @@ export async function fetchEmergencyMapReportsWithOptions(
   }
 
   const loadLegacyFeed = async () => {
-    const res = await api.get<{ data?: LegacyEmergencyReport[] }>("/api/emergencies/reports", {
+    const res = await api.get<unknown>("/api/emergencies/reports", {
       params: { limit },
     });
-    const rows = Array.isArray(res.data?.data) ? res.data.data : [];
+    const rows = extractRows<LegacyEmergencyReport>(res.data);
     return rows
       .map(mapLegacyReportToMapFeed)
       .filter((item): item is MapEmergencyReport => Boolean(item));

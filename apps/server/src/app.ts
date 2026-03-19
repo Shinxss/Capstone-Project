@@ -15,6 +15,8 @@ import { decryptBuffer } from "./utils/aesGcm";
 import { doubleCsrfProtection } from "./middlewares/csrf";
 import { AUDIT_EVENT } from "./features/audit/audit.constants";
 import { logSecurityEvent } from "./features/audit/audit.service";
+import { DispatchOffer } from "./features/dispatches/dispatch.model";
+import { EmergencyReportModel } from "./features/emergency/models/EmergencyReport.model";
 
 export const app = express();
 
@@ -99,6 +101,47 @@ function sanitizeMongoKeys(value: unknown): unknown {
   return output;
 }
 
+async function canReadDispatchProof(
+  roleRaw: unknown,
+  userIdRaw: unknown,
+  proofUrl: string
+) {
+  const role = String(roleRaw ?? "").trim().toUpperCase();
+  if (role === "ADMIN" || role === "LGU") return true;
+
+  const userId = String(userIdRaw ?? "").trim();
+  if (!userId) return false;
+
+  const offer = await DispatchOffer.findOne({
+    proofs: {
+      $elemMatch: {
+        url: proofUrl,
+      },
+    },
+  })
+    .select("emergencyId volunteerId")
+    .lean();
+
+  if (!offer) return false;
+
+  if (role === "VOLUNTEER") {
+    return String(offer.volunteerId ?? "") === userId;
+  }
+
+  if (role !== "COMMUNITY") return false;
+
+  if (!offer.emergencyId) return false;
+
+  const ownedReport = await EmergencyReportModel.findOne({
+    _id: offer.emergencyId,
+    reportedBy: userId,
+  })
+    .select("_id")
+    .lean();
+
+  return Boolean(ownedReport?._id);
+}
+
 app.use((req, _res, next) => {
   req.params = sanitizeMongoKeys(req.params) as Record<string, string>;
   next();
@@ -121,10 +164,20 @@ fs.mkdirSync(profileAvatarsDir, { recursive: true });
 app.get(
   "/uploads/dispatch-proofs/:filename",
   requireAuth,
-  requireRole("LGU", "ADMIN"),
-  (req, res) => {
+  async (req, res) => {
     try {
-      const filename = String(req.params.filename || "");
+      const requested = String(req.params.filename || "");
+      const filename = path.basename(requested);
+      if (!filename || filename !== requested) {
+        return res.status(400).json({ message: "Invalid filename" });
+      }
+
+      const proofUrl = `/uploads/dispatch-proofs/${filename}`;
+      const canRead = await canReadDispatchProof(req.role ?? req.user?.role, req.userId ?? req.user?.id, proofUrl);
+      if (!canRead) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
       const abs = path.join(dispatchProofsDir, filename);
       if (!fs.existsSync(abs)) return res.status(404).end();
 

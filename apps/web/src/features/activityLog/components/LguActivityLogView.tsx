@@ -1,4 +1,4 @@
-import { History, Search } from "lucide-react";
+import { History, Info, Search, Shield } from "lucide-react";
 import EmptyState from "../../../components/ui/EmptyState";
 import { useLguActivityLog } from "../hooks/useLguActivityLog";
 
@@ -45,8 +45,6 @@ export default function LguActivityLogView(props: Props) {
     clearFilters,
     search,
     setSearch,
-    pageSize,
-    setPageSize,
     pagination,
     page,
     setPage,
@@ -59,20 +57,26 @@ export default function LguActivityLogView(props: Props) {
 
   return (
     <>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-4 flex items-start gap-3">
+        <Shield size={28} className="mt-0.5 text-blue-600 dark:text-blue-400" />
         <div>
-          <div className="text-sm text-gray-600 dark:text-slate-400">Read-only</div>
-          <div className="text-xs text-gray-500 dark:text-slate-500">
-            This log is recorded in the browser for now (server audit endpoint pending).
+          <h2 className="text-3xl font-bold leading-tight text-gray-900 dark:text-slate-100">Audit Log</h2>
+          <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
+            Track all system actions for transparency and accountability
+          </p>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-amber-200 bg-[#F5EFE4] px-4 py-4 dark:border-amber-500/25 dark:bg-amber-500/10">
+        <div className="flex items-start gap-3">
+          <Info size={22} className="mt-0.5 text-blue-600 dark:text-blue-400" />
+          <div>
+            <div className="text-xl font-semibold text-gray-900 dark:text-slate-100">Read-Only Audit Trail</div>
+            <div className="mt-1 text-sm text-gray-600 dark:text-slate-300">
+              All system actions are logged here for transparency and accountability. Logs cannot be modified or deleted.
+            </div>
           </div>
         </div>
-
-        <button
-          onClick={onRefresh}
-          className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-800 hover:bg-gray-50 dark:bg-[#0E1626] dark:border-[#162544] dark:text-slate-200 dark:hover:bg-[#122036]"
-        >
-          Refresh
-        </button>
       </div>
 
       <div className="mt-4 rounded-lg border border-gray-200 bg-white p-3 dark:bg-[#0B1220] dark:border-[#162544]">
@@ -143,25 +147,13 @@ export default function LguActivityLogView(props: Props) {
             Showing {filtered.length === 0 ? 0 : pagination.startIndex + 1}-{pagination.endIndex} of {pagination.totalItems}
           </div>
 
-          <div className="flex items-center gap-2">
-            <select
-              value={String(pageSize)}
-              onChange={(e) => setPageSize(Number(e.target.value) || 10)}
-              className="rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-gray-300 dark:bg-[#0E1626] dark:border-[#162544] dark:text-slate-100"
-            >
-              <option value="10">10 / page</option>
-              <option value="20">20 / page</option>
-              <option value="50">50 / page</option>
-            </select>
-
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm font-semibold text-gray-800 hover:bg-gray-100 dark:bg-[#0E1626] dark:border-[#162544] dark:text-slate-200 dark:hover:bg-[#122036]"
-            >
-              Clear filters
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm font-semibold text-gray-800 hover:bg-gray-100 dark:bg-[#0E1626] dark:border-[#162544] dark:text-slate-200 dark:hover:bg-[#122036]"
+          >
+            Clear filters
+          </button>
         </div>
       </div>
 
@@ -181,7 +173,12 @@ export default function LguActivityLogView(props: Props) {
             <tbody className="divide-y divide-gray-200 dark:divide-[#162544]">
               {paginated.map((entry) => (
                 <tr key={entry.id} className="hover:bg-gray-50 dark:hover:bg-[#0E1626]">
-                  <td className="px-4 py-3 text-sm font-semibold text-gray-900 dark:text-slate-100">{entry.actor}</td>
+                  <td className="px-4 py-3">
+                    <div className="text-sm font-semibold text-gray-900 dark:text-slate-100">{entry.actor}</div>
+                    <div className="mt-0.5 text-xs text-gray-500 dark:text-slate-400">
+                      {entry.actorRole ? entry.actorRole.toLowerCase() : "-"}
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-sm text-gray-800 dark:text-slate-200">{entry.action}</td>
                   <td className="px-4 py-3 text-xs text-gray-700 dark:text-slate-300">
                     <div className="font-semibold">{entry.entityType}</div>
@@ -198,28 +195,40 @@ export default function LguActivityLogView(props: Props) {
       )}
 
       {filtered.length > 0 && (
-        <div className="mt-3 flex items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2 dark:bg-[#0B1220] dark:border-[#162544]">
-          <button
-            type="button"
-            onClick={() => setPage(Math.max(1, page - 1))}
-            disabled={page <= 1}
-            className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#0E1626] dark:border-[#162544] dark:text-slate-200 dark:hover:bg-[#122036]"
-          >
-            Previous
-          </button>
+        <div className="mt-3 rounded-lg border border-gray-200 bg-white px-3 py-2 dark:bg-[#0B1220] dark:border-[#162544]">
+          <div className="flex flex-col gap-2 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+            <div className="text-xs text-gray-500 dark:text-slate-400 sm:justify-self-start">
+              {pagination.totalItems} {pagination.totalItems === 1 ? "item" : "items"}
+            </div>
 
-          <div className="text-sm text-gray-600 dark:text-slate-300">
-            Page {pagination.page} of {pagination.totalPages}
+            <div className="flex items-center justify-center gap-3 sm:gap-4">
+              <button
+                type="button"
+                onClick={() => setPage(Math.max(1, page - 1))}
+                disabled={page <= 1}
+                className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#0E1626] dark:border-[#162544] dark:text-slate-200 dark:hover:bg-[#122036]"
+              >
+                Previous
+              </button>
+
+              <div className="text-sm text-gray-600 dark:text-slate-300">
+                Page {pagination.page} of {pagination.totalPages}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setPage(Math.min(pagination.totalPages, page + 1))}
+                disabled={page >= pagination.totalPages}
+                className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#0E1626] dark:border-[#162544] dark:text-slate-200 dark:hover:bg-[#122036]"
+              >
+                Next
+              </button>
+            </div>
+
+            <div className="hidden text-xs text-gray-500 opacity-0 sm:block sm:justify-self-end dark:text-slate-400">
+              {pagination.totalItems} {pagination.totalItems === 1 ? "item" : "items"}
+            </div>
           </div>
-
-          <button
-            type="button"
-            onClick={() => setPage(Math.min(pagination.totalPages, page + 1))}
-            disabled={page >= pagination.totalPages}
-            className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#0E1626] dark:border-[#162544] dark:text-slate-200 dark:hover:bg-[#122036]"
-          >
-            Next
-          </button>
         </div>
       )}
     </>

@@ -21,7 +21,11 @@ export function useSosReport() {
         accuracy: loc.accuracy,
         ...(locationLabel ? { locationLabel } : {}),
       });
-      return report;
+      return {
+        ...report,
+        lat: loc.lat,
+        lng: loc.lng,
+      };
     } finally {
       setSending(false);
     }

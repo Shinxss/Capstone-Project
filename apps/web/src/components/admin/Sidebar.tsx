@@ -151,7 +151,7 @@ export default function Sidebar({
         logoColor={isDark ? "blue" : "red"}
       />
 
-      <nav className="px-3 pt-1 flex-1 overflow-y-auto overflow-x-visible">
+      <nav className="sidebar-scroll-hidden px-3 pt-1 flex-1 overflow-y-auto overflow-x-visible">
         {navSections.map((section, idx) => {
           const visibleItems = section.items.filter((item) => (item.superOnly ? isSuper : true));
           if (visibleItems.length === 0) return null;

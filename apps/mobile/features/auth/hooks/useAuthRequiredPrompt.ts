@@ -1,5 +1,6 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "expo-router";
+import { useIsFocused } from "@react-navigation/native";
 import { useAuth } from "../AuthProvider";
 import type { AuthBlockedAction, AuthRequiredModalProps } from "../../../components/AuthRequiredModal";
 
@@ -22,8 +23,19 @@ const INITIAL_STATE: AuthRequiredState = {
 
 export function useAuthRequiredPrompt() {
   const router = useRouter();
-  const { signOut } = useAuth();
+  const { mode, signOut } = useAuth();
+  const isFocused = useIsFocused();
   const [state, setState] = useState<AuthRequiredState>(INITIAL_STATE);
+
+  useEffect(() => {
+    if (mode === "authed") return;
+    setState((prev) => (prev.visible ? INITIAL_STATE : prev));
+  }, [mode]);
+
+  useEffect(() => {
+    if (isFocused) return;
+    setState((prev) => (prev.visible ? INITIAL_STATE : prev));
+  }, [isFocused]);
 
   const closeAuthRequired = useCallback(() => {
     setState(INITIAL_STATE);
@@ -39,35 +51,33 @@ export function useAuthRequiredPrompt() {
   }, []);
 
   const navigateToAuth = useCallback(
-    async (path: "/(auth)/login" | "/(auth)/signup") => {
+    (path: "/(auth)/login" | "/(auth)/signup") => {
       closeAuthRequired();
-
-      try {
-        await signOut();
-      } catch {
-        // Navigation should still proceed even if local session cleanup fails.
-      }
-
+      void signOut().catch(() => undefined);
       router.replace(path);
     },
     [closeAuthRequired, router, signOut]
   );
 
-  const goToLogin = useCallback(async () => {
-    await navigateToAuth("/(auth)/login");
+  const goToLogin = useCallback(() => {
+    navigateToAuth("/(auth)/login");
   }, [navigateToAuth]);
 
-  const goToSignup = useCallback(async () => {
-    await navigateToAuth("/(auth)/signup");
+  const goToSignup = useCallback(() => {
+    navigateToAuth("/(auth)/signup");
   }, [navigateToAuth]);
 
   const requireAuth = useCallback(
     (isAuthed: boolean, options?: AuthRequiredOpenOptions) => {
       if (isAuthed) return true;
+      if (mode === "anonymous") {
+        router.replace("/(auth)/login");
+        return false;
+      }
       openAuthRequired(options);
       return false;
     },
-    [openAuthRequired]
+    [mode, openAuthRequired, router]
   );
 
   const modalProps = useMemo<AuthRequiredModalProps>(

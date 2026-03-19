@@ -16,11 +16,14 @@ export type TaskChainRecord = {
 
 export type TaskVolunteer = {
   id: string;
+  lifelineId?: string | null;
   name: string;
+  avatarUrl?: string | null;
 };
 
 export type TaskEmergency = {
   id: string;
+  referenceNumber?: string | null;
   emergencyType: string;
   source: string;
   status: string;

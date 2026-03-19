@@ -172,6 +172,9 @@ export function ReportEmergencyDetailsScreen() {
 
   const onSubmit = async () => {
     if (!canSubmit) return;
+    const reportLng = draft.location?.coords?.longitude;
+    const reportLat = draft.location?.coords?.latitude;
+    if (!Number.isFinite(reportLng) || !Number.isFinite(reportLat)) return;
 
     try {
       const response = await submit(draft);
@@ -181,6 +184,8 @@ export function ReportEmergencyDetailsScreen() {
           incidentId: response.incidentId,
           referenceNumber: response.referenceNumber,
           isSos: "0",
+          reportLng: String(reportLng),
+          reportLat: String(reportLat),
         },
       });
     } catch (error: any) {

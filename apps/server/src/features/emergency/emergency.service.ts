@@ -48,7 +48,7 @@ export async function listReports({ limit = 200 }: { limit?: number }) {
   const docs = await EmergencyReport.find({})
     .sort({ createdAt: -1 })
     .limit(limit)
-    .populate("reportedBy", "firstName lastName role username email lguName municipality barangay contactNo")
+    .populate("reportedBy", "firstName lastName role username email lguName municipality barangay contactNo lifelineId avatarUrl country postalCode")
     .lean();
 
   // small in-request cache (prevents repeat lookups for same coords)

@@ -11,6 +11,7 @@ export type ActivityEntityType =
 export type ActivityLogEntry = {
   id: string;
   actor: string;
+  actorRole?: string | null;
   action: string;
   entityType: ActivityEntityType;
   entityId?: string | null;
@@ -24,4 +25,3 @@ export type ActivityLogFilters = {
   action: string;
   actor: string;
 };
-

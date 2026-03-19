@@ -1,6 +1,7 @@
 import { Types } from "mongoose";
 import { VolunteerApplication } from "./volunteerApplication.model";
 import { User } from "../users/user.model";
+import { DispatchOffer } from "../dispatches/dispatch.model";
 
 function normalizeVolunteerApplicationStatus(status: unknown): string {
   const raw = String(status ?? "").trim().toLowerCase().replace(/-/g, "_");
@@ -85,7 +86,7 @@ function pickPreferredApplication(current: any | undefined, candidate: any) {
     : current;
 }
 
-function buildVerifiedVolunteerProfile(user: any, application?: any) {
+function buildVerifiedVolunteerProfile(user: any, application?: any, completedTasks = 0) {
   const fullNameFromUser = [safeStr(user?.firstName), safeStr(user?.lastName)]
     .filter(Boolean)
     .join(" ");
@@ -93,6 +94,7 @@ function buildVerifiedVolunteerProfile(user: any, application?: any) {
   return {
     _id: String(user?._id ?? ""),
     userId: String(user?._id ?? ""),
+    avatarUrl: safeStr(user?.avatarUrl) || undefined,
     fullName: safeStr(application?.fullName) || fullNameFromUser || "Verified Volunteer",
     sex: application?.sex ?? "Prefer not to say",
     birthdate: safeStr(application?.birthdate) || safeStr(user?.birthdate),
@@ -114,6 +116,7 @@ function buildVerifiedVolunteerProfile(user: any, application?: any) {
     availabilityText: safeStr(application?.availabilityText),
     preferredAssignmentText: safeStr(application?.preferredAssignmentText),
     healthNotes: safeStr(application?.healthNotes),
+    completedTasks,
     consent: {
       truth: Boolean(application?.consent?.truth),
       rules: Boolean(application?.consent?.rules),
@@ -188,7 +191,7 @@ async function listVerifiedVolunteerProfilesForReviewer(params: {
     role: { $in: ["VOLUNTEER", "COMMUNITY"] },
   })
     .select(
-      "_id firstName lastName email barangay municipality birthdate contactNo role volunteerStatus isActive createdAt updatedAt"
+      "_id firstName lastName email barangay municipality birthdate contactNo avatarUrl role volunteerStatus isActive createdAt updatedAt"
     )
     .sort({ updatedAt: -1, createdAt: -1, _id: -1 })
     .lean();
@@ -198,12 +201,36 @@ async function listVerifiedVolunteerProfilesForReviewer(params: {
   }
 
   const userIds = approvedUsers.map((user: any) => user._id as Types.ObjectId);
-  const applications = await VolunteerApplication.find({ userId: { $in: userIds } })
-    .select(
-      "userId fullName sex birthdate mobile email street barangay city province emergencyContact skillsOther certificationsText availabilityText preferredAssignmentText healthNotes consent status reviewedBy reviewedAt reviewNotes createdAt updatedAt"
-    )
-    .sort({ createdAt: -1, updatedAt: -1, _id: -1 })
-    .lean();
+  const [applications, completedTaskRows] = await Promise.all([
+    VolunteerApplication.find({ userId: { $in: userIds } })
+      .select(
+        "userId fullName sex birthdate mobile email street barangay city province emergencyContact skillsOther certificationsText availabilityText preferredAssignmentText healthNotes consent status reviewedBy reviewedAt reviewNotes createdAt updatedAt"
+      )
+      .sort({ createdAt: -1, updatedAt: -1, _id: -1 })
+      .lean(),
+    DispatchOffer.aggregate([
+      {
+        $match: {
+          volunteerId: { $in: userIds },
+          status: { $in: ["DONE", "VERIFIED"] },
+        },
+      },
+      {
+        $group: {
+          _id: "$volunteerId",
+          completedTasks: { $sum: 1 },
+        },
+      },
+    ]),
+  ]);
+
+  const completedTasksByUserId = new Map<string, number>();
+  for (const row of completedTaskRows as Array<{ _id: Types.ObjectId; completedTasks?: number }>) {
+    const userId = String(row?._id ?? "").trim();
+    if (!userId) continue;
+    const count = Number(row?.completedTasks ?? 0);
+    completedTasksByUserId.set(userId, Number.isFinite(count) ? count : 0);
+  }
 
   const preferredApplications = new Map<string, any>();
   for (const application of applications) {
@@ -218,7 +245,8 @@ async function listVerifiedVolunteerProfilesForReviewer(params: {
     .map((user: any) => {
       const key = String(user?._id ?? "");
       const application = preferredApplications.get(key);
-      const profile = buildVerifiedVolunteerProfile(user, application);
+      const completedTasks = completedTasksByUserId.get(key) ?? 0;
+      const profile = buildVerifiedVolunteerProfile(user, application, completedTasks);
       if (!matchesVerifiedVolunteerQuery(profile, user, q)) return null;
 
       return profile;
@@ -250,7 +278,7 @@ async function getVerifiedVolunteerProfileForReviewer(params: {
 
   const user = await User.findById(userId)
     .select(
-      "_id firstName lastName email barangay municipality birthdate contactNo role volunteerStatus isActive createdAt updatedAt"
+      "_id firstName lastName email barangay municipality birthdate contactNo avatarUrl role volunteerStatus isActive createdAt updatedAt"
     )
     .lean();
 
@@ -258,9 +286,15 @@ async function getVerifiedVolunteerProfileForReviewer(params: {
     return null;
   }
 
-  const application = await findPreferredApplicationForUser(String(user._id));
+  const [application, completedTasks] = await Promise.all([
+    findPreferredApplicationForUser(String(user._id)),
+    DispatchOffer.countDocuments({
+      volunteerId: new Types.ObjectId(String(user._id)),
+      status: { $in: ["DONE", "VERIFIED"] },
+    }),
+  ]);
 
-  return buildVerifiedVolunteerProfile(user, application);
+  return buildVerifiedVolunteerProfile(user, application, completedTasks);
 }
 
 export async function submitVolunteerApplication(userId: string, payload: any) {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ActivityLogEntry, ActivityLogFilters } from "../models/activityLog.types";
-import { listActivityLogEntries, seedActivityLogIfEmpty } from "../services/activityLog.service";
+import { listActivityLogEntries } from "../services/activityLog.service";
 
 function toStartOfDayIso(dateYmd: string) {
   const d = new Date(`${dateYmd}T00:00:00.000`);
@@ -18,6 +18,15 @@ const defaultFilters: ActivityLogFilters = {
   action: "",
   actor: "",
 };
+const FIXED_PAGE_SIZE = 50;
+
+function toErrorMessage(error: unknown, fallback: string) {
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) return message;
+  }
+  return fallback;
+}
 
 export function useActivityLog() {
   const [entries, setEntries] = useState<ActivityLogEntry[]>([]);
@@ -26,23 +35,21 @@ export function useActivityLog() {
   const [filters, setFilters] = useState<ActivityLogFilters>(defaultFilters);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
 
-  const refresh = useCallback(() => {
+  const refresh = useCallback(async () => {
     setLoading(true);
     try {
       setError(null);
-      seedActivityLogIfEmpty();
-      setEntries(listActivityLogEntries());
-    } catch (e: any) {
-      setError(e?.message || "Failed to load activity log");
+      setEntries(await listActivityLogEntries());
+    } catch (error: unknown) {
+      setError(toErrorMessage(error, "Failed to load activity log"));
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    refresh();
+    void refresh();
   }, [refresh]);
 
   const filtered = useMemo(() => {
@@ -79,24 +86,24 @@ export function useActivityLog() {
 
   useEffect(() => {
     setPage(1);
-  }, [filters, search, pageSize]);
+  }, [filters, search]);
 
   const pagination = useMemo(() => {
     const totalItems = filtered.length;
-    const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+    const totalPages = Math.max(1, Math.ceil(totalItems / FIXED_PAGE_SIZE));
     const safePage = Math.min(page, totalPages);
-    const startIndex = (safePage - 1) * pageSize;
-    const endIndex = Math.min(startIndex + pageSize, totalItems);
+    const startIndex = (safePage - 1) * FIXED_PAGE_SIZE;
+    const endIndex = Math.min(startIndex + FIXED_PAGE_SIZE, totalItems);
 
     return {
       totalItems,
       totalPages,
       page: safePage,
-      pageSize,
+      pageSize: FIXED_PAGE_SIZE,
       startIndex,
       endIndex,
     };
-  }, [filtered.length, page, pageSize]);
+  }, [filtered.length, page]);
 
   const paginated = useMemo(() => {
     return filtered.slice(pagination.startIndex, pagination.endIndex);
@@ -126,8 +133,6 @@ export function useActivityLog() {
     setSearch,
     page,
     setPage,
-    pageSize,
-    setPageSize,
     pagination,
     actionOptions,
     actorOptions,

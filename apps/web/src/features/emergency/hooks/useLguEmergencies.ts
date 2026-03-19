@@ -1,10 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { EmergencyReport } from "../models/emergency.types";
+import type { EmergencyReport, Reporter } from "../models/emergency.types";
 import { fetchEmergencyReports } from "../services/emergency.service";
 import type { DispatchTask } from "../../tasks/models/tasks.types";
 import { fetchLguTasksByStatus } from "../../tasks/services/tasksApi";
 
-export type EmergencyType = "SOS" | "Flood" | "Fire" | "Typhoon" | "Earthquake" | "Collapse";
+export type EmergencyType =
+  | "SOS"
+  | "Flood"
+  | "Fire"
+  | "Typhoon"
+  | "Earthquake"
+  | "Collapse"
+  | "Medical"
+  | "Other";
 type Priority = "critical" | "high" | "medium";
 type Status = "active" | "in_progress" | "resolved" | "pending";
 
@@ -38,14 +46,19 @@ type DispatchVolunteerCounts = {
 type DispatchCountsByEmergency = Record<string, DispatchVolunteerCounts>;
 
 function normalizeType(raw?: string): EmergencyType {
-  const up = String(raw || "").toUpperCase();
+  const up = String(raw || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s_-]+/g, "");
   if (up === "SOS") return "SOS";
   if (up === "FIRE") return "Fire";
   if (up === "FLOOD") return "Flood";
   if (up === "EARTHQUAKE") return "Earthquake";
   if (up === "TYPHOON") return "Typhoon";
   if (up === "COLLAPSE") return "Collapse";
-  return "SOS";
+  if (up === "MEDICAL") return "Medical";
+  if (up === "OTHER" || up === "OTHERS") return "Other";
+  return "Other";
 }
 
 function normalizeStatus(raw?: string): Status {
@@ -73,14 +86,32 @@ function formatTimeAgo(iso?: string) {
 }
 
 function reporterNameFrom(report: EmergencyReport) {
-  const reportedBy: any = report.reportedBy;
+  const reportedBy = report.reportedBy;
   if (!reportedBy || typeof reportedBy === "string") return "Unknown Reporter";
 
-  const fullName = `${reportedBy.firstName || ""} ${reportedBy.lastName || ""}`.trim();
-  return fullName || reportedBy.username || reportedBy.email || "Unknown Reporter";
+  const reporter = reportedBy as Reporter;
+  const fullName = `${reporter.firstName || ""} ${reporter.lastName || ""}`.trim();
+  return fullName || reporter.username || reporter.email || "Unknown Reporter";
+}
+
+function toErrorMessage(error: unknown) {
+  if (error && typeof error === "object") {
+    const withResponse = error as { response?: { data?: { message?: unknown } } };
+    const serverMessage = withResponse.response?.data?.message;
+    if (typeof serverMessage === "string" && serverMessage.trim()) return serverMessage;
+
+    const withMessage = error as { message?: unknown };
+    if (typeof withMessage.message === "string" && withMessage.message.trim()) {
+      return withMessage.message;
+    }
+  }
+  return "Failed to load emergencies";
 }
 
 function locationLabelFrom(report: EmergencyReport) {
+  const exactLabel = String(report.locationLabel || "").trim();
+  if (exactLabel) return exactLabel;
+
   const barangay = String(report.barangayName || "").trim();
   const city = String(report.barangayCity || "").trim();
   const province = String(report.barangayProvince || "").trim();
@@ -93,6 +124,15 @@ function locationLabelFrom(report: EmergencyReport) {
     ]
       .filter(Boolean)
       .join(", ");
+  }
+
+  const coordinates = report.location?.coordinates;
+  if (Array.isArray(coordinates) && coordinates.length >= 2) {
+    const lng = Number(coordinates[0]);
+    const lat = Number(coordinates[1]);
+    if (Number.isFinite(lng) && Number.isFinite(lat)) {
+      return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    }
   }
 
   return "Unknown location";
@@ -163,7 +203,8 @@ function buildCompletedEmergencyIds(tasks: DispatchTask[]): Set<string> {
 }
 
 function toEmergencyItem(report: EmergencyReport, volunteerCounts?: DispatchVolunteerCounts): LguEmergencyItem {
-  const isSOS = String(report.emergencyType).toUpperCase() === "SOS" || String(report.source).toUpperCase() === "SOS_BUTTON";
+  const type = normalizeType(report.emergencyType);
+  const isSOS = type === "SOS";
   const created = report.reportedAt || report.createdAt || report.updatedAt;
   const volunteersAssigned = Number(volunteerCounts?.assigned ?? 0);
   const volunteersNeeded = Number(volunteerCounts?.needed ?? 0);
@@ -171,8 +212,8 @@ function toEmergencyItem(report: EmergencyReport, volunteerCounts?: DispatchVolu
 
   return {
     id: report._id,
-    type: normalizeType(report.emergencyType),
-    title: isSOS ? "SOS Emergency" : `${normalizeType(report.emergencyType)} Emergency`,
+    type,
+    title: isSOS ? "SOS Emergency" : `${type} Emergency`,
     location: locationLabelFrom(report),
     timeAgo: formatTimeAgo(created),
     priority: isSOS ? "critical" : "high",
@@ -212,8 +253,8 @@ export function useLguEmergencies() {
       setReports(reportsData);
       setDispatchCountsByEmergency(buildDispatchCountsByEmergency(dispatchTasksData));
       setCompletedEmergencyIds(buildCompletedEmergencyIds(dispatchTasksData));
-    } catch (err: any) {
-      setError(err?.response?.data?.message || err?.message || "Failed to load emergencies");
+    } catch (error: unknown) {
+      setError(toErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -227,8 +268,10 @@ export function useLguEmergencies() {
     () =>
       reports
         .map((report) => toEmergencyItem(report, dispatchCountsByEmergency[String(report._id)]))
-        .filter((item) => item.status !== "resolved"),
-    [reports, dispatchCountsByEmergency]
+        .filter((item) => item.status !== "resolved")
+        .filter((item) => !completedEmergencyIds.has(String(item.id)))
+        .filter((item) => item.volunteersAssigned === 0),
+    [reports, dispatchCountsByEmergency, completedEmergencyIds]
   );
 
   const filtered = useMemo(() => {

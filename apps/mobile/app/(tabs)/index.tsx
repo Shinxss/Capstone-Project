@@ -347,6 +347,8 @@ export default function HomeScreen() {
           incidentId: result.incidentId,
           referenceNumber: result.referenceNumber,
           isSos: "1",
+          reportLng: String(result.lng),
+          reportLat: String(result.lat),
         },
       });
     } catch (e: any) {

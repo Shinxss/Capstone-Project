@@ -48,9 +48,8 @@ export default function ProfileSkillsScreen() {
             You need an account to manage profile skills.
           </Text>
           <Pressable
-            onPress={async () => {
-              await signOut();
-              router.replace("/(auth)/login");
+            onPress={() => {
+              void signOut();
             }}
             style={({ pressed }) => ({
               marginTop: 16,

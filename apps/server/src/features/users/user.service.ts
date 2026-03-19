@@ -6,6 +6,7 @@ import { getVolunteerPresenceStatus } from "../../realtime/notificationsSocket";
 
 export type DispatchVolunteer = {
   id: string;
+  lifelineId?: string;
   name: string;
   status: "available" | "offline";
   skill: string;
@@ -71,6 +72,12 @@ function buildFullName(user: {
   return safeStr(user.email) || "User";
 }
 
+function toDispatchAvailability(
+  presence: ReturnType<typeof getVolunteerPresenceStatus>
+): DispatchVolunteer["status"] {
+  return presence === "OFFLINE" ? "offline" : "available";
+}
+
 export async function listDispatchVolunteers(
   params: ListDispatchVolunteersParams = {}
 ): Promise<DispatchVolunteer[]> {
@@ -81,7 +88,7 @@ export async function listDispatchVolunteers(
   if (!includeInactive) match.isActive = true;
 
   const users = await User.find(match)
-    .select("_id firstName lastName isActive barangay municipality avatarUrl")
+    .select("_id lifelineId firstName lastName isActive barangay municipality avatarUrl")
     .sort({ createdAt: -1 })
     .lean();
 
@@ -116,8 +123,9 @@ export async function listDispatchVolunteers(
 
     return {
       id,
+      lifelineId: safeStr(u.lifelineId) || undefined,
       name,
-      status: getVolunteerPresenceStatus(id) === "ONLINE" ? "available" : "offline",
+      status: toDispatchAvailability(getVolunteerPresenceStatus(id)),
       skill,
       barangay,
       municipality,

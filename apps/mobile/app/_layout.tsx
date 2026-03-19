@@ -78,7 +78,13 @@ function RootLayoutInner() {
                 fullScreenGestureEnabled: true,
               }}
             >
-              <Stack.Screen name="(auth)" />
+              <Stack.Screen
+                name="(auth)"
+                options={{
+                  animation: "none",
+                  gestureEnabled: false,
+                }}
+              />
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="report" />
               <Stack.Screen name="my-requests" />
