@@ -10,7 +10,8 @@ type Props = {
 };
 
 export default function ForReviewQueueCard({ item, selected, verifying, onSelect }: Props) {
-  const attentionLabel = item.missingProof ? "Missing proof" : item.hasMissingData ? "Missing data" : null;
+  const statusLabel = item.missingProof ? "Missing proof" : item.severity;
+  const hasAttentionTone = item.missingProof || item.severity === "High";
 
   return (
     <button
@@ -21,7 +22,7 @@ export default function ForReviewQueueCard({ item, selected, verifying, onSelect
         "w-full rounded-xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50",
         selected
           ? "border-red-300 bg-red-50/70 shadow-sm dark:border-red-500/40 dark:bg-red-500/10"
-          : attentionLabel
+          : hasAttentionTone
             ? "border-amber-200 bg-amber-50/35 hover:border-amber-300 hover:bg-amber-50/55 dark:border-amber-900/35 dark:bg-amber-950/15 dark:hover:border-amber-800/45 dark:hover:bg-amber-950/25"
             : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 dark:border-[#162544] dark:bg-[#0B1220] dark:hover:border-[#22365D] dark:hover:bg-[#0E1626]",
       ].join(" ")}
@@ -33,11 +34,18 @@ export default function ForReviewQueueCard({ item, selected, verifying, onSelect
             <span className="truncate text-sm text-gray-800 dark:text-slate-200">{item.volunteerName}</span>
           </div>
           <div className="mt-1 text-sm font-bold text-gray-900 dark:text-slate-100">{item.emergencyType}</div>
-          {attentionLabel ? (
-            <span className="mt-1 inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700 dark:border-amber-800/40 dark:bg-amber-950/40 dark:text-amber-200">
-              {attentionLabel}
-            </span>
-          ) : null}
+          <span
+            className={[
+              "mt-1 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+              item.missingProof
+                ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800/40 dark:bg-amber-950/40 dark:text-amber-200"
+                : item.severity === "High"
+                  ? "border-red-200 bg-red-50 text-red-700 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200"
+                  : "border-gray-200 bg-gray-50 text-gray-700 dark:border-[#2A3D63] dark:bg-[#101A30] dark:text-slate-200",
+            ].join(" ")}
+          >
+            {statusLabel}
+          </span>
         </div>
 
         <span

@@ -8,11 +8,15 @@ import { EmergencyReport } from "../emergency/emergency.model";
 import { VolunteerApplication } from "../volunteerApplications/volunteerApplication.model";
 import { DispatchOffer } from "../dispatches/dispatch.model";
 import { User } from "../users/user.model";
+import { getLguDashboardStatCards } from "./dashboardStats.service";
 
 const router = Router();
 
 const overviewQuerySchema = z.object({
   range: z.enum(["7d", "30d"]).default("7d"),
+});
+const dashboardStatCardsQuerySchema = z.object({
+  comparisonWindowHours: z.coerce.number().int().min(1).max(24 * 7).default(24),
 });
 
 function toDateKey(value: Date) {
@@ -141,6 +145,27 @@ router.get(
         dispatchTasks: keys.map((day) => dispatchTrendByDay[day]),
       },
     });
+  }
+);
+
+router.get(
+  "/lgu-dashboard/stat-cards",
+  requireAuth,
+  requireRole("ADMIN", "LGU"),
+  requirePerm("analytics.view"),
+  validate(dashboardStatCardsQuerySchema, "query"),
+  async (req, res) => {
+    const { comparisonWindowHours } = req.query as unknown as z.infer<
+      typeof dashboardStatCardsQuerySchema
+    >;
+
+    const payload = await getLguDashboardStatCards({
+      actorRole: req.role ?? "",
+      actorUserId: req.userId,
+      comparisonWindowHours,
+    });
+
+    return res.json(payload);
   }
 );
 

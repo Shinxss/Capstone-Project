@@ -12,10 +12,12 @@ export type AuditLogItem = {
     role?: string;
     email?: string;
   };
+  actorName?: string;
   target?: {
     type?: string;
     id?: string;
   };
+  targetName?: string;
   request?: {
     method?: string;
     path?: string;

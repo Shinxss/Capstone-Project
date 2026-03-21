@@ -1,0 +1,53 @@
+{
+  "model": "routing-risk",
+  "type": "regression",
+  "features": [
+    "flood_depth_5yr",
+    "rainfall_mm",
+    "is_raining",
+    "bridge",
+    "road_priority"
+  ],
+  "metrics": {
+    "mae": 0.02538934163869097,
+    "mse": 0.0033841359737246503,
+    "rmse": 0.058173326995493824,
+    "r2": 0.998211940114532,
+    "derived_accuracy_3class": 0.9896305520963056,
+    "derived_f1_macro_3class": 0.9830997862896477
+  },
+  "class_report_3class": {
+    "high": {
+      "precision": 0.9762456546929317,
+      "recall": 0.9738477098685161,
+      "f1-score": 0.9750452079566003,
+      "support": 6921.0
+    },
+    "low": {
+      "precision": 0.9936131166541907,
+      "recall": 0.9954640023224308,
+      "f1-score": 0.9945376983407654,
+      "support": 82672.0
+    },
+    "medium": {
+      "precision": 0.9819010416666667,
+      "recall": 0.9775415626924199,
+      "f1-score": 0.979716452571577,
+      "support": 30857.0
+    },
+    "accuracy": 0.9896305520963056,
+    "macro avg": {
+      "precision": 0.9839199376712631,
+      "recall": 0.9822844249611222,
+      "f1-score": 0.9830997862896477,
+      "support": 120450.0
+    },
+    "weighted avg": {
+      "precision": 0.9896147795672343,
+      "recall": 0.9896305520963056,
+      "f1-score": 0.9896207476836574,
+      "support": 120450.0
+    }
+  },
+  "sample_count": 120450
+}

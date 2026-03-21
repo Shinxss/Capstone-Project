@@ -21,6 +21,8 @@ export type LguEmergencyItem = {
   type: EmergencyType;
   title: string;
   location: string;
+  reportedAt?: string;
+  reportedAtTimestamp: number;
   timeAgo: string;
   priority: Priority;
   status: Status;
@@ -44,6 +46,12 @@ type DispatchVolunteerCounts = {
 };
 
 type DispatchCountsByEmergency = Record<string, DispatchVolunteerCounts>;
+
+function toTimestamp(value?: string | null) {
+  if (!value) return 0;
+  const ts = new Date(value).getTime();
+  return Number.isFinite(ts) ? ts : 0;
+}
 
 function normalizeType(raw?: string): EmergencyType {
   const up = String(raw || "")
@@ -71,7 +79,8 @@ function normalizeStatus(raw?: string): Status {
 
 function formatTimeAgo(iso?: string) {
   if (!iso) return "Just now";
-  const then = new Date(iso).getTime();
+  const then = toTimestamp(iso);
+  if (then <= 0) return "Just now";
   const diff = Math.max(0, Date.now() - then);
   const mins = Math.floor(diff / 60000);
 
@@ -209,12 +218,15 @@ function toEmergencyItem(report: EmergencyReport, volunteerCounts?: DispatchVolu
   const volunteersAssigned = Number(volunteerCounts?.assigned ?? 0);
   const volunteersNeeded = Number(volunteerCounts?.needed ?? 0);
   const progressPercent = volunteersNeeded > 0 ? Math.round((volunteersAssigned / volunteersNeeded) * 100) : 0;
+  const reportedAtTimestamp = toTimestamp(created);
 
   return {
     id: report._id,
     type,
     title: isSOS ? "SOS Emergency" : `${type} Emergency`,
     location: locationLabelFrom(report),
+    reportedAt: created,
+    reportedAtTimestamp,
     timeAgo: formatTimeAgo(created),
     priority: isSOS ? "critical" : "high",
     status: normalizeStatus(report.status),
@@ -229,6 +241,38 @@ function toEmergencyItem(report: EmergencyReport, volunteerCounts?: DispatchVolu
     volunteersNeeded,
     progressPercent,
   };
+}
+
+function isOperationalStatus(status: Status) {
+  return status === "active" || status === "in_progress" || status === "pending";
+}
+
+function priorityRank(priority: Priority) {
+  if (priority === "critical") return 0;
+  if (priority === "high") return 1;
+  if (priority === "medium") return 2;
+  return 3;
+}
+
+function emergencyGroupRank(item: LguEmergencyItem) {
+  const operational = isOperationalStatus(item.status);
+  if (item.isSOS && operational) return 0;
+  if (operational) return 1;
+  return 2;
+}
+
+function compareEmergencyItems(a: LguEmergencyItem, b: LguEmergencyItem) {
+  const groupDiff = emergencyGroupRank(a) - emergencyGroupRank(b);
+  if (groupDiff !== 0) return groupDiff;
+
+  const priorityDiff = priorityRank(a.priority) - priorityRank(b.priority);
+  if (priorityDiff !== 0) return priorityDiff;
+
+  const aTimestamp = a.reportedAtTimestamp;
+  const bTimestamp = b.reportedAtTimestamp;
+  if (aTimestamp !== bTimestamp) return bTimestamp - aTimestamp;
+
+  return a.id.localeCompare(b.id);
 }
 
 export function useLguEmergencies() {
@@ -270,7 +314,8 @@ export function useLguEmergencies() {
         .map((report) => toEmergencyItem(report, dispatchCountsByEmergency[String(report._id)]))
         .filter((item) => item.status !== "resolved")
         .filter((item) => !completedEmergencyIds.has(String(item.id)))
-        .filter((item) => item.volunteersAssigned === 0),
+        .filter((item) => item.volunteersAssigned === 0)
+        .sort(compareEmergencyItems),
     [reports, dispatchCountsByEmergency, completedEmergencyIds]
   );
 

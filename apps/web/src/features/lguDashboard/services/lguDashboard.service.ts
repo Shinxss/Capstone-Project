@@ -1,7 +1,11 @@
+import { api } from "@/lib/api";
+import type {
+  DashboardOperationalStats,
+  DashboardStatCardsApiResponse,
+} from "../models/lguDashboard.types";
 import type { DispatchTask } from "../../tasks/models/tasks.types";
 import { fetchLguTasksByStatus } from "../../tasks/services/tasksApi";
 import { fetchDispatchVolunteers } from "../../lguLiveMap/services/volunteers.service";
-import type { DashboardOperationalStats } from "../models/lguDashboard.types";
 
 const DASHBOARD_DISPATCH_STATUSES = "PENDING,ACCEPTED,DECLINED,DONE,VERIFIED";
 
@@ -16,7 +20,12 @@ function summarizeDispatchTasks(tasks: DispatchTask[]) {
     if (status === "ACCEPTED") tasksInProgress += 1;
     if (status === "PENDING") pendingTasks += 1;
 
-    if (status === "ACCEPTED" || status === "DECLINED" || status === "DONE" || status === "VERIFIED") {
+    if (
+      status === "ACCEPTED" ||
+      status === "DECLINED" ||
+      status === "DONE" ||
+      status === "VERIFIED"
+    ) {
       respondedTasks += 1;
     }
   }
@@ -52,4 +61,17 @@ export async function fetchLguDashboardOperationalStats(): Promise<DashboardOper
     respondedTasks: dispatchStats.respondedTasks,
     dispatchOffers: dispatchStats.dispatchOffers,
   };
+}
+
+export async function fetchLguDashboardStatCards(
+  comparisonWindowHours = 24
+): Promise<DashboardStatCardsApiResponse> {
+  const res = await api.get<DashboardStatCardsApiResponse>(
+    "/api/admin/analytics/lgu-dashboard/stat-cards",
+    {
+      params: { comparisonWindowHours },
+    }
+  );
+
+  return res.data;
 }

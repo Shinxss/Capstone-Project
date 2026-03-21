@@ -25,6 +25,8 @@ export type EmergencyReport = {
   emergencyType: string;
   source: string;
   status: string;
+  progressLabel?: "Submitted" | "Assigned" | "En Route" | "Arrived" | "Resolved" | "Cancelled";
+  progressPercent?: number;
   location: GeoPoint;
   notes?: string;
   reportedBy?: Reporter | string;

@@ -28,6 +28,7 @@ lguAuthRouter.post("/login", loginLimiter, validate(lguLoginSchema), async (req,
     if (!user) {
       await logSecurityEvent(req, AUDIT_EVENT.AUTH_LOGIN_FAIL, "FAIL", {
         username,
+        reason: "INVALID_CREDENTIALS",
       });
       return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });
     }
@@ -36,6 +37,8 @@ lguAuthRouter.post("/login", loginLimiter, validate(lguLoginSchema), async (req,
       await logSecurityEvent(req, AUDIT_EVENT.AUTH_LOGIN_FAIL, "FAIL", {
         username,
         accountStatus: "SUSPENDED",
+        reason: "ACCOUNT_SUSPENDED",
+        scopeBarangay: user.role === "LGU" ? user.barangay ?? "" : "",
       });
       return res.status(403).json({
         success: false,
@@ -47,6 +50,8 @@ lguAuthRouter.post("/login", loginLimiter, validate(lguLoginSchema), async (req,
     if (!user.passwordHash) {
       await logSecurityEvent(req, AUDIT_EVENT.AUTH_LOGIN_FAIL, "FAIL", {
         username,
+        reason: "INVALID_CREDENTIALS",
+        scopeBarangay: user.role === "LGU" ? user.barangay ?? "" : "",
       });
       return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });
     }
@@ -55,12 +60,19 @@ lguAuthRouter.post("/login", loginLimiter, validate(lguLoginSchema), async (req,
     if (!ok) {
       await logSecurityEvent(req, AUDIT_EVENT.AUTH_LOGIN_FAIL, "FAIL", {
         username,
+        reason: "INVALID_CREDENTIALS",
+        scopeBarangay: user.role === "LGU" ? user.barangay ?? "" : "",
       });
       return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });
     }
 
     if (user.role === "ADMIN") {
       if (!user.email) {
+        await logSecurityEvent(req, AUDIT_EVENT.AUTH_LOGIN_FAIL, "FAIL", {
+          username,
+          reason: "ADMIN_EMAIL_MISSING_FOR_MFA",
+          scopeBarangay: "",
+        });
         return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });
       }
 

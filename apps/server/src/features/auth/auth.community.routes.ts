@@ -75,6 +75,7 @@ communityAuthRouter.post("/login", loginLimiter, validate(communityLoginSchema),
     if (!user) {
       await logSecurityEvent(req, AUDIT_EVENT.AUTH_LOGIN_FAIL, "FAIL", {
         actorEmail: cleanEmail,
+        reason: "INVALID_CREDENTIALS",
       });
       return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });
     }
@@ -83,6 +84,7 @@ communityAuthRouter.post("/login", loginLimiter, validate(communityLoginSchema),
       await logSecurityEvent(req, AUDIT_EVENT.AUTH_LOGIN_FAIL, "FAIL", {
         actorEmail: cleanEmail,
         accountStatus: "SUSPENDED",
+        reason: "ACCOUNT_SUSPENDED",
       });
       return res.status(403).json({
         success: false,
@@ -94,6 +96,7 @@ communityAuthRouter.post("/login", loginLimiter, validate(communityLoginSchema),
     if (!user.emailVerified || !user.passwordHash) {
       await logSecurityEvent(req, AUDIT_EVENT.AUTH_LOGIN_FAIL, "FAIL", {
         actorEmail: cleanEmail,
+        reason: "INVALID_CREDENTIALS",
       });
       return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });
     }
@@ -102,6 +105,7 @@ communityAuthRouter.post("/login", loginLimiter, validate(communityLoginSchema),
     if (!ok) {
       await logSecurityEvent(req, AUDIT_EVENT.AUTH_LOGIN_FAIL, "FAIL", {
         actorEmail: cleanEmail,
+        reason: "INVALID_CREDENTIALS",
       });
       return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });
     }

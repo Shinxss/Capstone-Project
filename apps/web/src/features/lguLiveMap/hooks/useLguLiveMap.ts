@@ -137,6 +137,36 @@ function emergencyCoordsFromReport(report: unknown): LngLat | null {
   return [lng, lat];
 }
 
+function emergencyLocationTextFromReport(report: unknown) {
+  const maybeReport = report as {
+    locationLabel?: unknown;
+    barangayName?: unknown;
+    barangayCity?: unknown;
+    barangayProvince?: unknown;
+  };
+
+  const exactLabel = String(maybeReport?.locationLabel ?? "").trim();
+  if (exactLabel) return exactLabel;
+
+  const coords = emergencyCoordsFromReport(report);
+  if (coords) {
+    const [lng, lat] = coords;
+    return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+  }
+
+  const locationBits = [
+    maybeReport?.barangayName,
+    maybeReport?.barangayCity,
+    maybeReport?.barangayProvince,
+  ]
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean);
+
+  if (locationBits.length > 0) return locationBits.join(", ");
+
+  return "Unknown location";
+}
+
 function isResolvedEmergencyStatus(raw?: string) {
   const up = String(raw ?? "").toUpperCase();
   return (
@@ -663,7 +693,7 @@ export function useLguLiveMap() {
       id: String(r._id),
       emergencyType: normalizeEmergencyType(r.emergencyType),
       status: String(r.status ?? ""),
-      barangayName: (r as any).barangayName ?? null,
+      locationText: emergencyLocationTextFromReport(r),
       source: r.source ?? null,
       reportedAt: r.reportedAt,
     }));

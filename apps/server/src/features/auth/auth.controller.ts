@@ -71,6 +71,7 @@ export async function login(req: Request, res: Response) {
       await logSecurityEvent(req, AUDIT_EVENT.AUTH_LOGIN_FAIL, "FAIL", {
         actorEmail,
         accountStatus: "SUSPENDED",
+        reason: "ACCOUNT_SUSPENDED",
       });
       return res.status(403).json({
         message: ACCOUNT_SUSPENDED,
@@ -82,6 +83,7 @@ export async function login(req: Request, res: Response) {
     if (!user) {
       await logSecurityEvent(req, AUDIT_EVENT.AUTH_LOGIN_FAIL, "FAIL", {
         actorEmail,
+        reason: "INVALID_CREDENTIALS",
       });
       return res.status(401).json({ message: "Invalid credentials" });
     }

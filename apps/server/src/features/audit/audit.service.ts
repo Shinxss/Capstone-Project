@@ -12,6 +12,7 @@ const EMAIL_KEY = /email/i;
 const PHONE_KEY = /phone|mobile|contact/i;
 const CONTROL_CHARS = /[\r\n\t\x00-\x1F\x7F]/g;
 const MAX_STRING_LENGTH = 500;
+const OBJECT_ID_RE = /^[a-fA-F\d]{24}$/;
 const VALID_EVENT_TYPES = new Set<string>(Object.values(AUDIT_EVENT));
 const VALID_SEVERITIES = new Set<string>(Object.values(AUDIT_SEVERITY));
 const VALID_OUTCOMES = new Set<string>(Object.values(AUDIT_OUTCOME));
@@ -274,9 +275,31 @@ export function getAuditRequestContext(req: Request) {
 }
 
 type AuditListItem = Omit<AuditLogDoc, never>;
+type AuditListItemView = AuditListItem & {
+  actorName?: string;
+  targetName?: string;
+};
+
+function resolveDisplayName(user: {
+  firstName?: unknown;
+  lastName?: unknown;
+  username?: unknown;
+  email?: unknown;
+}) {
+  const firstName = sanitizeString(user.firstName, 100);
+  const lastName = sanitizeString(user.lastName, 100);
+  const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
+  if (fullName) return fullName;
+
+  const username = sanitizeString(user.username, 100);
+  if (username) return username;
+
+  const email = sanitizeString(user.email, 120);
+  return email || "";
+}
 
 export async function queryAuditLogs(input: QueryAuditInput): Promise<{
-  items: AuditListItem[];
+  items: AuditListItemView[];
   pagination: {
     page: number;
     limit: number;
@@ -348,8 +371,56 @@ export async function queryAuditLogs(input: QueryAuditInput): Promise<{
     AuditLog.countDocuments(filter),
   ]);
 
+  const userIds = new Set<string>();
+  for (const item of items) {
+    const actorId = sanitizeString(item.actor?.id, 120);
+    if (OBJECT_ID_RE.test(actorId)) {
+      userIds.add(actorId);
+    }
+
+    const targetType = sanitizeString(item.target?.type, 50).toUpperCase();
+    const targetId = sanitizeString(item.target?.id, 120);
+    if (targetType === "USER" && OBJECT_ID_RE.test(targetId)) {
+      userIds.add(targetId);
+    }
+  }
+
+  const userNameById = new Map<string, string>();
+  if (userIds.size > 0) {
+    const users = await User.find({
+      _id: { $in: Array.from(userIds) },
+    })
+      .select("_id firstName lastName username email")
+      .lean<Array<{ _id: unknown; firstName?: unknown; lastName?: unknown; username?: unknown; email?: unknown }>>();
+
+    for (const user of users) {
+      const id = sanitizeString(String(user._id ?? ""), 120);
+      if (!id) continue;
+
+      const displayName = resolveDisplayName(user);
+      if (displayName) {
+        userNameById.set(id, displayName);
+      }
+    }
+  }
+
+  const resolvedItems = items.map((item) => {
+    const actorId = sanitizeString(item.actor?.id, 120);
+    const actorName = userNameById.get(actorId);
+
+    const targetType = sanitizeString(item.target?.type, 50).toUpperCase();
+    const targetId = sanitizeString(item.target?.id, 120);
+    const targetName = targetType === "USER" ? userNameById.get(targetId) : undefined;
+
+    return {
+      ...item,
+      ...(actorName ? { actorName } : {}),
+      ...(targetName ? { targetName } : {}),
+    };
+  });
+
   return {
-    items,
+    items: resolvedItems,
     pagination: {
       page,
       limit,

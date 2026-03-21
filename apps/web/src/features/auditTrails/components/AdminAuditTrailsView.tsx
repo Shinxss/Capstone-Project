@@ -1,6 +1,28 @@
 import type { useAdminAuditTrails } from "../hooks/useAdminAuditTrails";
+import type { AuditLogItem } from "../models/auditTrails.types";
 
 type Props = ReturnType<typeof useAdminAuditTrails>;
+
+function resolveActorCell(item: AuditLogItem) {
+  const name = String(item.actorName ?? "").trim();
+  const role = String(item.actor?.role ?? "-").trim() || "-";
+  const fallbackId = String(item.actor?.id ?? "-").trim() || "-";
+  return `${name || fallbackId} (${role})`;
+}
+
+function resolveTargetCell(item: AuditLogItem) {
+  const targetType = String(item.target?.type ?? "-").trim() || "-";
+  const targetId = String(item.target?.id ?? "").trim();
+
+  if (targetType.toUpperCase() === "USER") {
+    const targetName = String(item.targetName ?? "").trim();
+    if (targetName) {
+      return `${targetType} (${targetName})`;
+    }
+  }
+
+  return `${targetType}${targetId ? ` (${targetId})` : ""}`;
+}
 
 export default function AdminAuditTrailsView({
   items,
@@ -113,10 +135,10 @@ export default function AdminAuditTrailsView({
                     {item.outcome} / {item.severity}
                   </td>
                   <td className="px-4 py-3 text-gray-700 dark:text-slate-300">
-                    {item.actor?.id ?? "-"} ({item.actor?.role ?? "-"})
+                    {resolveActorCell(item)}
                   </td>
                   <td className="px-4 py-3 text-gray-700 dark:text-slate-300">
-                    {item.target?.type ?? "-"} {item.target?.id ? `(${item.target.id})` : ""}
+                    {resolveTargetCell(item)}
                   </td>
                   <td className="px-4 py-3 text-gray-700 dark:text-slate-300">{item.scopeBarangay || "-"}</td>
                 </tr>

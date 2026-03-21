@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { User } from "../../users/user.model";
 import { AUDIT_EVENT } from "../../audit/audit.constants";
-import { logAudit } from "../../audit/audit.service";
+import { logAudit, logSecurityEvent } from "../../audit/audit.service";
 import { PasswordResetRequest } from "../models/PasswordResetRequest.model";
 import { sendPasswordResetOtpEmail } from "../../../utils/mailer";
 import { zodPasswordSchema } from "../password.policy";
@@ -18,6 +18,11 @@ import {
 } from "../otp.utils";
 
 const passwordResetRoutes = Router();
+
+function resolveScopeBarangayForUser(user: { role?: string; barangay?: string } | null | undefined) {
+  if (!user || user.role !== "LGU") return "";
+  return String(user.barangay ?? "").trim();
+}
 
 const forgotPasswordSchema = z
   .object({
@@ -106,6 +111,14 @@ passwordResetRoutes.post("/forgot", async (req, res) => {
 
     const sent = await sendPasswordResetOtp(user._id.toString(), email);
     if (!sent.success) {
+      if (sent.status === 429) {
+        const scopeBarangay = resolveScopeBarangayForUser(user);
+        await logSecurityEvent(req, AUDIT_EVENT.AUTH_PASSWORD_RESET_TOO_MANY_ATTEMPTS, "DENY", {
+          email,
+          reason: sent.message,
+          scopeBarangay,
+        });
+      }
       return res.status(sent.status).json({ success: false, error: sent.message });
     }
 
@@ -149,17 +162,44 @@ passwordResetRoutes.post("/verify-otp", async (req, res) => {
       otpExpiresAt: { $gt: now },
     }).sort({ lastSentAt: -1 });
 
+    let scopeBarangay = "";
+    if (request?.userId) {
+      const requestUser = await User.findById(request.userId).select("role barangay").lean();
+      scopeBarangay = resolveScopeBarangayForUser(requestUser);
+    } else {
+      const userByEmail = await User.findOne({ email }).select("role barangay").lean();
+      scopeBarangay = resolveScopeBarangayForUser(userByEmail);
+    }
+
     if (!request || request.verifiedAt) {
+      await logSecurityEvent(req, AUDIT_EVENT.AUTH_PASSWORD_RESET_INVALID_OTP, "FAIL", {
+        email,
+        reason: "OTP_INVALID_OR_EXPIRED",
+        scopeBarangay,
+      });
       return res.status(400).json({ success: false, error: "OTP is invalid or expired" });
     }
 
     if (request.attempts >= OTP_MAX_VERIFY_ATTEMPTS) {
+      await logSecurityEvent(req, AUDIT_EVENT.AUTH_PASSWORD_RESET_TOO_MANY_ATTEMPTS, "DENY", {
+        email,
+        attempts: request.attempts,
+        maxAttempts: OTP_MAX_VERIFY_ATTEMPTS,
+        scopeBarangay,
+      });
       return res.status(400).json({ success: false, error: "Too many invalid OTP attempts" });
     }
 
     if (sha256(otp) !== request.otpHash) {
       request.attempts += 1;
       await request.save();
+      await logSecurityEvent(req, AUDIT_EVENT.AUTH_PASSWORD_RESET_INVALID_OTP, "FAIL", {
+        email,
+        attempts: request.attempts,
+        maxAttempts: OTP_MAX_VERIFY_ATTEMPTS,
+        reason: "OTP_HASH_MISMATCH",
+        scopeBarangay,
+      });
       return res.status(400).json({ success: false, error: "OTP is invalid or expired" });
     }
 

@@ -2,12 +2,9 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { useNavigate } from "react-router-dom";
 import { useThemeMode } from "../../theme/hooks/useThemeMode";
 import {
-  Activity,
   AlertTriangle,
   ArrowRight,
-  ClipboardList,
   LocateFixed,
-  Users,
   ShieldAlert,
 } from "lucide-react";
 import { toastWarning } from "@/services/feedback/toast.service";
@@ -17,9 +14,10 @@ import {
   EMERGENCY_TYPE_LABEL,
   iconForEmergency,
 } from "../../emergency/constants/emergency.constants";
-import type { DashboardEmergencyItem, DashboardStats } from "../models/lguDashboard.types";
+import type { DashboardEmergencyItem, DashboardStatCardItem } from "../models/lguDashboard.types";
 
 import EmergencyQuickView from "./EmergencyQuickView";
+import DashboardStatCard from "./DashboardStatCard";
 
 import type { HazardZone } from "../../hazardZones/models/hazardZones.types";
 import {
@@ -73,53 +71,6 @@ function severityForStatus(status: string) {
   return { label: s.toLowerCase() || "unknown", cls: "border-1 border-gray-300 bg-gray-200 text-gray-700 dark:border-white/35 dark:bg-white/10 dark:text-slate-300" };
 }
 
-function progressForStatus(status: string) {
-  const s = String(status || "").toUpperCase();
-  if (s === "OPEN") return 70;
-  if (s === "ACKNOWLEDGED") return 85;
-  if (s === "RESOLVED") return 100;
-  return 40;
-}
-
-function StatCard({
-  icon,
-  label,
-  value,
-  badge,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-  badge: string;
-}) {
-  return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm h-40 dark:bg-[#0E1626] dark:border-[#162544] mb-5">
-      {/* top row */}
-      <div className="flex items-start justify-between">
-        <div className="h-12 w-12 rounded-2xl bg-gray-100 flex items-center justify-center dark:bg-[#0B1324]">
-          {icon}
-        </div>
-
-        <span className="text-xs font-semibold bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300 px-2 py-1 rounded-full">
-          {badge}
-        </span>
-      </div>
-
-      {/* value + label */}
-      <div className="mt-2 ml-3">
-        <div className="text-4xl font-bold leading-none text-gray-900 dark:text-slate-100">
-          {value}
-        </div>
-        <div className="mt-1 text-sm text-gray-500 dark:text-slate-400">
-          {label}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-
-
 function ProgressRing({ percent, isDark }: { percent: number; isDark: boolean }) {
   const p = Math.max(0, Math.min(100, percent));
   return (
@@ -155,9 +106,7 @@ export default function LguDashboardView({
   loading,
   error,
   onRefresh,
-  stats,
-  statsSyncing,
-  statsError,
+  statCards,
   pins,
   recent,
   hazardZones,
@@ -167,9 +116,7 @@ export default function LguDashboardView({
   loading: boolean;
   error: string | null;
   onRefresh: () => void;
-  stats: DashboardStats;
-  statsSyncing: boolean;
-  statsError: string | null;
+  statCards: DashboardStatCardItem[];
   pins: DashboardEmergencyItem[];
   recent: DashboardEmergencyItem[];
   // ✅ be defensive: API shape changes or missing prop should not crash the dashboard
@@ -207,7 +154,10 @@ export default function LguDashboardView({
     refetch: refetchHazards,
   } = useHazardZones();
 
-  const effectiveHazardZones = (hazardZones && hazardZones.length ? hazardZones : hzFromHook) ?? [];
+  const effectiveHazardZones = useMemo(
+    () => (hazardZones && hazardZones.length ? hazardZones : hzFromHook) ?? [],
+    [hazardZones, hzFromHook]
+  );
   const effectiveHazardsLoading = hazardsLoading || hzLoading;
   const effectiveHazardsError = hazardsError || hzError;
 
@@ -269,7 +219,7 @@ export default function LguDashboardView({
     } catch {
       // ignore
     }
-  }, [quickView?.id, quickView?.lng, quickView?.lat, map, mapReady]);
+  }, [quickView, map, mapReady]);
 
   const onMapReady = useCallback((m: mapboxgl.Map) => {
     setMap(m);
@@ -278,7 +228,8 @@ export default function LguDashboardView({
     const setReady = () => setMapReady(true);
 
     // If already loaded, mark ready immediately.
-    const loadedFn = (m as any).loaded?.bind(m);
+    const mapWithLoaded = m as mapboxgl.Map & { loaded?: () => boolean };
+    const loadedFn = mapWithLoaded.loaded?.bind(m);
     if (typeof loadedFn === "function" && loadedFn()) {
       setReady();
       return;
@@ -297,7 +248,7 @@ export default function LguDashboardView({
   // ✅ only ACTIVE hazards are drawn on the dashboard map
   // older docs may not have isActive yet -> treat as true
   const safeHazardZones = useMemo(() => {
-    return (effectiveHazardZones ?? []).filter((z: any) => (z as any).isActive !== false);
+    return effectiveHazardZones.filter((z) => z.isActive !== false);
   }, [effectiveHazardZones]);
 
   // --- Apply hazard zones on the dashboard map
@@ -353,29 +304,6 @@ export default function LguDashboardView({
     };
   });
 
-  const volunteersValue = String(stats.availableVolunteers);
-  const volunteersBadge = statsSyncing
-    ? "sync"
-    : statsError
-      ? "retry"
-      : `${stats.totalVolunteers} total`;
-
-  const inProgressValue = String(stats.tasksInProgress);
-  const inProgressBadge = statsSyncing
-    ? "sync"
-    : statsError
-      ? "retry"
-      : `${stats.pendingTasks} pending`;
-
-  const responseValue = `${stats.responseRate}%`;
-  const responseBadge = statsSyncing
-    ? "sync"
-    : statsError
-      ? "retry"
-      : stats.dispatchOffers > 0
-        ? `${stats.respondedTasks}/${stats.dispatchOffers} responded`
-        : "No offers yet";
-
   if (loading) {
     return (
       <div className="rounded-lg border border-gray-200 bg-white p-4 text-gray-600 dark:bg-[#0B1220] dark:border-[#162544] dark:text-slate-300">
@@ -403,32 +331,11 @@ export default function LguDashboardView({
 
   return (
     <div className="px-6 py-4">
-      {/* Stats (keeps old design, but Active Emergencies is real) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
-        <StatCard
-          icon={<AlertTriangle size={16} className="text-red-500" />}
-          label="Active Emergencies"
-          value={String(stats.active)}
-          badge={loading ? "sync" : `${stats.open} open`}
-        />
-        <StatCard
-          icon={<Users size={16} className="text-green-600" />}
-          label="Available Volunteers"
-          value={volunteersValue}
-          badge={volunteersBadge}
-        />
-        <StatCard
-          icon={<ClipboardList size={16} className="text-orange-500" />}
-          label="Tasks in Progress"
-          value={inProgressValue}
-          badge={inProgressBadge}
-        />
-        <StatCard
-          icon={<Activity size={16} className="text-blue-600" />}
-          label="Response Rate"
-          value={responseValue}
-          badge={responseBadge}
-        />
+      {/* Dashboard stats */}
+      <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {statCards.map((card) => (
+          <DashboardStatCard key={card.key} item={card} />
+        ))}
       </div>
 
       {/* Map (with hazard zones overlay + LiveMap-style pills)
@@ -448,6 +355,8 @@ export default function LguDashboardView({
                 id: String(pin.id),
                 type: pin.type,
                 status: "OPEN",
+                progressLabel: "Submitted",
+                progressPercent: 20,
                 lng: pin.lng,
                 lat: pin.lat,
               }
@@ -594,7 +503,6 @@ export default function LguDashboardView({
               const typeLabel = EMERGENCY_TYPE_LABEL[e.type] ?? e.type;
               const Icon = iconForEmergency(e.type);
               const sev = severityForStatus(e.status);
-              const percent = progressForStatus(e.status);
 
               return (
                 <div
@@ -630,7 +538,12 @@ export default function LguDashboardView({
                     </div>
                   </div>
 
-                  <ProgressRing percent={percent} isDark={isDark} />
+                  <div className="ml-2 flex shrink-0 flex-col items-center gap-1">
+                    <ProgressRing percent={e.progressPercent} isDark={isDark} />
+                    <span className="text-[11px] font-semibold text-gray-500 dark:text-slate-400">
+                      {e.progressLabel}
+                    </span>
+                  </div>
                 </div>
               );
             })}

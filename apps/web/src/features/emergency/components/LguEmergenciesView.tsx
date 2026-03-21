@@ -1,5 +1,4 @@
 import {
-  Plus,
   Search,
   Siren,
   Droplet,
@@ -285,8 +284,6 @@ export default function LguEmergenciesView(props: Props) {
   const activeItems = items.filter((item) => isOperational(item.status));
   const activeSosItems = activeItems.filter((item) => item.isSOS);
   const activeSosCount = activeSosItems.length;
-  const activeSosVolunteersAssigned = activeSosItems.reduce((sum, item) => sum + item.volunteersAssigned, 0);
-  const activeSosVolunteersNeeded = activeSosItems.reduce((sum, item) => sum + item.volunteersNeeded, 0);
   const visibleItems = filtered.filter((item) => isOperational(item.status));
 
   const handleEmergencyAction = (item: LguEmergencyItem) => {
@@ -303,16 +300,10 @@ export default function LguEmergenciesView(props: Props) {
 
   return (
     <div className="space-y-5 p-6">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="text-4xl font-bold leading-tight text-gray-900 dark:text-slate-100">Emergencies</div>
-          <div className="mt-1 text-base text-gray-400 dark:text-slate-400">Monitor and manage active emergency situations</div>
-        </div>
-
-        <button className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow hover:bg-blue-700">
-          <Plus size={18} />
-          Report Emergency
-        </button>
+      <div className="min-w-0">
+        <div className="text-4xl font-bold leading-tight text-gray-900 dark:text-slate-100">Emergencies</div>
+        <div className="mt-1 text-base text-gray-400 dark:text-slate-400">Monitor and manage active emergency situations</div>
+        <div className="mt-2 text-sm font-semibold text-gray-600 dark:text-slate-300">Priority: SOS first, then latest reports.</div>
       </div>
 
       {activeSosCount > 0 ? (
@@ -324,7 +315,6 @@ export default function LguEmergenciesView(props: Props) {
             <div>
               <div className="text-lg font-bold text-red-700">{activeSosCount} Active SOS Alerts</div>
               <div className="text-sm text-gray-600 dark:text-slate-300">Urgent life-threatening situations requiring immediate response</div>
-              <div className="text-sm font-semibold text-gray-700 dark:text-slate-200">{activeSosVolunteersAssigned}/{activeSosVolunteersNeeded} Volunteers</div>
             </div>
           </div>
 

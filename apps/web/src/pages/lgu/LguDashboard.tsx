@@ -7,9 +7,7 @@ export default function LguDashboard() {
     loading,
     error,
     refetch,
-    stats,
-    statsSyncing,
-    statsError,
+    statCards,
     pins,
     recent,
     hazardZones,
@@ -24,9 +22,7 @@ export default function LguDashboard() {
         loading={loading}
         error={error}
         onRefresh={() => void refetch()}
-        stats={stats}
-        statsSyncing={statsSyncing}
-        statsError={statsError}
+        statCards={statCards}
         pins={pins}
         recent={recent}
         hazardZones={hazardZones}

@@ -69,23 +69,7 @@ export default function LguApprovalsView(props: Props) {
 
   return (
     <>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="text-sm text-gray-600 dark:text-slate-400">Pending non-SOS emergency reports</div>
-          <div className="text-xs text-gray-500 dark:text-slate-500">
-            Approve to publish on live map, or reject with a reason.
-          </div>
-        </div>
-
-        <button
-          onClick={onRefresh}
-          className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-800 hover:bg-gray-50 dark:bg-[#0E1626] dark:border-[#162544] dark:text-slate-200 dark:hover:bg-[#122036]"
-        >
-          Refresh
-        </button>
-      </div>
-
-      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-5">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
         <div className="md:col-span-2 rounded-lg border border-gray-200 bg-white p-3 dark:bg-[#0B1220] dark:border-[#162544]">
           <div className="text-xs font-semibold uppercase text-gray-500 dark:text-slate-400">Search</div>
           <input

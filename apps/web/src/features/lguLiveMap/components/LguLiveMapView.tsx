@@ -65,18 +65,16 @@ function ToggleRow({
         type="button"
         onClick={onToggle}
         className={[
-          "h-7 w-12 rounded-full relative transition-colors",
-          checked ? activeColorClass : "bg-gray-300",
+          "h-8 w-[62px] rounded-full border transition-all",
+          checked
+            ? `${activeColorClass} border-transparent shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)]`
+            : "bg-gray-300 border-gray-300 dark:bg-slate-600 dark:border-slate-600",
         ].join(" ")}
+        role="switch"
+        aria-checked={checked}
+        aria-pressed={checked}
         aria-label={`Toggle ${label}`}
-      >
-        <span
-          className={[
-            "absolute top-0.5 h-6 w-6 rounded-full bg-white dark:bg-[#0B1220] transition-transform",
-            checked ? "translate-x-6" : "translate-x-1",
-          ].join(" ")}
-        />
-      </button>
+      />
     </div>
   );
 }
@@ -861,8 +859,8 @@ export default function LguLiveMapView(props: Props) {
                                 </span>
                               </div>
 
-                              <div className="mt-1 text-sm font-bold text-gray-900 dark:text-slate-100 truncate">
-                                {incident.barangayName || "Unknown barangay"}
+                              <div className="mt-1 text-sm font-bold text-gray-900 dark:text-slate-100 leading-snug">
+                                {incident.locationText || "Unknown location"}
                               </div>
 
                               <div className="text-[11px] text-gray-600 dark:text-slate-400 truncate">

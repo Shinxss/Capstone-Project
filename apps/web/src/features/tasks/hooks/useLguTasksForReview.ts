@@ -28,6 +28,7 @@ export type ForReviewQueueItem = {
   volunteerAvatarUrl: string | null;
   volunteerLifelineId: string | null;
   emergencyType: string;
+  severity: "High" | "Normal";
   barangay: string;
   proofCount: number;
   hasProof: boolean;
@@ -133,6 +134,12 @@ function resolveSubmittedAt(task: DispatchTask) {
   return task.completedAt || task.updatedAt || task.createdAt || null;
 }
 
+function toSeverity(task: DispatchTask): "High" | "Normal" {
+  const source = String(task.emergency?.source ?? "").trim().toUpperCase();
+  const emergencyType = String(task.emergency?.emergencyType ?? "").trim().toUpperCase();
+  return source.includes("SOS") || emergencyType === "SOS" ? "High" : "Normal";
+}
+
 function toEpoch(iso: string | null | undefined) {
   if (!iso) return 0;
   const ms = new Date(iso).getTime();
@@ -171,6 +178,19 @@ function toChecklistStatus(value: boolean | undefined): ChecklistStatus {
   if (value === true) return "pass";
   if (value === false) return "fail";
   return "unknown";
+}
+
+function toBarangayLabel(value: string | null | undefined) {
+  const raw = String(value ?? "").replace(/\s+/g, " ").trim();
+  if (!raw) return "";
+  if (/^brgy\.?\s+/i.test(raw) || /^barangay\s+/i.test(raw)) return raw;
+  return `Brgy. ${raw}`;
+}
+
+function buildVerifiedDispatchLabel(task: DispatchTask | undefined) {
+  const emergencyType = toDisplayText(task?.emergency?.emergencyType, "Emergency");
+  const barangay = toBarangayLabel(task?.emergency?.barangayName);
+  return barangay ? `${emergencyType} response dispatch in ${barangay}` : `${emergencyType} response dispatch`;
 }
 
 export function useLguTasksForReview() {
@@ -275,6 +295,7 @@ export function useLguTasksForReview() {
       const inlineLifelineId = String(task.volunteer?.lifelineId ?? "").trim();
       const inlineReference = String(task.emergency?.referenceNumber ?? "").trim();
       const emergencyTypeLabel = toDisplayText(task.emergency?.emergencyType, "Unknown emergency");
+      const severity = toSeverity(task);
       const barangayName = toDisplayText(task.emergency?.barangayName, "Barangay unavailable");
       const proofs = task.proofs ?? [];
       const hasMissingData = !task.volunteer?.name || !task.emergency?.barangayName || !submittedAt;
@@ -289,6 +310,7 @@ export function useLguTasksForReview() {
         volunteerAvatarUrl: inlineAvatar || (volunteerId ? volunteerAvatarById[volunteerId] ?? null : null),
         volunteerLifelineId: inlineLifelineId || (volunteerId ? volunteerLifelineById[volunteerId] ?? null : null),
         emergencyType: emergencyTypeLabel,
+        severity,
         barangay: barangayName,
         proofCount: proofs.length,
         hasProof: proofs.length > 0,
@@ -599,7 +621,7 @@ export function useLguTasksForReview() {
           },
         });
 
-        toastSuccess("Task verified", `Dispatch ${id} has been verified.`);
+        toastSuccess("Task verified", `${buildVerifiedDispatchLabel(task)} has been verified.`);
         await refetch();
       } catch (verifyTaskError) {
         setVerifyError(toErrorMessage(verifyTaskError, "Failed to verify task"));

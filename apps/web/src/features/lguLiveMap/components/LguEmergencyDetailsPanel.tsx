@@ -60,6 +60,12 @@ function severityLabel(emergencyType?: string) {
   return "Medium";
 }
 
+function isSosEmergencyType(emergencyType?: string | null, source?: string | null) {
+  const normalizedType = String(emergencyType ?? "").trim().toUpperCase();
+  const normalizedSource = String(source ?? "").trim().toUpperCase();
+  return normalizedType === "SOS" || normalizedSource === "SOS";
+}
+
 function taskStatusClass(statusRaw?: string) {
   const status = String(statusRaw ?? "").toUpperCase();
   if (status === "VERIFIED") return "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300";
@@ -298,11 +304,15 @@ export default function LguEmergencyDetailsPanel({
   if (!open || !emergencyDetails) return null;
 
   const severity = severityLabel(emergencyDetails.emergencyType);
-  const title = `${emergencyDetails.emergencyType} Incident`;
+  const title = `${emergencyDetails.emergencyType} Emergency`;
   const reportId = emergencyReport?.referenceNumber || emergencyDetails.id;
   const reportedTime = emergencyReport?.reportedAt || emergencyReport?.createdAt || emergencyDetails.reportedAt;
   const coverPhoto = photoThumbs[0];
   const activePhoto = photoThumbs[activePhotoIndex] ?? coverPhoto ?? null;
+  const isSosEmergency = isSosEmergencyType(
+    emergencyReport?.emergencyType ?? emergencyDetails.emergencyType,
+    emergencyReport?.source ?? emergencyDetails.source
+  );
 
   return (
     <>
@@ -313,10 +323,24 @@ export default function LguEmergencyDetailsPanel({
           ) : (
             <div className="h-64 w-full bg-gradient-to-b from-slate-300 to-slate-200 dark:from-[#1A2740] dark:to-[#0E1626] flex items-center justify-center">
               {!photosLoading ? (
-                <div className="flex flex-col items-center gap-2 text-slate-600 dark:text-slate-300">
-                  <ImageOff size={36} />
-                  <span className="text-xs font-semibold uppercase tracking-wide">No image</span>
-                </div>
+                isSosEmergency ? (
+                  <div className="flex flex-col items-center gap-2 px-4 text-center">
+                    <div className="grid h-20 w-20 place-items-center rounded-xl bg-red-600 shadow-md shadow-red-500/25">
+                      <span className="text-2xl font-black tracking-wide text-white">SOS</span>
+                    </div>
+                    <div className="text-xl font-black uppercase tracking-tight text-slate-900 dark:text-slate-100">
+                      No image available
+                    </div>
+                    <span className="inline-flex items-center rounded-full bg-red-600 px-5 py-1.5 text-sm font-black uppercase tracking-wide text-white shadow-sm shadow-red-500/25">
+                      Urgent SOS report
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-2 text-slate-600 dark:text-slate-300">
+                    <ImageOff size={36} />
+                    <span className="text-xs font-semibold uppercase tracking-wide">No image</span>
+                  </div>
+                )
               ) : null}
             </div>
           )}

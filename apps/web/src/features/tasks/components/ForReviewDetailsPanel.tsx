@@ -129,7 +129,7 @@ export default function ForReviewDetailsPanel({
                   : "bg-gray-100 text-gray-700 dark:bg-[#101A30] dark:text-slate-200",
               ].join(" ")}
             >
-              Severity: {severityLabel}
+              {severityLabel}
             </span>
           </div>
         </div>
