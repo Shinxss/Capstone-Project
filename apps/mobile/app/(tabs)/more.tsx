@@ -129,14 +129,13 @@ export default function MoreScreen() {
           try {
             closeTransientUi();
             await signOut();
-            router.replace("/(auth)/login");
           } catch {
             Alert.alert("Logout failed", "Please try again.");
           }
         },
       },
     ]);
-  }, [closeTransientUi, goToLogin, isUser, router, signOut]);
+  }, [closeTransientUi, goToLogin, isUser, signOut]);
 
   const {
     avatarUrl: profileAvatarUrl,

@@ -5,6 +5,7 @@ import { TokenBlocklist } from "../features/auth/TokenBlocklist.model";
 import { DispatchOffer } from "../features/dispatches/dispatch.model";
 import { EmergencyReport } from "../features/emergency/emergency.model";
 import { getEmergencyRequestTrackingSnapshot } from "../features/emergency/services/emergencyReport.service";
+import { readAccessTokenFromCookieHeader } from "../features/auth/authCookie";
 import { User } from "../features/users/user.model";
 import { verifyAccessToken } from "../utils/jwt";
 
@@ -420,7 +421,8 @@ function startPresenceSweep() {
 async function authenticateSocket(socket: AuthenticatedSocket) {
   const authToken = parseBearerToken(socket.handshake.auth?.token as string | undefined);
   const headerToken = parseBearerToken(socket.handshake.headers.authorization as string | undefined);
-  const token = authToken || headerToken;
+  const cookieToken = readAccessTokenFromCookieHeader(socket.handshake.headers.cookie as string | undefined);
+  const token = authToken || headerToken || cookieToken;
 
   if (!token) {
     throw new Error("Unauthorized");

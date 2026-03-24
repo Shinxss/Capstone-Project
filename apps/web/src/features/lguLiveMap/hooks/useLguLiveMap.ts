@@ -37,7 +37,7 @@ import type {
 import { colorForVolunteerStatus } from "../utils/lguLiveMap.colors";
 import { createDispatchOffers, fetchDispatchTasks } from "../services/dispatch.service";
 import { fetchDispatchVolunteers } from "../services/volunteers.service";
-import { getLguToken } from "../../auth/services/authStorage";
+import { getLguUser } from "../../auth/services/authStorage";
 import { createLivePresenceSocket } from "../services/livePresence.socket";
 import {
   createNotificationsSocket,
@@ -439,10 +439,10 @@ export function useLguLiveMap() {
   }, [volunteers]);
 
   useEffect(() => {
-    const token = getLguToken();
-    if (!token) return;
+    const user = getLguUser();
+    if (!user?.id) return;
 
-    const socket = createLivePresenceSocket(token);
+    const socket = createLivePresenceSocket();
 
     const mergePresence = (
       volunteerIdRaw: unknown,
@@ -621,11 +621,11 @@ export function useLguLiveMap() {
   }, []);
 
   useEffect(() => {
-    const token = getLguToken();
-    if (!token) return;
+    const user = getLguUser();
+    if (!user?.id) return;
 
     let lastRefreshAt = 0;
-    const socket = createNotificationsSocket(token);
+    const socket = createNotificationsSocket();
 
     const onRefresh = (payload: NotificationsRefreshPayload) => {
       const now = Date.now();

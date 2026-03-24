@@ -135,6 +135,34 @@ export default function SignupForm({
 
         {error ? <Text className="text-[12px] text-red-500">{error}</Text> : null}
 
+        {/* Terms checkbox */}
+        <Pressable
+          onPress={onToggleAgree}
+          style={{ marginTop: 6, flexDirection: "row", alignItems: "flex-start", gap: 10 }}
+        >
+          <View
+            style={{
+              width: 18,
+              height: 18,
+              borderRadius: 4,
+              borderWidth: 1.5,
+              borderColor: "#EF4444",
+              backgroundColor: agree ? "#EF4444" : "transparent",
+              alignItems: "center",
+              justifyContent: "center",
+              marginTop: 2,
+            }}
+          >
+            {agree ? <Ionicons name="checkmark" size={14} color="#fff" /> : null}
+          </View>
+
+          <Text style={{ flex: 1, fontSize: 13, color: "#4B5563", lineHeight: 16, textAlign: "justify" }}>
+            By signing up you agree to our{" "}
+            <Text style={{ color: "#3B82F6", textDecorationLine: "underline" }}>Terms of Service</Text> and{" "}
+            <Text style={{ color: "#3B82F6", textDecorationLine: "underline" }}>Privacy Policy</Text>.
+          </Text>
+        </Pressable>
+
         <Pressable
           onPress={onSignup}
           disabled={loading}
@@ -188,34 +216,6 @@ export default function SignupForm({
             Log in
           </Text>
         </View>
-
-        {/* Terms checkbox */}
-        <Pressable
-          onPress={onToggleAgree}
-          style={{ marginTop: 55, flexDirection: "row", alignItems: "flex-start", gap: 10 }}
-        >
-          <View
-            style={{
-              width: 18,
-              height: 18,
-              borderRadius: 4,
-              borderWidth: 1.5,
-              borderColor: "#EF4444",
-              backgroundColor: agree ? "#EF4444" : "transparent",
-              alignItems: "center",
-              justifyContent: "center",
-              marginTop: 2,
-            }}
-          >
-            {agree ? <Ionicons name="checkmark" size={14} color="#fff" /> : null}
-          </View>
-
-          <Text style={{ flex: 1, fontSize: 13, color: "#4B5563", lineHeight: 16, textAlign: "justify" }}>
-            By signing up you agree to our{" "}
-            <Text style={{ color: "#3B82F6", textDecorationLine: "underline" }}>Terms of Service</Text> and{" "}
-            <Text style={{ color: "#3B82F6", textDecorationLine: "underline" }}>Privacy Policy</Text>.
-          </Text>
-        </Pressable>
       </View>
     </View>
   );

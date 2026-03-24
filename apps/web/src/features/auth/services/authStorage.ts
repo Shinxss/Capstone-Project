@@ -57,38 +57,37 @@ function readSessionSnapshot(): AuthSessionSnapshot {
   const sessionStore = getSessionStore();
   const localStore = getLocalStore();
 
-  const token = sessionStore?.getItem(AUTH_STORAGE_KEYS.lguToken) || "";
   const userRaw = sessionStore?.getItem(AUTH_STORAGE_KEYS.lguUser) || "";
+  const legacySessionToken = sessionStore?.getItem(AUTH_STORAGE_KEYS.lguToken) || "";
 
-  if (token || userRaw) {
-    clearLegacyLocalAuth(localStore);
-    inMemorySession.token = token;
-    inMemorySession.userRaw = userRaw;
-    return { token, userRaw };
+  if (legacySessionToken) {
+    sessionStore?.removeItem(AUTH_STORAGE_KEYS.lguToken);
   }
 
-  const legacyToken = localStore?.getItem(AUTH_STORAGE_KEYS.lguToken) || "";
+  if (userRaw) {
+    clearLegacyLocalAuth(localStore);
+    inMemorySession.token = "";
+    inMemorySession.userRaw = userRaw;
+    return { token: "", userRaw };
+  }
+
   const legacyUserRaw = localStore?.getItem(AUTH_STORAGE_KEYS.lguUser) || "";
 
-  if (legacyToken || legacyUserRaw) {
+  if (legacyUserRaw) {
     if (sessionStore) {
-      if (legacyToken) {
-        sessionStore.setItem(AUTH_STORAGE_KEYS.lguToken, legacyToken);
-      }
-      if (legacyUserRaw) {
-        sessionStore.setItem(AUTH_STORAGE_KEYS.lguUser, legacyUserRaw);
-      }
+      sessionStore.removeItem(AUTH_STORAGE_KEYS.lguToken);
+      sessionStore.setItem(AUTH_STORAGE_KEYS.lguUser, legacyUserRaw);
     }
 
     clearLegacyLocalAuth(localStore);
-    inMemorySession.token = legacyToken;
+    inMemorySession.token = "";
     inMemorySession.userRaw = legacyUserRaw;
 
-    return { token: legacyToken, userRaw: legacyUserRaw };
+    return { token: "", userRaw: legacyUserRaw };
   }
 
-  if (inMemorySession.token || inMemorySession.userRaw) {
-    return { token: inMemorySession.token, userRaw: inMemorySession.userRaw };
+  if (inMemorySession.userRaw) {
+    return { token: "", userRaw: inMemorySession.userRaw };
   }
 
   return EMPTY_SNAPSHOT;
@@ -99,15 +98,15 @@ function emitAuthChanged() {
 }
 
 export function setLguSession(token: string, user: StoredPortalUser) {
-  const nextToken = token || "";
+  void token; // Cookie session token is httpOnly and never persisted in web storage.
   const nextUserRaw = JSON.stringify(user);
   const sessionStore = getSessionStore();
 
   if (sessionStore) {
-    sessionStore.setItem(AUTH_STORAGE_KEYS.lguToken, nextToken);
+    sessionStore.removeItem(AUTH_STORAGE_KEYS.lguToken);
     sessionStore.setItem(AUTH_STORAGE_KEYS.lguUser, nextUserRaw);
   } else {
-    inMemorySession.token = nextToken;
+    inMemorySession.token = "";
     inMemorySession.userRaw = nextUserRaw;
   }
 
@@ -120,7 +119,7 @@ export function getLguSessionSnapshot() {
 }
 
 export function getLguToken() {
-  return readSessionSnapshot().token;
+  return "";
 }
 
 export function getLguUser(): StoredPortalUser | null {

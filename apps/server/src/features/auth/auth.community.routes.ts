@@ -8,6 +8,7 @@ import { loginLimiter, registerLimiter } from "../../middlewares/rateLimit";
 import { validate } from "../../middlewares/validate";
 import { signAccessToken } from "../../utils/jwt";
 import { communityLoginSchema, communityRegisterSchema } from "./auth.schemas";
+import { setAccessTokenCookie, shouldIncludeAccessTokenInBody } from "./authCookie";
 import { toAuthUserPayload } from "./otp.utils";
 import { resolveAccessTokenExpiresIn } from "./accessTokenExpiry";
 
@@ -114,6 +115,8 @@ communityAuthRouter.post("/login", loginLimiter, validate(communityLoginSchema),
       { sub: user._id.toString(), role: user.role },
       { expiresIn: resolveAccessTokenExpiresIn(req) }
     );
+    setAccessTokenCookie(res, token);
+
     await logAudit(req, {
       eventType: AUDIT_EVENT.AUTH_LOGIN_SUCCESS,
       outcome: "SUCCESS",
@@ -135,7 +138,7 @@ communityAuthRouter.post("/login", loginLimiter, validate(communityLoginSchema),
     return res.json({
       success: true,
       data: {
-        accessToken: token,
+        ...(shouldIncludeAccessTokenInBody(req) ? { accessToken: token } : {}),
         user: toAuthUserPayload(user),
       },
     });

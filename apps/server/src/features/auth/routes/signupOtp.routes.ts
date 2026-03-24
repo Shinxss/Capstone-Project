@@ -7,6 +7,7 @@ import { EmailVerificationRequest } from "../models/EmailVerificationRequest.mod
 import { sendSignupVerificationOtpEmail } from "../../../utils/mailer";
 import { signAccessToken } from "../../../utils/jwt";
 import { communityRegisterSchema } from "../auth.schemas";
+import { setAccessTokenCookie, shouldIncludeAccessTokenInBody } from "../authCookie";
 import { resolveAccessTokenExpiresIn } from "../accessTokenExpiry";
 import {
   OTP_EXPIRY_MINUTES,
@@ -183,11 +184,12 @@ signupOtpRoutes.post("/verify-otp", async (req, res) => {
       { sub: user._id.toString(), role: user.role },
       { expiresIn: resolveAccessTokenExpiresIn(req) }
     );
+    setAccessTokenCookie(res, accessToken);
 
     return res.status(200).json({
       success: true,
       data: {
-        accessToken,
+        ...(shouldIncludeAccessTokenInBody(req) ? { accessToken } : {}),
         user: toAuthUserPayload(user),
       },
     });

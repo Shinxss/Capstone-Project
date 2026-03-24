@@ -4,7 +4,7 @@ import {
   getVolunteerApplicationById,
   listVolunteerApplications,
 } from "../services/lguVolunteerApplications.service";
-import { getLguToken } from "../../auth/services/authStorage";
+import { getLguUser } from "../../auth/services/authStorage";
 import { DAGUPAN_CENTER } from "../../lguLiveMap/constants/lguLiveMap.constants";
 import { createLivePresenceSocket } from "../../lguLiveMap/services/livePresence.socket";
 
@@ -50,14 +50,14 @@ export function useLguVerifiedVolunteers() {
   >({});
 
   useEffect(() => {
-    const token = getLguToken();
-    if (!token) {
+    const user = getLguUser();
+    if (!user?.id) {
       setPresenceByVolunteerId({});
       setPresenceReady(false);
       return;
     }
 
-    const socket = createLivePresenceSocket(token);
+    const socket = createLivePresenceSocket();
 
     const onSnapshot = (payload: {
       volunteers?: Array<{ volunteerId?: string; status?: string; lastSeenAt?: string }>;

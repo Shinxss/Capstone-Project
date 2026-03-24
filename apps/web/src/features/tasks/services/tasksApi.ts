@@ -1,5 +1,5 @@
 import { api } from "../../../lib/api";
-import { clearLguSession, getLguToken } from "../../auth/services/authStorage";
+import { clearLguSession } from "../../auth/services/authStorage";
 import type { DispatchTask } from "../models/tasks.types";
 
 const SESSION_WARNING_KEY = "lifeline-login-warning";
@@ -24,11 +24,8 @@ export async function verifyTask(dispatchId: string) {
 }
 
 export async function fetchTaskProofBlob(proofUrl: string) {
-  const token = getLguToken();
-  if (!token) throw new Error("Missing access token. Please login again.");
-
   const res = await fetch(`${API_BASE}${proofUrl}`, {
-    headers: { Authorization: `Bearer ${token}` },
+    credentials: "include",
   });
 
   if (res.status === 401) {

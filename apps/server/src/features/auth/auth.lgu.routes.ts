@@ -7,6 +7,7 @@ import { loginLimiter } from "../../middlewares/rateLimit";
 import { validate } from "../../middlewares/validate";
 import { signAccessToken } from "../../utils/jwt";
 import { lguLoginSchema } from "./auth.schemas";
+import { setAccessTokenCookie, shouldIncludeAccessTokenInBody } from "./authCookie";
 import { createMfaChallenge, maskEmail } from "../../utils/mfa";
 import { sendOtpEmail } from "../../utils/mailer";
 import { resolveAccessTokenExpiresIn } from "./accessTokenExpiry";
@@ -126,6 +127,7 @@ lguAuthRouter.post("/login", loginLimiter, validate(lguLoginSchema), async (req,
       { sub: user._id.toString(), role: user.role },
       { expiresIn: resolveAccessTokenExpiresIn(req) }
     );
+    setAccessTokenCookie(res, token);
 
     await logAudit(req, {
       eventType: AUDIT_EVENT.AUTH_LOGIN_SUCCESS,
@@ -148,7 +150,7 @@ lguAuthRouter.post("/login", loginLimiter, validate(lguLoginSchema), async (req,
     return res.json({
       success: true,
       data: {
-        accessToken: token,
+        ...(shouldIncludeAccessTokenInBody(req) ? { accessToken: token } : {}),
         role: "LGU",
         user: {
           id: user._id.toString(),

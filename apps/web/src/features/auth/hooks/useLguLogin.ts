@@ -27,15 +27,6 @@ function isMfaRequired(result: PortalLoginData): result is Extract<PortalLoginDa
   );
 }
 
-function hasAccessToken(result: PortalLoginData): result is Extract<PortalLoginData, { accessToken: string }> {
-  return (
-    !!result &&
-    typeof result === "object" &&
-    "accessToken" in result &&
-    typeof (result as any).accessToken === "string"
-  );
-}
-
 type RequestError = {
   message?: string;
   response?: {
@@ -152,13 +143,8 @@ export function useLguLogin() {
         return;
       }
 
-      // ✅ LGU => token + redirect
-      if (!hasAccessToken(result)) {
-        throw new Error("No token returned");
-      }
-
       setFailedAttempts(0);
-      setLguSession(result.accessToken, result.user);
+      setLguSession(result.accessToken ?? "", result.user);
       appendActivityLog({
         action: "Auth login success",
         entityType: "system",
@@ -223,7 +209,7 @@ export function useLguLogin() {
 
     try {
       const data = await adminMfaVerify({ challengeId, code: otp });
-      setLguSession(data.accessToken, data.user);
+      setLguSession(data.accessToken ?? "", data.user);
       appendActivityLog({
         action: "Auth login success (MFA)",
         entityType: "system",

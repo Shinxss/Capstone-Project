@@ -29,7 +29,7 @@ export async function adminMfaVerify(payload: AdminMfaVerifyRequest): Promise<Ad
   }
 
   const data = res.data?.data;
-  if (!data?.accessToken) throw new Error("No token returned");
+  if (!data?.user?.id) throw new Error("OTP verification failed");
 
   return data;
 }

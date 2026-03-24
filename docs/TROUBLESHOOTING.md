@@ -1,162 +1,280 @@
 # Troubleshooting
 
-## Security Documentation References
+Common issues for the current `apps/server` backend.
 
-- Security architecture and controls: `apps/server/docs/security_documentation.md`
-- Security control-to-code map: `apps/server/docs/SECURITY_CHECKLIST_MAP.md`
-- Security test procedures: `apps/server/docs/SECURITY_CHECKLIST_TESTS.md`
+Last updated: 2026-03-24
 
-Use the checklist tests as the source of truth for command-level verification steps.
+## 1) Server fails at startup
 
-## DB Connection Failures
+Symptoms:
 
-### Symptoms
-- Server exits on startup with missing/invalid MongoDB errors
-- Timeouts when handling requests
+- process exits immediately
+- startup error in terminal
 
-### Checks
-- Confirm `MONGODB_URI` is set and valid.
-- Verify MongoDB Atlas/network allowlist or private network rules.
-- Confirm database credentials and cluster status.
+Checks:
 
-### Fix Steps
-1. Validate environment variable value formatting.
-2. Test connection string using MongoDB client tools.
-3. Confirm DNS/network access from deployment environment.
-4. Restart service after config correction.
+- `MONGODB_URI` exists and is valid
+- `PORT` is numeric
+- required secrets are loaded in runtime environment
 
-## CORS Errors
+Fix steps:
 
-### Symptoms
-- Browser requests blocked with CORS policy messages
-- Missing credentials/cookies on frontend calls
+1. Verify env file or secret injection.
+2. Start with explicit command from server package:
+   - `pnpm --filter server dev` (local)
+   - `pnpm --filter server build && node apps/server/dist/server.js` (build run)
+3. Recheck startup logs.
 
-### Checks
-- Ensure frontend origin is included in `CORS_ORIGINS`.
-- Confirm web client sends `withCredentials: true` where required.
+## 2) MongoDB connection issues
 
-### Fix Steps
-1. Add exact frontend origin(s) to `CORS_ORIGINS`.
-2. Redeploy/restart backend.
+Symptoms:
+
+- timeout or connection refused
+- requests hang or fail with DB errors
+
+Checks:
+
+- Atlas IP allowlist / VPC rules
+- username/password in URI
+- cluster availability
+
+Fix steps:
+
+1. Test connection string externally.
+2. Confirm DNS/network from deployment environment.
+3. Restart service after correcting URI.
+
+## 3) CORS errors in browser
+
+Symptoms:
+
+- blocked by CORS policy
+- cookie/token not sent
+
+Checks:
+
+- `CORS_ORIGINS` includes exact frontend origin
+- frontend sends credentials where needed
+
+Fix steps:
+
+1. Add exact origin(s) to `CORS_ORIGINS`.
+2. Restart backend.
 3. Clear browser cache and retest.
 
-## CSRF 403 Issues
+## 4) CSRF `403` on web requests
 
-### Symptoms
-- `403` on unsafe browser requests
-- Response includes `CSRF_INVALID` or `CSRF token validation failed`
+Symptoms:
 
-### Checks
-- Browser first calls `GET /api/security/csrf`.
-- Unsafe request includes `x-csrf-token` header.
-- CSRF cookie is being set and sent back.
-- Frontend/base URL and origin match CORS/CSRF expectations.
+- response contains `CSRF_INVALID`
+- unsafe browser requests fail
 
-### Fix Steps
-1. Re-run CSRF bootstrap call and capture token.
-2. Attach token in `x-csrf-token` for POST/PATCH/PUT/DELETE.
-3. Ensure `withCredentials: true` on browser API client.
-4. Verify HTTPS + cookie behavior in production.
+Checks:
 
-## JWT Expired / Invalid Token Issues
+- `GET /api/security/csrf` called first
+- unsafe request sends `x-csrf-token`
+- cookie is returned and sent back
 
-### Symptoms
-- `401` with invalid or expired token messages
-- sudden logout behavior
+Fix steps:
 
-### Checks
-- Token age vs `JWT_ACCESS_EXPIRES_IN`.
-- Whether token was invalidated on logout (blocklist).
-- Correct `Authorization: Bearer <token>` formatting.
+1. Bootstrap CSRF token again.
+2. Include `x-csrf-token` in unsafe call.
+3. Keep auth and CSRF requests on same trusted origin.
 
-### Fix Steps
-1. Re-authenticate to obtain a fresh token.
-2. Confirm client stores and sends current token.
-3. Check server clock skew if expiry appears incorrect.
-4. Validate JWT secret consistency across instances.
+## 5) `401 Unauthorized` or `Invalid token`
 
-## SMTP/OTP Failures
+Checks:
 
-### Symptoms
-- OTP emails not sent
-- login or admin MFA fails at OTP phase
+- `Authorization: Bearer <token>` format
+- token not expired
+- token not blocklisted after logout
 
-### Checks
-- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`.
-- Provider security rules (TLS, app passwords, sender restrictions).
+Fix steps:
 
-### Fix Steps
-1. Test SMTP credentials independently.
-2. Correct secure/non-secure port settings (`SMTP_SECURE`).
-3. Verify sender identity and domain policy at provider.
-4. Re-test OTP endpoints after config updates.
+1. Re-login for fresh token.
+2. Confirm client is not using stale cached token.
+3. Ensure all API instances share same `JWT_ACCESS_SECRET`.
 
-## Security Verification Checklist Issues
+## 6) Login and OTP issues
 
-### Rate Limit test does not return 429
+Symptoms:
 
-#### Checks
-- Confirm you are hitting rate-limited auth routes (for example `/api/auth/login`, `/api/auth/community/login`, `/api/auth/lgu/login`).
-- Ensure repeated requests are inside the limiter window.
-- Verify request path/method exactly match the protected route.
+- OTP not delivered
+- admin MFA cannot complete
 
-#### Fix Steps
-1. Re-run rapid repeated requests on the same route.
-2. Confirm response eventually returns `429`.
-3. Check audit events for `SECURITY_RATE_LIMIT_HIT`.
+Checks:
 
-### Generic login error behavior is inconsistent
+- SMTP env values (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`)
+- sender policy and SMTP provider restrictions
 
-#### Checks
-- Compare wrong-email and wrong-password responses on the same login endpoint.
-- Verify both cases return the same invalid credentials pattern.
+Fix steps:
 
-#### Fix Steps
-1. Retest with controlled inputs and identical request shape.
-2. Confirm status remains `401` for invalid credentials.
-3. Review auth route used (community, LGU, or general auth) to avoid mixing flows.
+1. Test SMTP credentials with provider tools.
+2. Confirm secure/port combination.
+3. In production, do not rely on dev fallback logging.
 
-### Logout does not invalidate token
+## 7) Google login or link fails
 
-#### Checks
-- Ensure logout call is made with a valid Bearer token.
-- Reuse the same token on a protected route after logout.
-- Confirm token includes `jti` and blocklist lookup is active.
+Checks:
 
-#### Fix Steps
-1. Login and capture token.
-2. Call `POST /api/auth/logout` with that token.
-3. Retry `GET /api/auth/me` with the same token; expect `401`.
+- `GOOGLE_WEB_CLIENT_ID` and/or `GOOGLE_ANDROID_CLIENT_ID`
+- Google token audience matches backend client IDs
+- account email is verified at Google
 
-### CSRF test not reproducing expected 403/200
+Fix steps:
 
-#### Checks
-- Browser-origin request should include `Origin`/`Referer`.
-- Call `GET /api/security/csrf` first to obtain token.
-- Unsafe method must include `x-csrf-token` and cookie.
+1. Update backend env client IDs.
+2. Rebuild/restart service.
+3. Retry with fresh Google ID token.
 
-#### Fix Steps
-1. Test unsafe request without token/header for expected `403`.
-2. Add `x-csrf-token` from bootstrap response and retry.
-3. Confirm request succeeds when CSRF requirements are met.
+## 8) Routing optimize fails
 
-### Audit event not visible after security test
+Symptoms:
 
-#### Checks
-- Query `/api/audit` with admin/LGU credentials.
-- Filter by expected event type (for example `AUTH_LOGIN_FAIL`, `SECURITY_ACCESS_DENIED`, `SECURITY_CSRF_FAIL`).
-- Verify time window and pagination (`page`, `limit`) are sufficient.
+- `/api/routing/optimize` returns 500/502/409
 
-#### Fix Steps
-1. Re-run the triggering test case once.
-2. Query `/api/audit?eventType=<EVENT>&page=1&limit=20`.
-3. Inspect `requestId` and `correlationId` fields for traceability.
+Checks:
 
-## Common Fix Sequence
+- `MAPBOX_TOKEN` is present
+- start/end coordinates are valid
+- network egress to Mapbox is available
 
-1. Confirm environment variables and restart service.
-2. Run `pnpm typecheck` and `pnpm build`.
-3. Validate `/health` and one protected route using a fresh token.
-4. Re-test CSRF flow (web) and auth flow (mobile/web).
-5. Inspect server logs and `audit_logs` for context.
-6. If validating security controls for presentation, follow `apps/server/docs/SECURITY_CHECKLIST_TESTS.md` end-to-end.
+Fix steps:
+
+1. Set valid `MAPBOX_TOKEN`.
+2. Retry with nearby destination when no viable route is found.
+3. Confirm rate limit is not being hit.
+
+## 9) Routing-risk model unavailable
+
+Symptoms:
+
+- predictions succeed but look defaulted
+- warning about ONNX inference disabled
+
+Checks:
+
+- `ROUTING_RISK_ONNX_PATH`
+- `ROUTING_RISK_META_PATH`
+- model file exists and is readable
+
+Fix steps:
+
+1. Deploy model and meta files.
+2. Ensure paths are absolute or correctly resolved from process cwd.
+3. Restart service.
+
+## 10) Weather data fallback responses
+
+Symptoms:
+
+- weather endpoint returns "Weather unavailable"
+
+Checks:
+
+- network access to Open-Meteo API
+- outbound timeout constraints
+
+Fix steps:
+
+1. Verify outbound internet from server.
+2. Retry request after cache TTL.
+3. Monitor logs for `[weather] open-meteo fetch failed`.
+
+## 11) Push notifications not delivered
+
+Checks:
+
+- valid Expo push token format
+- `EXPO_ACCESS_TOKEN` configured where required
+- token active in DB
+
+Fix steps:
+
+1. Re-register push token using `/api/push/register` or `/api/notifications/push-token`.
+2. Send `/api/notifications/push-test/me`.
+3. Inspect Expo ticket errors and deactivate invalid tokens.
+
+## 12) Dispatch verify/revoke/reverify fails
+
+Symptoms:
+
+- blockchain verification routes return error
+
+Checks:
+
+- `SEPOLIA_RPC_URL`
+- `SEPOLIA_PRIVATE_KEY`
+- `TASK_LEDGER_CONTRACT_ADDRESS`
+- signer account has funds and contract permissions
+
+Fix steps:
+
+1. Validate RPC endpoint reachability.
+2. Validate private key and chain network.
+3. Confirm contract address and ABI compatibility.
+
+## 13) File upload or proof retrieval issues
+
+Symptoms:
+
+- proof upload rejected
+- file endpoint returns 404/403/500
+
+Checks:
+
+- payload follows schema (`base64`, mime type, size)
+- file exists in `uploads/...`
+- requester has permission for proof access
+- encryption key compatibility (`AES_KEY_HEX` or fallback key source)
+
+Fix steps:
+
+1. Retry upload with supported mime (`image/png`, `image/jpeg`, `image/heic`).
+2. Confirm role/ownership for proof read endpoint.
+3. Keep encryption key stable for existing files.
+
+## 14) Audit routes return `403`
+
+Checks:
+
+- role is `ADMIN` or `LGU` for audit view
+- role profile includes `audit.view`
+- CSV export additionally requires `ADMIN` + `SUPER` + `audit.export`
+
+Fix steps:
+
+1. Inspect role profile permissions.
+2. Reseed RBAC if profiles are stale.
+3. Retry with proper admin tier account.
+
+## 15) Socket connection unauthorized
+
+Checks:
+
+- socket handshake token is valid
+- token not blocklisted
+- user account is active
+
+Fix steps:
+
+1. Re-authenticate and reconnect socket.
+2. Ensure reverse proxy forwards auth headers/cookies.
+3. Keep `CORS_ORIGINS` consistent with socket client origin.
+
+## 16) Quick maintenance commands
+
+```bash
+pnpm --filter server typecheck
+pnpm --filter server test
+pnpm --filter server seed:rbac
+pnpm --filter server seed:system-admin
+```
+
+## 17) Related docs
+
+- [API.md](./API.md)
+- [DEPLOYMENT.md](./DEPLOYMENT.md)
+- [MAINTENANCE.md](./MAINTENANCE.md)
+- [security_documentation.md](./security_documentation.md)
+- [task-ledger-v2-migration.md](./task-ledger-v2-migration.md)

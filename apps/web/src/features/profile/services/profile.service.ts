@@ -1,5 +1,5 @@
 import { api } from "../../../lib/api";
-import { getLguToken, getLguUser, setLguSession } from "../../auth/services/authStorage";
+import { getLguUser, setLguSession } from "../../auth/services/authStorage";
 import type { LguProfile, ProfileUpdateInput } from "../models/profile.types";
 import { appendActivityLog } from "../../activityLog/services/activityLog.service";
 
@@ -62,9 +62,8 @@ export async function fetchProfileFromApi() {
 }
 
 export async function refreshProfileToLocalStorage() {
-  const token = getLguToken();
   const u = getLguUser();
-  if (!token || !u) return getLocalProfile();
+  if (!u) return getLocalProfile();
 
   const apiUser = await fetchProfileFromApi();
   if (!apiUser?.id) return getLocalProfile();
@@ -89,14 +88,13 @@ export async function refreshProfileToLocalStorage() {
     username: apiUser.username ?? u.username,
   };
 
-  setLguSession(token, merged);
+  setLguSession("", merged);
   return getLocalProfile();
 }
 
 export async function updateProfile(input: ProfileUpdateInput) {
-  const token = getLguToken();
   const u = getLguUser();
-  if (!token || !u) throw new Error("Missing session. Please login again.");
+  if (!u) throw new Error("Missing session. Please login again.");
 
   const payload = {
     firstName: safeStr(input.firstName),
@@ -138,7 +136,7 @@ export async function updateProfile(input: ProfileUpdateInput) {
     avatarUrl: apiUser.avatarUrl ?? u.avatarUrl,
   };
 
-  setLguSession(token, merged);
+  setLguSession("", merged);
 
   appendActivityLog({
     action: "Updated profile",

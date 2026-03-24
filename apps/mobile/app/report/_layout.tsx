@@ -13,12 +13,14 @@ export default function ReportLayout() {
   useEffect(() => {
     if (!hydrated) return;
     if (isUser) return;
+    if (mode === "anonymous") return;
     openAuthRequired({ blockedAction: "report_emergency" });
-  }, [hydrated, isUser, openAuthRequired]);
+  }, [hydrated, isUser, mode, openAuthRequired]);
 
   if (!hydrated) return null;
 
   if (!isUser) {
+    if (mode === "anonymous") return null;
     return (
       <AuthRequiredModal
         {...modalProps}

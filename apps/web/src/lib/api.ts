@@ -1,5 +1,5 @@
 import axios from "axios";
-import { clearLguSession, getLguToken } from "../features/auth/services/authStorage";
+import { clearLguSession } from "../features/auth/services/authStorage";
 
 const SESSION_WARNING_KEY = "lifeline-login-warning";
 const SESSION_WARNING_MESSAGE = "Your session has expired. Please log in again.";
@@ -63,15 +63,8 @@ const AUTH_ENDPOINT_EXCLUSIONS = [
 
 let unauthorizedRedirectInFlight = false;
 
-// ── Request interceptor: attach Bearer + CSRF tokens ──
+// ── Request interceptor: attach CSRF tokens ──
 api.interceptors.request.use(async (config) => {
-  // Attach Bearer token
-  const token = getLguToken();
-  if (token) {
-    config.headers = config.headers ?? {};
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-
   const method = (config.method ?? "").toLowerCase();
 
   // Lazily fetch CSRF token before the first unsafe request

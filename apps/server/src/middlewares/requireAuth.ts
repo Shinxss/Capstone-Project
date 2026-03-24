@@ -1,14 +1,13 @@
 import { Request, Response, NextFunction } from "express";
+import { readAccessTokenFromRequest } from "../features/auth/authCookie";
 import { TokenBlocklist } from "../features/auth/TokenBlocklist.model";
 import { verifyAccessToken } from "../utils/jwt";
 
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
-  const header = req.headers.authorization;
-  if (!header?.startsWith("Bearer ")) {
+  const token = readAccessTokenFromRequest(req);
+  if (!token) {
     return res.status(401).json({ message: "Unauthorized" });
   }
-
-  const token = header.slice("Bearer ".length);
 
   try {
     const payload = verifyAccessToken(token);

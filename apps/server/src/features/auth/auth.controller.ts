@@ -8,6 +8,7 @@ import { VolunteerApplication } from "../volunteerApplications/volunteerApplicat
 import { verifyMfaChallenge } from "../../utils/mfa";
 import { signAccessToken } from "../../utils/jwt";
 import { authenticateUser } from "./auth.service";
+import { clearAccessTokenCookie, setAccessTokenCookie, shouldIncludeAccessTokenInBody } from "./authCookie";
 import { toAuthUserPayload } from "./otp.utils";
 import { TokenBlocklist } from "./TokenBlocklist.model";
 import { resolveAccessTokenExpiresIn } from "./accessTokenExpiry";
@@ -92,6 +93,7 @@ export async function login(req: Request, res: Response) {
       { sub: user._id.toString(), role: user.role },
       { expiresIn: resolveAccessTokenExpiresIn(req) }
     );
+    setAccessTokenCookie(res, token);
 
     await logAudit(req, {
       eventType: AUDIT_EVENT.AUTH_LOGIN_SUCCESS,
@@ -111,8 +113,12 @@ export async function login(req: Request, res: Response) {
     });
 
     return res.status(200).json({
-      token,
-      accessToken: token,
+      ...(shouldIncludeAccessTokenInBody(req)
+        ? {
+            token,
+            accessToken: token,
+          }
+        : {}),
       user: toAuthUserPayload(user),
     });
   } catch {
@@ -145,6 +151,7 @@ export async function adminMfaVerify(req: Request, res: Response) {
       { sub: user._id.toString(), role: user.role },
       { expiresIn: resolveAccessTokenExpiresIn(req) }
     );
+    setAccessTokenCookie(res, token);
 
     await logAudit(req, {
       eventType: AUDIT_EVENT.AUTH_MFA_VERIFY_SUCCESS,
@@ -166,7 +173,7 @@ export async function adminMfaVerify(req: Request, res: Response) {
     return res.json({
       success: true,
       data: {
-        accessToken: token,
+        ...(shouldIncludeAccessTokenInBody(req) ? { accessToken: token } : {}),
         role: "ADMIN",
         user: {
           id: user._id.toString(),
@@ -405,6 +412,7 @@ export async function logout(req: Request, res: Response) {
       },
     });
 
+    clearAccessTokenCookie(res);
     return res.status(200).json({ success: true });
   } catch {
     return res.status(401).json({ message: "Invalid token" });

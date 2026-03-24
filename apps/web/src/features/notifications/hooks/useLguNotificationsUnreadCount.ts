@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { getLguToken } from "../../auth/services/authStorage";
+import { getLguUser } from "../../auth/services/authStorage";
 import {
   createNotificationsSocket,
   type NotificationsRefreshPayload,
@@ -41,11 +41,11 @@ export function useLguNotificationsUnreadCount() {
   }, [refreshUnreadCount]);
 
   useEffect(() => {
-    const token = getLguToken();
-    if (!token) return;
+    const user = getLguUser();
+    if (!user?.id) return;
 
     let lastRefreshAt = 0;
-    const socket = createNotificationsSocket(token);
+    const socket = createNotificationsSocket();
 
     const onRefresh = (_payload: NotificationsRefreshPayload) => {
       const now = Date.now();

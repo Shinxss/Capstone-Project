@@ -13,7 +13,7 @@ export type LguLoginRequest = {
 };
 
 export type LoginSuccessData = {
-  accessToken: string;
+  accessToken?: string;
   role: UserRole;
   user: {
     id: string;
@@ -53,7 +53,7 @@ export type AdminMfaVerifyRequest = {
 };
 
 export type AdminMfaVerifyData = {
-  accessToken: string;
+  accessToken?: string;
   role: "ADMIN";
   user: {
     id: string;

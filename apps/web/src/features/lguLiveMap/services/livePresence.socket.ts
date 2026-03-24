@@ -73,13 +73,11 @@ export type LivePresenceSocket = Socket<
 const apiBaseUrl = String(import.meta.env.VITE_API_URL || "http://localhost:5000").trim();
 const socketBaseUrl = apiBaseUrl.replace(/\/api\/?$/, "");
 
-export function createLivePresenceSocket(token: string): LivePresenceSocket {
+export function createLivePresenceSocket(token?: string): LivePresenceSocket {
   return io(socketBaseUrl, {
     autoConnect: false,
     withCredentials: true,
     transports: ["websocket"],
-    auth: {
-      token: token ? `Bearer ${token}` : "",
-    },
+    ...(token ? { auth: { token: `Bearer ${token}` } } : {}),
   }) as LivePresenceSocket;
 }

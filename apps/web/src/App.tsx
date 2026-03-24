@@ -37,14 +37,14 @@ import AdminBarangaysCoverage from "./pages/admin/AdminBarangaysCoverage";
 import AdminRolesPermissions from "./pages/admin/AdminRolesPermissions";
 import AdminMasterData from "./pages/admin/AdminMasterData";
 
-import { getLguToken, getLguUser } from "./features/auth/services/authStorage";
+import { getLguUser } from "./features/auth/services/authStorage";
 import { Toaster } from "@/components/ui/sonner";
 import { ConfirmDialogProvider } from "@/features/feedback/context/confirm.context";
 
 function RequireLguAuth() {
-  const token = getLguToken();
+  const user = getLguUser();
 
-  if (!token) {
+  if (!user?.id) {
     return <Navigate to="/lgu/login" replace />;
   }
 
@@ -52,10 +52,9 @@ function RequireLguAuth() {
 }
 
 function RequireAdminAuth() {
-  const token = getLguToken();
   const user = getLguUser();
 
-  if (!token || user?.role !== "ADMIN") {
+  if (!user?.id || user?.role !== "ADMIN") {
     return <Navigate to="/lgu/login" replace />;
   }
 

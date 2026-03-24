@@ -16,7 +16,7 @@ import {
   unarchiveNotification,
   unarchiveNotifications,
 } from "../services/notifications.service";
-import { getLguToken } from "../../auth/services/authStorage";
+import { getLguUser } from "../../auth/services/authStorage";
 import {
   createNotificationsSocket,
   type NotificationsRefreshPayload,
@@ -130,11 +130,11 @@ export function useLguNotifications() {
   }, []);
 
   useEffect(() => {
-    const token = getLguToken();
-    if (!token) return;
+    const user = getLguUser();
+    if (!user?.id) return;
 
     let lastRefreshAt = 0;
-    const socket = createNotificationsSocket(token);
+    const socket = createNotificationsSocket();
 
     const onRefresh = (payload: NotificationsRefreshPayload) => {
       const now = Date.now();

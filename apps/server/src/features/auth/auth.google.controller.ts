@@ -8,6 +8,7 @@ import { logAudit, logSecurityEvent } from "../audit/audit.service";
 import { User } from "../users/user.model";
 import { generateNextLifelineId } from "../users/userId.service";
 import { toAuthUserPayload } from "./otp.utils";
+import { setAccessTokenCookie, shouldIncludeAccessTokenInBody } from "./authCookie";
 import { zodPasswordSchema } from "./password.policy";
 import { resolveAccessTokenExpiresIn } from "./accessTokenExpiry";
 
@@ -173,6 +174,7 @@ export async function loginWithGoogle(req: Request, res: Response) {
       { sub: user._id.toString(), role: user.role },
       { expiresIn: resolveAccessTokenExpiresIn(req) }
     );
+    setAccessTokenCookie(res, accessToken);
 
     await logAudit(req, {
       eventType: AUDIT_EVENT.AUTH_OAUTH_GOOGLE_SUCCESS,
@@ -194,7 +196,7 @@ export async function loginWithGoogle(req: Request, res: Response) {
     return res.json({
       success: true,
       data: {
-        accessToken,
+        ...(shouldIncludeAccessTokenInBody(req) ? { accessToken } : {}),
         user: toAuthUserPayload(user),
       },
     });

@@ -41,14 +41,23 @@ export function useAuthRequiredPrompt() {
     setState(INITIAL_STATE);
   }, []);
 
-  const openAuthRequired = useCallback((options?: AuthRequiredOpenOptions) => {
-    setState({
-      visible: true,
-      blockedAction: options?.blockedAction,
-      title: options?.title,
-      message: options?.message,
-    });
-  }, []);
+  const openAuthRequired = useCallback(
+    (options?: AuthRequiredOpenOptions) => {
+      if (mode === "anonymous") {
+        closeAuthRequired();
+        router.replace("/(auth)/login");
+        return;
+      }
+
+      setState({
+        visible: true,
+        blockedAction: options?.blockedAction,
+        title: options?.title,
+        message: options?.message,
+      });
+    },
+    [closeAuthRequired, mode, router]
+  );
 
   const navigateToAuth = useCallback(
     (path: "/(auth)/login" | "/(auth)/signup") => {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getLguToken } from "../../../features/auth/services/authStorage";
+import { getLguUser } from "../../../features/auth/services/authStorage";
 import { fetchEmergencyReports } from "../../../features/emergency/services/emergency.service";
 import { fetchPendingEmergencyVerifications } from "../../../features/approvals/services/approvalsApi";
 import { fetchLguTasksByStatus } from "../../../features/tasks/services/tasksApi";
@@ -179,11 +179,11 @@ export function useLguSidebarIndicators() {
   }, [refresh]);
 
   useEffect(() => {
-    const token = getLguToken();
-    if (!token) return;
+    const user = getLguUser();
+    if (!user?.id) return;
 
     let lastRefreshAt = 0;
-    const socket = createNotificationsSocket(token);
+    const socket = createNotificationsSocket();
 
     const onRefresh = (_payload: NotificationsRefreshPayload) => {
       const now = Date.now();

@@ -1,194 +1,304 @@
-# API Catalog
+# Lifeline API Catalog
 
-This document provides a feature-grouped API catalog for the Lifeline server.
+This document reflects the current backend routes in `apps/server/src`.
+
+Last updated: 2026-03-24
 
 ## Base URL
 
-- Local: `http://localhost:5000`
-- All routes are mounted under `/api` unless noted.
+- Local API base: `http://localhost:5000`
+- Health: `GET /health`
+- Most endpoints are mounted under `/api`
 
-## Authentication
+## Authentication and Security
 
-### Headers
+## Access token input
 
-- Protected endpoints require:
-  - `Authorization: Bearer <access_token>`
-- For browser-based unsafe requests (`POST`, `PATCH`, `PUT`, `DELETE`), also send:
-  - `x-csrf-token: <csrf_token>`
+Protected routes accept either:
 
-### CSRF Token Endpoint
+- `Authorization: Bearer <access_token>`
+- Auth cookie (default cookie name `accessToken`, configurable via `AUTH_ACCESS_COOKIE_NAME`)
 
-- `GET /api/security/csrf`
-  - Returns `{ "csrfToken": "..." }`
-  - Sets CSRF cookie used by server validation
+Mobile clients can send `x-client-platform: mobile` to receive token in response body on login flows.
 
-## Error Format
+## CSRF behavior
 
-Error responses vary by feature, but typically follow one of these forms:
+CSRF is enforced for unsafe methods (`POST`, `PATCH`, `PUT`, `DELETE`) only for browser-origin requests.
 
-```json
-{ "success": false, "error": "message" }
-```
+- CSRF bootstrap endpoint: `GET /api/security/csrf`
+- Header for unsafe browser calls: `x-csrf-token: <token>`
+- Mobile or non-browser requests (no `Origin` and no `Referer`) bypass CSRF.
 
-```json
-{ "message": "message" }
-```
+## Role model
 
-CSRF validation failure example:
+- Roles: `ADMIN`, `LGU`, `VOLUNTEER`, `COMMUNITY`
+- Admin tiers: `SUPER`, `CDRRMO`
+- Additional permission checks use RBAC role profiles (`requirePerm`).
 
-```json
-{ "code": "CSRF_INVALID", "message": "CSRF token validation failed" }
-```
+## Rate limits
 
----
+- Login limiter: 10 requests / 15 minutes
+- OTP limiter: 5 requests / 10 minutes
+- Password reset limiter: 5 requests / 10 minutes
+- Community register limiter: 10 requests / 15 minutes
+- Guest emergency report limiter: 5 requests / 5 minutes
+- Guest emergency photo upload limiter: 10 requests / 5 minutes
+- Routing optimize limiter: 30 requests / 60 seconds
 
-## Endpoint Groups
+## Common response patterns
 
-### 1) Security
+- Success (varies per module): `{ "success": true, ... }` or `{ "data": ... }`
+- Error (varies per module):
+  - `{ "message": "..." }`
+  - `{ "success": false, "error": "..." }`
+  - global errors may include `{ "error": "...", "code": "..." }`
 
-- `GET /api/security/csrf` – get CSRF token for browser clients
+## HTTP Endpoints
 
-### 2) Auth
+## Public and utility routes
+
+- `GET /health`
+- `GET /uploads/profile-avatars/:filename` (public)
+- `GET /uploads/dispatch-proofs/:filename` (auth + ownership check)
+- `GET /uploads/emergency-report-photos/:filename` (role: `VOLUNTEER|LGU|ADMIN`)
+
+## Security
+
+- `GET /api/security/csrf` (public)
+
+## Auth
+
+- `POST /api/auth/login` (general email/password login)
+- `POST /api/auth/google` (Google login)
+- `POST /api/auth/set-password` (auth required)
+- `POST /api/auth/link-google` (auth required)
+- `GET /api/auth/me` (auth required)
+- `PATCH /api/auth/me` (auth required)
+- `POST /api/auth/logout` (auth required)
+
+Community and volunteer auth
 
 - `POST /api/auth/community/register`
 - `POST /api/auth/community/login`
+
+LGU and admin auth
+
 - `POST /api/auth/lgu/login`
 - `POST /api/auth/admin/mfa/verify`
-- `POST /api/auth/login`
-- `POST /api/auth/google`
+
+Signup OTP flow
+
 - `POST /api/auth/signup`
 - `POST /api/auth/signup/verify-otp`
 - `POST /api/auth/signup/resend-otp`
+
+Password reset OTP flow
+
 - `POST /api/auth/password/forgot`
 - `POST /api/auth/password/verify-otp`
 - `POST /api/auth/password/reset`
-- `GET /api/auth/me`
-- `POST /api/auth/logout`
-- `POST /api/auth/set-password`
-- `POST /api/auth/link-google`
 
-### 3) Emergencies
+## Emergencies
 
-- `POST /api/emergencies/sos`
-- `GET /api/emergencies/reports`
+- `POST /api/emergencies/sos` (role: `COMMUNITY|VOLUNTEER|LGU|ADMIN`)
+- `GET /api/emergencies/reports` (role: `LGU|ADMIN`)
 
-### 4) Hazard Zones
+## Emergency reports
 
-- `GET /api/hazard-zones`
-- `POST /api/hazard-zones`
-- `DELETE /api/hazard-zones/:id`
-- `PATCH /api/hazard-zones/:id/status`
+- `POST /api/emergency/reports` (guest or auth)
+- `POST /api/emergency/reports/photos` (guest or auth)
+- `GET /api/emergency/reports/my/active` (auth)
+- `GET /api/emergency/reports/my` (auth)
+- `GET /api/emergency/reports/my/counts` (auth)
+- `GET /api/emergency/reports/my/map` (auth)
+- `PATCH /api/emergency/reports/my/:id/cancel` (auth)
+- `GET /api/emergency/reports/my/:id/tracking` (auth)
+- `GET /api/emergency/reports/map` (public)
+- `GET /api/emergency/reports/ref/:referenceNumber` (public)
+- `GET /api/emergency/reports/:id` (guest or auth)
 
-### 5) Volunteer Applications
+LGU emergency approval queue
 
-- `POST /api/volunteer-applications`
-- `GET /api/volunteer-applications/me/latest`
-- `GET /api/volunteer-applications`
-- `GET /api/volunteer-applications/:id`
-- `POST /api/volunteer-applications/:id/review`
+- `GET /api/lgu/approvals/emergency-reports` (role: `LGU|ADMIN`)
+- `PATCH /api/lgu/approvals/emergency-reports/:id/approve` (role: `LGU|ADMIN`)
+- `PATCH /api/lgu/approvals/emergency-reports/:id/reject` (role: `LGU|ADMIN`)
 
-### 6) Users
+## Volunteer applications
 
-- `GET /api/users/volunteers`
+- `POST /api/volunteer-applications` (role: `COMMUNITY|VOLUNTEER`)
+- `GET /api/volunteer-applications/me/latest` (role: `COMMUNITY|VOLUNTEER`)
+- `POST /api/volunteer-applications/:id/review` (role: `LGU|ADMIN`)
+- `GET /api/volunteer-applications` (role: `LGU|ADMIN`)
+- `GET /api/volunteer-applications/:id` (role: `LGU|ADMIN`)
 
-### 7) Dispatches
+## Hazard zones
 
-- `POST /api/dispatches`
-- `GET /api/dispatches`
-- `GET /api/dispatches/my/pending`
-- `GET /api/dispatches/my/active`
-- `GET /api/dispatches/my/current`
-- `PATCH /api/dispatches/:id/respond`
-- `POST /api/dispatches/:id/proof`
-- `PATCH /api/dispatches/:id/complete`
-- `PATCH /api/dispatches/:id/verify`
+- `GET /api/hazard-zones` (auth)
+- `POST /api/hazard-zones` (role: `LGU|ADMIN`)
+- `DELETE /api/hazard-zones/:id` (role: `LGU|ADMIN`)
+- `PATCH /api/hazard-zones/:id/status` (role: `LGU|ADMIN`)
 
-### 8) Uploads (non-`/api` route)
+## Users
 
-- `GET /uploads/dispatch-proofs/:filename`
-  - Requires LGU/Admin auth
+- `GET /api/users/me/profile-summary` (auth)
+- `GET /api/users/profile-skill-options` (auth)
+- `POST /api/users/me/avatar` (auth)
+- `DELETE /api/users/me/avatar` (auth)
+- `GET /api/users/volunteers` (role: `LGU|ADMIN`)
 
----
+## Dispatches
 
-## Request/Response Examples
+- `POST /api/dispatches` (role: `LGU|ADMIN`)
+- `GET /api/dispatches` (role: `LGU|ADMIN`)
+- `GET /api/dispatches/my/pending` (role: `VOLUNTEER`)
+- `GET /api/dispatches/my/active` (role: `VOLUNTEER`)
+- `GET /api/dispatches/my/current` (role: `VOLUNTEER`)
+- `GET /api/dispatches/my/focus-stats` (role: `VOLUNTEER`)
+- `PATCH /api/dispatches/:id/respond` (role: `VOLUNTEER`)
+- `POST /api/dispatches/:id/proof` (role: `VOLUNTEER`)
+- `PATCH /api/dispatches/:id/complete` (role: `VOLUNTEER`)
+- `PATCH /api/dispatches/:id/location` (role: `VOLUNTEER`)
+- `POST /api/dispatches/:id/verify` (role: `LGU|ADMIN`)
+- `PATCH /api/dispatches/:id/verify` (role: `LGU|ADMIN`)
+- `POST /api/dispatches/:id/revoke` (role: `ADMIN`)
+- `POST /api/dispatches/:id/reverify` (role: `ADMIN`)
 
-### Example A: Community Login
+## Audit
 
-`POST /api/auth/community/login`
+- `GET /api/audit` (role: `ADMIN|LGU`, perm: `audit.view`)
+- `GET /api/audit/:eventId` (role: `ADMIN|LGU`, perm: `audit.view`)
+- `GET /api/audit/export/csv` (role: `ADMIN`, tier: `SUPER`, perm: `audit.export`)
 
-Request:
+## Notifications and push state
 
-```json
-{
-  "email": "community@example.com",
-  "password": "StrongPass123"
-}
-```
+- `POST /api/notifications/push-token` (auth)
+- `DELETE /api/notifications/push-token` (auth)
+- `GET /api/notifications/push-token/me` (auth)
+- `POST /api/notifications/push-test/me` (auth)
+- `POST /api/notifications/state/query` (role: `LGU|ADMIN`)
+- `PATCH /api/notifications/state/read` (role: `LGU|ADMIN`)
+- `PATCH /api/notifications/state/archive` (role: `LGU|ADMIN`)
 
-Success response:
+`/api/push` endpoints (same push token backend, alternate client API)
 
-```json
-{
-  "success": true,
-  "data": {
-    "accessToken": "<jwt>",
-    "user": {
-      "id": "...",
-      "role": "COMMUNITY"
-    }
-  }
-}
-```
+- `POST /api/push/register` (auth)
+- `POST /api/push/unregister` (auth)
+- `PATCH /api/push/preferences` (auth)
+- `GET /api/push/preferences` (auth)
 
-### Example B: Browser CSRF Bootstrap
+## Announcements
 
-1) `GET /api/security/csrf`
+Public feed
 
-Response:
+- `GET /api/announcements/feed`
 
-```json
-{ "csrfToken": "<token>" }
-```
+LGU-managed announcements
 
-2) Send unsafe request with headers:
-- `Authorization: Bearer <jwt>`
-- `x-csrf-token: <token>`
+- `GET /api/announcements` (role: `LGU`)
+- `POST /api/announcements` (role: `LGU`)
+- `PATCH /api/announcements/:id` (role: `LGU`, own records)
+- `POST /api/announcements/:id/publish` (role: `LGU`, own records)
+- `POST /api/announcements/:id/unpublish` (role: `LGU`, own records)
+- `DELETE /api/announcements/:id` (role: `LGU`, own records)
 
-### Example C: Post Volunteer Application
+Admin-managed announcements
 
-`POST /api/volunteer-applications`
+- `GET /api/admin/announcements` (role: `ADMIN`)
+- `POST /api/admin/announcements` (role: `ADMIN`, perm: `announcements.manage`)
+- `PATCH /api/admin/announcements/:id` (role: `ADMIN`, perm: `announcements.manage`)
+- `POST /api/admin/announcements/:id/publish` (role: `ADMIN`, perm: `announcements.manage`)
+- `POST /api/admin/announcements/:id/unpublish` (role: `ADMIN`, perm: `announcements.manage`)
+- `DELETE /api/admin/announcements/:id` (role: `ADMIN`, tier: `SUPER`)
 
-Request (shortened):
+## Admin core
 
-```json
-{
-  "fullName": "Juan Dela Cruz",
-  "barangay": "Example Barangay",
-  "consent": {
-    "truth": true,
-    "rules": true,
-    "data": true
-  }
-}
-```
+User management
 
-Success response:
+- `GET /api/admin/users` (role: `ADMIN`, perm: `users.view`)
+- `POST /api/admin/users` (role: `ADMIN`, tier: `SUPER`)
+- `PATCH /api/admin/users/:id` (role: `ADMIN`, tier-based behavior)
+- `POST /api/admin/users/:id/suspend` (role: `ADMIN`)
+- `POST /api/admin/users/:id/reactivate` (role: `ADMIN`)
 
-```json
-{
-  "success": true,
-  "data": {
-    "id": "...",
-    "status": "PENDING"
-  }
-}
-```
+Barangay management
 
-## Auth Requirements Summary
+- `GET /api/admin/barangays` (role: `ADMIN|LGU`, perm: `barangays.view`)
+- `POST /api/admin/barangays` (role: `ADMIN`, tier: `SUPER`, perm: `barangays.edit`)
+- `PATCH /api/admin/barangays/:id` (role: `ADMIN`, tier: `SUPER`, perm: `barangays.edit`)
+- `POST /api/admin/barangays/:id/deactivate` (role: `ADMIN`, tier: `SUPER`, perm: `barangays.edit`)
+- `POST /api/admin/barangays/:id/activate` (role: `ADMIN`, tier: `SUPER`, perm: `barangays.edit`)
 
-- Public: CSRF token fetch endpoint, selected auth endpoints
-- Authenticated: most feature routes
-- Role-restricted:
-  - LGU/Admin: hazard writes, volunteer review/listing, dispatch creation/listing
-  - Volunteer: dispatch response/proof/complete + self dispatch queries
-  - Community/Volunteer: volunteer application submission and self-latest lookup
+RBAC management
+
+- `GET /api/admin/rbac/roles` (role: `ADMIN`, tier: `SUPER`)
+- `PATCH /api/admin/rbac/roles/:key` (role: `ADMIN`, tier: `SUPER`)
+- `GET /api/admin/rbac/perms` (role: `ADMIN`, tier: `SUPER`)
+
+Master data
+
+- `GET /api/admin/masterdata/:type` (role: `ADMIN|LGU`, perm: `masterdata.view`)
+- `POST /api/admin/masterdata/:type` (role: `ADMIN`, tier: `SUPER`, perm: `masterdata.edit`)
+- `PATCH /api/admin/masterdata/:type/:id` (role: `ADMIN`, tier: `SUPER`, perm: `masterdata.edit`)
+
+Analytics
+
+- `GET /api/admin/analytics/overview` (role: `ADMIN|LGU`, perm: `analytics.view`)
+- `GET /api/admin/analytics/lgu-dashboard/stat-cards` (role: `ADMIN|LGU`, perm: `analytics.view`)
+
+## Routing and weather
+
+- `POST /api/routing-risk/predict` (auth)
+- `POST /api/routing/optimize` (auth)
+- `GET /api/weather/summary?lat=<number>&lng=<number>` (auth)
+
+## Realtime (Socket.IO)
+
+Socket server is initialized on the same HTTP server (`apps/server/src/realtime/notificationsSocket.ts`).
+
+Auth token can be supplied through:
+
+- `auth.token` in socket handshake
+- `Authorization` header
+- auth cookie
+
+Key rooms/events:
+
+- User room: `user:<userId>`
+- Role room: `role:<ROLE>`
+- Request room: `request:<emergencyReportId>`
+- Request tracking events: `request:tracking_snapshot`, `request:tracking_update`
+- Volunteer presence events: `volunteers:snapshot`, `volunteers:presence_changed`, `volunteers:location_update`
+- Notification refresh event: `notifications:refresh`
+
+## Domain statuses
+
+Dispatch status values:
+
+- `PENDING`, `ACCEPTED`, `DECLINED`, `CANCELLED`, `DONE`, `VERIFIED`
+
+Volunteer application status values:
+
+- `pending_verification`, `needs_info`, `verified`, `rejected`
+
+Emergency report status values:
+
+- `open`, `assigned`, `in_progress`, `resolved`, `cancelled`
+
+Emergency verification status values:
+
+- `not_required`, `pending`, `approved`, `rejected`
+
+## Example: browser CSRF bootstrap
+
+1. `GET /api/security/csrf`
+2. For unsafe request, include:
+   - `Authorization: Bearer <token>`
+   - `x-csrf-token: <csrf token from step 1>`
+
+## Example: dispatch verify
+
+`POST /api/dispatches/:id/verify`
+
+- Allowed roles: `LGU`, `ADMIN`
+- Request body: `{}`
+- On success: dispatch is verified, blockchain hash record is updated, and response includes `txHash`.

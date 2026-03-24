@@ -1,23 +1,10 @@
 import type { NextFunction, Request, Response } from "express";
+import { readAccessTokenFromRequest } from "../features/auth/authCookie";
 import { TokenBlocklist } from "../features/auth/TokenBlocklist.model";
 import { verifyAccessToken } from "../utils/jwt";
 
-function readToken(req: Request): string | null {
-  const authHeader = req.headers.authorization;
-  if (authHeader?.startsWith("Bearer ")) {
-    return authHeader.slice("Bearer ".length).trim();
-  }
-
-  const cookieToken = req.cookies?.accessToken ?? req.cookies?.token;
-  if (typeof cookieToken === "string" && cookieToken.trim()) {
-    return cookieToken.trim();
-  }
-
-  return null;
-}
-
 export async function maybeAuth(req: Request, _res: Response, next: NextFunction) {
-  const token = readToken(req);
+  const token = readAccessTokenFromRequest(req);
   if (!token) return next();
 
   try {
