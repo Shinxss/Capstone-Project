@@ -17,7 +17,9 @@ import { useOtpVerification, type OtpMode } from "../../features/auth/hooks/useO
 
 function normalizeMode(value: string | string[] | undefined): OtpMode {
   const mode = Array.isArray(value) ? value[0] : value;
-  return mode === "reset" ? "reset" : "signup";
+  if (mode === "reset") return "reset";
+  if (mode === "phone") return "phone";
+  return "signup";
 }
 
 function normalizeParam(value: string | string[] | undefined) {
@@ -26,14 +28,15 @@ function normalizeParam(value: string | string[] | undefined) {
 }
 
 export default function OtpVerificationScreen() {
-  const params = useLocalSearchParams<{ mode?: string; email?: string }>();
+  const params = useLocalSearchParams<{ mode?: string; email?: string; phone?: string }>();
   const mode = normalizeMode(params.mode);
   const email = normalizeParam(params.email).toLowerCase();
-  const vm = useOtpVerification(mode, email);
+  const phone = normalizeParam(params.phone);
+  const vm = useOtpVerification(mode, email, phone);
   const isVerifyDisabled = !vm.canSubmit || vm.loading;
-  const displayEmail = vm.maskedEmail || vm.email;
+  const displayContact = vm.maskedContact || vm.contact;
 
-  if (!vm.email) {
+  if (!vm.contact) {
     return (
       <AuthBackground>
         <View className="flex-1 px-5 pt-20">
@@ -45,7 +48,7 @@ export default function OtpVerificationScreen() {
             <AuthCard
               icon={<ShieldCheck size={30} color="#FFFFFF" strokeWidth={2.4} />}
               title={vm.title}
-              subtitle="Missing email information for verification. Please go back and request a new code."
+              subtitle={`Missing ${vm.contactLabel} information for verification. Please go back and request a new code.`}
             >
               <Pressable onPress={vm.goBack} style={({ pressed }) => [styles.secondaryButton, pressed ? styles.pressed : null]}>
                 <Text style={styles.secondaryButtonText}>Go Back</Text>
@@ -79,7 +82,7 @@ export default function OtpVerificationScreen() {
                 <Text className="text-center text-[15px] text-slate-600">
                   Code sent to{" "}
                   <Text className="font-semibold text-slate-800">
-                    {displayEmail}
+                    {displayContact}
                   </Text>
                 </Text>
 
@@ -124,7 +127,7 @@ export default function OtpVerificationScreen() {
                 </Pressable>
 
                 <View className="flex-row items-center justify-center">
-                  <Text className="text-[15px] text-slate-600">Wrong email? </Text>
+                  <Text className="text-[15px] text-slate-600">Wrong {vm.contactLabel}? </Text>
                   <Pressable onPress={vm.goBack}>
                     <Text className="text-[15px] font-bold text-red-600">Go back</Text>
                   </Pressable>

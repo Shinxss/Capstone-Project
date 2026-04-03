@@ -9,6 +9,7 @@ import { useAuthRequiredPrompt } from "../../features/auth/hooks/useAuthRequired
 import { useSession } from "../../features/auth/hooks/useSession";
 import { useSosHold } from "../../features/emergency/hooks/useSosHold";
 import { useSosReport } from "../../features/emergency/hooks/useSosReport";
+import { useGuestSosLimit } from "../../features/emergency/hooks/useGuestSosLimit";
 import { DispatchOfferModal } from "../../features/dispatch/components/DispatchOfferModal";
 import { useActiveDispatch } from "../../features/dispatch/hooks/useActiveDispatch";
 import { useDispatchModal } from "../../features/dispatch/hooks/useDispatchModal";
@@ -129,6 +130,10 @@ const WEATHER_THEMES = {
   },
 } as const;
 
+const GUEST_SOS_LIMIT_TITLE = "Guest SOS limit reached";
+const GUEST_SOS_LIMIT_MESSAGE =
+  "Your one-time guest SOS has already been used.";
+
 function weatherVisualFromSummary(
   weatherCode: number | null,
   severity: WeatherSeverity,
@@ -212,8 +217,14 @@ function weatherVisualFromSummary(
 
 export default function HomeScreen() {
   const { displayName, session, isUser } = useSession();
+  const isGuest = session?.mode === "guest";
   const authRequired = useAuthRequiredPrompt();
   const { sendSos, sending: sosSending } = useSosReport();
+  const {
+    loaded: guestSosLoaded,
+    used: guestSosUsed,
+    saveUsed: markGuestSosUsed,
+  } = useGuestSosLimit({ enabled: isGuest });
   const isVolunteer = useMemo(() => session?.mode === "user" && String(session.user.role ?? "").toUpperCase() === "VOLUNTEER", [session]);
   const { activeRequest: myActiveRequest, refresh: refreshMyActiveRequest } = useMyActiveRequest({
     pollMs: 8000,
@@ -327,19 +338,44 @@ export default function HomeScreen() {
     });
   }, [homeActiveRequest?.id]);
 
+  const openGuestSosLimitPrompt = useCallback(() => {
+    authRequired.openAuthRequired({
+      title: GUEST_SOS_LIMIT_TITLE,
+      message: GUEST_SOS_LIMIT_MESSAGE,
+    });
+  }, [authRequired]);
+
+  const canProceedWithSos = useCallback(() => {
+    if (isUser) return true;
+
+    if (isGuest) {
+      if (!guestSosLoaded) return false;
+      if (guestSosUsed) {
+        openGuestSosLimitPrompt();
+        return false;
+      }
+      return true;
+    }
+
+    return authRequired.requireAuth(false, { blockedAction: "report_emergency" });
+  }, [authRequired, guestSosLoaded, guestSosUsed, isGuest, isUser, openGuestSosLimitPrompt]);
+
   const onSosTriggered = useCallback(() => {
-    if (!authRequired.requireAuth(isUser, { blockedAction: "report_emergency" })) return;
+    if (!canProceedWithSos()) return;
     setSosConfirmVisible(true);
-  }, [authRequired, isUser]);
+  }, [canProceedWithSos]);
 
   const onConfirmSos = useCallback(async () => {
-    if (!authRequired.requireAuth(isUser, { blockedAction: "report_emergency" })) {
+    if (!canProceedWithSos()) {
       setSosConfirmVisible(false);
       return;
     }
 
     try {
       const result = await sendSos();
+      if (isGuest) {
+        await markGuestSosUsed().catch(() => undefined);
+      }
       setSosConfirmVisible(false);
       router.push({
         pathname: "/report/success",
@@ -354,7 +390,7 @@ export default function HomeScreen() {
     } catch (e: any) {
       Alert.alert("SOS failed", e?.message ?? "Please try again.");
     }
-  }, [authRequired, isUser, sendSos]);
+  }, [canProceedWithSos, isGuest, markGuestSosUsed, sendSos]);
 
   const onCancelSosConfirm = useCallback(() => {
     if (sosSending) return;
@@ -367,10 +403,9 @@ export default function HomeScreen() {
   });
 
   const onStartSosHold = useCallback(() => {
-    if (!authRequired.requireAuth(isUser, { blockedAction: "report_emergency" })) return;
     if (sosSending || sosConfirmVisible) return;
     startHold();
-  }, [authRequired, isUser, sosSending, sosConfirmVisible, startHold]);
+  }, [sosSending, sosConfirmVisible, startHold]);
 
   const onCancelSosHold = useCallback(() => {
     if (sosSending || sosConfirmVisible) return;

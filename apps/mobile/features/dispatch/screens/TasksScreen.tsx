@@ -2,6 +2,7 @@ import { useCallback, useEffect } from "react";
 import { useRouter } from "expo-router";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useIsFocused } from "@react-navigation/native";
 import { useAuth } from "../../auth/AuthProvider";
 import { useTasksAccess } from "../../auth/hooks/useTasksAccess";
 import { RefreshableScrollScreen } from "../../common/components/RefreshableScrollScreen";
@@ -20,12 +21,14 @@ export function TasksScreen() {
   const router = useRouter();
   const { mode, token } = useAuth();
   const { hydrated, canAccessTasks } = useTasksAccess();
+  const isFocused = useIsFocused();
 
   useEffect(() => {
+    if (!isFocused) return;
     if (!hydrated) return;
     if (canAccessTasks) return;
     router.replace("/(auth)/login");
-  }, [canAccessTasks, hydrated, router]);
+  }, [canAccessTasks, hydrated, isFocused, router]);
 
   const tasks = useTasksScreen({
     enabled: hydrated && canAccessTasks,

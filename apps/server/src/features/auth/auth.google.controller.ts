@@ -117,7 +117,7 @@ export async function loginWithGoogle(req: Request, res: Response) {
         emailVerified: true,
       });
     } else {
-      if (user.role !== "COMMUNITY" && user.role !== "VOLUNTEER") {
+      if (user.role !== "COMMUNITY" && user.role !== "VOLUNTEER" && user.role !== "RESPONDER") {
         return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });
       }
 

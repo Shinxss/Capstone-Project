@@ -9,6 +9,8 @@ import LguLiveMap from "./pages/lgu/LguLiveMap";
 import PlaceholderPage from "./pages/lgu/PlaceholderPage";
 import LguApplicants from "./pages/lgu/LguApplicants";
 import LguVerifiedVolunteers from "./pages/lgu/LguVerifiedVolunteers";
+import LguResponderAccounts from "./pages/lgu/LguResponderAccounts";
+import LguResponderTeams from "./pages/lgu/LguResponderTeams";
 import LguTasksInProgress from "./pages/lgu/tasks/LguTasksInProgress";
 import LguTasksForReview from "./pages/lgu/tasks/LguTasksForReview";
 import LguTasksCompleted from "./pages/lgu/tasks/LguTasksCompleted";
@@ -72,6 +74,10 @@ export default function App() {
           <Route path="/lgu/dashboard" element={<LguDashboard />} />
           <Route path="/lgu/notifications" element={<LguNotifications />} />
           <Route path="/lgu/emergencies" element={<LguEmergencies />} />
+
+          <Route path="/lgu/responders" element={<Navigate to="/lgu/responders/accounts" replace />} />
+          <Route path="/lgu/responders/accounts" element={<LguResponderAccounts />} />
+          <Route path="/lgu/responders/teams" element={<LguResponderTeams />} />
 
           <Route path="/lgu/volunteers" element={<PlaceholderPage title="Volunteers" />} />
           <Route path="/lgu/volunteers/applicants" element={<LguApplicants />} />

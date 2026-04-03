@@ -1,4 +1,4 @@
-export type PortalUserRole = "ADMIN" | "LGU" | "VOLUNTEER" | "COMMUNITY";
+export type PortalUserRole = "ADMIN" | "LGU" | "VOLUNTEER" | "RESPONDER" | "COMMUNITY";
 export type PortalAdminTier = "SUPER" | "CDRRMO";
 
 export type AdminUserItem = {

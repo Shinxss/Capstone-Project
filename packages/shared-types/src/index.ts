@@ -1,4 +1,10 @@
-export type Role = "SUPER_ADMIN" | "CDRRMO_ADMIN" | "LGU" | "VOLUNTEER" | "COMMUNITY";
+export type Role =
+  | "SUPER_ADMIN"
+  | "CDRRMO_ADMIN"
+  | "LGU"
+  | "VOLUNTEER"
+  | "RESPONDER"
+  | "COMMUNITY";
 
 export type ApiResponse<T> = {
   success: boolean;

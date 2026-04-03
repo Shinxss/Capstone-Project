@@ -70,7 +70,7 @@ communityAuthRouter.post("/login", loginLimiter, validate(communityLoginSchema),
     const cleanEmail = email.trim().toLowerCase();
     const user = await User.findOne({
       email: cleanEmail,
-      role: { $in: ["COMMUNITY", "VOLUNTEER"] },
+      role: { $in: ["COMMUNITY", "VOLUNTEER", "RESPONDER"] },
     });
 
     if (!user) {

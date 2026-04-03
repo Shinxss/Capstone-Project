@@ -21,7 +21,7 @@ const router = Router();
 
 const userListQuerySchema = z.object({
   q: z.string().trim().optional(),
-  role: z.enum(["ADMIN", "LGU", "VOLUNTEER", "COMMUNITY"]).optional(),
+  role: z.enum(["ADMIN", "LGU", "VOLUNTEER", "RESPONDER", "COMMUNITY"]).optional(),
   adminTier: z.enum(["SUPER", "CDRRMO"]).optional(),
   barangay: z.string().trim().optional(),
   isActive: z.enum(["true", "false"]).optional(),
@@ -53,7 +53,7 @@ const superUpdateUserSchema = z.object({
   firstName: z.string().trim().max(100).optional(),
   lastName: z.string().trim().max(100).optional(),
   email: z.string().email().trim().toLowerCase().optional(),
-  role: z.enum(["ADMIN", "LGU", "VOLUNTEER", "COMMUNITY"]).optional(),
+  role: z.enum(["ADMIN", "LGU", "VOLUNTEER", "RESPONDER", "COMMUNITY"]).optional(),
   adminTier: z.enum(["CDRRMO"]).optional(),
   barangay: z.string().trim().optional(),
   municipality: z.string().trim().optional(),
@@ -110,7 +110,7 @@ function buildUserSearchFilter(query: z.infer<typeof userListQuerySchema>, admin
   const filter: Record<string, unknown> = {};
 
   if (adminTier === "CDRRMO") {
-    filter.role = { $in: ["VOLUNTEER", "COMMUNITY", "LGU"] };
+    filter.role = { $in: ["VOLUNTEER", "RESPONDER", "COMMUNITY", "LGU"] };
   } else if (query.role) {
     filter.role = query.role;
   }
@@ -320,8 +320,8 @@ router.patch(
       return res.status(403).json({ message: "Forbidden" });
     }
 
-    if (targetUser.role !== "VOLUNTEER" && targetUser.role !== "COMMUNITY") {
-      return res.status(403).json({ message: "CDRRMO admins can only update volunteer/community accounts" });
+    if (!["VOLUNTEER", "RESPONDER", "COMMUNITY"].includes(targetUser.role)) {
+      return res.status(403).json({ message: "CDRRMO admins can only update responder/volunteer/community accounts" });
     }
 
     const parsed = cdrrmoUpdateUserSchema.safeParse(req.body);
@@ -371,8 +371,8 @@ async function updateUserActivation(req: any, res: any, isActive: boolean) {
     return res.status(403).json({ message: "Forbidden" });
   }
 
-  if (actorTier === "CDRRMO" && targetUser.role !== "VOLUNTEER" && targetUser.role !== "COMMUNITY") {
-    return res.status(403).json({ message: "CDRRMO admins can only suspend/reactivate volunteer/community accounts" });
+  if (actorTier === "CDRRMO" && !["VOLUNTEER", "RESPONDER", "COMMUNITY"].includes(targetUser.role)) {
+    return res.status(403).json({ message: "CDRRMO admins can only suspend/reactivate responder/volunteer/community accounts" });
   }
 
   const updated = await User.findByIdAndUpdate(

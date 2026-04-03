@@ -1,67 +1,41 @@
 import React from "react";
 import { View, Text, TextInput, Pressable, Modal, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import LifelineLogo from "../../../components/LifelineLogo";
 import GoogleIcon from "../../../components/GoogleIcon";
+import LifelineLogo from "../../../components/LifelineLogo";
 import {
   COUNTRY_REGION_OPTIONS,
   flagFromIsoCode,
   toCountryRegionValue,
 } from "../constants/countryRegionOptions";
 
-type AuthMode = "email" | "phone";
-
 type Props = {
-  authMode: AuthMode;
-  email: string;
-  password: string;
   countryRegion: string;
   phoneNumber: string;
-  showPassword: boolean;
   loading: boolean;
   googleLoading: boolean;
-  loginCooldownSeconds: number;
   error: string | null;
-  onChangeEmail: (v: string) => void;
-  onChangePassword: (v: string) => void;
-  onChangeCountryRegion: (v: string) => void;
-  onChangePhoneNumber: (v: string) => void;
-  onToggleShowPassword: () => void;
-  onToggleAuthMode: () => void;
-  onForgotPassword: () => void;
-  onLogin: () => void;
+  onChangeCountryRegion: (value: string) => void;
+  onChangePhoneNumber: (value: string) => void;
   onSendOtp: () => void;
   onGoogle: () => void;
-  onGoSignup: () => void;
+  onGoLogin: () => void;
 };
 
-export default function LoginForm({
-  authMode,
-  email,
-  password,
+export default function PhoneRegistrationForm({
   countryRegion,
   phoneNumber,
-  showPassword,
   loading,
   googleLoading,
-  loginCooldownSeconds,
   error,
-  onChangeEmail,
-  onChangePassword,
   onChangeCountryRegion,
   onChangePhoneNumber,
-  onToggleShowPassword,
-  onToggleAuthMode,
-  onForgotPassword,
-  onLogin,
   onSendOtp,
   onGoogle,
-  onGoSignup,
+  onGoLogin,
 }: Props) {
   const [pickerOpen, setPickerOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
-
-  const isPhoneMode = authMode === "phone";
 
   const filteredCountryOptions = React.useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -85,18 +59,6 @@ export default function LoginForm({
     setPickerOpen(false);
   }
 
-  const actionDisabled = isPhoneMode
-    ? loading || googleLoading
-    : loading || googleLoading || loginCooldownSeconds > 0;
-
-  const actionText = isPhoneMode
-    ? loading
-      ? "Sending OTP..."
-      : "Send OTP"
-    : loading
-      ? "Logging in..."
-      : "Login";
-
   return (
     <View className="flex-1 px-5 pt-45">
       <View className="mb-10">
@@ -104,113 +66,74 @@ export default function LoginForm({
       </View>
 
       <View className="gap-3">
-        {isPhoneMode ? (
-          <>
-            <Pressable
-              onPress={() => {
-                setSearchQuery("");
-                setPickerOpen(true);
-              }}
-              className="border border-gray-200 bg-white"
+        <Pressable
+          onPress={() => {
+            setSearchQuery("");
+            setPickerOpen(true);
+          }}
+          className="border border-gray-200 bg-white"
+          style={{
+            height: 60,
+            minHeight: 60,
+            borderRadius: 8,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingLeft: 18,
+            paddingRight: 12,
+            borderWidth: 1,
+            borderColor: "#E5E7EB",
+            backgroundColor: "#FFFFFF",
+          }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+            <Text
               style={{
-                height: 53,
-                borderRadius: 8,
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                paddingLeft: 18,
-                paddingRight: 12,
-                borderWidth: 1,
-                borderColor: "#E5E7EB",
-                backgroundColor: "#FFFFFF",
+                fontSize: 15,
+                fontWeight: "600",
+                color: countryRegion ? "#111827" : "#9CA3AF",
               }}
             >
-              <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
-                <Text
-                  style={{
-                    fontSize: 15,
-                    fontWeight: "600",
-                    color: countryRegion ? "#111827" : "#9CA3AF",
-                  }}
-                >
-                  {countryRegion || "Country/Region"}
-                </Text>
-              </View>
-              <Ionicons name="chevron-down" size={20} color="#6B7280" />
-            </Pressable>
+              {countryRegion || "Country/Region"}
+            </Text>
+          </View>
+          <Ionicons name="chevron-down" size={20} color="#6B7280" />
+        </Pressable>
 
-            <TextInput
-              placeholder="Phone number"
-              placeholderTextColor="#9CA3AF"
-              className="h-15 border border-gray-200 bg-white px-6 pl-3 text-[15px] font-semibold"
-              style={{
-                borderRadius: 8,
-                borderWidth: 1,
-                backgroundColor: "#FFFFFF",
-              }}
-              value={phoneNumber}
-              onChangeText={onChangePhoneNumber}
-              keyboardType="phone-pad"
-            />
-          </>
-        ) : (
-          <>
-            <TextInput
-              placeholder="Email"
-              placeholderTextColor="#9CA3AF"
-              className="h-15 border border-gray-200 bg-white px-6 pl-3 text-[15px] font-semibold"
-              style={{ borderRadius: 8 }}
-              value={email}
-              onChangeText={onChangeEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-            />
-
-            <View className="relative">
-              <TextInput
-                placeholder="Password"
-                placeholderTextColor="#9CA3AF"
-                className="h-15 border border-gray-200 bg-white px-4 pr-12 pl-3 text-[15px] font-semibold text-gray-900"
-                style={{ borderRadius: 8 }}
-                value={password}
-                onChangeText={onChangePassword}
-                secureTextEntry={!showPassword}
-                autoCapitalize="none"
-              />
-              <Pressable
-                onPress={onToggleShowPassword}
-                className="absolute right-3 top-0 h-15 items-center justify-center"
-              >
-                <Ionicons
-                  name={showPassword ? "eye-off-outline" : "eye-outline"}
-                  size={23}
-                  color="#9CA3AF"
-                />
-              </Pressable>
-            </View>
-
-            <Pressable onPress={onForgotPassword}>
-              <Text className="text-[15px] text-gray-700">Forgot Password?</Text>
-            </Pressable>
-          </>
-        )}
+        <TextInput
+          placeholder="Phone number"
+          placeholderTextColor="#9CA3AF"
+          className="h-15 border border-gray-200 bg-white px-6 pl-3 text-[15px] font-semibold"
+          style={{
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: "#E5E7EB",
+            backgroundColor: "#FFFFFF",
+          }}
+          value={phoneNumber}
+          onChangeText={onChangePhoneNumber}
+          keyboardType="phone-pad"
+        />
 
         {error ? <Text className="text-[15px] text-red-500">{error}</Text> : null}
 
         <Pressable
-          onPress={isPhoneMode ? onSendOtp : onLogin}
-          disabled={actionDisabled}
+          onPress={onSendOtp}
+          disabled={loading}
           style={({ pressed }) => ({
+            marginTop: 14,
             height: 48,
             width: "100%",
             borderRadius: 10,
             backgroundColor: "#EF4444",
             alignItems: "center",
             justifyContent: "center",
-            opacity: pressed || actionDisabled ? 0.75 : 1,
+            opacity: pressed || loading ? 0.75 : 1,
           })}
         >
-          <Text style={{ color: "#fff", fontSize: 15, fontWeight: "700" }}>{actionText}</Text>
+          <Text style={{ color: "#fff", fontSize: 15, fontWeight: "700" }}>
+            {loading ? "Sending OTP..." : "Send OTP"}
+          </Text>
         </Pressable>
 
         <View className="my-3 flex-row items-center">
@@ -240,37 +163,16 @@ export default function LoginForm({
           </Text>
         </Pressable>
 
-        <Pressable
-          onPress={onToggleAuthMode}
-          disabled={loading || googleLoading}
-          style={({ pressed }) => ({
-            height: 56,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
-            borderRadius: 12,
-            borderWidth: 1,
-            borderColor: "#E5E7EB",
-            backgroundColor: "#FFFFFF",
-            opacity: pressed || loading || googleLoading ? 0.75 : 1,
-          })}
-        >
-          <Ionicons name={isPhoneMode ? "mail-outline" : "call-outline"} size={24} color="#1F2937" />
-          <Text style={{ marginLeft: 15, fontSize: 16, fontWeight: "600", color: "#1F2937" }}>
-            {isPhoneMode ? "Continue with Email" : "Continue with Phone"}
-          </Text>
-        </Pressable>
-
         <View className="mt-13 flex-row justify-center">
-          <Text className="text-[15px] text-gray-700">Don't have an account? </Text>
-          <Text onPress={onGoSignup} style={{ color: "#3B82F6", fontSize: 15, fontWeight: "500" }}>
-            Sign up
+          <Text className="text-[15px] text-gray-700">Already have an account? </Text>
+          <Text onPress={onGoLogin} style={{ color: "#3B82F6", fontSize: 15, fontWeight: "500" }}>
+            Log in
           </Text>
         </View>
       </View>
 
       <Modal
-        visible={isPhoneMode && pickerOpen}
+        visible={pickerOpen}
         transparent
         animationType="slide"
         onRequestClose={() => setPickerOpen(false)}

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, Pressable, Text, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSession } from "../../auth/hooks/useSession";
 import { usePullToRefresh } from "../../common/hooks/usePullToRefresh";
@@ -53,6 +53,7 @@ function emptyMessageForTab(tab: MyRequestStatusTab) {
 export function MyRequestsHistoryScreen() {
   const params = useLocalSearchParams<{ tab?: string | string[] }>();
   const { isUser, loading: sessionLoading } = useSession();
+  const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
   const tabParam = Array.isArray(params.tab) ? params.tab[0] : params.tab;
   const initialTab = useMemo(
@@ -74,11 +75,12 @@ export function MyRequestsHistoryScreen() {
   }, [initialTab]);
 
   useEffect(() => {
+    if (!isFocused) return;
     if (sessionLoading) return;
     if (!isUser) {
       router.replace("/(auth)/login");
     }
-  }, [isUser, sessionLoading]);
+  }, [isFocused, isUser, sessionLoading]);
 
   useFocusEffect(
     useCallback(() => {

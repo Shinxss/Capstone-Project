@@ -5,7 +5,7 @@ import {
   normalizeLifelineId,
 } from "./userId.service";
 
-export type UserRole = "ADMIN" | "LGU" | "VOLUNTEER" | "COMMUNITY";
+export type UserRole = "ADMIN" | "LGU" | "VOLUNTEER" | "RESPONDER" | "COMMUNITY";
 export type AdminTier = "SUPER" | "CDRRMO";
 export type VolunteerStatus = "NONE" | "PENDING" | "APPROVED";
 export type AuthProvider = "local" | "google" | "both";
@@ -88,7 +88,7 @@ const UserSchema = new Schema<UserDoc>(
     role: {
       type: String,
       required: true,
-      enum: ["ADMIN", "LGU", "VOLUNTEER", "COMMUNITY"],
+      enum: ["ADMIN", "LGU", "VOLUNTEER", "RESPONDER", "COMMUNITY"],
       index: true,
     },
     adminTier: {

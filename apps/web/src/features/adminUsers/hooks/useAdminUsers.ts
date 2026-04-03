@@ -9,12 +9,13 @@ import {
   suspendAdminUser,
 } from "../services/adminUsers.service";
 
-export type AdminUsersTab = "LGU" | "CDRRMO" | "VOLUNTEER" | "COMMUNITY";
+export type AdminUsersTab = "LGU" | "CDRRMO" | "VOLUNTEER" | "RESPONDER" | "COMMUNITY";
 
-const tabRoleMap: Record<AdminUsersTab, "LGU" | "ADMIN" | "VOLUNTEER" | "COMMUNITY"> = {
+const tabRoleMap: Record<AdminUsersTab, "LGU" | "ADMIN" | "VOLUNTEER" | "RESPONDER" | "COMMUNITY"> = {
   LGU: "LGU",
   CDRRMO: "ADMIN",
   VOLUNTEER: "VOLUNTEER",
+  RESPONDER: "RESPONDER",
   COMMUNITY: "COMMUNITY",
 };
 
@@ -145,8 +146,8 @@ export function useAdminUsers() {
   }, [refresh]);
 
   const visibleTabs = useMemo(() => {
-    if (isSuper) return ["LGU", "CDRRMO", "VOLUNTEER", "COMMUNITY"] as AdminUsersTab[];
-    return ["LGU", "VOLUNTEER", "COMMUNITY"] as AdminUsersTab[];
+    if (isSuper) return ["LGU", "CDRRMO", "VOLUNTEER", "RESPONDER", "COMMUNITY"] as AdminUsersTab[];
+    return ["LGU", "VOLUNTEER", "RESPONDER", "COMMUNITY"] as AdminUsersTab[];
   }, [isSuper]);
 
   return {

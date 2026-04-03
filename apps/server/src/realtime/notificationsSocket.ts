@@ -9,7 +9,7 @@ import { readAccessTokenFromCookieHeader } from "../features/auth/authCookie";
 import { User } from "../features/users/user.model";
 import { verifyAccessToken } from "../utils/jwt";
 
-type Role = "LGU" | "ADMIN" | "VOLUNTEER" | "COMMUNITY";
+type Role = "LGU" | "ADMIN" | "VOLUNTEER" | "RESPONDER" | "COMMUNITY";
 type VolunteerPresenceStatus = "ONLINE" | "BUSY" | "IDLE" | "OFFLINE";
 
 type SocketUserContext = {

@@ -49,9 +49,10 @@ export default function ForgotPasswordScreen() {
                   returnKeyType="done"
                   onSubmitEditing={vm.submit}
                   placeholderTextColor="#94A3B8"
-                  className={`h-14 rounded-2xl border bg-white px-4 text-[16px] font-semibold text-slate-900 ${
-                    vm.error ? "border-red-300" : "border-slate-200"
+                  className={`h-15 border bg-white px-6 pl-3 text-[15px] font-semibold text-slate-900 ${
+                    vm.error ? "border-red-300" : "border-gray-200"
                   }`}
+                  style={{ borderRadius: 8 }}
                 />
 
                 {vm.error ? <Text className="text-[13px] font-medium text-red-600">{vm.error}</Text> : null}
@@ -100,30 +101,24 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   primaryButton: {
-    marginTop: 6,
-    minHeight: 52,
-    borderRadius: 16,
+    marginTop: 14,
+    height: 48,
+    width: "100%",
+    borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#DC2626",
-    shadowColor: "#DC2626",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 14,
-    elevation: 5,
+    backgroundColor: "#EF4444",
   },
   primaryButtonDisabled: {
-    backgroundColor: "#F87171",
-    shadowOpacity: 0,
-    elevation: 0,
+    opacity: 0.75,
   },
   primaryButtonText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
   },
   pressed: {
-    opacity: 0.92,
+    opacity: 0.75,
   },
   footerSpacer: {
     height: 18,

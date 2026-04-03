@@ -204,8 +204,8 @@ export default function SignupForm({
             opacity: pressed || googleLoading ? 0.75 : 1,
           })}
         >
-          <GoogleIcon />
-          <Text style={{ marginLeft: 8, fontSize: 15, color: "#1F2937" }}>
+          <GoogleIcon size={25} />
+          <Text style={{ marginLeft: 15, fontSize: 16, fontWeight: "600", color: "#1F2937" }}>
             {googleLoading ? "Signing in with Google..." : "Continue with Google"}
           </Text>
         </Pressable>

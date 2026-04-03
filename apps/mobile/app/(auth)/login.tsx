@@ -16,8 +16,11 @@ export default function LoginScreen() {
       </View>
 
       <LoginForm
+        authMode={vm.authMode}
         email={vm.email}
         password={vm.password}
+        countryRegion={vm.countryRegion}
+        phoneNumber={vm.phoneNumber}
         showPassword={vm.showPassword}
         loading={vm.loading}
         googleLoading={vm.googleLoading}
@@ -25,9 +28,13 @@ export default function LoginScreen() {
         error={vm.error}
         onChangeEmail={vm.setEmail}
         onChangePassword={vm.setPassword}
+        onChangeCountryRegion={vm.setCountryRegion}
+        onChangePhoneNumber={vm.setPhoneNumber}
         onToggleShowPassword={vm.toggleShowPassword}
+        onToggleAuthMode={vm.toggleAuthMode}
         onForgotPassword={vm.goForgotPassword}
         onLogin={vm.onLogin}
+        onSendOtp={vm.onSendOtp}
         onGoogle={vm.onGoogle}
         onGoSignup={vm.goSignup}
       />

@@ -28,6 +28,7 @@ const tabLabels: Record<AdminUsersTab, string> = {
   LGU: "LGU Accounts",
   CDRRMO: "CDRRMO Admins",
   VOLUNTEER: "Volunteers",
+  RESPONDER: "Responders",
   COMMUNITY: "Community",
 };
 
@@ -207,7 +208,11 @@ export default function AdminUserManagementView({
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-[#162544]">
                 {items.map((item) => {
-                  const canToggle = isSuper || item.role === "VOLUNTEER" || item.role === "COMMUNITY";
+                  const canToggle =
+                    isSuper ||
+                    item.role === "VOLUNTEER" ||
+                    item.role === "RESPONDER" ||
+                    item.role === "COMMUNITY";
                   const actionLabel = item.isActive ? "Suspend" : "Reactivate";
 
                   return (

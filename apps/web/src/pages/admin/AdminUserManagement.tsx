@@ -11,7 +11,7 @@ export default function AdminUserManagement() {
   }
 
   return (
-    <AdminShell title="User Management" subtitle="Manage LGU, CDRRMO, volunteer, and community accounts">
+    <AdminShell title="User Management" subtitle="Manage LGU, CDRRMO, responder, volunteer, and community accounts">
       <AdminUserManagementView {...vm} />
     </AdminShell>
   );

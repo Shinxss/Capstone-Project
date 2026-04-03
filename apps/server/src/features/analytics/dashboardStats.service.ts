@@ -255,27 +255,16 @@ async function resolveScopeForActor(
   }
 
   const actor = await User.findById(actorUserId)
-    .select("barangay municipality")
+    .select("municipality")
     .lean();
-  const barangayName = normalizeName(actor?.barangay);
   const municipality = normalizeName(actor?.municipality) || "Dagupan City";
 
-  if (!barangayName) {
-    return {
-      key: "city:dagupan-city",
-      type: "city",
-      barangayName: null,
-      municipality,
-      label: "City-wide scope (LGU barangay not configured)",
-    };
-  }
-
   return {
-    key: `barangay:${normalizeKeyPart(barangayName)}|city:${normalizeKeyPart(municipality)}`,
-    type: "barangay",
-    barangayName,
+    key: `city:${normalizeKeyPart(municipality)}`,
+    type: "city",
+    barangayName: null,
     municipality,
-    label: `Barangay scope (${barangayName}${municipality ? `, ${municipality}` : ""})`,
+    label: `City-wide scope (${municipality})`,
   };
 }
 
@@ -464,6 +453,22 @@ async function findNearestComparisonSnapshot(params: {
   return candidates[0];
 }
 
+async function findLegacyComparisonSnapshot(params: {
+  scopeKey: string;
+  municipality: string | null;
+  currentBucketStart: Date;
+}) {
+  const municipality = normalizeName(params.municipality);
+
+  return DashboardStatSnapshot.findOne({
+    scopeKey: { $ne: params.scopeKey },
+    ...(municipality ? { municipality } : {}),
+    bucketStart: { $lt: params.currentBucketStart },
+  })
+    .sort({ bucketStart: -1 })
+    .lean();
+}
+
 function sanitizeComparisonWindowHours(value?: number) {
   const fallback = DEFAULT_COMPARISON_WINDOW_HOURS;
   if (!Number.isFinite(value)) return fallback;
@@ -495,10 +500,17 @@ export async function getLguDashboardStatCards(params: {
     currentBucketStart,
     comparisonWindowHours,
   });
+  const comparisonSnapshot =
+    previousSnapshot ??
+    (await findLegacyComparisonSnapshot({
+      scopeKey: scope.key,
+      municipality: scope.municipality,
+      currentBucketStart,
+    }));
 
   const statCards = buildStatCards(
     stats,
-    previousSnapshot ? previousSnapshot.metrics : null,
+    comparisonSnapshot ? comparisonSnapshot.metrics : null,
     comparisonLabel
   );
 

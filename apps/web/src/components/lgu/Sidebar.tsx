@@ -494,6 +494,25 @@ export default function Sidebar({
               {section.title === "Operations" && (
                 <>
                   <SidebarSubmenu
+                    label="Responder"
+                    icon={Shield}
+                    basePath="/lgu/responders"
+                    collapsed={collapsed}
+                    items={[
+                      {
+                        label: "Responder Accounts",
+                        to: "/lgu/responders/accounts",
+                        icon: User,
+                      },
+                      {
+                        label: "Teams",
+                        to: "/lgu/responders/teams",
+                        icon: Users,
+                      },
+                    ]}
+                  />
+
+                  <SidebarSubmenu
                     label="Volunteers"
                     icon={Users}
                     basePath="/lgu/volunteers"
