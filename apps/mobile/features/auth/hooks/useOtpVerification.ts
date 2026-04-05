@@ -11,7 +11,7 @@ import {
 import { getErrorMessage } from "../utils/authErrors";
 import { normalizeEmail } from "../utils/authValidators";
 
-export type OtpMode = "signup" | "reset" | "phone";
+export type OtpMode = "signup" | "reset";
 
 const OTP_LENGTH = 6;
 const RESEND_COOLDOWN_SECONDS = 30;
@@ -45,35 +45,6 @@ function maskEmailAddress(email: string) {
   return `${visiblePrefix}${"*".repeat(hiddenLength)}@${domainPart}`;
 }
 
-function normalizePhoneNumber(phone: string) {
-  const trimmed = phone.trim();
-  if (!trimmed) return "";
-
-  const hasLeadingPlus = trimmed.startsWith("+");
-  const digits = trimmed.replace(/\D/g, "");
-  if (!digits) return "";
-
-  return hasLeadingPlus ? `+${digits}` : digits;
-}
-
-function maskPhoneNumber(phone: string) {
-  const normalized = normalizePhoneNumber(phone);
-  if (!normalized) return "";
-
-  const hasLeadingPlus = normalized.startsWith("+");
-  const digits = normalized.replace(/\D/g, "");
-  if (!digits) return normalized;
-
-  if (digits.length <= 4) {
-    return `${hasLeadingPlus ? "+" : ""}${"*".repeat(digits.length)}`;
-  }
-
-  const head = digits.slice(0, 2);
-  const tail = digits.slice(-2);
-  const hidden = "*".repeat(Math.max(2, digits.length - 4));
-  return `${hasLeadingPlus ? "+" : ""}${head}${hidden}${tail}`;
-}
-
 function formatCountdown(seconds: number) {
   const safeSeconds = Math.max(0, Math.floor(seconds));
   const minutes = Math.floor(safeSeconds / 60);
@@ -95,7 +66,7 @@ function mapVerificationError(message: string) {
   return message;
 }
 
-export function useOtpVerification(mode: OtpMode, email: string, phone = "") {
+export function useOtpVerification(mode: OtpMode, email: string) {
   const router = useRouter();
   const { signInWithToken } = useAuth();
 
@@ -106,22 +77,15 @@ export function useOtpVerification(mode: OtpMode, email: string, phone = "") {
   const [error, setError] = useState<string | null>(null);
 
   const normalizedEmail = useMemo(() => normalizeEmail(email), [email]);
-  const normalizedPhone = useMemo(() => normalizePhoneNumber(phone), [phone]);
-  const contact = mode === "phone" ? normalizedPhone : normalizedEmail;
+  const contact = normalizedEmail;
   const otp = useMemo(() => otpDigits.join(""), [otpDigits]);
 
-  const title = useMemo(() => {
-    if (mode === "phone") return "Verify Your Phone";
-    return mode === "signup" ? "Verify Your Email" : "Verify Reset Code";
-  }, [mode]);
-  const subtitle =
-    mode === "phone"
-      ? "Enter the 6-digit code sent to your phone number."
-      : "Enter the 6-digit code sent to your email.";
-  const maskedContact = useMemo(
-    () => (mode === "phone" ? maskPhoneNumber(normalizedPhone) : maskEmailAddress(normalizedEmail)),
-    [mode, normalizedEmail, normalizedPhone]
+  const title = useMemo(
+    () => (mode === "signup" ? "Verify Your Email" : "Verify Reset Code"),
+    [mode]
   );
+  const subtitle = "Enter the 6-digit code sent to your email.";
+  const maskedContact = useMemo(() => maskEmailAddress(normalizedEmail), [normalizedEmail]);
   const canSubmit = otp.length === OTP_LENGTH && !loading;
   const canResend = resendCountdown <= 0 && !resending && !loading;
   const resendCountdownLabel = useMemo(() => formatCountdown(resendCountdown), [resendCountdown]);
@@ -146,7 +110,7 @@ export function useOtpVerification(mode: OtpMode, email: string, phone = "") {
     setError(null);
 
     if (!contact) {
-      setError(mode === "phone" ? "Missing phone number for OTP verification." : "Missing email for OTP verification.");
+      setError("Missing email for OTP verification.");
       return;
     }
 
@@ -157,11 +121,6 @@ export function useOtpVerification(mode: OtpMode, email: string, phone = "") {
 
     setLoading(true);
     try {
-      if (mode === "phone") {
-        Alert.alert("Coming Soon", "Phone OTP verification will be connected to Firebase soon.");
-        return;
-      }
-
       if (mode === "signup") {
         const result = await signupVerifyOtp(normalizedEmail, otp);
         if (result.accessToken) {
@@ -195,18 +154,13 @@ export function useOtpVerification(mode: OtpMode, email: string, phone = "") {
     try {
       if (mode === "signup") {
         await signupResendOtp(normalizedEmail);
-      } else if (mode === "reset") {
+      } else {
         await requestPasswordOtp(normalizedEmail);
       }
 
       setOtpDigitsState(createEmptyOtpDigits());
       setResendCountdown(RESEND_COOLDOWN_SECONDS);
-      Alert.alert(
-        "Code Sent",
-        mode === "phone"
-          ? "A new verification code will be sent once Firebase OTP is connected."
-          : "A new verification code has been sent."
-      );
+      Alert.alert("Code Sent", "A new verification code has been sent.");
     } catch (err) {
       setError(getErrorMessage(err, "Failed to resend OTP"));
     } finally {
@@ -219,10 +173,9 @@ export function useOtpVerification(mode: OtpMode, email: string, phone = "") {
     title,
     subtitle,
     email: normalizedEmail,
-    phone: normalizedPhone,
     contact,
     maskedContact,
-    contactLabel: mode === "phone" ? "phone number" : "email",
+    contactLabel: "email",
     otpDigits,
     otpLength: OTP_LENGTH,
     loading,

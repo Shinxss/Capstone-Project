@@ -31,6 +31,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     segments[0] === "my-requests" ||
     segments[0] === "my-request-tracking";
   const inProfileFlow = segments[0] === "profile";
+  const inNotificationsFlow = segments[0] === "notifications";
 
   useEffect(() => {
     if (!hydrated) return;
@@ -41,7 +42,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       !inVolunteerFlow &&
       !inReportFlow &&
       !inMyRequestsFlow &&
-      !inProfileFlow
+      !inProfileFlow &&
+      !inNotificationsFlow
     ) {
       router.replace("/(tabs)");
       return;
@@ -50,7 +52,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     if (mode === "anonymous" && !inAuthGroup) {
       router.replace("/(auth)/login");
     }
-  }, [hydrated, mode, inAuthGroup, inTabsGroup, inVolunteerFlow, inReportFlow, inMyRequestsFlow, inProfileFlow, router]);
+  }, [hydrated, mode, inAuthGroup, inTabsGroup, inVolunteerFlow, inReportFlow, inMyRequestsFlow, inProfileFlow, inNotificationsFlow, router]);
 
   if (!hydrated) {
     return <SplashScreen />;
@@ -90,6 +92,7 @@ function RootLayoutInner() {
               <Stack.Screen name="my-requests" />
               <Stack.Screen name="my-request-tracking" />
               <Stack.Screen name="profile" />
+              <Stack.Screen name="notifications" />
               <Stack.Screen
                 name="volunteer-apply-modal"
                 options={{ presentation: "transparentModal" }}

@@ -1,18 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { useRouter } from "expo-router";
 import { validateLogin } from "../utils/authValidators";
 import { getErrorMessage } from "../utils/authErrors";
 import { useGoogleLogin } from "./useGoogleLogin";
 import { useAuth } from "../AuthProvider";
-import { DEFAULT_COUNTRY_REGION } from "../constants/countryRegionOptions";
-import { buildDestinationPhone, normalizePhoneNumber } from "../utils/phoneAuth";
 
 const MAX_FAILED_LOGIN_ATTEMPTS = 10;
 const LOGIN_COOLDOWN_MIN_SECONDS = 60;
 const LOGIN_COOLDOWN_MAX_SECONDS = 60;
-
-type AuthMode = "email" | "phone";
 
 function clampCooldown(seconds: number) {
   return Math.min(LOGIN_COOLDOWN_MAX_SECONDS, Math.max(LOGIN_COOLDOWN_MIN_SECONDS, seconds));
@@ -35,11 +31,8 @@ export function useLogin() {
     clearError: clearGoogleError,
   } = useGoogleLogin();
 
-  const [authMode, setAuthMode] = useState<AuthMode>("email");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [countryRegion, setCountryRegion] = useState(DEFAULT_COUNTRY_REGION);
-  const [phoneNumber, setPhoneNumber] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   const [loading, setLoading] = useState(false);
@@ -76,11 +69,6 @@ export function useLogin() {
     cooldownRemainingSeconds > 0
       ? `Too many login attempts. Try again in ${formatCooldown(cooldownRemainingSeconds)}.`
       : null;
-
-  const destinationPhone = useMemo(
-    () => buildDestinationPhone(countryRegion, phoneNumber),
-    [countryRegion, phoneNumber]
-  );
 
   const onLogin = useCallback(async () => {
     if (loading || googleLoading) return;
@@ -138,59 +126,6 @@ export function useLogin() {
     startCooldown,
   ]);
 
-  const onSendOtp = useCallback(async () => {
-    if (loading || googleLoading) return;
-
-    setError(null);
-    clearGoogleError();
-
-    if (!countryRegion.trim()) {
-      setError("Please enter your country or region.");
-      return;
-    }
-
-    const normalizedPhone = normalizePhoneNumber(phoneNumber);
-    if (!normalizedPhone) {
-      setError("Please enter your phone number.");
-      return;
-    }
-
-    const digitsOnlyCount = normalizedPhone.replace(/\D/g, "").length;
-    if (digitsOnlyCount < 7) {
-      setError("Phone number looks too short.");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      router.push({
-        pathname: "/otp-verification",
-        params: {
-          mode: "phone",
-          phone: destinationPhone,
-        },
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    clearGoogleError,
-    countryRegion,
-    destinationPhone,
-    googleLoading,
-    loading,
-    phoneNumber,
-    router,
-  ]);
-
-  const toggleAuthMode = useCallback(() => {
-    if (loading || googleLoading) return;
-
-    setError(null);
-    clearGoogleError();
-    setAuthMode((mode) => (mode === "email" ? "phone" : "email"));
-  }, [loading, googleLoading, clearGoogleError]);
-
   const skip = useCallback(async () => {
     if (loading || googleLoading) return;
     setError(null);
@@ -204,24 +139,17 @@ export function useLogin() {
   }, [loading, googleLoading, clearGoogleError, continueAsGuest]);
 
   return {
-    authMode,
     email,
     password,
-    countryRegion,
-    phoneNumber,
     showPassword,
     loading,
     googleLoading,
-    error: authMode === "email" ? cooldownMessage ?? error ?? googleError : error ?? googleError,
-    loginCooldownSeconds: authMode === "email" ? cooldownRemainingSeconds : 0,
+    error: cooldownMessage ?? error ?? googleError,
+    loginCooldownSeconds: cooldownRemainingSeconds,
     setEmail,
     setPassword,
-    setCountryRegion,
-    setPhoneNumber,
     toggleShowPassword: () => setShowPassword((s) => !s),
-    toggleAuthMode,
     onLogin,
-    onSendOtp,
     onGoogle,
     goForgotPassword: () => router.push("/forgot-password"),
     goSignup: () => router.push("/(auth)/signup"),
