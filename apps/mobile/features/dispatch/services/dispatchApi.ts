@@ -50,6 +50,12 @@ export async function fetchMyCurrentDispatch(): Promise<DispatchOffer | null> {
   }
 }
 
+// Tasks screen: volunteer completed history (VERIFIED)
+export async function fetchMyCompletedDispatches(): Promise<DispatchOffer[]> {
+  const res = await api.get<ApiResponse<DispatchOffer[]>>("/api/dispatches/my/completed");
+  return Array.isArray(res.data.data) ? res.data.data : [];
+}
+
 export async function fetchMyDispatchFocusStats(): Promise<DispatchFocusStats> {
   const res = await api.get<ApiResponse<DispatchFocusStats>>("/api/dispatches/my/focus-stats");
   return res.data.data;

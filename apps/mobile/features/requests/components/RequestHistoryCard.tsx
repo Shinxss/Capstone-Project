@@ -1,9 +1,9 @@
 import React, { useMemo } from "react";
 import { GestureResponderEvent, Pressable, StyleSheet, Text, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import type { MyRequestSummary, TrackingLabel } from "../models/myRequests";
 import { formatEtaText } from "../utils/formatters";
 import { RequestProgressTracker } from "./RequestProgressTracker";
+import { getMobileEmergencyVisual } from "../../emergency/constants/emergencyVisuals";
 
 type RequestHistoryCardProps = {
   item: MyRequestSummary;
@@ -20,35 +20,6 @@ type PillStyle = {
   borderColor: string;
   textColor: string;
 };
-
-type EmergencyIconStyle = {
-  backgroundColor: string;
-  iconColor: string;
-};
-
-function iconByEmergencyType(type: string): React.ComponentProps<typeof Ionicons>["name"] {
-  const normalized = String(type ?? "").trim().toLowerCase();
-  if (normalized === "sos") return "warning-outline";
-  if (normalized === "fire") return "flame-outline";
-  if (normalized === "flood") return "water-outline";
-  if (normalized === "medical") return "medkit-outline";
-  if (normalized === "earthquake") return "pulse-outline";
-  if (normalized === "collapse") return "business-outline";
-  if (normalized === "typhoon") return "thunderstorm-outline";
-  return "alert-circle-outline";
-}
-
-function iconStyleByEmergencyType(type: string): EmergencyIconStyle {
-  const normalized = String(type ?? "").trim().toLowerCase();
-  if (normalized === "sos") return { backgroundColor: "#FEE2E2", iconColor: "#B91C1C" };
-  if (normalized === "fire") return { backgroundColor: "#FFEDD5", iconColor: "#C2410C" };
-  if (normalized === "flood") return { backgroundColor: "#DBEAFE", iconColor: "#1D4ED8" };
-  if (normalized === "medical") return { backgroundColor: "#DCFCE7", iconColor: "#166534" };
-  if (normalized === "earthquake") return { backgroundColor: "#FEF3C7", iconColor: "#92400E" };
-  if (normalized === "collapse") return { backgroundColor: "#EDE9FE", iconColor: "#6D28D9" };
-  if (normalized === "typhoon") return { backgroundColor: "#E0F2FE", iconColor: "#0369A1" };
-  return { backgroundColor: "#F4F4F5", iconColor: "#334155" };
-}
 
 function pillStyleForLabel(label: TrackingLabel): PillStyle {
   if (label === "Submitted") return { backgroundColor: "#EEF2FF", borderColor: "#C7D2FE", textColor: "#4338CA" };
@@ -98,8 +69,8 @@ export function RequestHistoryCard({
   onPressCancel,
   cancelDisabled,
 }: RequestHistoryCardProps) {
-  const iconName = useMemo(() => iconByEmergencyType(item.type), [item.type]);
-  const iconStyle = useMemo(() => iconStyleByEmergencyType(item.type), [item.type]);
+  const emergencyVisual = useMemo(() => getMobileEmergencyVisual(item.type), [item.type]);
+  const EmergencyTypeIcon = emergencyVisual.icon;
   const pillStyle = useMemo(() => pillStyleForLabel(item.trackingLabel), [item.trackingLabel]);
   const createdAtText = useMemo(() => formatCreatedAt(item.createdAt), [item.createdAt]);
   const requestTypeText = useMemo(() => formatRequestType(item.type), [item.type]);
@@ -133,8 +104,8 @@ export function RequestHistoryCard({
     >
       <View style={styles.topRow}>
         <View style={styles.leftGroup}>
-          <View style={[styles.iconWrap, { backgroundColor: iconStyle.backgroundColor }]}>
-            <Ionicons name={iconName} size={20} color={iconStyle.iconColor} />
+          <View style={[styles.iconWrap, { backgroundColor: emergencyVisual.iconBgColor }]}>
+            <EmergencyTypeIcon size={21} color={emergencyVisual.iconColor} strokeWidth={2.3} />
           </View>
 
           <View style={styles.textWrap}>

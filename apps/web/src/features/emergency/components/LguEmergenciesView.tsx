@@ -1,12 +1,7 @@
 import {
   Search,
   Siren,
-  Droplet,
-  Flame,
-  Wind,
-  Zap,
-  Building2,
-  HeartPulse,
+  Droplets,
   Phone,
   ShieldCheck,
   AlertTriangle,
@@ -18,7 +13,13 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import EmptyState from "../../../components/ui/EmptyState";
-import type { EmergencyType, LguEmergencyItem, LguEmergencyTypeFilter, useLguEmergencies } from "../hooks/useLguEmergencies";
+import type { LguEmergencyItem, LguEmergencyTypeFilter, useLguEmergencies } from "../hooks/useLguEmergencies";
+import {
+  EMERGENCY_TYPE_LABEL,
+  colorForEmergency,
+  iconForEmergency,
+  type EmergencyType,
+} from "../constants/emergency.constants";
 
 type Props = ReturnType<typeof useLguEmergencies> & {
   loading: boolean;
@@ -26,54 +27,39 @@ type Props = ReturnType<typeof useLguEmergencies> & {
   onRefresh: () => void;
 };
 
-const typeChips: { key: LguEmergencyTypeFilter; label: string; icon: LucideIcon }[] = [
-  { key: "ALL", label: "All Types", icon: AlertTriangle },
-  { key: "SOS", label: "SOS Only", icon: Siren },
-  { key: "Flood", label: "Flood", icon: Droplet },
-  { key: "Fire", label: "Fire", icon: Flame },
-  { key: "Typhoon", label: "Typhoon", icon: Wind },
-  { key: "Earthquake", label: "Earthquake", icon: Zap },
-  { key: "Collapse", label: "Collapse", icon: Building2 },
-  { key: "Medical", label: "Medical", icon: HeartPulse },
-  { key: "Other", label: "Other", icon: AlertTriangle },
+const TYPE_CHIP_ORDER: EmergencyType[] = [
+  "SOS",
+  "FIRE",
+  "FLOOD",
+  "TYPHOON",
+  "EARTHQUAKE",
+  "COLLAPSE",
+  "MEDICAL",
+  "OTHER",
 ];
 
-const TYPE_ICONS: Record<EmergencyType, LucideIcon> = {
-  SOS: Siren,
-  Flood: Droplet,
-  Fire: Flame,
-  Typhoon: Wind,
-  Earthquake: Zap,
-  Collapse: Building2,
-  Medical: HeartPulse,
-  Other: AlertTriangle,
-};
+const typeChips: { key: LguEmergencyTypeFilter; label: string; icon: LucideIcon }[] = [
+  { key: "ALL", label: "All Types", icon: AlertTriangle },
+  ...TYPE_CHIP_ORDER.map((type) => ({
+    key: type,
+    label: type === "SOS" ? "SOS Only" : EMERGENCY_TYPE_LABEL[type],
+    icon: iconForEmergency(type),
+  })),
+];
 
 function Pill({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${className}`}>{children}</span>;
 }
 
-function bgForType(type: EmergencyType) {
-  switch (type) {
-    case "Fire":
-      return "bg-blue-100";
-    case "Flood":
-      return "bg-red-100";
-    case "Collapse":
-      return "bg-yellow-100";
-    case "Typhoon":
-      return "bg-red-100";
-    case "Earthquake":
-      return "bg-purple-100";
-    case "Medical":
-      return "bg-emerald-100";
-    case "Other":
-      return "bg-gray-100";
-    case "SOS":
-      return "bg-red-100";
-    default:
-      return "bg-gray-100";
-  }
+function hexToRgba(hex: string, alpha: number) {
+  const value = String(hex ?? "").replace("#", "");
+  const full = value.length === 3 ? value.split("").map((part) => part + part).join("") : value;
+  const parsed = Number.parseInt(full, 16);
+  if (!Number.isFinite(parsed)) return `rgba(0,0,0,${alpha})`;
+  const r = (parsed >> 16) & 255;
+  const g = (parsed >> 8) & 255;
+  const b = parsed & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 function priorityPill(priority: "critical" | "high" | "medium") {
@@ -126,23 +112,20 @@ function EmergencyCard({
   item: LguEmergencyItem;
   onActionClick: (item: LguEmergencyItem) => void;
 }) {
-  const Icon = TYPE_ICONS[item.type];
+  const Icon = iconForEmergency(item.type);
+  const typeAccent = colorForEmergency(item.type);
   const isSOS = !!item.isSOS;
 
-  const cardBorder = isSOS
-    ? "border-2 border-red-500"
-    : item.type === "Fire"
-      ? "border-l-4 border-l-blue-600"
-      : item.type === "Collapse"
-        ? "border-l-4 border-l-yellow-500"
-        : item.type === "Typhoon"
-          ? "border-l-4 border-l-red-600"
-          : "border border-gray-200 dark:border-[#162544]";
+  const cardBorderClass = isSOS ? "border-2 border-red-500" : "border border-gray-200 dark:border-[#162544]";
+  const cardBorderStyle = isSOS ? undefined : { borderLeftWidth: 4, borderLeftColor: typeAccent };
 
   const actionLabel = "Dispatch Now";
 
   return (
-    <div className={`overflow-hidden rounded-2xl bg-white text-white shadow-sm dark:bg-[#0B1220] ${cardBorder}`}>
+    <div
+      className={`overflow-hidden rounded-2xl bg-white text-white shadow-sm dark:bg-[#0B1220] ${cardBorderClass}`}
+      style={cardBorderStyle}
+    >
       {isSOS ? (
         <div className="heartbeat-strip flex items-center justify-between px-4 py-2">
           <div className="flex items-center gap-2 text-sm font-bold tracking-wide">
@@ -158,8 +141,14 @@ function EmergencyCard({
 
       <div className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-[1fr_280px]">
         <div className="flex gap-4">
-          <div className={`flex h-14 w-14 items-center justify-center rounded-2xl ${bgForType(item.type)}`}>
-            <Icon size={22} className="text-red-600" />
+          <div
+            className="flex h-14 w-14 items-center justify-center rounded-2xl border"
+            style={{
+              backgroundColor: hexToRgba(typeAccent, 0.14),
+              borderColor: hexToRgba(typeAccent, 0.26),
+            }}
+          >
+            <Icon size={22} style={{ color: typeAccent }} />
           </div>
 
           <div className="flex-1">
@@ -366,7 +355,7 @@ export default function LguEmergenciesView(props: Props) {
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
         <StatCard value={String(activeSosCount)} label="Active SOS" tone="pink" icon={<Siren className="text-red-600" />} />
         <StatCard value={stats.critical} label="Critical" tone="pink" icon={<AlertTriangle className="text-red-600" />} />
-        <StatCard value={stats.high} label="High Priority" tone="blue" icon={<Droplet className="text-blue-600" />} />
+        <StatCard value={stats.high} label="High Priority" tone="blue" icon={<Droplets className="text-blue-600" />} />
         <StatCard value={stats.inProgress} label="In Progress" tone="yellow" icon={<Clock className="text-yellow-700" />} />
         <StatCard value={stats.deployed} label="Deployed" tone="green" icon={<Users className="text-green-700" />} />
       </div>

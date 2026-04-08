@@ -6,6 +6,8 @@ import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../auth/AuthProvider";
 import { showInAppNotification } from "../components/InAppNotificationHost";
+import { normalizeNotificationType } from "../constants/notification.constants";
+import { addMobileNotification } from "../services/mobileNotificationsStore";
 import {
   registerPushToken,
   unregisterPushToken,
@@ -23,6 +25,32 @@ Notifications.setNotificationHandler({
 
 const DISPATCH_CHANNEL_ID = "lifeline_dispatch_v6";
 const ALERTS_CHANNEL_ID = "lifeline_alerts_v2";
+
+function normalizeStep(raw: unknown) {
+  return String(raw ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[_-]+/g, " ");
+}
+
+function typeFromPushData(data: Record<string, unknown>) {
+  const rawType = String(data?.type ?? "").trim().toUpperCase();
+  if (rawType === "REQUEST_UPDATE") {
+    const step = normalizeStep(data?.step);
+    if (step === "APPROVED" || step === "VERIFIED") return "EMERGENCY_VERIFIED";
+    if (step === "ASSIGNED") return "RESPONDER_DISPATCHED";
+    if (step === "EN ROUTE") return "RESPONDER_EN_ROUTE";
+    if (step === "ARRIVED") return "RESPONDER_ARRIVED";
+    if (step === "RESOLVED") return "EMERGENCY_RESOLVED";
+    return "HELP_REQUEST_ACKNOWLEDGED";
+  }
+
+  if (rawType === "DISPATCH_OFFER") {
+    return "NEW_TASK_ASSIGNED";
+  }
+
+  return normalizeNotificationType(rawType);
+}
 
 function getProjectId(): string | undefined {
   const easProjectId =
@@ -137,6 +165,12 @@ export function usePushNotificationsBootstrap() {
       };
     }
 
+    if (kind === "WEATHER_ADVISORY" || kind === "HAZARD_ZONE_WARNING") {
+      return {
+        pathname: "/(tabs)/map",
+      };
+    }
+
     return null;
   };
 
@@ -150,12 +184,42 @@ export function usePushNotificationsBootstrap() {
   };
 
   useEffect(() => {
+    const addToFeedFromPush = (notification: Notifications.Notification) => {
+      const data = notification.request.content.data as Record<string, unknown>;
+      const title = String(notification.request.content.title ?? "Lifeline update").trim() || "Lifeline update";
+      const body = String(notification.request.content.body ?? "").trim() || "You have a new update.";
+      const type = typeFromPushData(data);
+      const requestId = String(data?.requestId ?? "").trim();
+      const dispatchId = String(data?.dispatchId ?? "").trim();
+      const notificationId = String(data?.notificationId ?? "").trim();
+      const dedupeId =
+        notificationId ||
+        `push:${type}:${requestId || dispatchId || String(notification.date ?? Date.now())}`;
+
+      void addMobileNotification({
+        id: dedupeId,
+        type,
+        title,
+        body,
+        createdAt: new Date(notification.date ?? Date.now()).toISOString(),
+        routeName: resolveNotificationTarget(data)?.pathname,
+        routeParams: resolveNotificationTarget(data)?.params,
+        relatedEntityType: requestId ? "REQUEST" : dispatchId ? "TASK" : undefined,
+        relatedEntityId: requestId || dispatchId || undefined,
+        metadata: Object.fromEntries(
+          Object.entries(data).map(([key, value]) => [key, String(value ?? "")])
+        ),
+      });
+    };
+
     const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      addToFeedFromPush(response.notification);
       const data = response.notification.request.content.data as Record<string, unknown>;
       routeFromNotificationData(data);
     });
 
     const foregroundSubscription = Notifications.addNotificationReceivedListener((notification) => {
+      addToFeedFromPush(notification);
       const data = notification.request.content.data as Record<string, unknown>;
       const target = resolveNotificationTarget(data);
       const title = String(notification.request.content.title ?? "Lifeline update").trim();

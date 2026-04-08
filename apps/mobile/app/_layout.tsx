@@ -8,6 +8,7 @@ import { ThemeProvider } from "../features/theme/ThemeProvider";
 import { useTheme } from "../features/theme/useTheme";
 import { InAppNotificationHost } from "../features/notifications/components/InAppNotificationHost";
 import { usePushNotificationsBootstrap } from "../features/notifications/hooks/usePushNotificationsBootstrap";
+import { useNotificationsBootstrap } from "../features/notifications/hooks/useNotificationsBootstrap";
 import { useRealtimeBootstrap } from "../features/realtime/hooks/useRealtimeBootstrap";
 import SplashScreen from "../screens/SplashScreen";
 import "../global.css";
@@ -19,6 +20,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const segments = useSegments();
   const { hydrated, mode } = useAuth();
   usePushNotificationsBootstrap();
+  useNotificationsBootstrap();
   useRealtimeBootstrap();
 
   const inAuthGroup = segments[0] === "(auth)";

@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import EmergencyMap from "../../emergency/components/EmergencyMap";
 import type { MapEmergencyPin } from "../../emergency/components/EmergencyMap";
+import {
+  colorForEmergency,
+  emergencyTitleForType,
+  type EmergencyType,
+} from "../../emergency/constants/emergency.constants";
 
 import {
   Layers,
@@ -817,7 +822,9 @@ export default function LguLiveMapView(props: Props) {
                 ) : (
                   <div className="space-y-2">
                     {liveIncidents.map((incident) => {
-                      const isSos = String(incident.emergencyType).toUpperCase() === "SOS";
+                      const emergencyType = incident.emergencyType as EmergencyType;
+                      const emergencyTypeColor = colorForEmergency(emergencyType);
+                      const emergencyTypeLabel = emergencyTitleForType(emergencyType);
                       const status = String(incident.status || "unknown").toUpperCase();
                       const statusClass =
                         status === "ACTIVE"
@@ -841,13 +848,15 @@ export default function LguLiveMapView(props: Props) {
                               <div className="flex items-center gap-2">
                                 <span
                                   className={[
-                                    "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-black",
-                                    isSos
-                                      ? "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300"
-                                      : "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300",
+                                    "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-black",
                                   ].join(" ")}
+                                  style={{
+                                    backgroundColor: `${emergencyTypeColor}1A`,
+                                    color: emergencyTypeColor,
+                                    borderColor: `${emergencyTypeColor}4D`,
+                                  }}
                                 >
-                                  {incident.emergencyType}
+                                  {emergencyTypeLabel}
                                 </span>
                                 <span
                                   className={[

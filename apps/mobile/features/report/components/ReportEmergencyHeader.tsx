@@ -76,10 +76,10 @@ export function ReportEmergencyHeader({
         {showBackButton ? (
           <Pressable
             onPress={onBack}
-            className="h-10 w-10 items-center justify-center"
+            className="h-10 w-10 items-center justify-center ml-4"
             disabled={!onBack}
           >
-            <Ionicons name="arrow-back" size={20} color={onBack ? "#18181b" : "#a1a1aa"} />
+            <Ionicons name="arrow-back" size={21} color={onBack ? "#18181b" : "#a1a1aa"} />
           </Pressable>
         ) : (
           <View className="h-10 w-10" />

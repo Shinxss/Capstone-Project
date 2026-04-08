@@ -5,6 +5,7 @@ import { validate } from "../../middlewares/validate";
 import {
   getLguTasks,
   getMyActive,
+  getMyCompleted,
   getMyCurrent,
   getMyFocusStats,
   getMyPending,
@@ -47,6 +48,9 @@ router.get("/my/active", requireAuth, requireRole("VOLUNTEER"), getMyActive);
 
 // Volunteer gets current task (ACCEPTED or DONE)
 router.get("/my/current", requireAuth, requireRole("VOLUNTEER"), getMyCurrent);
+
+// Volunteer gets verified task history for Tasks "Completed" tab
+router.get("/my/completed", requireAuth, requireRole("VOLUNTEER"), getMyCompleted);
 
 // Volunteer gets daily focus stats for Tasks dashboard
 router.get("/my/focus-stats", requireAuth, requireRole("VOLUNTEER"), getMyFocusStats);

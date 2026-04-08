@@ -39,7 +39,7 @@ export const TASKS_TAB_CONFIG: TasksTabConfig[] = [
     key: "completed",
     label: "Completed",
     emptyTitle: "No verified tasks yet",
-    emptyDescription: "VERIFIED tasks will appear here once the backend exposes volunteer history.",
+    emptyDescription: "Verified tasks will appear here after LGU approval.",
   },
 ];
 

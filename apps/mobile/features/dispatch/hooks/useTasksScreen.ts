@@ -2,7 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DispatchOffer } from "../models/dispatch";
 import type { TasksTabKey, TasksTabItem } from "../models/dispatchTaskView";
 import { DEFAULT_TASKS_TAB, TASKS_TAB_CONFIG } from "../constants/dispatchUi.constants";
-import { fetchMyCurrentDispatch, fetchMyPendingDispatch } from "../services/dispatchApi";
+import {
+  fetchMyCompletedDispatches,
+  fetchMyCurrentDispatch,
+  fetchMyPendingDispatch,
+} from "../services/dispatchApi";
 import { usePullToRefresh } from "../../common/hooks/usePullToRefresh";
 import { connectRealtime, getRealtimeSocket } from "../../realtime/socketClient";
 import { useDispatchActions } from "./useDispatchActions";
@@ -38,6 +42,7 @@ export function useTasksScreen(params: UseTasksScreenParams) {
   const { enabled, mode, token } = params;
   const [pendingDispatch, setPendingDispatch] = useState<DispatchOffer | null>(null);
   const [currentDispatch, setCurrentDispatch] = useState<DispatchOffer | null>(null);
+  const [completedDispatches, setCompletedDispatches] = useState<DispatchOffer[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TasksTabKey>(DEFAULT_TASKS_TAB);
@@ -67,12 +72,14 @@ export function useTasksScreen(params: UseTasksScreenParams) {
       }
 
       try {
-        const [pending, current] = await Promise.all([
+        const [pending, current, completed] = await Promise.all([
           fetchMyPendingDispatch(),
           fetchMyCurrentDispatch(),
+          fetchMyCompletedDispatches(),
         ]);
         setPendingDispatch(pending);
         setCurrentDispatch(current);
+        setCompletedDispatches(completed);
         await refreshFocusStats({ showLoading: false });
       } catch {
         // Keep existing state on network failures.
@@ -95,6 +102,7 @@ export function useTasksScreen(params: UseTasksScreenParams) {
     if (!enabled) {
       setPendingDispatch(null);
       setCurrentDispatch(null);
+      setCompletedDispatches([]);
       setSearchQuery("");
       setLoading(false);
       setActiveTab(DEFAULT_TASKS_TAB);
@@ -124,11 +132,6 @@ export function useTasksScreen(params: UseTasksScreenParams) {
       socket.off("connect", syncDispatches);
     };
   }, [enabled, mode, refresh, token]);
-
-  const completedDispatches = useMemo<DispatchOffer[]>(() => {
-    // TODO: Replace with a volunteer completed-history endpoint once available from backend contracts.
-    return [];
-  }, []);
 
   const groups = useMemo(
     () =>

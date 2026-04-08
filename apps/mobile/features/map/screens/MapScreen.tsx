@@ -18,7 +18,7 @@ import * as Location from "expo-location";
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useMapStyle } from "../hooks/useMapStyle";
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import { Droplets, Construction, Flame, Mountain, ShieldAlert } from "lucide-react-native";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { api } from "../../../lib/api";
@@ -42,6 +42,11 @@ import { getEffectiveLocation } from "../../location/utils/getEffectiveLocation"
 import { useVolunteerMapFeed } from "../../realtime/hooks/useVolunteerMapFeed";
 import { connectRealtime } from "../../realtime/socketClient";
 import { useTheme } from "../../theme/useTheme";
+import {
+  getMobileEmergencyVisual,
+  mobileEmergencyTitle,
+  normalizeMobileEmergencyVisualType,
+} from "../../emergency/constants/emergencyVisuals";
 
 type HazardZone = {
   _id: string;
@@ -73,29 +78,6 @@ if (TOKEN) {
   Logger.setLogLevel("verbose");
 }
 
-const colorForType = (type: EmergencyType) => {
-  switch (type) {
-    case "Flood":
-      return "#2563EB";
-    case "Fire":
-      return "#DC2626";
-    case "Typhoon":
-      return "#B91C1C";
-    case "Earthquake":
-      return "#F59E0B";
-    case "Collapse":
-      return "#CA8A04";
-    case "Medical":
-      return "#10B981";
-    case "Other":
-      return "#64748B";
-    case "SOS":
-      return "#EF4444";
-    default:
-      return "#64748B";
-  }
-};
-
 const hazardColorForType = (raw?: string) => {
   const t = String(raw ?? "").toUpperCase();
   if (t === "FLOODED" || t === "FLOOD") return { fill: "#0ea5e9", line: "#0ea5e9" };
@@ -122,8 +104,8 @@ const MAP_TYPE_OPTIONS = [
 
 const EMERGENCY_LEGEND_ITEMS: EmergencyType[] = [
   "SOS",
-  "Flood",
   "Fire",
+  "Flood",
   "Typhoon",
   "Earthquake",
   "Collapse",
@@ -131,40 +113,15 @@ const EMERGENCY_LEGEND_ITEMS: EmergencyType[] = [
   "Other",
 ];
 
-// MaterialCommunityIcons mapping
-const mciForType = (type: EmergencyType) => {
-  switch (type) {
-    case "Fire":
-      return "fire";
-    case "Flood":
-      return "water";
-    case "Typhoon":
-      return "weather-hurricane";
-    case "Earthquake":
-      return "chart-bell-curve-cumulative";
-    case "Collapse":
-      return "home-city";
-    case "Medical":
-      return "medical-bag";
-    case "Other":
-      return "help-circle";
-    case "SOS":
-      return "alarm-light";
-    default:
-      return "alert";
-  }
-};
-
-function normalizeEmergencyType(raw: string): EmergencyType {
-  const normalized = String(raw ?? "").toUpperCase();
-  if (normalized === "FIRE") return "Fire";
-  if (normalized === "FLOOD") return "Flood";
-  if (normalized === "EARTHQUAKE") return "Earthquake";
-  if (normalized === "TYPHOON") return "Typhoon";
-  if (normalized === "COLLAPSE") return "Collapse";
-  if (normalized === "MEDICAL") return "Medical";
-  if (normalized === "OTHER") return "Other";
-  if (normalized === "SOS") return "SOS";
+function toMapEmergencyType(raw: unknown): EmergencyType {
+  const normalized = normalizeMobileEmergencyVisualType(raw);
+  if (normalized === "sos") return "SOS";
+  if (normalized === "fire") return "Fire";
+  if (normalized === "flood") return "Flood";
+  if (normalized === "typhoon") return "Typhoon";
+  if (normalized === "earthquake") return "Earthquake";
+  if (normalized === "collapse") return "Collapse";
+  if (normalized === "medical") return "Medical";
   return "Other";
 }
 
@@ -207,12 +164,12 @@ function mapDispatchToEmergency(dispatch: DispatchOffer | null | undefined): Eme
   const lat = Number(emergency?.lat);
   if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null;
 
-  const type = normalizeEmergencyType(String(emergency?.emergencyType ?? ""));
+  const type = toMapEmergencyType(String(emergency?.emergencyType ?? ""));
 
   return {
     id: incidentId,
     type,
-    title: `${type} Emergency`,
+    title: mobileEmergencyTitle(type),
     description: String(emergency?.notes ?? "").trim() || undefined,
     images: [],
     reportedAt: emergency?.reportedAt,
@@ -311,8 +268,9 @@ function spreadOverlappingEmergencyMarkers(items: Emergency[]): EmergencyMarkerP
  * Big pulse wave (RN Animated version of your CSS)
  */
 function PulseMarker({ type }: { type: EmergencyType }) {
-  const color = colorForType(type);
-  const icon = mciForType(type) as any;
+  const emergencyVisual = getMobileEmergencyVisual(type);
+  const color = emergencyVisual.markerColor;
+  const EmergencyTypeIcon = emergencyVisual.icon;
 
   const scale1 = useRef(new Animated.Value(0.2)).current;
   const scale2 = useRef(new Animated.Value(0.2)).current;
@@ -380,7 +338,7 @@ function PulseMarker({ type }: { type: EmergencyType }) {
 
       <View style={[styles.pin, { borderColor: hexToRgba(color, 0.95) }]}>
         <View style={styles.innerWave} />
-        <MaterialCommunityIcons name={icon} size={16} color={color} />
+        <EmergencyTypeIcon size={16} color={color} strokeWidth={2.3} />
       </View>
     </View>
   );
@@ -532,11 +490,11 @@ export default function MapTab() {
         items
           .filter((item) => !isClosedEmergencyStatus(item.status))
           .map((item) => {
-          const emergencyType = normalizeEmergencyType(item.type);
+          const emergencyType = toMapEmergencyType(item.type);
           return {
             id: item.incidentId,
             type: emergencyType,
-            title: `${emergencyType} Emergency`,
+            title: mobileEmergencyTitle(emergencyType),
             description: item.description,
             images: [],
             referenceNumber: item.referenceNumber,
@@ -1519,11 +1477,13 @@ export default function MapTab() {
                   <Text style={[styles.layersLegendSection, isDark ? styles.layersLegendSectionDark : null]}>Emergencies</Text>
                   <View style={styles.layersLegendList}>
                     {EMERGENCY_LEGEND_ITEMS.map((type) => {
-                      const color = colorForType(type);
+                      const emergencyVisual = getMobileEmergencyVisual(type);
+                      const color = emergencyVisual.markerColor;
+                      const EmergencyTypeIcon = emergencyVisual.icon;
                       return (
                         <View key={type} style={styles.layersLegendRow}>
                           <View style={[styles.layersEmergencySwatch, { borderColor: color }]}>
-                            <MaterialCommunityIcons name={mciForType(type) as any} size={11} color={color} />
+                            <EmergencyTypeIcon size={11} color={color} strokeWidth={2.3} />
                           </View>
                           <Text style={[styles.layersLegendText, isDark ? styles.layersLegendTextDark : null]}>{type}</Text>
                         </View>

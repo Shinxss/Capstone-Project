@@ -2,7 +2,11 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import mapboxgl from "mapbox-gl";
 import { createRoot, type Root } from "react-dom/client";
 import EmergencyMarker from "./EmergencyMarker";
-import type { EmergencyType } from "../constants/emergency.constants";
+import {
+  EMERGENCY_TYPE_LABEL,
+  colorForEmergency,
+  type EmergencyType,
+} from "../constants/emergency.constants";
 import { toastWarning } from "@/services/feedback/toast.service";
 
 export type MapEmergencyPin = {
@@ -158,17 +162,22 @@ export default function EmergencyMap({
   };
 
   const counts = useMemo(() => {
-    const byType: Record<string, number> = {};
+    const byType: Partial<Record<EmergencyType, number>> = {};
     for (const r of reports) byType[r.type] = (byType[r.type] ?? 0) + 1;
-
-    const sos = byType.SOS ?? 0;
-    const fire = byType.FIRE ?? 0;
-    const other = Object.entries(byType)
-      .filter(([k]) => k !== "SOS" && k !== "FIRE")
-      .reduce((acc, [, v]) => acc + (v ?? 0), 0);
-
-    return { byType, sos, fire, other };
+    return byType;
   }, [reports]);
+
+  const legendEntries = useMemo(
+    () =>
+      Object.entries(counts)
+        .map(([type, count]) => ({
+          type: type as EmergencyType,
+          count: Number(count ?? 0),
+        }))
+        .filter((entry) => entry.count > 0)
+        .sort((a, b) => b.count - a.count),
+    [counts]
+  );
 
   // ✅ IMPORTANT: prevent calling setStyle on first mount (causes your warning)
   const lastStyleRef = useRef<string | null>(null);
@@ -466,31 +475,25 @@ export default function EmergencyMap({
           </div>
 
           <div className="pointer-events-auto flex items-center gap-2 mr-12">
-            {legendVariant === "legacy" ? (
-              <>
-                <span className="px-3 py-1 rounded-full bg-red-500/20 text-red-200 border border-red-400/30 text-xs font-semibold backdrop-blur-md">
-                  {counts.sos} SOS
-                </span>
-                <span className="px-3 py-1 rounded-full bg-orange-500/20 text-orange-200 border border-orange-400/30 text-xs font-semibold backdrop-blur-md">
-                  {counts.fire} Fire
-                </span>
-                <span className="px-3 py-1 rounded-full bg-white/10 text-white border border-white/20 text-xs font-semibold backdrop-blur-md">
-                  {counts.other} Other
-                </span>
-              </>
-            ) : (
-              Object.entries(counts.byType)
-                .sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0))
-                .slice(0, 4)
-                .map(([type, n]) => (
+            {legendEntries
+              .slice(0, legendVariant === "legacy" ? 3 : 6)
+              .map((entry) => {
+                const color = colorForEmergency(entry.type);
+                const label = EMERGENCY_TYPE_LABEL[entry.type] ?? entry.type;
+                return (
                   <span
-                    key={type}
-                    className="px-3 py-1 rounded-full bg-white/10 text-white border border-white/20 text-xs font-semibold backdrop-blur-md"
+                    key={entry.type}
+                    className="px-3 py-1 rounded-full border text-xs font-semibold backdrop-blur-md"
+                    style={{
+                      backgroundColor: `${color}1F`,
+                      color: "#FFFFFF",
+                      borderColor: `${color}A8`,
+                    }}
                   >
-                    {n} {type}
+                    {entry.count} {label}
                   </span>
-                ))
-            )}
+                );
+              })}
           </div>
         </div>
       ) : null}

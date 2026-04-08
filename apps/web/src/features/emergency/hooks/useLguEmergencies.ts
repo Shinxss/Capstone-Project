@@ -3,16 +3,11 @@ import type { EmergencyReport, Reporter } from "../models/emergency.types";
 import { fetchEmergencyReports } from "../services/emergency.service";
 import type { DispatchTask } from "../../tasks/models/tasks.types";
 import { fetchLguTasksByStatus } from "../../tasks/services/tasksApi";
-
-export type EmergencyType =
-  | "SOS"
-  | "Flood"
-  | "Fire"
-  | "Typhoon"
-  | "Earthquake"
-  | "Collapse"
-  | "Medical"
-  | "Other";
+import {
+  emergencyTitleForType,
+  normalizeEmergencyType,
+  type EmergencyType,
+} from "../constants/emergency.constants";
 type Priority = "critical" | "high" | "medium";
 type Status = "active" | "in_progress" | "resolved" | "pending";
 
@@ -38,7 +33,7 @@ export type LguEmergencyItem = {
   progressPercent: number;
 };
 
-export type LguEmergencyTypeFilter = "ALL" | "SOS" | EmergencyType;
+export type LguEmergencyTypeFilter = "ALL" | EmergencyType;
 
 type DispatchVolunteerCounts = {
   assigned: number;
@@ -51,22 +46,6 @@ function toTimestamp(value?: string | null) {
   if (!value) return 0;
   const ts = new Date(value).getTime();
   return Number.isFinite(ts) ? ts : 0;
-}
-
-function normalizeType(raw?: string): EmergencyType {
-  const up = String(raw || "")
-    .trim()
-    .toUpperCase()
-    .replace(/[\s_-]+/g, "");
-  if (up === "SOS") return "SOS";
-  if (up === "FIRE") return "Fire";
-  if (up === "FLOOD") return "Flood";
-  if (up === "EARTHQUAKE") return "Earthquake";
-  if (up === "TYPHOON") return "Typhoon";
-  if (up === "COLLAPSE") return "Collapse";
-  if (up === "MEDICAL") return "Medical";
-  if (up === "OTHER" || up === "OTHERS") return "Other";
-  return "Other";
 }
 
 function normalizeStatus(raw?: string): Status {
@@ -212,7 +191,7 @@ function buildCompletedEmergencyIds(tasks: DispatchTask[]): Set<string> {
 }
 
 function toEmergencyItem(report: EmergencyReport, volunteerCounts?: DispatchVolunteerCounts): LguEmergencyItem {
-  const type = normalizeType(report.emergencyType);
+  const type = normalizeEmergencyType(report.emergencyType);
   const isSOS = type === "SOS";
   const created = report.reportedAt || report.createdAt || report.updatedAt;
   const volunteersAssigned = Number(volunteerCounts?.assigned ?? 0);
@@ -223,7 +202,7 @@ function toEmergencyItem(report: EmergencyReport, volunteerCounts?: DispatchVolu
   return {
     id: report._id,
     type,
-    title: isSOS ? "SOS Emergency" : `${type} Emergency`,
+    title: emergencyTitleForType(type),
     location: locationLabelFrom(report),
     reportedAt: created,
     reportedAtTimestamp,
@@ -326,7 +305,7 @@ export function useLguEmergencies() {
         item.title.toLowerCase().includes(query.toLowerCase()) ||
         item.reporterName.toLowerCase().includes(query.toLowerCase());
 
-      const matchesType = typeFilter === "ALL" ? true : typeFilter === "SOS" ? !!item.isSOS : item.type === typeFilter;
+      const matchesType = typeFilter === "ALL" ? true : item.type === typeFilter;
 
       return matchesQuery && matchesType;
     });

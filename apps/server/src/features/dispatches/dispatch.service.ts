@@ -237,6 +237,14 @@ export async function getMyCurrentDispatch(volunteerUserId: string) {
   }).sort({ updatedAt: -1 });
 }
 
+// Volunteer history for completed (verified) tasks
+export async function listMyCompletedDispatches(volunteerUserId: string) {
+  return DispatchOffer.find({
+    volunteerId: new Types.ObjectId(volunteerUserId),
+    status: "VERIFIED",
+  }).sort({ verifiedAt: -1, updatedAt: -1 });
+}
+
 export async function respondToDispatch(params: {
   dispatchId: string;
   volunteerUserId: string;

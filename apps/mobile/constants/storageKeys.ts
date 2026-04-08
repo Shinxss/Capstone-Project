@@ -7,4 +7,6 @@ export const STORAGE_KEYS = {
   ACTIVE_DISPATCH: "lifeline.dispatch.active.v1",
   DEV_WEATHER_OVERRIDE: "lifeline.dev.weather_override.v1",
   DEV_LOCATION_OVERRIDE: "lifeline.dev.location_override.v1",
+  MOBILE_NOTIFICATIONS: "lifeline.mobile.notifications.v1",
+  MOBILE_NOTIFICATIONS_META: "lifeline.mobile.notifications.meta.v1",
 } as const;

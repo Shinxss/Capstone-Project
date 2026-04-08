@@ -11,6 +11,7 @@ import {
 
 import EmptyState from "../../../components/ui/EmptyState";
 import type { EmergencyReport } from "../../emergency/models/emergency.types";
+import { emergencyTitleForType, normalizeEmergencyType } from "../../emergency/constants/emergency.constants";
 import type { DispatchTask, TaskProof } from "../../tasks/models/tasks.types";
 import { fetchTaskProofBlob } from "../../tasks/services/tasksApi";
 import type { LguEmergencyDetails, Volunteer } from "../models/lguLiveMap.types";
@@ -284,7 +285,7 @@ export default function EmergencyDetailsDrawer({
             </div>
 
             <div className="mt-3 text-xl font-black tracking-tight text-gray-900 dark:text-slate-100">
-              {String(emergency?.emergencyType ?? "Unknown").toUpperCase()}
+              {emergency ? emergencyTitleForType(normalizeEmergencyType(emergency.emergencyType)) : "Unknown"}
             </div>
 
             <div className="mt-2 flex items-center gap-2">

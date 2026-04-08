@@ -4,6 +4,7 @@ import {
   completeDispatch,
   createDispatchOffers,
   getMyActiveDispatch,
+  listMyCompletedDispatches,
   getMyCurrentDispatch,
   getMyPendingDispatch,
   listDispatchTasksForLgu,
@@ -102,6 +103,18 @@ export async function getMyCurrent(req: Request, res: Response) {
 
     const current = await getMyCurrentDispatch(String(userId));
     return res.json({ data: toDispatchDTO(current) });
+  } catch (e: any) {
+    return res.status(400).json({ message: e?.message ?? "Failed" });
+  }
+}
+
+export async function getMyCompleted(req: Request, res: Response) {
+  try {
+    const { role, userId } = getAuth(req);
+    if (role !== "VOLUNTEER") return res.status(403).json({ message: "Forbidden" });
+
+    const completed = await listMyCompletedDispatches(String(userId));
+    return res.json({ data: completed.map(toDispatchDTO), count: completed.length });
   } catch (e: any) {
     return res.status(400).json({ message: e?.message ?? "Failed" });
   }

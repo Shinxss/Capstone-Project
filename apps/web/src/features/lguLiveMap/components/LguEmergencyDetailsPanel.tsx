@@ -3,6 +3,7 @@ import { Clock3, Image as ImageIcon, ImageOff, X } from "lucide-react";
 
 import { fetchTaskProofBlob } from "@/features/tasks/services/tasksApi";
 import type { EmergencyReport } from "../../emergency/models/emergency.types";
+import { emergencyTitleForType } from "../../emergency/constants/emergency.constants";
 import type { DispatchTask } from "../../tasks/models/tasks.types";
 import type { LguEmergencyDetails, Volunteer } from "../models/lguLiveMap.types";
 
@@ -304,7 +305,7 @@ export default function LguEmergencyDetailsPanel({
   if (!open || !emergencyDetails) return null;
 
   const severity = severityLabel(emergencyDetails.emergencyType);
-  const title = `${emergencyDetails.emergencyType} Emergency`;
+  const title = emergencyTitleForType(emergencyDetails.emergencyType);
   const reportId = emergencyReport?.referenceNumber || emergencyDetails.id;
   const reportedTime = emergencyReport?.reportedAt || emergencyReport?.createdAt || emergencyDetails.reportedAt;
   const coverPhoto = photoThumbs[0];
