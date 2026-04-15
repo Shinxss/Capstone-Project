@@ -73,6 +73,49 @@ export async function listVolunteers(req: AuthedRequest, res: Response) {
   }
 }
 
+export async function listDispatchResponders(req: AuthedRequest, res: Response) {
+  try {
+    if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+
+    const role = String(req.user.role ?? "");
+    if (!role || !["LGU", "ADMIN"].includes(role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const includeInactive = String(req.query.includeInactive ?? "false") === "true";
+    const onlyOnDuty = String(req.query.onlyOnDuty ?? "true") !== "false";
+    const q = String(req.query.q ?? "").trim() || undefined;
+    const barangay = String(req.query.barangay ?? "").trim() || undefined;
+    const teamId = String(req.query.teamId ?? "").trim() || undefined;
+    const limitRaw = Number(req.query.limit);
+    const limit = Number.isFinite(limitRaw) ? Math.min(200, Math.max(1, limitRaw)) : undefined;
+
+    let scopeBarangay: string | undefined;
+    if (role === "LGU") {
+      const actor = await User.findById(req.user.id).select("barangay").lean();
+      scopeBarangay = String(actor?.barangay ?? "").trim() || undefined;
+
+      if (!scopeBarangay) {
+        return res.status(403).json({ message: "LGU account has no barangay scope" });
+      }
+    }
+
+    const items = await userService.listDispatchResponders({
+      includeInactive,
+      onlyOnDuty,
+      q,
+      barangay,
+      teamId,
+      scopeBarangay,
+      limit,
+    });
+
+    return res.json({ data: items });
+  } catch (err: any) {
+    return res.status(500).json({ message: err?.message ?? "Server error" });
+  }
+}
+
 export async function uploadMyAvatar(req: AuthedRequest, res: Response) {
   try {
     const userId = req.userId ?? req.user?.id;

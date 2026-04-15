@@ -113,8 +113,9 @@ function PersonalInfoRow({
 
 export default function ProfilePersonalInfoCard({ summary, onPressHeader, onPressRow }: ProfilePersonalInfoCardProps) {
   const { isDark } = useTheme();
-  const isVolunteer = String(summary.role ?? "").trim().toUpperCase() === "VOLUNTEER";
-  const hasCommunitySkills = !isVolunteer && Boolean(String(summary.skills ?? "").trim());
+  const normalizedRole = String(summary.role ?? "").trim().toUpperCase();
+  const isDispatchAssignee = normalizedRole === "VOLUNTEER" || normalizedRole === "RESPONDER";
+  const hasNonAssigneeSkills = !isDispatchAssignee && Boolean(String(summary.skills ?? "").trim());
   const formattedSkills = formatSkillsDisplayText(summary.skills);
 
   const rows: PersonalInfoRowItem[] = [
@@ -144,7 +145,7 @@ export default function ProfilePersonalInfoCard({ summary, onPressHeader, onPres
     },
   ];
 
-  if (isVolunteer || hasCommunitySkills) {
+  if (isDispatchAssignee || hasNonAssigneeSkills) {
     rows.push({
       key: "skills",
       icon: "shield-checkmark-outline",

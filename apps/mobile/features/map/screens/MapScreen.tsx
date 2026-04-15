@@ -363,7 +363,7 @@ export default function MapTab() {
     clear: clearDevLoc,
   } = useDevLocationOverride();
   const normalizedRole = useMemo(() => String(user?.role ?? "").trim().toUpperCase(), [user?.role]);
-  const isVolunteer = mode === "authed" && normalizedRole === "VOLUNTEER";
+  const isDispatchAssignee = mode === "authed" && (normalizedRole === "VOLUNTEER" || normalizedRole === "RESPONDER");
   const isCommunityUser = mode === "authed" && normalizedRole === "COMMUNITY";
   const canViewEmergencies = mode === "authed";
   const canViewUnapprovedEmergencyReports =
@@ -380,11 +380,11 @@ export default function MapTab() {
   }, [mapRouteParams.reportLat, mapRouteParams.reportLng]);
   const { activeDispatch, refresh: refreshActiveDispatch } = useActiveDispatch({
     pollMs: 10000,
-    enabled: isVolunteer,
+    enabled: isDispatchAssignee,
   });
   const { pendingDispatch, refresh: refreshPendingDispatch } = usePendingDispatch({
     pollMs: 10000,
-    enabled: isVolunteer,
+    enabled: isDispatchAssignee,
   });
 
   const [myLocation, setMyLocation] = useState<[number, number] | null>(null);
@@ -461,7 +461,7 @@ export default function MapTab() {
       return;
     }
 
-    if (isVolunteer) {
+    if (isDispatchAssignee) {
       const assigned = [pendingDispatch, activeDispatch]
         .map(mapDispatchToEmergency)
         .filter((item): item is Emergency => Boolean(item));
@@ -519,7 +519,7 @@ export default function MapTab() {
     canViewEmergencies,
     canViewUnapprovedEmergencyReports,
     isCommunityUser,
-    isVolunteer,
+    isDispatchAssignee,
     pendingDispatch,
   ]);
 
@@ -636,7 +636,7 @@ export default function MapTab() {
   const [isMapReady, setIsMapReady] = useState(false);
 
   useEffect(() => {
-    if (!isFocused || !isVolunteer) return;
+    if (!isFocused || !isDispatchAssignee) return;
     if (!activeDispatch?.id) return;
     if (!myLocation) return;
 
@@ -648,10 +648,10 @@ export default function MapTab() {
       lng: myLocation[0],
       lat: myLocation[1],
     }).catch(() => undefined);
-  }, [activeDispatch?.id, isFocused, isVolunteer, myLocation]);
+  }, [activeDispatch?.id, isFocused, isDispatchAssignee, myLocation]);
 
   useEffect(() => {
-    if (!isFocused || !isVolunteer || !token || !myLocation) return;
+    if (!isFocused || !isDispatchAssignee || !token || !myLocation) return;
 
     const now = Date.now();
     if (now - lastSocketLocationUpdateAtRef.current < 4000) return;
@@ -664,7 +664,7 @@ export default function MapTab() {
       lng: myLocation[0],
       lat: myLocation[1],
     });
-  }, [isFocused, isVolunteer, myLocation, token]);
+  }, [isFocused, isDispatchAssignee, myLocation, token]);
 
   // draggable "Google Maps-ish" sheet
   const layersSheetRef = useRef<BottomSheet>(null);
@@ -792,7 +792,7 @@ export default function MapTab() {
   const refreshActiveDispatchRef = useRef(refreshActiveDispatch);
 
   useEffect(() => {
-    if (!isFocused || !isVolunteer || !isMapReady) return;
+    if (!isFocused || !isDispatchAssignee || !isMapReady) return;
     if (emergencySheet.sheetMode === "directions") return;
 
     const dispatchId = String(activeDispatch?.id ?? "").trim();
@@ -839,7 +839,7 @@ export default function MapTab() {
     emergencySheet.sheetMode,
     isFocused,
     isMapReady,
-    isVolunteer,
+    isDispatchAssignee,
   ]);
 
   useEffect(() => {

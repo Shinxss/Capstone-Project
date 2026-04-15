@@ -187,13 +187,7 @@ function applyTabFilter(items: MyRequestSummary[], tab: MyRequestStatusTab): MyR
   }
 
   if (tab === "review") {
-    return items
-      .filter((item) => toMyRequestStatusTabFromLabel(item.trackingLabel) === "resolved")
-      .map((item) => ({
-        ...item,
-        trackingLabel: "Review",
-        trackingStatus: "Review",
-      }));
+    return items.filter((item) => toMyRequestStatusTabFromLabel(item.trackingLabel) === "review");
   }
 
   return items.filter((item) => toMyRequestStatusTabFromLabel(item.trackingLabel) === tab);
@@ -260,7 +254,7 @@ export async function getCountsByStatus(): Promise<MyRequestCountsByStatus> {
 
 export async function getMyRequests(params: { tab: MyRequestStatusTab }): Promise<MyRequestSummary[]> {
   const tab = normalizeMyRequestStatusTab(params.tab, "all");
-  const requestTab: MyRequestStatusTab = tab === "cancelled" ? "all" : tab;
+  const requestTab: MyRequestStatusTab = tab;
   let primaryError: unknown = null;
   let primaryFiltered: MyRequestSummary[] = [];
 
@@ -276,7 +270,7 @@ export async function getMyRequests(params: { tab: MyRequestStatusTab }): Promis
     if (tab === "all" && primaryFiltered.length > 0) {
       const hasHistoryItem = primaryFiltered.some((item) => {
         const itemTab = toMyRequestStatusTabFromLabel(item.trackingLabel);
-        return itemTab === "resolved" || itemTab === "cancelled";
+        return itemTab === "review" || itemTab === "resolved" || itemTab === "cancelled";
       });
       if (hasHistoryItem) {
         return primaryFiltered;

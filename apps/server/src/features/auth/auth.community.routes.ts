@@ -66,16 +66,28 @@ communityAuthRouter.post("/register", registerLimiter, validate(communityRegiste
 
 communityAuthRouter.post("/login", loginLimiter, validate(communityLoginSchema), async (req, res) => {
   try {
-    const { email, password } = req.body as { email: string; password: string };
-    const cleanEmail = email.trim().toLowerCase();
+    const { identifier, email, password } = req.body as {
+      identifier?: string;
+      email?: string;
+      password: string;
+    };
+    const rawIdentifier = String(identifier ?? email ?? "").trim();
+    if (!rawIdentifier) {
+      return res.status(400).json({ success: false, error: "Email or username is required." });
+    }
+
+    const normalizedIdentifier = rawIdentifier.toLowerCase();
     const user = await User.findOne({
-      email: cleanEmail,
       role: { $in: ["COMMUNITY", "VOLUNTEER", "RESPONDER"] },
+      $or: [
+        { email: normalizedIdentifier },
+        { username: rawIdentifier },
+      ],
     });
 
     if (!user) {
       await logSecurityEvent(req, AUDIT_EVENT.AUTH_LOGIN_FAIL, "FAIL", {
-        actorEmail: cleanEmail,
+        actorIdentifier: rawIdentifier,
         reason: "INVALID_CREDENTIALS",
       });
       return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });
@@ -83,7 +95,7 @@ communityAuthRouter.post("/login", loginLimiter, validate(communityLoginSchema),
 
     if (!user.isActive) {
       await logSecurityEvent(req, AUDIT_EVENT.AUTH_LOGIN_FAIL, "FAIL", {
-        actorEmail: cleanEmail,
+        actorIdentifier: rawIdentifier,
         accountStatus: "SUSPENDED",
         reason: "ACCOUNT_SUSPENDED",
       });
@@ -96,7 +108,7 @@ communityAuthRouter.post("/login", loginLimiter, validate(communityLoginSchema),
 
     if (!user.emailVerified || !user.passwordHash) {
       await logSecurityEvent(req, AUDIT_EVENT.AUTH_LOGIN_FAIL, "FAIL", {
-        actorEmail: cleanEmail,
+        actorIdentifier: rawIdentifier,
         reason: "INVALID_CREDENTIALS",
       });
       return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });
@@ -105,7 +117,7 @@ communityAuthRouter.post("/login", loginLimiter, validate(communityLoginSchema),
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) {
       await logSecurityEvent(req, AUDIT_EVENT.AUTH_LOGIN_FAIL, "FAIL", {
-        actorEmail: cleanEmail,
+        actorIdentifier: rawIdentifier,
         reason: "INVALID_CREDENTIALS",
       });
       return res.status(401).json({ success: false, error: INVALID_CREDENTIALS });

@@ -1,25 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Pressable,
-  SectionList,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Swipeable } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { NotificationFilterTabs } from "../components/NotificationFilterTabs";
+import { NotificationSearchBar } from "../components/NotificationSearchBar";
+import { NotificationSectionList } from "../components/NotificationSectionList";
 import { NotificationsActionsMenu } from "../components/NotificationsActionsMenu";
-import { NotificationsCard } from "../components/NotificationsCard";
-import { NotificationsDetailModal } from "../components/NotificationsDetailModal";
 import { NotificationsDeleteConfirmModal } from "../components/NotificationsDeleteConfirmModal";
+import { NotificationsDetailModal } from "../components/NotificationsDetailModal";
 import { NotificationsEmptyState } from "../components/NotificationsEmptyState";
 import { NotificationsHeader } from "../components/NotificationsHeader";
 import { NotificationsListSkeleton } from "../components/NotificationsListSkeleton";
-import { NotificationsSummaryBanner } from "../components/NotificationsSummaryBanner";
-import { NotificationsTabs } from "../components/NotificationsTabs";
-import { useNotifications } from "../hooks/useNotifications";
+import { useNotificationsScreenModel } from "../hooks/useNotificationsScreenModel";
 import type { MobileNotificationItem } from "../models/mobileNotification";
 import { useTheme } from "../../theme/useTheme";
 
@@ -27,8 +21,8 @@ export default function NotificationsScreen() {
   const router = useRouter();
   const { isDark } = useTheme();
   const insets = useSafeAreaInsets();
-  const vm = useNotifications();
-  const [actionsVisible, setActionsVisible] = useState(false);
+  const vm = useNotificationsScreenModel();
+
   const [detailItem, setDetailItem] = useState<MobileNotificationItem | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
@@ -38,14 +32,9 @@ export default function NotificationsScreen() {
   const swipeableRefs = useRef<Record<string, Swipeable | null>>({});
   const openSwipeableIdRef = useRef<string | null>(null);
 
-  const sectionData = useMemo(
-    () => vm.sections.map((section) => ({ ...section, data: section.items })),
-    [vm.sections]
-  );
-
   const detailTitle = detailItem ? vm.titleForItem(detailItem) : "";
-  const detailTime = detailItem ? vm.formatTime(detailItem.createdAt) : "";
-  const visibleIds = useMemo(() => vm.filteredItems.map((item) => item.id), [vm.filteredItems]);
+  const detailTime = detailItem ? vm.formatItemTime(detailItem.createdAt) : "";
+  const visibleIds = useMemo(() => vm.filtered.map((item) => item.id), [vm.filtered]);
   const allSelected = useMemo(
     () => visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id)),
     [selectedIds, visibleIds]
@@ -161,30 +150,11 @@ export default function NotificationsScreen() {
     setSelectedIds([]);
   };
 
-  const renderSwipeDeleteAction = (item: MobileNotificationItem) => (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`Delete ${vm.titleForItem(item)} notification`}
-      onPress={() => {
-        closeActiveSwipeable();
-        openDeleteConfirm([item.id]);
-      }}
-      style={({ pressed }) => [
-        styles.swipeDeleteAction,
-        isDark ? styles.swipeDeleteActionDark : null,
-        pressed ? styles.swipeDeleteActionPressed : null,
-      ]}
-    >
-      <Ionicons name="trash-outline" size={18} color="#FFFFFF" />
-      <Text style={styles.swipeDeleteText}>Delete</Text>
-    </Pressable>
-  );
-
   return (
     <View style={[styles.safe, isDark ? styles.safeDark : styles.safeLight]}>
       <NotificationsHeader
         onPressBack={() => router.back()}
-        onPressMenu={selectionMode ? undefined : () => setActionsVisible(true)}
+        onPressMenu={selectionMode ? undefined : () => vm.setActionsVisible(true)}
         unreadCount={vm.unreadCount}
         selectionMode={selectionMode}
         selectedCount={selectedCount}
@@ -193,21 +163,19 @@ export default function NotificationsScreen() {
         onCancelSelection={onCancelSelection}
       />
 
-      {selectionMode ? null : (
-        <>
-          <NotificationsTabs
-            activeTab={vm.filter}
-            onTabChange={vm.setFilter}
-            unreadByFilter={vm.unreadByFilter}
-          />
+      <NotificationSearchBar
+        value={vm.searchValue}
+        onChangeText={vm.setSearchValue}
+      />
 
-          <NotificationsSummaryBanner
-            unreadCount={vm.unreadCount}
-            disabled={vm.unreadCount === 0}
-            onPressMarkAllRead={onMarkAllRead}
-          />
-        </>
-      )}
+      <NotificationFilterTabs
+        visible={!selectionMode}
+        activeTab={vm.filterTab}
+        onTabChange={vm.setFilterTab}
+        unreadByFilter={vm.unreadByFilter}
+        unreadCount={vm.unreadCount}
+        onPressMarkAllRead={onMarkAllRead}
+      />
 
       {vm.error ? (
         <View style={[styles.errorBanner, isDark ? styles.errorBannerDark : null]}>
@@ -227,82 +195,51 @@ export default function NotificationsScreen() {
 
       {vm.loading ? (
         <NotificationsListSkeleton />
-      ) : sectionData.length === 0 ? (
+      ) : vm.sections.length === 0 ? (
         <NotificationsEmptyState
           title={vm.emptyState.title}
           body={vm.emptyState.body}
         />
       ) : (
-        <SectionList
-          sections={sectionData}
-          keyExtractor={(item) => item.id}
+        <NotificationSectionList
+          sections={vm.sections}
+          isDark={isDark}
+          selectionMode={selectionMode}
+          selectedIds={selectedIds}
           refreshing={vm.refreshing}
-          onScrollBeginDrag={() => closeActiveSwipeable()}
           onRefresh={() => {
             void vm.onRefresh();
           }}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.listContent}
-          renderSectionHeader={({ section }) => (
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionLabel, isDark ? styles.sectionLabelDark : null]}>
-                {section.label}
-              </Text>
-              <View style={[styles.sectionDivider, isDark ? styles.sectionDividerDark : null]} />
-            </View>
-          )}
-          renderItem={({ item }) => (
-            selectionMode ? (
-              <NotificationsCard
-                item={item}
-                title={vm.titleForItem(item)}
-                iconName={vm.iconForItem(item) as React.ComponentProps<typeof Ionicons>["name"]}
-                timeLabel={vm.formatTime(item.createdAt)}
-                showChevron={false}
-                selectionMode
-                selected={selectedIds.includes(item.id)}
-                onLongPress={onLongPressCard}
-                onToggleSelect={(nextItem) => {
-                  setSelectedIds((prev) =>
-                    prev.includes(nextItem.id)
-                      ? prev.filter((id) => id !== nextItem.id)
-                      : [...prev, nextItem.id]
-                  );
-                }}
-                onPress={(nextItem) => {
-                  void onOpenCard(nextItem);
-                }}
-              />
-            ) : (
-              <Swipeable
-                ref={(ref) => bindSwipeableRef(item.id, ref)}
-                overshootRight={false}
-                onSwipeableWillOpen={() => {
-                  closeActiveSwipeable(item.id);
-                  openSwipeableIdRef.current = item.id;
-                }}
-                onSwipeableClose={() => {
-                  if (openSwipeableIdRef.current === item.id) {
-                    openSwipeableIdRef.current = null;
-                  }
-                }}
-                renderRightActions={() => renderSwipeDeleteAction(item)}
-              >
-                <NotificationsCard
-                  item={item}
-                  title={vm.titleForItem(item)}
-                  iconName={vm.iconForItem(item) as React.ComponentProps<typeof Ionicons>["name"]}
-                  timeLabel={vm.formatTime(item.createdAt)}
-                  showChevron={vm.canNavigate(item)}
-                  onLongPress={onLongPressCard}
-                  onPress={(nextItem) => {
-                    void onOpenCard(nextItem);
-                  }}
-                />
-              </Swipeable>
-            )
-          )}
-          ItemSeparatorComponent={() => <View style={styles.itemGap} />}
+          onScrollBeginDrag={() => closeActiveSwipeable()}
+          onOpenItem={(item) => {
+            void onOpenCard(item);
+          }}
+          onLongPressItem={onLongPressCard}
+          onToggleSelectItem={(item) => {
+            setSelectedIds((prev) =>
+              prev.includes(item.id)
+                ? prev.filter((id) => id !== item.id)
+                : [...prev, item.id]
+            );
+          }}
+          onDeleteItem={(item) => {
+            closeActiveSwipeable();
+            openDeleteConfirm([item.id]);
+          }}
+          bindSwipeableRef={bindSwipeableRef}
+          onSwipeableWillOpen={(id) => {
+            closeActiveSwipeable(id);
+            openSwipeableIdRef.current = id;
+          }}
+          onSwipeableClose={(id) => {
+            if (openSwipeableIdRef.current === id) {
+              openSwipeableIdRef.current = null;
+            }
+          }}
+          titleForItem={vm.titleForItem}
+          iconForItem={vm.iconForItem}
+          formatItemTime={vm.formatItemTime}
+          canNavigate={vm.canNavigate}
         />
       )}
 
@@ -333,12 +270,12 @@ export default function NotificationsScreen() {
         </View>
       ) : (
         <NotificationsActionsMenu
-          visible={actionsVisible}
+          visible={vm.actionsVisible}
           canMarkAllRead={vm.unreadCount > 0}
-          onClose={() => setActionsVisible(false)}
+          onClose={() => vm.setActionsVisible(false)}
           onPressMarkAllRead={() => {
             void onMarkAllRead();
-            setActionsVisible(false);
+            vm.setActionsVisible(false);
           }}
         />
       )}
@@ -416,60 +353,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800",
     color: "#DC2626",
-  },
-  listContent: {
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 26,
-  },
-  sectionHeader: {
-    paddingTop: 8,
-    paddingBottom: 8,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  sectionLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#6B7280",
-    textTransform: "uppercase",
-    letterSpacing: 0.35,
-  },
-  sectionLabelDark: {
-    color: "#94A3B8",
-  },
-  sectionDivider: {
-    flex: 1,
-    height: 1,
-    marginLeft: 8,
-    backgroundColor: "#D1D5DB",
-  },
-  sectionDividerDark: {
-    backgroundColor: "#334155",
-  },
-  itemGap: {
-    height: 10,
-  },
-  swipeDeleteAction: {
-    width: 90,
-    borderRadius: 12,
-    backgroundColor: "#DC2626",
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: 8,
-    paddingHorizontal: 8,
-  },
-  swipeDeleteActionDark: {
-    backgroundColor: "#B91C1C",
-  },
-  swipeDeleteActionPressed: {
-    opacity: 0.78,
-  },
-  swipeDeleteText: {
-    marginTop: 4,
-    fontSize: 12,
-    fontWeight: "800",
-    color: "#FFFFFF",
   },
   selectionDeleteBar: {
     borderTopWidth: 1,

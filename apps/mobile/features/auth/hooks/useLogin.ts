@@ -31,7 +31,7 @@ export function useLogin() {
     clearError: clearGoogleError,
   } = useGoogleLogin();
 
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
@@ -80,7 +80,7 @@ export function useLogin() {
     setError(null);
     clearGoogleError();
 
-    const validation = validateLogin({ email, password });
+    const validation = validateLogin({ identifier, password });
     if (validation) {
       setError(validation);
       return;
@@ -88,7 +88,7 @@ export function useLogin() {
 
     setLoading(true);
     try {
-      await signIn(email.trim(), password);
+      await signIn(identifier.trim(), password);
       setFailedAttempts(0);
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.status === 429) {
@@ -114,7 +114,7 @@ export function useLogin() {
       setLoading(false);
     }
   }, [
-    email,
+    identifier,
     password,
     loading,
     googleLoading,
@@ -139,14 +139,14 @@ export function useLogin() {
   }, [loading, googleLoading, clearGoogleError, continueAsGuest]);
 
   return {
-    email,
+    identifier,
     password,
     showPassword,
     loading,
     googleLoading,
     error: cooldownMessage ?? error ?? googleError,
     loginCooldownSeconds: cooldownRemainingSeconds,
-    setEmail,
+    setIdentifier,
     setPassword,
     toggleShowPassword: () => setShowPassword((s) => !s),
     onLogin,

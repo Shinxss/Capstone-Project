@@ -40,35 +40,35 @@ router.post("/", requireAuth, requireRole("LGU", "ADMIN"), validate(createDispat
 // e.g. GET /api/dispatches?status=ACCEPTED or status=DONE
 router.get("/", requireAuth, requireRole("LGU", "ADMIN"), validate(listTasksQuerySchema, "query"), getLguTasks);
 
-// Volunteer polls pending offers
-router.get("/my/pending", requireAuth, requireRole("VOLUNTEER"), getMyPending);
+// Volunteer/Responder polls pending offers
+router.get("/my/pending", requireAuth, requireRole("VOLUNTEER", "RESPONDER"), getMyPending);
 
-// Volunteer gets active accepted dispatch (Map)
-router.get("/my/active", requireAuth, requireRole("VOLUNTEER"), getMyActive);
+// Volunteer/Responder gets active accepted dispatch (Map)
+router.get("/my/active", requireAuth, requireRole("VOLUNTEER", "RESPONDER"), getMyActive);
 
-// Volunteer gets current task (ACCEPTED or DONE)
-router.get("/my/current", requireAuth, requireRole("VOLUNTEER"), getMyCurrent);
+// Volunteer/Responder gets current task (ACCEPTED or DONE)
+router.get("/my/current", requireAuth, requireRole("VOLUNTEER", "RESPONDER"), getMyCurrent);
 
-// Volunteer gets verified task history for Tasks "Completed" tab
-router.get("/my/completed", requireAuth, requireRole("VOLUNTEER"), getMyCompleted);
+// Volunteer/Responder gets verified task history for Tasks "Completed" tab
+router.get("/my/completed", requireAuth, requireRole("VOLUNTEER", "RESPONDER"), getMyCompleted);
 
-// Volunteer gets daily focus stats for Tasks dashboard
-router.get("/my/focus-stats", requireAuth, requireRole("VOLUNTEER"), getMyFocusStats);
+// Volunteer/Responder gets daily focus stats for Tasks dashboard
+router.get("/my/focus-stats", requireAuth, requireRole("VOLUNTEER", "RESPONDER"), getMyFocusStats);
 
-// Volunteer responds to a pending offer
-router.patch("/:id/respond", requireAuth, requireRole("VOLUNTEER"), validate(dispatchIdParamsSchema, "params"), validate(respondSchema), patchRespond);
+// Volunteer/Responder responds to a pending offer
+router.patch("/:id/respond", requireAuth, requireRole("VOLUNTEER", "RESPONDER"), validate(dispatchIdParamsSchema, "params"), validate(respondSchema), patchRespond);
 
-// Volunteer uploads proof (base64)
-router.post("/:id/proof", requireAuth, requireRole("VOLUNTEER"), validate(dispatchIdParamsSchema, "params"), validate(proofSchema), postProof);
+// Volunteer/Responder uploads proof (base64)
+router.post("/:id/proof", requireAuth, requireRole("VOLUNTEER", "RESPONDER"), validate(dispatchIdParamsSchema, "params"), validate(proofSchema), postProof);
 
-// Volunteer marks as done
-router.patch("/:id/complete", requireAuth, requireRole("VOLUNTEER"), validate(dispatchIdParamsSchema, "params"), patchComplete);
+// Volunteer/Responder marks as done
+router.patch("/:id/complete", requireAuth, requireRole("VOLUNTEER", "RESPONDER"), validate(dispatchIdParamsSchema, "params"), patchComplete);
 
-// Volunteer pushes latest location for community-side live tracking
+// Volunteer/Responder pushes latest location for community-side live tracking
 router.patch(
   "/:id/location",
   requireAuth,
-  requireRole("VOLUNTEER"),
+  requireRole("VOLUNTEER", "RESPONDER"),
   validate(dispatchIdParamsSchema, "params"),
   validate(dispatchLocationUpdateSchema),
   patchLocation

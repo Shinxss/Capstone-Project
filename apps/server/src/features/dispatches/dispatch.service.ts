@@ -83,16 +83,23 @@ export async function createDispatchOffers(input: CreateDispatchInput) {
     throw new Error("volunteerIds is required");
   }
 
-  // Ensure volunteers exist and are approved volunteers
-  const volunteers = await User.find({
+  // Maintain backward compatibility with volunteer dispatch while also allowing
+  // responder accounts to share the same assignment pipeline.
+  const assignees = await User.find({
     _id: { $in: uniqVolunteerIds },
-    role: "VOLUNTEER",
-    volunteerStatus: "APPROVED",
-  }).select("_id");
+    role: { $in: ["VOLUNTEER", "RESPONDER"] },
+    isActive: true,
+  }).select("_id role volunteerStatus");
 
-  const validVolunteerIds = volunteers.map((v) => String(v._id));
+  const validVolunteerIds = assignees
+    .filter((assignee: any) => {
+      const role = String(assignee.role ?? "").toUpperCase();
+      if (role === "RESPONDER") return true;
+      return String(assignee.volunteerStatus ?? "").toUpperCase() === "APPROVED";
+    })
+    .map((assignee: any) => String(assignee._id));
   if (validVolunteerIds.length === 0) {
-    throw new Error("No valid approved volunteers found");
+    throw new Error("No valid approved volunteers or active responders found");
   }
 
   if (Types.ObjectId.isValid(reporterUserId) && validVolunteerIds.includes(reporterUserId)) {
@@ -751,7 +758,7 @@ export async function listDispatchTasksForLgu(params: { statuses: DispatchStatus
   }
 
   return DispatchOffer.find(query)
-    .populate({ path: "volunteerId", select: "firstName lastName email lifelineId avatarUrl" })
+    .populate({ path: "volunteerId", select: "firstName lastName email role lifelineId avatarUrl" })
     .sort({ updatedAt: -1 })
     .lean();
 }
@@ -767,6 +774,7 @@ export function toDispatchDTO(doc: any) {
     ? {
         id: String(vol._id ?? vol),
         lifelineId: String(vol.lifelineId ?? "").trim() || undefined,
+        role: String(vol.role ?? "").trim().toUpperCase() || undefined,
         name: [vol.firstName, vol.lastName].filter(Boolean).join(" ").trim() || vol.email || "Volunteer",
         avatarUrl: String(vol.avatarUrl ?? "").trim() || undefined,
       }

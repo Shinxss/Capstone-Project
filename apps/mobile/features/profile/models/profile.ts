@@ -81,6 +81,15 @@ export function isVolunteerRole(role?: string | null) {
   return String(role ?? "").trim().toUpperCase() === "VOLUNTEER";
 }
 
+export function isResponderRole(role?: string | null) {
+  return String(role ?? "").trim().toUpperCase() === "RESPONDER";
+}
+
+export function isDispatchAssigneeRole(role?: string | null) {
+  const normalizedRole = String(role ?? "").trim().toUpperCase();
+  return normalizedRole === "VOLUNTEER" || normalizedRole === "RESPONDER";
+}
+
 export function isCommunityRole(role?: string | null) {
   return String(role ?? "").trim().toUpperCase() === "COMMUNITY";
 }
@@ -165,7 +174,10 @@ export function normalizeProfileSummary(raw: any): ProfileSummary {
 
 export function formatProfileRoleLabel(role?: string | null) {
   const normalized = String(role ?? "").trim().toUpperCase();
+  if (normalized === "RESPONDER") return "Responder";
   if (normalized === "VOLUNTEER") return "Volunteer";
+  if (normalized === "LGU") return "LGU";
+  if (normalized === "ADMIN") return "Admin";
   return "Community";
 }
 

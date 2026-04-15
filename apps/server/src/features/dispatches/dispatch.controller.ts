@@ -24,7 +24,11 @@ import { emitNotificationsRefresh } from "../../realtime/notificationsSocket";
 function getAuth(req: Request) {
   const role = (req as any).user?.role ?? (req as any).role;
   const userId = (req as any).user?.id ?? (req as any).userId;
-  return { role: String(role || ""), userId: String(userId || "") };
+  return { role: String(role || "").trim().toUpperCase(), userId: String(userId || "").trim() };
+}
+
+function isDispatchAssigneeRole(role: string) {
+  return role === "VOLUNTEER" || role === "RESPONDER";
 }
 
 export async function postDispatchOffers(req: Request, res: Response) {
@@ -75,7 +79,7 @@ export async function postDispatchOffers(req: Request, res: Response) {
 export async function getMyPending(req: Request, res: Response) {
   try {
     const { role, userId } = getAuth(req);
-    if (role !== "VOLUNTEER") return res.status(403).json({ message: "Forbidden" });
+    if (!isDispatchAssigneeRole(role)) return res.status(403).json({ message: "Forbidden" });
 
     const pending = await getMyPendingDispatch(String(userId));
     return res.json({ data: toDispatchDTO(pending) });
@@ -87,7 +91,7 @@ export async function getMyPending(req: Request, res: Response) {
 export async function getMyActive(req: Request, res: Response) {
   try {
     const { role, userId } = getAuth(req);
-    if (role !== "VOLUNTEER") return res.status(403).json({ message: "Forbidden" });
+    if (!isDispatchAssigneeRole(role)) return res.status(403).json({ message: "Forbidden" });
 
     const active = await getMyActiveDispatch(String(userId));
     return res.json({ data: toDispatchDTO(active) });
@@ -99,7 +103,7 @@ export async function getMyActive(req: Request, res: Response) {
 export async function getMyCurrent(req: Request, res: Response) {
   try {
     const { role, userId } = getAuth(req);
-    if (role !== "VOLUNTEER") return res.status(403).json({ message: "Forbidden" });
+    if (!isDispatchAssigneeRole(role)) return res.status(403).json({ message: "Forbidden" });
 
     const current = await getMyCurrentDispatch(String(userId));
     return res.json({ data: toDispatchDTO(current) });
@@ -111,7 +115,7 @@ export async function getMyCurrent(req: Request, res: Response) {
 export async function getMyCompleted(req: Request, res: Response) {
   try {
     const { role, userId } = getAuth(req);
-    if (role !== "VOLUNTEER") return res.status(403).json({ message: "Forbidden" });
+    if (!isDispatchAssigneeRole(role)) return res.status(403).json({ message: "Forbidden" });
 
     const completed = await listMyCompletedDispatches(String(userId));
     return res.json({ data: completed.map(toDispatchDTO), count: completed.length });
@@ -123,7 +127,7 @@ export async function getMyCompleted(req: Request, res: Response) {
 export async function patchRespond(req: Request, res: Response) {
   try {
     const { role, userId } = getAuth(req);
-    if (role !== "VOLUNTEER") return res.status(403).json({ message: "Forbidden" });
+    if (!isDispatchAssigneeRole(role)) return res.status(403).json({ message: "Forbidden" });
 
     const decision = String(req.body?.decision ?? "").toUpperCase();
     if (decision !== "ACCEPT" && decision !== "DECLINE") {
@@ -159,7 +163,7 @@ export async function patchRespond(req: Request, res: Response) {
 export async function postProof(req: Request, res: Response) {
   try {
     const { role, userId } = getAuth(req);
-    if (role !== "VOLUNTEER") return res.status(403).json({ message: "Forbidden" });
+    if (!isDispatchAssigneeRole(role)) return res.status(403).json({ message: "Forbidden" });
 
     const { base64, mimeType, fileName } = (req.body ?? {}) as {
       base64?: string;
@@ -195,7 +199,7 @@ export async function postProof(req: Request, res: Response) {
 export async function patchComplete(req: Request, res: Response) {
   try {
     const { role, userId } = getAuth(req);
-    if (role !== "VOLUNTEER") return res.status(403).json({ message: "Forbidden" });
+    if (!isDispatchAssigneeRole(role)) return res.status(403).json({ message: "Forbidden" });
 
     const updated = await completeDispatch({ dispatchId: String(req.params.id), volunteerUserId: String(userId) });
 
@@ -238,7 +242,7 @@ export async function getLguTasks(req: Request, res: Response) {
 export async function getMyFocusStats(req: Request, res: Response) {
   try {
     const { role, userId } = getAuth(req);
-    if (role !== "VOLUNTEER") return res.status(403).json({ message: "Forbidden" });
+    if (!isDispatchAssigneeRole(role)) return res.status(403).json({ message: "Forbidden" });
 
     const stats = await getMyDispatchFocusStats(String(userId));
     return res.json({ data: stats });
@@ -282,7 +286,7 @@ export async function postVerify(req: Request, res: Response) {
 export async function patchLocation(req: Request, res: Response) {
   try {
     const { role, userId } = getAuth(req);
-    if (role !== "VOLUNTEER") return res.status(403).json({ message: "Forbidden" });
+    if (!isDispatchAssigneeRole(role)) return res.status(403).json({ message: "Forbidden" });
 
     const updated = await updateDispatchResponderLocation({
       dispatchId: String(req.params.id),

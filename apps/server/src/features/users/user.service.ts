@@ -3,6 +3,7 @@ import { User } from "./user.model";
 import { VolunteerApplication } from "../volunteerApplications/volunteerApplication.model";
 import { DispatchOffer } from "../dispatches/dispatch.model";
 import { getVolunteerPresenceStatus } from "../../realtime/notificationsSocket";
+import { ResponderTeam } from "../responderTeams/responderTeam.model";
 
 export type DispatchVolunteer = {
   id: string;
@@ -18,6 +19,29 @@ export type DispatchVolunteer = {
 export type ListDispatchVolunteersParams = {
   onlyApproved?: boolean;
   includeInactive?: boolean;
+};
+
+export type DispatchResponder = {
+  id: string;
+  lifelineId?: string;
+  name: string;
+  status: "available" | "offline";
+  skill: string;
+  barangay?: string;
+  municipality?: string;
+  avatarUrl?: string;
+  teamId?: string;
+  teamName?: string;
+};
+
+export type ListDispatchRespondersParams = {
+  includeInactive?: boolean;
+  onlyOnDuty?: boolean;
+  q?: string;
+  barangay?: string;
+  scopeBarangay?: string;
+  teamId?: string;
+  limit?: number;
 };
 
 export type UserProfileSummary = {
@@ -61,6 +85,10 @@ function joinAddressParts(parts: unknown[]) {
     .join(", ");
 }
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function buildFullName(user: {
   firstName?: unknown;
   lastName?: unknown;
@@ -76,6 +104,39 @@ function toDispatchAvailability(
   presence: ReturnType<typeof getVolunteerPresenceStatus>
 ): DispatchVolunteer["status"] {
   return presence === "OFFLINE" ? "offline" : "available";
+}
+
+async function buildActiveResponderTeamByMemberId(memberIds: string[]) {
+  const validObjectIds = memberIds
+    .filter((id) => Types.ObjectId.isValid(id))
+    .map((id) => new Types.ObjectId(id));
+
+  if (validObjectIds.length === 0) return new Map<string, { id: string; name: string }>();
+
+  const teams = await ResponderTeam.find({
+    isActive: true,
+    memberIds: { $in: validObjectIds },
+  })
+    .select("_id name memberIds")
+    .sort({ updatedAt: -1, _id: -1 })
+    .lean();
+
+  const teamByMember = new Map<string, { id: string; name: string }>();
+  for (const team of teams) {
+    const summary = {
+      id: String(team._id),
+      name: safeStr(team.name),
+    };
+
+    for (const memberId of team.memberIds ?? []) {
+      const key = String(memberId);
+      if (!teamByMember.has(key)) {
+        teamByMember.set(key, summary);
+      }
+    }
+  }
+
+  return teamByMember;
 }
 
 export async function listDispatchVolunteers(
@@ -130,6 +191,106 @@ export async function listDispatchVolunteers(
       barangay,
       municipality,
       avatarUrl: safeStr(u.avatarUrl) || undefined,
+    };
+  });
+}
+
+export async function listDispatchResponders(
+  params: ListDispatchRespondersParams = {}
+): Promise<DispatchResponder[]> {
+  const {
+    includeInactive = false,
+    onlyOnDuty = true,
+    q,
+    barangay,
+    scopeBarangay,
+    teamId,
+    limit = 100,
+  } = params;
+
+  const match: Record<string, unknown> = { role: "RESPONDER" };
+  if (!includeInactive) {
+    match.isActive = true;
+  }
+  if (onlyOnDuty) {
+    match.onDuty = true;
+  }
+
+  const requestedBarangay = safeStr(barangay);
+  const scopedBarangay = safeStr(scopeBarangay);
+
+  if (scopedBarangay) {
+    if (requestedBarangay && requestedBarangay !== scopedBarangay) {
+      return [];
+    }
+    match.barangay = scopedBarangay;
+  } else if (requestedBarangay) {
+    match.barangay = requestedBarangay;
+  }
+
+  const search = safeStr(q);
+  if (search) {
+    const regex = new RegExp(escapeRegExp(search), "i");
+    match.$or = [
+      { username: regex },
+      { email: regex },
+      { firstName: regex },
+      { lastName: regex },
+      { skills: regex },
+      { lifelineId: regex },
+    ];
+  }
+
+  if (teamId) {
+    if (!Types.ObjectId.isValid(teamId)) {
+      return [];
+    }
+
+    const team = await ResponderTeam.findById(teamId).select("memberIds barangay isActive").lean();
+    if (!team || !team.isActive) {
+      return [];
+    }
+
+    if (scopedBarangay && safeStr(team.barangay) !== scopedBarangay) {
+      return [];
+    }
+
+    const memberIds = (team.memberIds ?? [])
+      .map((id: Types.ObjectId | string) => String(id))
+      .filter((id: string) => Types.ObjectId.isValid(id));
+    if (memberIds.length === 0) {
+      return [];
+    }
+
+    match._id = { $in: memberIds.map((id: string) => new Types.ObjectId(id)) };
+  }
+
+  const normalizedLimit = Number.isFinite(limit) ? Math.min(200, Math.max(1, limit)) : 100;
+  const users = await User.find(match)
+    .select("_id lifelineId firstName lastName username email skills barangay municipality avatarUrl")
+    .sort({ onDuty: -1, updatedAt: -1, createdAt: -1 })
+    .limit(normalizedLimit)
+    .lean();
+
+  if (users.length === 0) return [];
+
+  const teamByMember = await buildActiveResponderTeamByMemberId(users.map((user: any) => String(user._id)));
+
+  return users.map((user: any) => {
+    const userId = String(user._id);
+    const team = teamByMember.get(userId);
+
+    return {
+      id: userId,
+      lifelineId: safeStr(user.lifelineId) || undefined,
+      name: buildFullName(user),
+      status: toDispatchAvailability(getVolunteerPresenceStatus(userId)),
+      skill: safeStr(user.skills) || "General Responder",
+      barangay: safeStr(user.barangay) || undefined,
+      municipality: safeStr(user.municipality) || undefined,
+      avatarUrl: safeStr(user.avatarUrl) || undefined,
+      teamId: team?.id,
+      teamName: team?.name || undefined,
     };
   });
 }

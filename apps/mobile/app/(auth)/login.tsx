@@ -16,14 +16,14 @@ export default function LoginScreen() {
       </View>
 
       <LoginForm
-        email={vm.email}
+        identifier={vm.identifier}
         password={vm.password}
         showPassword={vm.showPassword}
         loading={vm.loading}
         googleLoading={vm.googleLoading}
         loginCooldownSeconds={vm.loginCooldownSeconds}
         error={vm.error}
-        onChangeEmail={vm.setEmail}
+        onChangeIdentifier={vm.setIdentifier}
         onChangePassword={vm.setPassword}
         onToggleShowPassword={vm.toggleShowPassword}
         onForgotPassword={vm.goForgotPassword}

@@ -24,8 +24,8 @@ const STATUS_TAB_ORDER: MyRequestStatusTab[] = [
   "assigned",
   "en_route",
   "arrived",
-  "resolved",
   "review",
+  "resolved",
   "cancelled",
 ];
 
@@ -34,7 +34,9 @@ const STATUS_TABS: MyRequestsHeaderTabOption<MyRequestStatusTab>[] = STATUS_TAB_
   label: MY_REQUEST_TAB_LABELS[tab],
 }));
 
-function actionLabelForStatus(): string {
+function actionLabelForStatus(tab: MyRequestStatusTab, item: MyRequestSummary): string {
+  if (tab === "review" || item.trackingLabel === "Review") return "Leave Review";
+  if (tab === "resolved" || item.trackingLabel === "Resolved") return "View Review";
   return "View Tracking Details";
 }
 
@@ -51,11 +53,12 @@ function emptyMessageForTab(tab: MyRequestStatusTab) {
 }
 
 export function MyRequestsHistoryScreen() {
-  const params = useLocalSearchParams<{ tab?: string | string[] }>();
+  const params = useLocalSearchParams<{ tab?: string | string[]; refreshTs?: string | string[] }>();
   const { isUser, loading: sessionLoading } = useSession();
   const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
   const tabParam = Array.isArray(params.tab) ? params.tab[0] : params.tab;
+  const refreshParam = Array.isArray(params.refreshTs) ? params.refreshTs[0] : params.refreshTs;
   const initialTab = useMemo(
     () => normalizeMyRequestStatusTab(tabParam, "all"),
     [tabParam]
@@ -73,6 +76,11 @@ export function MyRequestsHistoryScreen() {
   useEffect(() => {
     setActiveTab(initialTab);
   }, [initialTab]);
+
+  useEffect(() => {
+    if (!isUser || !refreshParam) return;
+    void refreshHistory();
+  }, [isUser, refreshHistory, refreshParam]);
 
   useEffect(() => {
     if (!isFocused) return;
@@ -96,6 +104,13 @@ export function MyRequestsHistoryScreen() {
     });
   }, []);
 
+  const openReview = useCallback((requestId: string) => {
+    router.push({
+      pathname: "/my-requests/review",
+      params: { id: requestId },
+    });
+  }, []);
+
   const onPressCard = useCallback(
     (item: MyRequestSummary) => {
       openTracking(item.id);
@@ -104,10 +119,14 @@ export function MyRequestsHistoryScreen() {
   );
 
   const onPressAction = useCallback(
-    (item: { id: string }) => {
+    (item: MyRequestSummary) => {
+      if (item.trackingLabel === "Review" || item.trackingLabel === "Resolved") {
+        openReview(item.id);
+        return;
+      }
       openTracking(item.id);
     },
-    [openTracking]
+    [openReview, openTracking]
   );
 
   const onPressCancel = useCallback(
@@ -218,7 +237,7 @@ export function MyRequestsHistoryScreen() {
         renderItem={({ item }) => (
           <RequestHistoryCard
             item={item}
-            actionLabel={actionLabelForStatus()}
+            actionLabel={actionLabelForStatus(activeTab, item)}
             onPress={() => onPressCard(item)}
             onPressAction={() => onPressAction(item)}
             cancelLabel={

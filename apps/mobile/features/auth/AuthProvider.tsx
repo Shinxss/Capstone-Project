@@ -25,7 +25,7 @@ type AuthContextValue = {
   guestId: string | null;
   isGuest: boolean;
   setAuthed: (token: string, user: AuthUser) => Promise<void>;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (identifier: string, password: string) => Promise<void>;
   signInWithToken: (accessToken: string) => Promise<void>;
   continueAsGuest: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -132,8 +132,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setGuestId(null);
   }, []);
 
-  const signIn = useCallback(async (email: string, password: string) => {
-    const session = await signInSession(email, password);
+  const signIn = useCallback(async (identifier: string, password: string) => {
+    const session = await signInSession(identifier, password);
     setUser(session.user);
     setToken(session.token);
     setMode("authed");

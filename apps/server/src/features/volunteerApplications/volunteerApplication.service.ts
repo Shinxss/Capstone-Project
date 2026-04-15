@@ -2,6 +2,7 @@ import { Types } from "mongoose";
 import { VolunteerApplication } from "./volunteerApplication.model";
 import { User } from "../users/user.model";
 import { DispatchOffer } from "../dispatches/dispatch.model";
+import { VolunteerReview } from "../volunteerReviews/volunteerReview.model";
 
 function normalizeVolunteerApplicationStatus(status: unknown): string {
   const raw = String(status ?? "").trim().toLowerCase().replace(/-/g, "_");
@@ -86,10 +87,19 @@ function pickPreferredApplication(current: any | undefined, candidate: any) {
     : current;
 }
 
-function buildVerifiedVolunteerProfile(user: any, application?: any, completedTasks = 0) {
+function buildVerifiedVolunteerProfile(
+  user: any,
+  application?: any,
+  completedTasks = 0,
+  ratingStats?: { avgRating: number; reviewCount: number }
+) {
   const fullNameFromUser = [safeStr(user?.firstName), safeStr(user?.lastName)]
     .filter(Boolean)
     .join(" ");
+  const avgRatingValue = Number(ratingStats?.avgRating ?? 0);
+  const reviewCountValue = Number(ratingStats?.reviewCount ?? 0);
+  const avgRating = Number.isFinite(avgRatingValue) ? Number(avgRatingValue.toFixed(1)) : 0;
+  const reviewCount = Number.isFinite(reviewCountValue) ? Math.max(0, Math.round(reviewCountValue)) : 0;
 
   return {
     _id: String(user?._id ?? ""),
@@ -117,6 +127,8 @@ function buildVerifiedVolunteerProfile(user: any, application?: any, completedTa
     preferredAssignmentText: safeStr(application?.preferredAssignmentText),
     healthNotes: safeStr(application?.healthNotes),
     completedTasks,
+    avgRating,
+    reviewCount,
     consent: {
       truth: Boolean(application?.consent?.truth),
       rules: Boolean(application?.consent?.rules),
@@ -201,7 +213,7 @@ async function listVerifiedVolunteerProfilesForReviewer(params: {
   }
 
   const userIds = approvedUsers.map((user: any) => user._id as Types.ObjectId);
-  const [applications, completedTaskRows] = await Promise.all([
+  const [applications, completedTaskRows, ratingRows] = await Promise.all([
     VolunteerApplication.find({ userId: { $in: userIds } })
       .select(
         "userId fullName sex birthdate mobile email street barangay city province emergencyContact skillsOther certificationsText availabilityText preferredAssignmentText healthNotes consent status reviewedBy reviewedAt reviewNotes createdAt updatedAt"
@@ -222,6 +234,20 @@ async function listVerifiedVolunteerProfilesForReviewer(params: {
         },
       },
     ]),
+    VolunteerReview.aggregate([
+      {
+        $match: {
+          volunteerId: { $in: userIds },
+        },
+      },
+      {
+        $group: {
+          _id: "$volunteerId",
+          avgRating: { $avg: "$rating" },
+          reviewCount: { $sum: 1 },
+        },
+      },
+    ]),
   ]);
 
   const completedTasksByUserId = new Map<string, number>();
@@ -230,6 +256,19 @@ async function listVerifiedVolunteerProfilesForReviewer(params: {
     if (!userId) continue;
     const count = Number(row?.completedTasks ?? 0);
     completedTasksByUserId.set(userId, Number.isFinite(count) ? count : 0);
+  }
+
+  const ratingsByUserId = new Map<string, { avgRating: number; reviewCount: number }>();
+  for (const row of ratingRows as Array<{ _id: Types.ObjectId; avgRating?: number; reviewCount?: number }>) {
+    const userId = String(row?._id ?? "").trim();
+    if (!userId) continue;
+
+    const avgRating = Number(row?.avgRating ?? 0);
+    const reviewCount = Number(row?.reviewCount ?? 0);
+    ratingsByUserId.set(userId, {
+      avgRating: Number.isFinite(avgRating) ? avgRating : 0,
+      reviewCount: Number.isFinite(reviewCount) ? reviewCount : 0,
+    });
   }
 
   const preferredApplications = new Map<string, any>();
@@ -246,7 +285,8 @@ async function listVerifiedVolunteerProfilesForReviewer(params: {
       const key = String(user?._id ?? "");
       const application = preferredApplications.get(key);
       const completedTasks = completedTasksByUserId.get(key) ?? 0;
-      const profile = buildVerifiedVolunteerProfile(user, application, completedTasks);
+      const ratingStats = ratingsByUserId.get(key) ?? { avgRating: 0, reviewCount: 0 };
+      const profile = buildVerifiedVolunteerProfile(user, application, completedTasks, ratingStats);
       if (!matchesVerifiedVolunteerQuery(profile, user, q)) return null;
 
       return profile;
@@ -286,15 +326,37 @@ async function getVerifiedVolunteerProfileForReviewer(params: {
     return null;
   }
 
-  const [application, completedTasks] = await Promise.all([
+  const [application, completedTasks, ratingStatsRow] = await Promise.all([
     findPreferredApplicationForUser(String(user._id)),
     DispatchOffer.countDocuments({
       volunteerId: new Types.ObjectId(String(user._id)),
       status: { $in: ["DONE", "VERIFIED"] },
     }),
+    VolunteerReview.aggregate([
+      {
+        $match: {
+          volunteerId: new Types.ObjectId(String(user._id)),
+        },
+      },
+      {
+        $group: {
+          _id: "$volunteerId",
+          avgRating: { $avg: "$rating" },
+          reviewCount: { $sum: 1 },
+        },
+      },
+      { $limit: 1 },
+    ]),
   ]);
 
-  return buildVerifiedVolunteerProfile(user, application, completedTasks);
+  const ratingStats = ratingStatsRow?.[0]
+    ? {
+        avgRating: Number(ratingStatsRow[0]?.avgRating ?? 0),
+        reviewCount: Number(ratingStatsRow[0]?.reviewCount ?? 0),
+      }
+    : { avgRating: 0, reviewCount: 0 };
+
+  return buildVerifiedVolunteerProfile(user, application, completedTasks, ratingStats);
 }
 
 export async function submitVolunteerApplication(userId: string, payload: any) {

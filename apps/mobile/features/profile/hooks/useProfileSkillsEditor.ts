@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSession } from "../../auth/hooks/useSession";
-import { isVolunteerRole, normalizeStringValue } from "../models/profile";
+import { isDispatchAssigneeRole, normalizeStringValue } from "../models/profile";
 import { getMyProfile, getProfileSkillOptions, updateMyProfile } from "../services/profileApi";
 import { composeSkillsText, normalizeSkillOptions, parseSkillState } from "../utils/skills";
 
@@ -35,7 +35,10 @@ export function useProfileSkillsEditor() {
   const [lastName, setLastName] = useState("");
   const [role, setRole] = useState("");
 
-  const canEdit = useMemo(() => isVolunteerRole(role || sessionUser?.role), [role, sessionUser?.role]);
+  const canEdit = useMemo(
+    () => isDispatchAssigneeRole(role || sessionUser?.role),
+    [role, sessionUser?.role]
+  );
 
   const refresh = useCallback(async () => {
     if (!isUser) {

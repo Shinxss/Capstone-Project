@@ -4,6 +4,7 @@ import { requireRole } from "../../middlewares/requireRole";
 import {
   deleteMyAvatar,
   getMyProfileSummary,
+  listDispatchResponders,
   getProfileSkillOptions,
   listVolunteers,
   uploadMyAvatar,
@@ -19,5 +20,14 @@ router.delete("/me/avatar", requireAuth, deleteMyAvatar);
 // LGU/Admin: list volunteers for dispatching
 // GET /api/users/volunteers
 router.get("/volunteers", requireAuth, requireRole("LGU", "ADMIN"), listVolunteers);
+
+// LGU/Admin: list responder accounts suitable for dispatch operations
+// GET /api/users/responders/dispatchable
+router.get(
+  "/responders/dispatchable",
+  requireAuth,
+  requireRole("LGU", "ADMIN"),
+  listDispatchResponders
+);
 
 export default router;

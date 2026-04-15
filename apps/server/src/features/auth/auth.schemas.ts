@@ -12,8 +12,19 @@ export const communityRegisterSchema = z
 
 export const communityLoginSchema = z
   .object({
-    email: z.string().trim().email("Invalid email"),
+    identifier: z.string().trim().min(1, "Email or username is required").optional(),
+    email: z.string().trim().min(1, "Email or username is required").optional(),
     password: z.string().min(1, "Password is required"),
+  })
+  .superRefine((value, ctx) => {
+    const candidate = String(value.identifier ?? value.email ?? "").trim();
+    if (!candidate) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Email or username is required",
+        path: ["identifier"],
+      });
+    }
   })
   .strict();
 

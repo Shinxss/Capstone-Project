@@ -225,7 +225,7 @@ export default function HomeScreen() {
     used: guestSosUsed,
     saveUsed: markGuestSosUsed,
   } = useGuestSosLimit({ enabled: isGuest });
-  const isVolunteer = useMemo(() => session?.mode === "user" && String(session.user.role ?? "").toUpperCase() === "VOLUNTEER", [session]);
+  const isDispatchAssignee = useMemo(() => session?.mode === "user" && ["VOLUNTEER", "RESPONDER"].includes(String(session.user.role ?? "").toUpperCase()), [session]);
   const { activeRequest: myActiveRequest, refresh: refreshMyActiveRequest } = useMyActiveRequest({
     pollMs: 8000,
     enabled: isUser,
@@ -238,20 +238,20 @@ export default function HomeScreen() {
     retry: retryWeather,
   } = useWeatherSummary();
 
-  const { refresh: refreshActive } = useActiveDispatch({ pollMs: 8000, enabled: isVolunteer });
+  const { refresh: refreshActive } = useActiveDispatch({ pollMs: 8000, enabled: isDispatchAssignee });
   const { pendingDispatch, refresh: refreshPending, clear: clearPending } = usePendingDispatch({
     pollMs: 8000,
-    enabled: isVolunteer,
+    enabled: isDispatchAssignee,
   });
   const refreshHome = useCallback(async () => {
     const refreshJobs: Promise<unknown>[] = [refreshMyActiveRequest(), retryWeather()];
 
-    if (isVolunteer) {
+    if (isDispatchAssignee) {
       refreshJobs.push(refreshPending(), refreshActive());
     }
 
     await Promise.allSettled(refreshJobs);
-  }, [isVolunteer, refreshActive, refreshMyActiveRequest, refreshPending, retryWeather]);
+  }, [isDispatchAssignee, refreshActive, refreshMyActiveRequest, refreshPending, retryWeather]);
   const { refreshing: refreshingHome, triggerRefresh: triggerRefreshHome } = usePullToRefresh(refreshHome);
 
   const [sosConfirmVisible, setSosConfirmVisible] = useState(false);
@@ -456,7 +456,7 @@ export default function HomeScreen() {
           router.push("/notifications");
         }}
         onPressViewAll={() => {}}
-        showVolunteerCta={!isVolunteer}
+        showVolunteerCta={!isDispatchAssignee}
         onPressApplyVolunteer={onPressApplyVolunteer}
       />
 
@@ -471,7 +471,7 @@ export default function HomeScreen() {
         {...authRequired.modalProps}
       />
 
-      {isVolunteer ? (
+      {isDispatchAssignee ? (
         <DispatchOfferModal
           visible={dispatchModal.visible}
           data={dispatchModal.data}

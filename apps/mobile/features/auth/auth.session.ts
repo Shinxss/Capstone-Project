@@ -181,8 +181,17 @@ export async function bootstrapSession(): Promise<BootstrapSessionResult> {
   }
 }
 
-export async function signIn(email: string, password: string): Promise<AuthedBootstrapResult> {
-  const res = await api.post(COMMUNITY_LOGIN_PATH, { email, password });
+export async function signIn(identifier: string, password: string): Promise<AuthedBootstrapResult> {
+  const normalizedIdentifier = asString(identifier);
+  if (!normalizedIdentifier) {
+    throw new Error("Email or username is required");
+  }
+
+  const loginPayload = normalizedIdentifier.includes("@")
+    ? { email: normalizedIdentifier, password }
+    : { identifier: normalizedIdentifier, password };
+
+  const res = await api.post(COMMUNITY_LOGIN_PATH, loginPayload);
   const token = extractToken(res.data);
 
   if (!token) {

@@ -10,12 +10,15 @@ import {
   referenceNumberParamSchema,
   uploadEmergencyReportPhotoSchema,
 } from "../schemas/emergencyReport.schema";
+import { upsertVolunteerReviewSchema } from "../../volunteerReviews/volunteerReview.validation";
 import {
   getMyActiveEmergencyReportController,
+  getMyEmergencyReviewController,
   getMyEmergencyReportCountsController,
   getMyEmergencyReportsMapFeed,
   getMyEmergencyTrackingController,
   patchMyEmergencyReportCancelController,
+  putMyEmergencyReviewController,
   getEmergencyReportsMapFeed,
   getEmergencyReportByReferenceNumber,
   getEmergencyReportDetail,
@@ -43,6 +46,14 @@ router.patch(
   requireAuth,
   validate(emergencyReportIdParamSchema, "params"),
   patchMyEmergencyReportCancelController
+);
+router.get("/my/:id/review", requireAuth, validate(emergencyReportIdParamSchema, "params"), getMyEmergencyReviewController);
+router.put(
+  "/my/:id/review",
+  requireAuth,
+  validate(emergencyReportIdParamSchema, "params"),
+  validate(upsertVolunteerReviewSchema),
+  putMyEmergencyReviewController
 );
 router.get("/my/:id/tracking", requireAuth, validate(emergencyReportIdParamSchema, "params"), getMyEmergencyTrackingController);
 router.get("/map", getEmergencyReportsMapFeed);

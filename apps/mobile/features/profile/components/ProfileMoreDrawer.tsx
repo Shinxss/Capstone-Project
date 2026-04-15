@@ -275,7 +275,7 @@ export default function ProfileMoreDrawer({
               />
               {canShowVolunteerAssignmentsToggle ? (
                 <DrawerRow
-                  title="Volunteer Assignments"
+                  title="Task Assignments"
                   subtitle="Alerts when a new dispatch is assigned"
                   icon="clipboard-outline"
                   right={

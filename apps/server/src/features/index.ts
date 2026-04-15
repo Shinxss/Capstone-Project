@@ -16,6 +16,8 @@ import announcementsRoutes from "./announcements/announcements.routes";
 import routingRiskRoutes from "./routingRisk/routingRisk.routes";
 import routingRoutes from "./routing/routing.routes";
 import weatherRoutes from "./weather/weather.routes";
+import responderRoutes from "./responders/responder.routes";
+import responderTeamRoutes from "./responderTeams/responderTeam.routes";
 const router = Router();
 
 // feature routes
@@ -36,5 +38,7 @@ router.use("/announcements", announcementsRoutes);
 router.use("/routing-risk", routingRiskRoutes);
 router.use("/routing", routingRoutes);
 router.use("/weather", weatherRoutes);
+router.use("/responders", responderRoutes);
+router.use("/responders/teams", responderTeamRoutes);
 
 export default router;

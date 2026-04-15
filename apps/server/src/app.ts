@@ -124,7 +124,7 @@ async function canReadDispatchProof(
 
   if (!offer) return false;
 
-  if (role === "VOLUNTEER") {
+  if (role === "VOLUNTEER" || role === "RESPONDER") {
     return String(offer.volunteerId ?? "") === userId;
   }
 
@@ -205,7 +205,7 @@ app.get(
 app.get(
   "/uploads/emergency-report-photos/:filename",
   requireAuth,
-  requireRole("VOLUNTEER", "LGU", "ADMIN"),
+  requireRole("VOLUNTEER", "RESPONDER", "LGU", "ADMIN"),
   (req, res) => {
     try {
       const requested = String(req.params.filename || "");

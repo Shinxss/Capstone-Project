@@ -85,7 +85,7 @@ export default function ProfileSkillsScreen() {
               lineHeight: 20,
             }}
           >
-            Skills can only be edited for volunteer profiles.
+            Skills can only be edited for responder and volunteer profiles.
           </Text>
           <Pressable
             onPress={() => router.back()}

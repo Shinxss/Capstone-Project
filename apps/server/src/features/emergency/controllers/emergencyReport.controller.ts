@@ -19,12 +19,17 @@ import { uploadEmergencyReportPhoto } from "../services/emergencyReportUpload.se
 import { AUDIT_EVENT } from "../../audit/audit.constants";
 import { logAudit } from "../../audit/audit.service";
 import { emitNotificationsRefresh } from "../../../realtime/notificationsSocket";
+import {
+  getMyRequestVolunteerReview,
+  upsertMyRequestVolunteerReview,
+} from "../../volunteerReviews/volunteerReview.service";
 import type {
   CreateEmergencyReportInput,
   MyEmergencyReportsQuery,
   RejectEmergencyReportInput,
   UploadEmergencyReportPhotoInput,
 } from "../schemas/emergencyReport.schema";
+import type { UpsertVolunteerReviewInput } from "../../volunteerReviews/volunteerReview.validation";
 
 type MaybeAuthedRequest = Request & {
   user?: {
@@ -195,6 +200,59 @@ export async function getMyEmergencyTrackingController(req: MaybeAuthedRequest, 
     return res.status(200).json(tracking);
   } catch (error: any) {
     return res.status(500).json({ message: error?.message ?? "Failed to fetch emergency tracking details" });
+  }
+}
+
+export async function getMyEmergencyReviewController(req: MaybeAuthedRequest, res: Response) {
+  try {
+    if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+
+    const reportId = String(req.params.id ?? "").trim();
+    const result = await getMyRequestVolunteerReview(reportId, String(req.user.id));
+
+    if (result.code === "INVALID_ID") {
+      return res.status(400).json({ message: "Invalid request id" });
+    }
+    if (result.code === "NOT_FOUND") {
+      return res.status(404).json({ message: "Emergency request not found" });
+    }
+    if (result.code === "FORBIDDEN") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    return res.status(200).json(result.data);
+  } catch (error: any) {
+    return res.status(500).json({ message: error?.message ?? "Failed to fetch review details" });
+  }
+}
+
+export async function putMyEmergencyReviewController(req: MaybeAuthedRequest, res: Response) {
+  try {
+    if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+
+    const reportId = String(req.params.id ?? "").trim();
+    const input = req.body as UpsertVolunteerReviewInput;
+    const result = await upsertMyRequestVolunteerReview(reportId, String(req.user.id), input);
+
+    if (result.code === "INVALID_ID") {
+      return res.status(400).json({ message: "Invalid request id" });
+    }
+    if (result.code === "NOT_FOUND") {
+      return res.status(404).json({ message: "Emergency request not found" });
+    }
+    if (result.code === "FORBIDDEN") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    if (result.code === "NOT_REVIEWABLE") {
+      return res.status(409).json({ message: result.reason });
+    }
+    if (result.code === "CONFLICT") {
+      return res.status(409).json({ message: result.message });
+    }
+
+    return res.status(200).json(result.data);
+  } catch (error: any) {
+    return res.status(500).json({ message: error?.message ?? "Failed to save volunteer review" });
   }
 }
 

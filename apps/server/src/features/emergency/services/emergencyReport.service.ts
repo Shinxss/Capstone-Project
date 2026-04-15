@@ -12,6 +12,7 @@ import {
 import type { VerificationStatus } from "../emergency.model";
 import { findBarangayByPoint } from "../../barangays/barangay.service";
 import { DispatchOffer } from "../../dispatches/dispatch.model";
+import { getReviewedEmergencyIdSet } from "../../volunteerReviews/volunteerReview.service";
 
 const EMERGENCY_REPORT_PHOTO_URL_PREFIX = "/uploads/emergency-report-photos/";
 const DISPATCH_PROOF_URL_PREFIX = "/uploads/dispatch-proofs/";
@@ -81,15 +82,15 @@ const MY_REQUEST_LIST_LABELS = [
   "Assigned",
   "En Route",
   "Arrived",
-  "Resolved",
   "Review",
+  "Resolved",
   "Cancelled",
 ] as const;
 
 type TrackingTimelineStep = (typeof TRACKING_TIMELINE_STEPS)[number];
 export type TrackingLabel = TrackingTimelineStep | "Cancelled";
 export type MyRequestListTrackingLabel = (typeof MY_REQUEST_LIST_LABELS)[number];
-type MappedMyRequestStatusTab = Exclude<MyRequestStatusTab, "all" | "review">;
+type MappedMyRequestStatusTab = Exclude<MyRequestStatusTab, "all">;
 type LegacyScope = "active" | "history";
 
 type LocationPoint = {
@@ -308,22 +309,28 @@ const MY_REQUEST_TRACKING_LABEL_BY_TAB: Record<MappedMyRequestStatusTab, MyReque
   assigned: "Assigned",
   en_route: "En Route",
   arrived: "Arrived",
+  review: "Review",
   resolved: "Resolved",
   cancelled: "Cancelled",
 };
 
-function deriveMyRequestStatusTab(report: any, offers: any[]): MappedMyRequestStatusTab {
+function deriveMyRequestStatusTab(
+  report: any,
+  offers: any[],
+  options?: { hasReview?: boolean }
+): MappedMyRequestStatusTab {
   const emergencyStatus = String(report?.status ?? "").trim().toUpperCase();
   const verificationStatus = String(report?.verification?.status ?? "").trim().toLowerCase();
+  const hasReview = options?.hasReview === true;
 
   if (emergencyStatus === "CANCELLED" || verificationStatus === "rejected") {
     return "cancelled";
   }
   if (emergencyStatus === "RESOLVED" || hasOfferStatus(offers, "VERIFIED")) {
-    return "resolved";
+    return hasReview ? "resolved" : "review";
   }
   if (hasOfferStatus(offers, "DONE")) {
-    return "resolved";
+    return hasReview ? "resolved" : "review";
   }
   if (hasOfferStatus(offers, "ACCEPTED")) {
     return "en_route";
@@ -337,13 +344,7 @@ function deriveMyRequestStatusTab(report: any, offers: any[]): MappedMyRequestSt
   return "submitted";
 }
 
-function toMyRequestTrackingLabel(
-  tab: MappedMyRequestStatusTab,
-  requestedTab?: MyRequestStatusTab
-): MyRequestListTrackingLabel {
-  if (requestedTab === "review" && tab === "resolved") {
-    return "Review";
-  }
+function toMyRequestTrackingLabel(tab: MappedMyRequestStatusTab): MyRequestListTrackingLabel {
   return MY_REQUEST_TRACKING_LABEL_BY_TAB[tab];
 }
 
@@ -359,9 +360,9 @@ function getRequestFlowRank(label: MyRequestListTrackingLabel) {
       return 3;
     case "Arrived":
       return 4;
-    case "Resolved":
-      return 5;
     case "Review":
+      return 5;
+    case "Resolved":
       return 6;
     case "Cancelled":
       return 7;
@@ -376,15 +377,14 @@ function matchesMyRequestFilter(
 ) {
   if (options?.tab) {
     if (options.tab === "all") return true;
-    if (options.tab === "review") return tab === "resolved";
     return tab === options.tab;
   }
 
   if (options?.scope === "active") {
-    return tab !== "resolved" && tab !== "cancelled";
+    return tab !== "review" && tab !== "resolved" && tab !== "cancelled";
   }
   if (options?.scope === "history") {
-    return tab === "resolved" || tab === "cancelled";
+    return tab === "review" || tab === "resolved" || tab === "cancelled";
   }
 
   return true;
@@ -495,7 +495,6 @@ async function buildMyRequestSummaryFromReport(
   offers: any[],
   options?: {
     includeEta?: boolean;
-    requestedTab?: MyRequestStatusTab;
     mappedTab?: MappedMyRequestStatusTab;
   }
 ): Promise<MyRequestSummary> {
@@ -506,7 +505,7 @@ async function buildMyRequestSummaryFromReport(
     verificationStatus === "rejected" ? String(report?.verification?.reason ?? "").trim() : "";
   const location = toPointCoordinates(report?.location?.coordinates);
   const safeLocation = location ?? { lng: 0, lat: 0 };
-  const label = toMyRequestTrackingLabel(mappedTab, options?.requestedTab);
+  const label = toMyRequestTrackingLabel(mappedTab);
   const relevantOffer = pickRelevantOffer(offers);
   const responderOffer = pickResponderOffer(offers);
   const locationOffer = pickRelevantOffer(offers) ?? responderOffer;
@@ -827,7 +826,7 @@ export async function listMyMapEmergencyReports(
     .filter((report) => {
       const reportOffers = offersByEmergencyId.get(String(report._id)) ?? [];
       const mappedTab = deriveMyRequestStatusTab(report, reportOffers);
-      return mappedTab !== "resolved" && mappedTab !== "cancelled";
+      return mappedTab !== "review" && mappedTab !== "resolved" && mappedTab !== "cancelled";
     })
     .map((report) => ({
     incidentId: report._id.toString(),
@@ -1091,10 +1090,13 @@ export async function listMyEmergencyReports(
   if (!reports.length) return [];
 
   const emergencyIds = reports.map((report) => report._id);
-  const offers = await DispatchOffer.find({ emergencyId: { $in: emergencyIds } })
-    .sort({ updatedAt: -1, _id: -1 })
-    .select("emergencyId status updatedAt lastKnownLocation lastKnownLocationAt")
-    .lean();
+  const [offers, reviewedEmergencyIds] = await Promise.all([
+    DispatchOffer.find({ emergencyId: { $in: emergencyIds } })
+      .sort({ updatedAt: -1, _id: -1 })
+      .select("emergencyId status updatedAt lastKnownLocation lastKnownLocationAt")
+      .lean(),
+    getReviewedEmergencyIdSet(reporterUserId, emergencyIds),
+  ]);
 
   const offersByEmergencyId = new Map<string, any[]>();
   for (const offer of offers) {
@@ -1107,15 +1109,16 @@ export async function listMyEmergencyReports(
 
   const summaries = await Promise.all(
     reports.map(async (report) => {
+      const reportId = String(report._id);
       const reportOffers = offersByEmergencyId.get(String(report._id)) ?? [];
-      const mappedTab = deriveMyRequestStatusTab(report, reportOffers);
+      const hasReview = reviewedEmergencyIds.has(reportId);
+      const mappedTab = deriveMyRequestStatusTab(report, reportOffers, { hasReview });
       if (!matchesMyRequestFilter(mappedTab, normalizedOptions)) {
         return null;
       }
 
       return buildMyRequestSummaryFromReport(report, reportOffers, {
         includeEta: true,
-        requestedTab: normalizedOptions.tab,
         mappedTab,
       });
     })
@@ -1180,7 +1183,7 @@ export async function getMyEmergencyReportCounts(
     if (mappedTab === "assigned") counts.assigned += 1;
     if (mappedTab === "en_route") counts.en_route += 1;
     if (mappedTab === "arrived") counts.arrived += 1;
-    if (mappedTab === "resolved") counts.resolved += 1;
+    if (mappedTab === "review" || mappedTab === "resolved") counts.resolved += 1;
   }
 
   return counts;

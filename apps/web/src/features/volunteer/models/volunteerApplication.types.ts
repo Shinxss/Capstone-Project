@@ -11,6 +11,8 @@ export type VolunteerApplication = {
   userId: string;
   avatarUrl?: string;
   completedTasks?: number;
+  avgRating?: number;
+  reviewCount?: number;
 
   fullName: string;
   sex: Sex;

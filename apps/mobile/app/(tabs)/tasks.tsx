@@ -6,8 +6,9 @@ import { MyRequestsHistoryScreen } from "../../features/requests/screens/MyReque
 export default function TasksRoute() {
   const { user } = useAuth();
   const normalizedRole = String(user?.role ?? "").trim().toUpperCase();
+  const isCommunity = normalizedRole === "COMMUNITY";
 
-  if (normalizedRole === "COMMUNITY") {
+  if (isCommunity) {
     return <MyRequestsHistoryScreen />;
   }
 

@@ -5,7 +5,7 @@ import {
   editableProfileFromUser,
   formatProfileRoleLabel,
   isApprovedVolunteer,
-  isVolunteerRole,
+  isDispatchAssigneeRole,
   normalizeStringValue,
   type EditableProfile,
   type EditableProfileFields,
@@ -106,7 +106,7 @@ export function useEditProfile() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const canEditSkills = useMemo(() => isVolunteerRole(profile.role), [profile.role]);
+  const canEditSkills = useMemo(() => isDispatchAssigneeRole(profile.role), [profile.role]);
 
   const refresh = useCallback(async () => {
     if (!isUser) {

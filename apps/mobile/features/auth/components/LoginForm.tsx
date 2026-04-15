@@ -5,14 +5,14 @@ import LifelineLogo from "../../../components/LifelineLogo";
 import GoogleIcon from "../../../components/GoogleIcon";
 
 type Props = {
-  email: string;
+  identifier: string;
   password: string;
   showPassword: boolean;
   loading: boolean;
   googleLoading: boolean;
   loginCooldownSeconds: number;
   error: string | null;
-  onChangeEmail: (v: string) => void;
+  onChangeIdentifier: (v: string) => void;
   onChangePassword: (v: string) => void;
   onToggleShowPassword: () => void;
   onForgotPassword: () => void;
@@ -22,14 +22,14 @@ type Props = {
 };
 
 export default function LoginForm({
-  email,
+  identifier,
   password,
   showPassword,
   loading,
   googleLoading,
   loginCooldownSeconds,
   error,
-  onChangeEmail,
+  onChangeIdentifier,
   onChangePassword,
   onToggleShowPassword,
   onForgotPassword,
@@ -48,14 +48,13 @@ export default function LoginForm({
 
       <View className="gap-3">
         <TextInput
-          placeholder="Email"
+          placeholder="Email or username"
           placeholderTextColor="#9CA3AF"
           className="h-15 border border-gray-200 bg-white px-6 pl-3 text-[15px] font-semibold"
           style={{ borderRadius: 8 }}
-          value={email}
-          onChangeText={onChangeEmail}
+          value={identifier}
+          onChangeText={onChangeIdentifier}
           autoCapitalize="none"
-          keyboardType="email-address"
         />
 
         <View className="relative">

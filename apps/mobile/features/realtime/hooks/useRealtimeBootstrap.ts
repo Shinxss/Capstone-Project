@@ -125,7 +125,7 @@ export function useRealtimeBootstrap() {
     const socket = connectRealtime(token);
     if (!socket) return;
     const normalizedRole = String(user?.role ?? "").trim().toUpperCase();
-    const isVolunteer = normalizedRole === "VOLUNTEER";
+    const isDispatchAssignee = normalizedRole === "VOLUNTEER" || normalizedRole === "RESPONDER";
 
     const onRequestUpdate = (payload: RequestUpdatePayload) => {
       showInAppNotification({
@@ -186,7 +186,7 @@ export function useRealtimeBootstrap() {
     };
 
     let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
-    if (isVolunteer) {
+    if (isDispatchAssignee) {
       const sendHeartbeat = () => {
         socket.emit("volunteer:heartbeat", { onDuty: true });
       };
@@ -206,3 +206,4 @@ export function useRealtimeBootstrap() {
     };
   }, [hydrated, mode, token, user?.role]);
 }
+

@@ -44,7 +44,7 @@ export default function ProfileActivitiesGrid({
       },
       {
         key: "volunteerHours",
-        label: "Volunteer\nHours",
+        label: "Service\nHours",
         value: formatMetricValue(summary.stats.volunteerHours),
         unit: "h",
         subtitle: "hours served",

@@ -1,7 +1,19 @@
 import { api } from "../../../lib/api";
 import type { Volunteer } from "../models/lguLiveMap.types";
 
-// Response shape from the backend
+type DispatchResponderDTO = {
+  id: string;
+  lifelineId?: string;
+  name: string;
+  status: "available" | "offline";
+  skill: string;
+  barangay?: string;
+  municipality?: string;
+  avatarUrl?: string;
+  teamId?: string;
+  teamName?: string;
+};
+
 type DispatchVolunteerDTO = {
   id: string;
   lifelineId?: string;
@@ -32,21 +44,60 @@ function resolveAvatarUrl(value?: string) {
   }
 }
 
-export async function fetchDispatchVolunteers(): Promise<Volunteer[]> {
+function mapResponderToVolunteer(item: DispatchResponderDTO): Volunteer {
+  return {
+    id: item.id,
+    lifelineId: item.lifelineId,
+    name: item.name,
+    status: item.status,
+    skill: item.skill ?? "General Responder",
+    barangayName: item.barangay,
+    municipality: item.municipality,
+    avatarUrl: resolveAvatarUrl(item.avatarUrl),
+  };
+}
+
+function mapVolunteerToVolunteer(item: DispatchVolunteerDTO): Volunteer {
+  return {
+    id: item.id,
+    lifelineId: item.lifelineId,
+    name: item.name,
+    status: item.status,
+    skill: item.skill ?? "General Volunteer",
+    barangayName: item.barangay,
+    municipality: item.municipality,
+    avatarUrl: resolveAvatarUrl(item.avatarUrl),
+  };
+}
+
+async function fetchLegacyDispatchVolunteers(): Promise<Volunteer[]> {
   const res = await api.get<{ data: DispatchVolunteerDTO[] }>("/api/users/volunteers", {
     params: { onlyApproved: true, includeInactive: true },
   });
 
-  return (res.data.data ?? []).map((v) => ({
-    id: v.id,
-    lifelineId: v.lifelineId,
-    name: v.name,
-    // backend has no BUSY state (busy is per-task), keep it as available/offline
-    status: v.status,
-    skill: v.skill ?? "General Volunteer",
-    barangayName: v.barangay,
-    municipality: v.municipality,
-    avatarUrl: resolveAvatarUrl(v.avatarUrl),
-    // lng/lat intentionally missing until mobile location is wired
-  }));
+  return (res.data.data ?? []).map(mapVolunteerToVolunteer);
+}
+
+export async function fetchDispatchVolunteers(): Promise<Volunteer[]> {
+  try {
+    const responderRes = await api.get<{ data: DispatchResponderDTO[] }>(
+      "/api/responders/accounts/dispatchable/list"
+    );
+
+    const responders = (responderRes.data.data ?? []).map(mapResponderToVolunteer);
+    if (responders.length > 0) {
+      return responders;
+    }
+
+    // Backward-compatible fallback:
+    // if no responder accounts exist yet, keep volunteer dispatch source available
+    // so legacy LGU environments can still dispatch while migrating.
+    return fetchLegacyDispatchVolunteers();
+  } catch (responderError) {
+    try {
+      return await fetchLegacyDispatchVolunteers();
+    } catch {
+      throw responderError;
+    }
+  }
 }

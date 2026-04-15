@@ -19,7 +19,12 @@ export function useProfileNotificationPreferences(options: UseProfileNotificatio
   const canShowVolunteerAssignmentsToggle = useMemo(() => {
     const normalizedRole = String(role ?? "").trim().toUpperCase();
     const normalizedVolunteerStatus = String(volunteerStatus ?? "").trim().toUpperCase();
-    return enabled && (normalizedRole === "VOLUNTEER" || normalizedVolunteerStatus === "APPROVED");
+    return (
+      enabled &&
+      (normalizedRole === "RESPONDER" ||
+        normalizedRole === "VOLUNTEER" ||
+        normalizedVolunteerStatus === "APPROVED")
+    );
   }, [enabled, role, volunteerStatus]);
 
   const refresh = useCallback(async () => {

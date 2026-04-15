@@ -38,8 +38,9 @@ export function isPasswordPolicyValid(password: string) {
 }
 
 export function validateLogin(payload: LoginRequest): string | null {
-  if (!payload.email.trim() || !payload.password) return "Please enter email and password.";
-  if (!isEmailValid(payload.email)) return "Please enter a valid email.";
+  const identifier = payload.identifier.trim();
+  if (!identifier || !payload.password) return "Please enter your email/username and password.";
+  if (identifier.includes("@") && !isEmailValid(identifier)) return "Please enter a valid email.";
   return null;
 }
 

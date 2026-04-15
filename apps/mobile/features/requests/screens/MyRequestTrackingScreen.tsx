@@ -21,8 +21,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSession } from "../../auth/hooks/useSession";
 import { usePullToRefresh } from "../../common/hooks/usePullToRefresh";
 import { useRequestLiveTracking } from "../hooks/useRequestLiveTracking";
+import { useMyRequestReview } from "../hooks/useMyRequestReview";
 import type { TrackingLabel } from "../models/myRequests";
 import { formatEtaText } from "../utils/formatters";
+import { VolunteerReviewSummaryCard } from "../components/VolunteerReviewSummaryCard";
 
 const TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? "";
 const DAGUPAN: [number, number] = [120.34, 16.043];
@@ -120,9 +122,16 @@ export function MyRequestTrackingScreen() {
     pollMs: 6000,
     enabled: isUser && isFocused && Boolean(requestId),
   });
+  const {
+    data: reviewData,
+    loading: reviewLoading,
+    refresh: refreshReview,
+  } = useMyRequestReview(requestId, {
+    enabled: isUser && isFocused && Boolean(requestId),
+  });
   const refreshTracking = useCallback(async () => {
-    await refresh();
-  }, [refresh]);
+    await Promise.all([refresh(), refreshReview()]);
+  }, [refresh, refreshReview]);
   const { refreshing: refreshingTracking, triggerRefresh: triggerRefreshTracking } =
     usePullToRefresh(refreshTracking);
   const sheetSnapPoints = useMemo(() => ["34%", "62%", "88%"], []);
@@ -229,6 +238,22 @@ export function MyRequestTrackingScreen() {
     () => trackingLabel === "Resolved" || proofImages.length > 0,
     [proofImages.length, trackingLabel]
   );
+  const shouldShowReviewCard = useMemo(
+    () => trackingLabel === "Resolved" || Boolean(reviewData?.review) || Boolean(reviewData?.reviewable),
+    [reviewData?.review, reviewData?.reviewable, trackingLabel]
+  );
+  const reviewPrimaryLabel = useMemo(() => {
+    if (reviewLoading && !reviewData) return null;
+    if (reviewData?.reviewable && !reviewData.review) return "Leave Review";
+    if (reviewData?.review) return "Open Full Review";
+    return null;
+  }, [reviewData, reviewLoading]);
+  const onOpenReview = useCallback(() => {
+    router.push({
+      pathname: "/my-requests/review",
+      params: { id: requestId },
+    });
+  }, [requestId]);
 
   useEffect(() => {
     if (!isFocused || !cameraRef.current || !emergencyCoordinate) return;
@@ -524,6 +549,15 @@ export function MyRequestTrackingScreen() {
                 </Pressable>
               ) : null}
             </View>
+
+            {shouldShowReviewCard ? (
+              <VolunteerReviewSummaryCard
+                data={reviewData}
+                loading={reviewLoading}
+                primaryLabel={reviewPrimaryLabel}
+                onPressPrimary={reviewPrimaryLabel ? onOpenReview : undefined}
+              />
+            ) : null}
 
             {!isCancelledRequest ? (
               <View style={styles.timelineCard}>
