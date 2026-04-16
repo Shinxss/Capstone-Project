@@ -18,6 +18,17 @@ function splitSkills(raw?: string) {
     .filter(Boolean);
 }
 
+function initialsFromName(fullName: string) {
+  const tokens = String(fullName)
+    .split(" ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (tokens.length === 0) return "R";
+  if (tokens.length === 1) return tokens[0].slice(0, 2).toUpperCase();
+  return `${tokens[0][0] ?? ""}${tokens[1][0] ?? ""}`.toUpperCase();
+}
+
 export default function LguResponderAccountsView({
   loading,
   error,
@@ -133,133 +144,122 @@ export default function LguResponderAccountsView({
               />
             </div>
           ) : (
-            <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-[#162544] dark:bg-[#0B1220]">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-gray-50 text-xs font-semibold uppercase text-gray-500 dark:bg-[#0E1626] dark:text-slate-400">
-                  <tr>
-                    <th className="px-4 py-3">Responder</th>
-                    <th className="px-4 py-3">Contact</th>
-                    <th className="px-4 py-3">Team</th>
-                    <th className="px-4 py-3">Skills</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Created</th>
-                    <th className="px-4 py-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-[#162544]">
-                  {accounts.map((account) => {
-                    const skills = splitSkills(account.skills);
-                    const activeLabel = account.isActive ? "Active" : "Suspended";
-                    const dutyLabel = account.onDuty ? "On duty" : "Off duty";
-                    const actionLabel = account.isActive ? "Suspend" : "Reactivate";
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {accounts.map((account) => {
+                const skills = splitSkills(account.skills);
+                const activeLabel = account.isActive ? "Active" : "Suspended";
+                const dutyLabel = account.onDuty ? "On duty" : "Off duty";
+                const actionLabel = account.isActive ? "Suspend" : "Reactivate";
 
-                    return (
-                      <tr key={account.id}>
-                        <td className="px-4 py-3 align-top">
-                          <div className="font-semibold text-gray-900 dark:text-slate-100">{account.fullName}</div>
-                          <div className="mt-0.5 text-xs text-gray-600 dark:text-slate-400">
-                            {account.lifelineId ? `${account.lifelineId} • ` : ""}
+                return (
+                  <div
+                    key={account.id}
+                    className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-[#162544] dark:bg-[#0B1220]"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-start gap-3">
+                        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-red-200 bg-red-100 text-sm font-black text-red-600 ring-2 ring-red-500 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-200 dark:ring-red-400">
+                          {initialsFromName(account.fullName)}
+                        </div>
+
+                        <div className="min-w-0">
+                          <div className="truncate text-lg font-bold text-gray-900 dark:text-slate-100">
+                            {account.fullName}
+                          </div>
+                          <div className="mt-0.5 truncate text-xs text-gray-600 dark:text-slate-400">
+                            {account.lifelineId ? `${account.lifelineId} - ` : ""}
                             {account.username ? `@${account.username}` : "No username"}
                           </div>
-                          <div className="mt-0.5 text-xs text-gray-500 dark:text-slate-500">
+                          <div className="mt-0.5 truncate text-xs text-gray-500 dark:text-slate-500">
                             {account.barangay}, {account.municipality}
                           </div>
-                        </td>
+                        </div>
+                      </div>
 
-                        <td className="px-4 py-3 align-top text-xs text-gray-700 dark:text-slate-300">
-                          <div>{account.contactNo || "No contact"}</div>
-                          <div className="mt-0.5">{account.email || "No email"}</div>
-                        </td>
+                      <span
+                        className={
+                          account.isActive
+                            ? "inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
+                            : "inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:bg-red-500/20 dark:text-red-300"
+                        }
+                      >
+                        {activeLabel}
+                      </span>
+                    </div>
 
-                        <td className="px-4 py-3 align-top text-xs text-gray-700 dark:text-slate-300">
-                          {account.team?.name || "Unassigned"}
-                        </td>
+                    <div className="mt-4 space-y-1 text-xs text-gray-700 dark:text-slate-300">
+                      <div>{account.contactNo || "No contact"}</div>
+                      <div className="truncate">{account.email || "No email"}</div>
+                      <div className="text-gray-600 dark:text-slate-400">
+                        Team: {account.team?.name || "Unassigned"}
+                      </div>
+                    </div>
 
-                        <td className="px-4 py-3 align-top">
-                          {skills.length === 0 ? (
-                            <span className="text-xs text-gray-500 dark:text-slate-500">No skills listed</span>
-                          ) : (
-                            <div className="flex flex-wrap gap-1">
-                              {skills.slice(0, 3).map((skill) => (
-                                <span
-                                  key={`${account.id}-${skill}`}
-                                  className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] font-semibold text-gray-700 dark:border-[#22365D] dark:bg-[#0E1626] dark:text-slate-300"
-                                >
-                                  {skill}
-                                </span>
-                              ))}
-                              {skills.length > 3 ? (
-                                <span className="text-[11px] text-gray-500 dark:text-slate-500">
-                                  +{skills.length - 3}
-                                </span>
-                              ) : null}
-                            </div>
-                          )}
-                        </td>
+                    <div className="mt-3 flex flex-wrap gap-1">
+                      <span
+                        className={
+                          account.onDuty
+                            ? "inline-flex rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
+                            : "inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-700 dark:bg-slate-500/20 dark:text-slate-300"
+                        }
+                      >
+                        {dutyLabel}
+                      </span>
 
-                        <td className="px-4 py-3 align-top">
-                          <div className="flex flex-wrap gap-1">
+                      {skills.length === 0 ? (
+                        <span className="text-[11px] text-gray-500 dark:text-slate-500">No skills listed</span>
+                      ) : (
+                        <>
+                          {skills.slice(0, 3).map((skill) => (
                             <span
-                              className={
-                                account.isActive
-                                  ? "inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
-                                  : "inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:bg-red-500/20 dark:text-red-300"
-                              }
+                              key={`${account.id}-${skill}`}
+                              className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] font-semibold text-gray-700 dark:border-[#22365D] dark:bg-[#0E1626] dark:text-slate-300"
                             >
-                              {activeLabel}
+                              {skill}
                             </span>
-                            <span
-                              className={
-                                account.onDuty
-                                  ? "inline-flex rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
-                                  : "inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-700 dark:bg-slate-500/20 dark:text-slate-300"
-                              }
-                            >
-                              {dutyLabel}
-                            </span>
-                          </div>
-                        </td>
+                          ))}
+                          {skills.length > 3 ? (
+                            <span className="text-[11px] text-gray-500 dark:text-slate-500">+{skills.length - 3}</span>
+                          ) : null}
+                        </>
+                      )}
+                    </div>
 
-                        <td className="px-4 py-3 align-top text-xs text-gray-700 dark:text-slate-300">
-                          {formatDate(account.createdAt)}
-                        </td>
+                    <div className="mt-4 flex items-center justify-between border-t border-gray-200 pt-3 text-xs text-gray-600 dark:border-[#162544] dark:text-slate-400">
+                      <span>Created {formatDate(account.createdAt)}</span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void openEdit(account.id);
+                          }}
+                          className="rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50 dark:border-[#162544] dark:bg-[#0E1626] dark:text-slate-200 dark:hover:bg-[#122036]"
+                        >
+                          Edit
+                        </button>
 
-                        <td className="px-4 py-3 align-top text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                void openEdit(account.id);
-                              }}
-                              className="rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50 dark:border-[#162544] dark:bg-[#0E1626] dark:text-slate-200 dark:hover:bg-[#122036]"
-                            >
-                              Edit
-                            </button>
-
-                            <button
-                              type="button"
-                              disabled={busyAccountId === account.id}
-                              onClick={() => {
-                                void toggleActivation(account);
-                              }}
-                              className="rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60 dark:border-[#162544] dark:bg-[#0E1626] dark:text-slate-200 dark:hover:bg-[#122036]"
-                            >
-                              {busyAccountId === account.id ? "Working..." : actionLabel}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                        <button
+                          type="button"
+                          disabled={busyAccountId === account.id}
+                          onClick={() => {
+                            void toggleActivation(account);
+                          }}
+                          className="rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60 dark:border-[#162544] dark:bg-[#0E1626] dark:text-slate-200 dark:hover:bg-[#122036]"
+                        >
+                          {busyAccountId === account.id ? "Working..." : actionLabel}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )
         ) : null}
 
         <div className="flex items-center justify-between text-xs text-gray-600 dark:text-slate-400">
           <span>
-            {total.toLocaleString()} responders • Page {page} of {totalPages}
+            {total.toLocaleString()} responders - Page {page} of {totalPages}
           </span>
           <div className="flex items-center gap-2">
             <button
@@ -297,4 +297,3 @@ export default function LguResponderAccountsView({
     </>
   );
 }
-

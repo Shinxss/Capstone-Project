@@ -12,10 +12,15 @@ import { clearAccessTokenCookie, setAccessTokenCookie, shouldIncludeAccessTokenI
 import { toAuthUserPayload } from "./otp.utils";
 import { TokenBlocklist } from "./TokenBlocklist.model";
 import { resolveAccessTokenExpiresIn } from "./accessTokenExpiry";
+import {
+  getProfileCompletionStatus,
+  normalizePhilippineMobileContact,
+  PROFILE_COMPLETION_ALLOWED_GENDERS,
+} from "./profileCompletion";
 
 const ACCOUNT_SUSPENDED = "Account is suspended. Please contact your administrator.";
 const BIRTHDATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
-const ALLOWED_GENDERS = ["Male", "Female", "Prefer not to say"] as const;
+const ALLOWED_GENDERS = [...PROFILE_COMPLETION_ALLOWED_GENDERS] as const;
 const ALLOWED_GENDER_SET = new Set<string>(ALLOWED_GENDERS);
 
 function asTrimmedString(value: unknown) {
@@ -50,6 +55,19 @@ const updateMeSchema = z
     country: z.string().trim().max(100, "Country is too long").optional(),
     postalCode: z.string().trim().max(20, "Postal code is too long").optional(),
     avatarUrl: z.string().trim().max(500, "Avatar URL is too long").optional(),
+  })
+  .strict();
+
+const completeProfileSchema = z
+  .object({
+    firstName: z.string().trim().max(100, "First name is too long").optional(),
+    lastName: z.string().trim().max(100, "Last name is too long").optional(),
+    contactNo: z.string().trim().min(1, "Contact number is required").max(20, "Contact number is too long"),
+    gender: z.enum(PROFILE_COMPLETION_ALLOWED_GENDERS, {
+      error: "Gender must be Male, Female, or Prefer not to say",
+    }),
+    barangay: z.string().trim().min(1, "Address is required").max(200, "Address is too long"),
+    municipality: z.string().trim().max(200, "Municipality is too long").optional(),
   })
   .strict();
 
@@ -233,6 +251,132 @@ export async function me(req: Request, res: Response) {
     });
   } catch {
     return res.status(500).json({ message: "Failed to fetch profile." });
+  }
+}
+
+export async function completeProfile(req: Request, res: Response) {
+  try {
+    const userId = req.userId;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+    const parsed = completeProfileSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten() });
+    }
+
+    const user = await User.findById(userId).select(
+      "firstName lastName role authProvider contactNo gender barangay municipality isActive email volunteerStatus passwordHash googleSub"
+    );
+    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user.isActive) {
+      return res.status(403).json({
+        message: ACCOUNT_SUSPENDED,
+        code: "ACCOUNT_SUSPENDED",
+      });
+    }
+
+    const incoming = parsed.data;
+    const existingStatus = getProfileCompletionStatus({
+      role: user.role,
+      authProvider: user.authProvider,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      contactNo: user.contactNo,
+      gender: user.gender,
+      barangay: user.barangay,
+    });
+
+    const needsFirstName = existingStatus.missingProfileFields.includes("firstName");
+    const needsLastName = existingStatus.missingProfileFields.includes("lastName");
+
+    const changedFields: string[] = [];
+    const nextFirstName = asTrimmedString(incoming.firstName);
+    const nextLastName = asTrimmedString(incoming.lastName);
+
+    if (needsFirstName && !nextFirstName) {
+      return res.status(400).json({ message: "First name is required." });
+    }
+    if (needsLastName && !nextLastName) {
+      return res.status(400).json({ message: "Last name is required." });
+    }
+
+    if (incoming.firstName !== undefined) {
+      if (!nextFirstName) {
+        return res.status(400).json({ message: "First name is required." });
+      }
+      if ((user.firstName ?? "") !== nextFirstName) changedFields.push("firstName");
+      user.firstName = nextFirstName;
+    }
+
+    if (incoming.lastName !== undefined) {
+      if (!nextLastName) {
+        return res.status(400).json({ message: "Last name is required." });
+      }
+      if ((user.lastName ?? "") !== nextLastName) changedFields.push("lastName");
+      user.lastName = nextLastName;
+    }
+
+    const normalizedContactNo = normalizePhilippineMobileContact(incoming.contactNo);
+    if (!normalizedContactNo) {
+      return res.status(400).json({
+        message: "Contact number must be a valid Philippine mobile number (+639XXXXXXXXX or 09XXXXXXXXX).",
+      });
+    }
+    if ((user.contactNo ?? "") !== normalizedContactNo) changedFields.push("contactNo");
+    user.contactNo = normalizedContactNo;
+
+    if ((user.gender ?? "") !== incoming.gender) changedFields.push("gender");
+    user.gender = incoming.gender;
+
+    const nextBarangay = incoming.barangay.trim();
+    if ((user.barangay ?? "") !== nextBarangay) changedFields.push("barangay");
+    user.barangay = nextBarangay;
+
+    const nextMunicipality =
+      asTrimmedString(incoming.municipality) || asTrimmedString(user.municipality) || "Dagupan City";
+    if ((user.municipality ?? "") !== nextMunicipality) changedFields.push("municipality");
+    user.municipality = nextMunicipality;
+
+    const finalStatus = getProfileCompletionStatus({
+      role: user.role,
+      authProvider: user.authProvider,
+      firstName: incoming.firstName !== undefined ? nextFirstName : user.firstName,
+      lastName: incoming.lastName !== undefined ? nextLastName : user.lastName,
+      contactNo: normalizedContactNo,
+      gender: incoming.gender,
+      barangay: nextBarangay,
+    });
+
+    if (finalStatus.profileCompletionRequired) {
+      return res.status(400).json({ message: "Please complete all required profile fields before continuing." });
+    }
+
+    await user.save();
+
+    await logAudit(req, {
+      eventType: AUDIT_EVENT.USER_PROFILE_UPDATE,
+      outcome: "SUCCESS",
+      actor: {
+        id: user._id.toString(),
+        role: user.role,
+        email: user.email,
+      },
+      target: {
+        type: "USER",
+        id: user._id.toString(),
+      },
+      metadata: {
+        changedFields,
+        reason: "profile_completion",
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      user: toAuthUserPayload(user),
+    });
+  } catch {
+    return res.status(500).json({ message: "Failed to complete profile." });
   }
 }
 

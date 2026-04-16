@@ -17,6 +17,7 @@ export type CommunityLoginUser = {
   birthdate?: string;
   contactNo?: string;
   barangay?: string;
+  municipality?: string;
   gender?: string;
   skills?: string;
   avatarUrl?: string;
@@ -24,6 +25,8 @@ export type CommunityLoginUser = {
   emailVerified?: boolean;
   passwordSet?: boolean;
   googleLinked?: boolean;
+  profileCompletionRequired?: boolean;
+  missingProfileFields?: string[];
 };
 
 export type CommunityLoginResult = {
@@ -40,6 +43,16 @@ type SetPasswordPayload = {
   confirmPassword: string;
 };
 
+function asStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+
+  const nextValues = value
+    .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+    .filter((entry) => entry.length > 0);
+
+  return nextValues;
+}
+
 function parseUserPayload(data: any): CommunityLoginUser {
   const id = data?.id;
   if (!id || typeof id !== "string") throw new Error("No user profile returned");
@@ -55,6 +68,7 @@ function parseUserPayload(data: any): CommunityLoginUser {
     birthdate: typeof data?.birthdate === "string" ? data.birthdate : undefined,
     contactNo: typeof data?.contactNo === "string" ? data.contactNo : undefined,
     barangay: typeof data?.barangay === "string" ? data.barangay : undefined,
+    municipality: typeof data?.municipality === "string" ? data.municipality : undefined,
     gender: typeof data?.gender === "string" ? data.gender : undefined,
     skills: typeof data?.skills === "string" ? data.skills : undefined,
     avatarUrl: typeof data?.avatarUrl === "string" ? data.avatarUrl : undefined,
@@ -65,6 +79,9 @@ function parseUserPayload(data: any): CommunityLoginUser {
     emailVerified: typeof data?.emailVerified === "boolean" ? data.emailVerified : undefined,
     passwordSet: typeof data?.passwordSet === "boolean" ? data.passwordSet : undefined,
     googleLinked: typeof data?.googleLinked === "boolean" ? data.googleLinked : undefined,
+    profileCompletionRequired:
+      typeof data?.profileCompletionRequired === "boolean" ? data.profileCompletionRequired : undefined,
+    missingProfileFields: asStringArray(data?.missingProfileFields),
   };
 }
 

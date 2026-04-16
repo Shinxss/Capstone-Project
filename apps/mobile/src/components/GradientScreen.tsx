@@ -25,8 +25,7 @@ export default function GradientScreen({
 
   return (
     <View
-      className="flex-1 bg-lgu-lightBg dark:bg-lgu-darkBg"
-      style={[{ backgroundColor: isDark ? "#060C18" : "#F6F7F9" }, style]}
+      style={[{ flex: 1, backgroundColor: isDark ? "#060C18" : "#F6F7F9" }, style]}
     >
       <LinearGradient
         pointerEvents="none"
@@ -43,7 +42,7 @@ export default function GradientScreen({
         }}
       />
 
-      <SafeAreaView className="flex-1 bg-transparent" edges={["top", "left", "right"]}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: "transparent" }} edges={["top", "left", "right"]}>
         {children}
       </SafeAreaView>
     </View>

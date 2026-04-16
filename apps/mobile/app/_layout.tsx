@@ -1,5 +1,5 @@
-import React, { useEffect } from "react";
-import { Stack, useRouter, useSegments } from "expo-router";
+import React from "react";
+import { Redirect, Stack, usePathname } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as WebBrowser from "expo-web-browser";
 import { StatusBar } from "expo-status-bar";
@@ -16,48 +16,49 @@ import "../global.css";
 WebBrowser.maybeCompleteAuthSession();
 
 function AuthGate({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
-  const segments = useSegments();
-  const { hydrated, mode } = useAuth();
+  const pathname = usePathname();
+  const { hydrated, mode, user } = useAuth();
   usePushNotificationsBootstrap();
   useNotificationsBootstrap();
   useRealtimeBootstrap();
 
-  const inAuthGroup = segments[0] === "(auth)";
-  const inTabsGroup = segments[0] === "(tabs)";
-  const inReportFlow = segments[0] === "report";
-  const inVolunteerFlow =
-    segments[0] === "volunteer-apply-modal" ||
-    segments[0] === "volunteer-application";
-  const inMyRequestsFlow =
-    segments[0] === "my-requests" ||
-    segments[0] === "my-request-tracking";
-  const inProfileFlow = segments[0] === "profile";
-  const inNotificationsFlow = segments[0] === "notifications";
+  const currentPath = String(pathname ?? "");
+  const inAuthFlow =
+    currentPath.startsWith("/(auth)") ||
+    currentPath === "/login" ||
+    currentPath === "/signup" ||
+    currentPath === "/forgot-password" ||
+    currentPath === "/otp-verification" ||
+    currentPath === "/reset-password";
+  const inProfileCompletionFlow = currentPath === "/profile-completion";
+  const inSetPasswordFlow = currentPath === "/set-password";
 
-  useEffect(() => {
-    if (!hydrated) return;
-
-    if (
-      (mode === "authed" || mode === "guest") &&
-      !inTabsGroup &&
-      !inVolunteerFlow &&
-      !inReportFlow &&
-      !inMyRequestsFlow &&
-      !inProfileFlow &&
-      !inNotificationsFlow
-    ) {
-      router.replace("/(tabs)");
-      return;
-    }
-
-    if (mode === "anonymous" && !inAuthGroup) {
-      router.replace("/(auth)/login");
-    }
-  }, [hydrated, mode, inAuthGroup, inTabsGroup, inVolunteerFlow, inReportFlow, inMyRequestsFlow, inProfileFlow, inNotificationsFlow, router]);
+  const profileCompletionRequired = mode === "authed" && user?.profileCompletionRequired === true;
 
   if (!hydrated) {
     return <SplashScreen />;
+  }
+
+  if (mode === "anonymous" && !inAuthFlow) {
+    return <Redirect href="/(auth)/login" />;
+  }
+
+  if (mode === "guest" && inAuthFlow) {
+    return <Redirect href="/(tabs)" />;
+  }
+
+  if (mode === "authed") {
+    if (profileCompletionRequired && !inProfileCompletionFlow && !inSetPasswordFlow) {
+      return <Redirect href="/profile-completion" />;
+    }
+
+    if (!profileCompletionRequired && inProfileCompletionFlow) {
+      return <Redirect href="/(tabs)" />;
+    }
+
+    if (!profileCompletionRequired && inAuthFlow) {
+      return <Redirect href="/(tabs)" />;
+    }
   }
 
   return <>{children}</>;
@@ -93,8 +94,10 @@ function RootLayoutInner() {
               <Stack.Screen name="report" />
               <Stack.Screen name="my-requests" />
               <Stack.Screen name="my-request-tracking" />
-              <Stack.Screen name="profile" />
+              <Stack.Screen name="profile/edit" />
+              <Stack.Screen name="profile/skills" />
               <Stack.Screen name="notifications" />
+              <Stack.Screen name="profile-completion" />
               <Stack.Screen
                 name="volunteer-apply-modal"
                 options={{ presentation: "transparentModal" }}

@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { getProfileCompletionStatus } from "./profileCompletion";
 
 export const OTP_DIGITS = 6;
 export const OTP_EXPIRY_MINUTES = 10;
@@ -101,6 +102,16 @@ type UserLike = {
 };
 
 export function toAuthUserPayload(user: UserLike) {
+  const profileCompletion = getProfileCompletionStatus({
+    role: user.role,
+    authProvider: user.authProvider,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    contactNo: user.contactNo,
+    gender: user.gender,
+    barangay: user.barangay,
+  });
+
   return {
     id: typeof user._id === "string" ? user._id : user._id.toString(),
     lifelineId: user.lifelineId ?? undefined,
@@ -132,5 +143,7 @@ export function toAuthUserPayload(user: UserLike) {
     emailVerified: Boolean(user.emailVerified),
     passwordSet: Boolean(user.passwordHash),
     googleLinked: Boolean(user.googleSub),
+    profileCompletionRequired: profileCompletion.profileCompletionRequired,
+    missingProfileFields: profileCompletion.missingProfileFields,
   };
 }

@@ -19,6 +19,7 @@ export type OtpUserPayload = {
   birthdate?: string;
   contactNo?: string;
   barangay?: string;
+  municipality?: string;
   gender?: string;
   skills?: string;
   avatarUrl?: string;
@@ -26,6 +27,8 @@ export type OtpUserPayload = {
   emailVerified?: boolean;
   passwordSet?: boolean;
   googleLinked?: boolean;
+  profileCompletionRequired?: boolean;
+  missingProfileFields?: string[];
 };
 
 export type SignupVerifyOtpResult = {

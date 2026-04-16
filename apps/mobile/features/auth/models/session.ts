@@ -17,6 +17,8 @@ export type AuthUser = {
   emailVerified?: boolean;
   passwordSet?: boolean;
   googleLinked?: boolean;
+  profileCompletionRequired?: boolean;
+  missingProfileFields?: string[];
   accessToken: string;
 };
 

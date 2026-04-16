@@ -122,6 +122,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       emailVerified: nextUser.emailVerified,
       passwordSet: nextUser.passwordSet,
       googleLinked: nextUser.googleLinked,
+      profileCompletionRequired: nextUser.profileCompletionRequired,
+      missingProfileFields: nextUser.missingProfileFields,
       accessToken: nextToken,
     });
 

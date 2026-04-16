@@ -48,6 +48,16 @@ function getBoolean(value: unknown): boolean | undefined {
   return typeof value === "boolean" ? value : undefined;
 }
 
+function asStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+
+  const nextValues = value
+    .map((entry) => asString(entry))
+    .filter((entry): entry is string => Boolean(entry));
+
+  return nextValues;
+}
+
 function extractToken(payload: any): string | null {
   const candidates = [
     payload?.token,
@@ -95,6 +105,8 @@ function parseAuthUser(payload: any): AuthUser | null {
     emailVerified: getBoolean(data?.emailVerified),
     passwordSet: getBoolean(data?.passwordSet),
     googleLinked: getBoolean(data?.googleLinked),
+    profileCompletionRequired: getBoolean(data?.profileCompletionRequired),
+    missingProfileFields: asStringArray(data?.missingProfileFields),
   };
 }
 
@@ -118,6 +130,8 @@ async function persistUserSession(user: AuthUser, token: string): Promise<void> 
     emailVerified: user.emailVerified,
     passwordSet: user.passwordSet,
     googleLinked: user.googleLinked,
+    profileCompletionRequired: user.profileCompletionRequired,
+    missingProfileFields: user.missingProfileFields,
     accessToken: token,
   });
 }
