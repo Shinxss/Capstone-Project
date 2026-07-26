@@ -109,7 +109,7 @@ function buildStatCards(
     },
     {
       key: "availableVolunteers",
-      label: "Available Volunteers",
+      label: "Available Responders & Volunteers",
       value: stats.availableVolunteers,
       valueDisplay: formatCount(stats.availableVolunteers),
       trend: trendByKey.availableVolunteers ?? neutralTrend("count"),

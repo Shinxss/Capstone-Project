@@ -314,7 +314,7 @@ export default function LguLiveMapView(props: Props) {
         <div className="pointer-events-auto inline-flex items-center gap-2 rounded-full bg-white/70 backdrop-blur px-2 py-1 border border-white/70 shadow-sm dark:bg-black/55 dark:border-white/10">
           <Pill icon={<AlertTriangle size={14} />} label="Emergencies" value={emergenciesCount} />
           <Pill icon={<ShieldAlert size={14} />} label="Hazards" value={hazardsCount} />
-          <Pill icon={<Users size={14} />} label="Volunteers" value={volunteersCount} />
+          <Pill icon={<Users size={14} />} label="Responders & Volunteers" value={volunteersCount} />
         </div>
 
         <button
@@ -377,7 +377,7 @@ export default function LguLiveMapView(props: Props) {
                 ))}
               </div>
 
-              <div className="mt-3 text-[11px] font-bold text-gray-600 mb-2 dark:text-white/85">Volunteers</div>
+              <div className="mt-3 text-[11px] font-bold text-gray-600 mb-2 dark:text-white/85">Responders & Volunteers</div>
               <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[12px]">
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-emerald-500" />
@@ -391,10 +391,7 @@ export default function LguLiveMapView(props: Props) {
                   <span className="h-2 w-2 rounded-full bg-slate-500" />
                   <span>Idle</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-red-500" />
-                  <span>Offline</span>
-                </div>
+
               </div>
             </div>
           ) : (
@@ -757,7 +754,7 @@ export default function LguLiveMapView(props: Props) {
 
                 <ToggleRow
                   icon={<Users size={16} className="text-gray-600 dark:text-slate-400" />}
-                  label="Volunteers"
+                  label="Responders & Volunteers"
                   checked={showVolunteers}
                   onToggle={() => setShowVolunteers((v) => !v)}
                   activeColorClass="bg-blue-600"

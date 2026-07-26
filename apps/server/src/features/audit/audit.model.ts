@@ -37,12 +37,11 @@ export type AuditLogDoc = {
 
 const AuditLogSchema = new Schema<AuditLogDoc>(
   {
-    eventId: { type: String, required: true, unique: true, index: true, default: () => randomUUID() },
-    timestamp: { type: Date, required: true, default: Date.now, index: true },
+    eventId: { type: String, required: true, unique: true, default: () => randomUUID() },
+    timestamp: { type: Date, required: true, default: Date.now },
     eventType: {
       type: String,
       required: true,
-      index: true,
       enum: Object.values(AUDIT_EVENT),
     },
     severity: {
@@ -54,11 +53,10 @@ const AuditLogSchema = new Schema<AuditLogDoc>(
     outcome: {
       type: String,
       required: true,
-      index: true,
       enum: Object.values(AUDIT_OUTCOME),
     },
     actor: {
-      id: { type: String, default: "", index: true },
+      id: { type: String, default: "" },
       role: { type: String, default: "" },
       email: { type: String, default: "" },
     },
@@ -75,10 +73,10 @@ const AuditLogSchema = new Schema<AuditLogDoc>(
       method: { type: String, default: "" },
       path: { type: String, default: "" },
       requestId: { type: String, default: "" },
-      correlationId: { type: String, default: "", index: true },
+      correlationId: { type: String, default: "" },
     },
     metadata: { type: Schema.Types.Mixed, default: {} },
-    scopeBarangay: { type: String, default: "", index: true },
+    scopeBarangay: { type: String, default: "" },
   },
   {
     strict: "throw",

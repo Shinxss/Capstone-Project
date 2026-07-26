@@ -431,7 +431,7 @@ export default function LguDashboardView({
                   ))}
                 </div>
 
-                <div className="mt-3 text-[11px] font-bold text-gray-600 mb-2 dark:text-white/85">Volunteers</div>
+                <div className="mt-3 text-[11px] font-bold text-gray-600 mb-2 dark:text-white/85">Responders &amp; Volunteers</div>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[12px]">
                   <div className="flex items-center gap-2">
                     <span className="h-2 w-2 rounded-full bg-emerald-500" />
@@ -441,9 +441,9 @@ export default function LguDashboardView({
                     <span className="h-2 w-2 rounded-full bg-orange-500" />
                     <span>Busy</span>
                   </div>
-                  <div className="flex items-center gap-2 col-span-2">
-                    <span className="h-2 w-2 rounded-full bg-red-500" />
-                    <span>Offline</span>
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-slate-500" />
+                    <span>Idle</span>
                   </div>
                 </div>
               </div>
