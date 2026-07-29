@@ -47,7 +47,7 @@ export const {
   cookieName: "csrf",
   cookieOptions: {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: isProduction ? "none" : "lax",
     path: "/",
     secure: isProduction,
   },
