@@ -32,8 +32,10 @@ function resolveCookieSecure() {
 function resolveCookieSameSite(secure: boolean): CookieOptions["sameSite"] {
   const raw = String(process.env.AUTH_COOKIE_SAME_SITE ?? "").trim().toLowerCase();
   if (raw === "strict") return "strict";
+  if (raw === "lax") return "lax";
   if (raw === "none" && secure) return "none";
-  return "lax";
+  // Cross-origin deployments (e.g. Vercel → Render) require "none"
+  return secure ? "none" : "lax";
 }
 
 function resolveCookieDomain() {
