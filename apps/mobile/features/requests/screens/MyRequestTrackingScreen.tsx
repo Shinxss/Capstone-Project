@@ -28,10 +28,6 @@ import { VolunteerReviewSummaryCard } from "../components/VolunteerReviewSummary
 
 const TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? "";
 const DAGUPAN: [number, number] = [120.34, 16.043];
-const DAGUPAN_BOUNDS = {
-  sw: [120.25, 15.98] as [number, number],
-  ne: [120.43, 16.12] as [number, number],
-} as const;
 
 if (TOKEN) {
   MapboxGL.setAccessToken(TOKEN);
@@ -395,7 +391,6 @@ export function MyRequestTrackingScreen() {
             ref={cameraRef}
             centerCoordinate={emergencyCoordinate ?? DAGUPAN}
             zoomLevel={13}
-            maxBounds={DAGUPAN_BOUNDS}
           />
 
           {routeGeometry &&

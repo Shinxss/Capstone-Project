@@ -33,19 +33,6 @@ import {
 } from "../../hazardZones/utils/hazardZones.mapbox";
 import { DAGUPAN_CENTER } from "../../lguLiveMap/constants/lguLiveMap.constants";
 
-const DAGUPAN_BOUNDS = {
-  minLng: 120.25,
-  maxLng: 120.43,
-  minLat: 15.98,
-  maxLat: 16.12,
-} as const;
-
-function clampToDagupan(lng: number, lat: number): [number, number] {
-  return [
-    Math.min(DAGUPAN_BOUNDS.maxLng, Math.max(DAGUPAN_BOUNDS.minLng, lng)),
-    Math.min(DAGUPAN_BOUNDS.maxLat, Math.max(DAGUPAN_BOUNDS.minLat, lat)),
-  ];
-}
 
 function timeAgo(iso?: string) {
   if (!iso) return "-";
@@ -129,15 +116,6 @@ export default function LguDashboardView({
 
   const [quickView, setQuickView] = useState<DashboardEmergencyItem | null>(null);
   const [legendMinimized, setLegendMinimized] = useState(false);
-  const maxBounds = useMemo(
-    () =>
-      [
-        [DAGUPAN_BOUNDS.minLng, DAGUPAN_BOUNDS.minLat],
-        [DAGUPAN_BOUNDS.maxLng, DAGUPAN_BOUNDS.maxLat],
-      ] as [[number, number], [number, number]],
-    []
-  );
-
   // ✅ Allow clicking a map marker on the dashboard to open the quick view.
   const emergencyById = useMemo(() => {
     const m = new Map<string, DashboardEmergencyItem>();
@@ -190,7 +168,8 @@ export default function LguDashboardView({
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const [lng, lat] = clampToDagupan(pos.coords.longitude, pos.coords.latitude);
+        const lng = pos.coords.longitude;
+        const lat = pos.coords.latitude;
         map.flyTo({
           center: [lng, lat],
           zoom: Math.max(map.getZoom(), 14),
@@ -209,7 +188,8 @@ export default function LguDashboardView({
     if (!Number.isFinite(quickView.lng) || !Number.isFinite(quickView.lat)) return;
 
     try {
-      const [lng, lat] = clampToDagupan(quickView.lng, quickView.lat);
+      const lng = quickView.lng;
+      const lat = quickView.lat;
       map.flyTo({
         center: [lng, lat],
         zoom: Math.max(map.getZoom(), 15),
@@ -369,7 +349,6 @@ export default function LguDashboardView({
           onMapReady={onMapReady}
           center={DAGUPAN_CENTER}
           zoom={12.6}
-          maxBounds={maxBounds}
           fitReports="initial"
           navPosition="bottom-right"
           attributionPosition="bottom-left"

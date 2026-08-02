@@ -21,10 +21,6 @@ import { useReportPhotos } from "../hooks/useReportPhotos";
 import { getCurrentCoords, reverseGeocodeCoords } from "../../../shared/services/locationService";
 
 const DAGUPAN_CENTER: [number, number] = [120.34, 16.043];
-const DAGUPAN_BOUNDS = {
-  sw: [120.25, 15.98] as [number, number],
-  ne: [120.43, 16.12] as [number, number],
-} as const;
 const FALLBACK_CENTER: [number, number] = DAGUPAN_CENTER;
 const TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? "";
 
@@ -37,12 +33,6 @@ function toLabel(latitude: number, longitude: number) {
   return `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
 }
 
-function clampToDagupanBounds(longitude: number, latitude: number): [number, number] {
-  const clampedLongitude = Math.min(DAGUPAN_BOUNDS.ne[0], Math.max(DAGUPAN_BOUNDS.sw[0], longitude));
-  const clampedLatitude = Math.min(DAGUPAN_BOUNDS.ne[1], Math.max(DAGUPAN_BOUNDS.sw[1], latitude));
-  return [clampedLongitude, clampedLatitude];
-}
-
 export function ReportEmergencyDetailsScreen() {
   const insets = useSafeAreaInsets();
   const { draft, setDescription, setLocation, setLocationText } = useReportDraft();
@@ -52,12 +42,12 @@ export function ReportEmergencyDetailsScreen() {
   const [showMapPicker, setShowMapPicker] = useState(false);
   const [mapCenter, setMapCenter] = useState<[number, number]>(
     draft.location
-      ? clampToDagupanBounds(draft.location.coords.longitude, draft.location.coords.latitude)
+      ? [draft.location.coords.longitude, draft.location.coords.latitude] as [number, number]
       : FALLBACK_CENTER
   );
   const [mapPicked, setMapPicked] = useState<[number, number] | null>(
     draft.location
-      ? clampToDagupanBounds(draft.location.coords.longitude, draft.location.coords.latitude)
+      ? [draft.location.coords.longitude, draft.location.coords.latitude] as [number, number]
       : null
   );
   const [resolvingAddress, setResolvingAddress] = useState(false);
@@ -83,10 +73,10 @@ export function ReportEmergencyDetailsScreen() {
 
     const run = async () => {
       if (draft.location?.coords) {
-        const existing = clampToDagupanBounds(
+        const existing: [number, number] = [
           draft.location.coords.longitude,
           draft.location.coords.latitude
-        );
+        ];
         setMapCenter(existing);
         setMapPicked(existing);
         return;
@@ -95,7 +85,7 @@ export function ReportEmergencyDetailsScreen() {
       try {
         const current = await getCurrentCoords();
         if (!active) return;
-        setMapCenter(clampToDagupanBounds(current.longitude, current.latitude));
+        setMapCenter([current.longitude, current.latitude]);
       } catch {
         // keep fallback center
       }
@@ -133,7 +123,7 @@ export function ReportEmergencyDetailsScreen() {
   const onUseCurrentLocation = async () => {
     try {
       const coords = await getCurrentCoords();
-      const [longitude, latitude] = clampToDagupanBounds(coords.longitude, coords.latitude);
+      const [longitude, latitude] = [coords.longitude, coords.latitude];
       const address = await reverseGeocodeCoords({ latitude, longitude });
       const label = address ?? toLabel(latitude, longitude);
       setLocationText(label);
@@ -239,7 +229,7 @@ export function ReportEmergencyDetailsScreen() {
                   onPress={(event) => {
                     if (event.geometry.type !== "Point") return;
                     const coordinates = event.geometry.coordinates;
-                    const clamped = clampToDagupanBounds(coordinates[0], coordinates[1]);
+                    const clamped: [number, number] = [coordinates[0], coordinates[1]];
                     setMapPicked(clamped);
                     setMapCenter(clamped);
                   }}
@@ -248,7 +238,6 @@ export function ReportEmergencyDetailsScreen() {
                     centerCoordinate={mapCenter}
                     zoomLevel={14}
                     animationMode="flyTo"
-                    maxBounds={DAGUPAN_BOUNDS}
                   />
 
                   {markerCoordinate ? (

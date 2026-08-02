@@ -43,9 +43,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     return <Redirect href="/(auth)/login" />;
   }
 
-  if (mode === "guest" && inAuthFlow) {
-    return <Redirect href="/(tabs)" />;
-  }
+
+
 
   if (mode === "authed") {
     if (profileCompletionRequired && !inProfileCompletionFlow && !inSetPasswordFlow) {

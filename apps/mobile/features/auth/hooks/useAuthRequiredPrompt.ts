@@ -60,9 +60,9 @@ export function useAuthRequiredPrompt() {
   );
 
   const navigateToAuth = useCallback(
-    (path: "/(auth)/login" | "/(auth)/signup") => {
+    async (path: "/(auth)/login" | "/(auth)/signup") => {
       closeAuthRequired();
-      void signOut().catch(() => undefined);
+      await signOut().catch(() => undefined);
       router.replace(path);
     },
     [closeAuthRequired, router, signOut]

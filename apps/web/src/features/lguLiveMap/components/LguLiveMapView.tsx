@@ -219,17 +219,6 @@ export default function LguLiveMapView(props: Props) {
     ? `https://api.mapbox.com/styles/v1/${activeMapStyleOption.stylePath}/static/120.34,16.043,11,0/220x220?access_token=${mapPreviewToken}&logo=false&attribution=false`
     : null;
 
-  // ✅ IMPORTANT: keep maxBounds reference stable.
-  // EmergencyMap recreates the Mapbox instance when maxBounds changes (dependency in its init effect).
-  const maxBounds = useMemo(
-    () =>
-      [
-        [120.25, 15.98],
-        [120.43, 16.12],
-      ] as any,
-    []
-  );
-
   const toHazardType = (v: unknown): HazardType =>
     HAZARD_TYPES.includes(v as HazardType) ? (v as HazardType) : "UNSAFE";
 
@@ -287,7 +276,6 @@ export default function LguLiveMapView(props: Props) {
           center={center}
           zoom={12.6}
           mapStyle={mapStyleUrl}
-          maxBounds={maxBounds}
           navPosition="bottom-right"
           attributionPosition="bottom-left"
           onMapReady={onMapReady}

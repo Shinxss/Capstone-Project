@@ -66,10 +66,6 @@ type MapRouteSearchParams = {
 };
 
 const DAGUPAN: [number, number] = [120.34, 16.043];
-const DAGUPAN_BOUNDS = {
-  sw: [120.25, 15.98] as [number, number],
-  ne: [120.43, 16.12] as [number, number],
-} as const;
 const TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? "";
 
 if (TOKEN) {
@@ -193,11 +189,7 @@ function hexToRgba(hex: string, alpha: number) {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-function clampToDagupan([lng, lat]: [number, number]): [number, number] {
-  const clampedLng = Math.min(DAGUPAN_BOUNDS.ne[0], Math.max(DAGUPAN_BOUNDS.sw[0], lng));
-  const clampedLat = Math.min(DAGUPAN_BOUNDS.ne[1], Math.max(DAGUPAN_BOUNDS.sw[1], lat));
-  return [clampedLng, clampedLat];
-}
+
 
 function readRouteParam(value?: string | string[]) {
   if (Array.isArray(value)) return value[0];
@@ -255,7 +247,7 @@ function spreadOverlappingEmergencyMarkers(items: Emergency[]): EmergencyMarkerP
     const latOffset = radiusDeg * Math.sin(angle);
     const lngScale = Math.max(Math.cos((baseLat * Math.PI) / 180), 0.2);
     const lngOffset = (radiusDeg * Math.cos(angle)) / lngScale;
-    const [markerLng, markerLat] = clampToDagupan([baseLng + lngOffset, baseLat + latOffset]);
+    const [markerLng, markerLat] = [baseLng + lngOffset, baseLat + latOffset];
 
     return {
       emergency,
@@ -376,7 +368,7 @@ export default function MapTab() {
     const lng = readRouteNumber(mapRouteParams.reportLng);
     const lat = readRouteNumber(mapRouteParams.reportLat);
     if (lng === null || lat === null) return null;
-    return clampToDagupan([lng, lat]);
+    return [lng, lat];
   }, [mapRouteParams.reportLat, mapRouteParams.reportLng]);
   const { activeDispatch, refresh: refreshActiveDispatch } = useActiveDispatch({
     pollMs: 10000,
@@ -672,7 +664,7 @@ export default function MapTab() {
 
   const fitRoute = (coords: [number, number][]) => {
     try {
-      const boundedCoords = coords.map(clampToDagupan);
+      const boundedCoords = coords;
 
       let minLng = boundedCoords[0][0];
       let maxLng = boundedCoords[0][0];
@@ -700,8 +692,8 @@ export default function MapTab() {
       });
     } catch {
       // fallback
-      const [startLng, startLat] = clampToDagupan(coords[0]);
-      const [endLng, endLat] = clampToDagupan(coords[coords.length - 1]);
+      const [startLng, startLat] = coords[0];
+      const [endLng, endLat] = coords[coords.length - 1];
       const midLng = (startLng + endLng) / 2;
       const midLat = (startLat + endLat) / 2;
       cameraRef.current?.setCamera({
@@ -811,7 +803,7 @@ export default function MapTab() {
     if (!Number.isFinite(emergencyLng) || !Number.isFinite(emergencyLat)) return;
 
     lastAutoFocusedDispatchIdRef.current = dispatchId;
-    const target = clampToDagupan([emergencyLng, emergencyLat]);
+    const target: [number, number] = [emergencyLng, emergencyLat];
 
     // Step 1: move camera to incident location.
     cameraRef.current?.setCamera({
@@ -1064,7 +1056,7 @@ export default function MapTab() {
             centerCoordinate={camera.centerCoordinate}
             zoomLevel={camera.zoomLevel}
             animationDuration={camera.animationDuration}
-            maxBounds={DAGUPAN_BOUNDS}
+
           />
 
           {hazardZonesGeoJSON.features.length ? (

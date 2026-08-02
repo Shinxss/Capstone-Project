@@ -8,10 +8,6 @@ import type { EmergencyReport } from "@/features/emergency/models/emergency.type
 import { fetchEmergencyReports } from "@/features/emergency/services/emergency.service";
 import { DAGUPAN_CENTER } from "@/features/lguLiveMap/constants/lguLiveMap.constants";
 
-const DASHBOARD_MAX_BOUNDS: [[number, number], [number, number]] = [
-  [120.25, 15.98],
-  [120.43, 16.12],
-];
 
 function toActiveIncidentPin(report: EmergencyReport): MapEmergencyPin | null {
   const status = String(report.status || "").toUpperCase();
@@ -132,7 +128,6 @@ export default function AdminDashboard() {
             reports={mapPins}
             center={DAGUPAN_CENTER}
             zoom={12.4}
-            maxBounds={DASHBOARD_MAX_BOUNDS}
             fitReports="initial"
             navPosition="bottom-right"
             attributionPosition="bottom-left"
