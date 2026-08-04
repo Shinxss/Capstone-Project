@@ -43,6 +43,8 @@ import {
   createNotificationsSocket,
   type NotificationsRefreshPayload,
 } from "../../notifications/services/notifications.socket";
+import { activeAssignedResponderIds } from "../dispatch/utils/dispatchResponder.utils";
+import type { PresenceConnectionState } from "../dispatch/types/dispatchResponders.types";
 
 type LngLat = [number, number];
 
@@ -338,6 +340,7 @@ export function useLguLiveMap() {
   const dragPanWasEnabledRef = useRef(false);
 
   const [mapReady, setMapReady] = useState(false);
+  const [presenceConnectionState, setPresenceConnectionState] = useState<PresenceConnectionState>("connecting");
 
   // UI
   const [query, setQuery] = useState("");
@@ -443,6 +446,7 @@ export function useLguLiveMap() {
     if (!user?.id) return;
 
     const socket = createLivePresenceSocket();
+    setPresenceConnectionState("connecting");
 
     const mergePresence = (
       volunteerIdRaw: unknown,
@@ -602,20 +606,31 @@ export function useLguLiveMap() {
       });
     };
 
+    const onConnect = () => {
+      setPresenceConnectionState("live");
+      subscribe();
+    };
+    const onDisconnect = () => setPresenceConnectionState("reconnecting");
+    const onConnectError = () => setPresenceConnectionState("reconnecting");
+
     socket.on("volunteers:snapshot", onSnapshot);
     socket.on("volunteers:presence_changed", onPresenceChanged);
     socket.on("volunteers:location_update", onLocationUpdate);
-    socket.on("connect", subscribe);
+    socket.on("connect", onConnect);
+    socket.on("disconnect", onDisconnect);
+    socket.on("connect_error", onConnectError);
 
     socket.connect();
-    if (socket.connected) subscribe();
+    if (socket.connected) onConnect();
 
     return () => {
       socket.emit("volunteers:unsubscribe");
       socket.off("volunteers:snapshot", onSnapshot);
       socket.off("volunteers:presence_changed", onPresenceChanged);
       socket.off("volunteers:location_update", onLocationUpdate);
-      socket.off("connect", subscribe);
+      socket.off("connect", onConnect);
+      socket.off("disconnect", onDisconnect);
+      socket.off("connect_error", onConnectError);
       socket.disconnect();
     };
   }, []);
@@ -738,7 +753,9 @@ export function useLguLiveMap() {
       lat,
       notes: selectedEmergency.notes ?? null,
       reportedAt: selectedEmergency.reportedAt,
-      barangayName: (selectedEmergency as any).barangayName ?? null,
+      barangayName: selectedEmergency.barangayName ?? null,
+      locationLabel: selectedEmergency.locationLabel ?? null,
+      referenceNumber: selectedEmergency.referenceNumber ?? null,
     };
   }, [selectedEmergency]);
 
@@ -1442,11 +1459,8 @@ export function useLguLiveMap() {
   const openDispatchResponders = useCallback(() => {
     if (!selectedEmergencyDetails) return;
 
-    const available = volunteers.filter((v) => v.status === "available");
-    if (available.length === 0) {
-      toastWarning("No available responders right now.");
-      return;
-    }
+    const assignedIds = activeAssignedResponderIds(selectedEmergencyTasks);
+    const available = volunteers.filter((v) => v.status === "available" && !assignedIds.has(v.id));
 
     // Preselect nearest 2 available responders (only if nothing is selected yet)
     setDispatchSelection((prev) => {
@@ -1465,25 +1479,43 @@ export function useLguLiveMap() {
     });
 
     setDispatchModalOpen(true);
-  }, [selectedEmergencyDetails, volunteers]);
+  }, [selectedEmergencyDetails, selectedEmergencyTasks, volunteers]);
 
   const closeDispatchResponders = useCallback(() => {
     setDispatchModalOpen(false);
     setDispatchSelection([]);
   }, []);
 
+  const clearDispatchSelection = useCallback(() => {
+    setDispatchSelection([]);
+  }, []);
+
   useEffect(() => {
     if (!dispatchModalOpen) return;
+    const assignedIds = activeAssignedResponderIds(selectedEmergencyTasks);
     const availableIds = new Set(
-      volunteers.filter((volunteer) => volunteer.status === "available").map((volunteer) => volunteer.id)
+      volunteers
+        .filter((volunteer) => volunteer.status === "available" && !assignedIds.has(volunteer.id))
+        .map((volunteer) => volunteer.id)
     );
-    setDispatchSelection((prev) => prev.filter((id) => availableIds.has(id)));
-  }, [dispatchModalOpen, volunteers]);
+    const removedIds = dispatchSelection.filter((id) => !availableIds.has(id));
+    if (removedIds.length === 0) return;
+    setDispatchSelection((previous) => previous.filter((id) => availableIds.has(id)));
+    const removedNames = removedIds
+      .map((id) => volunteers.find((volunteer) => volunteer.id === id)?.name)
+      .filter((name): name is string => Boolean(name));
+    toastWarning(
+      removedNames.length === 1
+        ? `${removedNames[0]} is no longer available and was removed from the dispatch selection.`
+        : "One or more responders are no longer available and were removed from the dispatch selection."
+    );
+  }, [dispatchModalOpen, dispatchSelection, selectedEmergencyTasks, volunteers]);
 
   const toggleDispatchResponder = useCallback(
     (volunteerId: string) => {
       const v = volunteers.find((x) => x.id === volunteerId);
-      if (!v || v.status !== "available") return;
+      const assignedIds = activeAssignedResponderIds(selectedEmergencyTasks);
+      if (!v || v.status !== "available" || assignedIds.has(volunteerId)) return;
 
       setDispatchSelection((prev) =>
         prev.includes(volunteerId)
@@ -1491,20 +1523,21 @@ export function useLguLiveMap() {
           : [...prev, volunteerId]
       );
     },
-    [volunteers]
+    [selectedEmergencyTasks, volunteers]
   );
 
   const confirmDispatchResponders = useCallback(async () => {
-    if (!selectedEmergencyId) return;
+    if (!selectedEmergencyId) return false;
 
+    const assignedIds = activeAssignedResponderIds(selectedEmergencyTasks);
     const availableSet = new Set(
-      volunteers.filter((v) => v.status === "available").map((v) => v.id)
+      volunteers.filter((v) => v.status === "available" && !assignedIds.has(v.id)).map((v) => v.id)
     );
     const chosen = dispatchSelection.filter((id) => availableSet.has(id));
 
     if (chosen.length === 0) {
       toastWarning("Select at least one available responder.");
-      return;
+      return false;
     }
 
     // ✅ Persist dispatch offers to the backend (web → backend → mobile)
@@ -1512,8 +1545,14 @@ export function useLguLiveMap() {
       await createDispatchOffers({ emergencyId: selectedEmergencyId, volunteerIds: chosen });
     } catch (error: unknown) {
       const parsed = error as { message?: string; response?: { data?: { message?: string } } };
-      toastError(parsed.response?.data?.message ?? parsed.message ?? "Failed to dispatch responders.");
-      return;
+      const backendMessage = String(parsed.response?.data?.message ?? parsed.message ?? "").toLowerCase();
+      if (backendMessage.includes("available") || backendMessage.includes("busy") || backendMessage.includes("dispatch")) {
+        await refetchVolunteers().catch(() => undefined);
+        toastError("One or more responders are no longer available. Review the updated selection and try again.");
+      } else {
+        toastError("The dispatch could not be completed. Please try again.");
+      }
+      return false;
     }
     appendActivityLog({
       action: "Dispatched volunteers",
@@ -1545,7 +1584,8 @@ export function useLguLiveMap() {
     setDispatchSelection([]);
     setTrackOpen(true);
     toastSuccess("Responders dispatched.");
-  }, [dispatchSelection, selectedEmergencyId, volunteers]);
+    return true;
+  }, [dispatchSelection, refetchVolunteers, selectedEmergencyId, selectedEmergencyTasks, volunteers]);
 
   const toggleTrackPanel = useCallback(() => {
     setTrackOpen((v) => !v);
@@ -1680,10 +1720,12 @@ export function useLguLiveMap() {
     volunteersLoading,
     volunteersError,
     refetchVolunteers,
+    presenceConnectionState,
     dispatchModalOpen,
     openDispatchResponders,
     closeDispatchResponders,
     dispatchSelection,
+    clearDispatchSelection,
     toggleDispatchResponder,
     confirmDispatchResponders,
     trackOpen,

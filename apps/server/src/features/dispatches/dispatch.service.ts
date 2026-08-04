@@ -14,6 +14,7 @@ import { getDispatchPendingResponseCutoffDate } from "./dispatch.constants";
 import {
   emitRequestTrackingUpdate,
   emitUserNotification,
+  getDispatchAssigneePresenceStatus,
   syncVolunteerBusyState,
 } from "../../realtime/notificationsSocket";
 import { findBarangayByPoint } from "../barangays/barangay.service";
@@ -70,14 +71,6 @@ export async function createDispatchOffers(input: CreateDispatchInput) {
     throw new Error("LGU cannot dispatch volunteers to their own emergency report.");
   }
 
-  // Once responders are dispatched, treat the incident as acknowledged.
-  // This removes it from "active SOS alert" queues that track unhandled reports.
-  const snapshotStatus = emergency.status === "OPEN" ? "ACKNOWLEDGED" : emergency.status;
-  if (snapshotStatus !== emergency.status) {
-    emergency.status = snapshotStatus;
-    await emergency.save();
-  }
-
   const uniqVolunteerIds = Array.from(new Set((input.volunteerIds ?? []).map(String))).filter(Boolean);
   if (uniqVolunteerIds.length === 0) {
     throw new Error("volunteerIds is required");
@@ -102,6 +95,13 @@ export async function createDispatchOffers(input: CreateDispatchInput) {
     throw new Error("No valid approved volunteers or active responders found");
   }
 
+  const unavailableVolunteerIds = validVolunteerIds.filter(
+    (volunteerId) => getDispatchAssigneePresenceStatus(volunteerId) !== "ONLINE"
+  );
+  if (unavailableVolunteerIds.length > 0) {
+    throw new Error("One or more selected responders are no longer available.");
+  }
+
   if (Types.ObjectId.isValid(reporterUserId) && validVolunteerIds.includes(reporterUserId)) {
     throw new Error("Reporter cannot be dispatched to their own emergency report.");
   }
@@ -120,6 +120,13 @@ export async function createDispatchOffers(input: CreateDispatchInput) {
 
   if (dispatchableVolunteerIds.length === 0) {
     throw new Error("Selected volunteers are already dispatched for this emergency.");
+  }
+
+  // Only acknowledge the incident after all dispatch eligibility checks pass.
+  const snapshotStatus = emergency.status === "OPEN" ? "ACKNOWLEDGED" : emergency.status;
+  if (snapshotStatus !== emergency.status) {
+    emergency.status = snapshotStatus;
+    await emergency.save();
   }
 
   const snapshot = {

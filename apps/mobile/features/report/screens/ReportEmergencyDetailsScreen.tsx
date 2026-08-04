@@ -271,9 +271,8 @@ export function ReportEmergencyDetailsScreen() {
                   <Pressable
                     onPress={onUsePinnedLocation}
                     disabled={!mapPicked || resolvingAddress}
-                    className={`h-10 flex-1 items-center justify-center rounded-xl ${
-                      mapPicked && !resolvingAddress ? "bg-red-500" : "bg-zinc-300"
-                    }`}
+                    className={`h-10 flex-1 items-center justify-center rounded-xl ${mapPicked && !resolvingAddress ? "bg-red-500" : "bg-zinc-300"
+                      }`}
                   >
                     <Text className="text-sm font-semibold text-white">Use Pinpoint</Text>
                   </Pressable>
@@ -304,9 +303,8 @@ export function ReportEmergencyDetailsScreen() {
             <Pressable
               onPress={onAddPhoto}
               disabled={photos.length >= 5}
-              className={`h-24 w-24 items-center justify-center rounded-2xl border border-dashed border-zinc-300 ${
-                photos.length >= 5 ? "opacity-40" : ""
-              }`}
+              className={`h-24 w-24 items-center justify-center rounded-2xl border border-dashed border-zinc-300 ${photos.length >= 5 ? "opacity-40" : ""
+                }`}
             >
               <Ionicons name="camera-outline" size={20} color="#71717a" />
               <Text className="mt-1 text-sm text-zinc-500">Add</Text>
@@ -370,7 +368,7 @@ export function ReportEmergencyDetailsScreen() {
         onRequestClose={() => setProofSheetVisible(false)}
       >
         <Pressable style={styles.sheetBackdrop} onPress={() => setProofSheetVisible(false)}>
-          <Pressable style={styles.sheetCard} onPress={() => {}}>
+          <Pressable style={styles.sheetCard} onPress={() => { }}>
             <Text style={styles.sheetTitle}>Add Proof</Text>
 
             <Pressable onPress={onTakePhoto} style={styles.sheetAction}>

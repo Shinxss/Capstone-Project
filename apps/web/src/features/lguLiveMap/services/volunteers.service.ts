@@ -5,13 +5,19 @@ type DispatchResponderDTO = {
   id: string;
   lifelineId?: string;
   name: string;
-  status: "available" | "offline";
+  status: "available" | "busy" | "idle" | "offline";
   skill: string;
   barangay?: string;
   municipality?: string;
   avatarUrl?: string;
   teamId?: string;
   teamName?: string;
+  role?: string;
+  rating?: number;
+  reviewCount?: number;
+  etaMinutes?: number;
+  recommendationScore?: number;
+  recommendationReasons?: string[];
 };
 
 type DispatchVolunteerDTO = {
@@ -23,6 +29,12 @@ type DispatchVolunteerDTO = {
   barangay?: string;
   municipality?: string;
   avatarUrl?: string;
+  role?: string;
+  rating?: number;
+  reviewCount?: number;
+  etaMinutes?: number;
+  recommendationScore?: number;
+  recommendationReasons?: string[];
 };
 
 function resolveAvatarUrl(value?: string) {
@@ -54,6 +66,13 @@ function mapResponderToVolunteer(item: DispatchResponderDTO): Volunteer {
     barangayName: item.barangay,
     municipality: item.municipality,
     avatarUrl: resolveAvatarUrl(item.avatarUrl),
+    teamName: item.teamName,
+    role: item.role,
+    rating: item.rating,
+    reviewCount: item.reviewCount,
+    etaMinutes: item.etaMinutes,
+    recommendationScore: item.recommendationScore,
+    recommendationReasons: item.recommendationReasons,
   };
 }
 
@@ -67,6 +86,12 @@ function mapVolunteerToVolunteer(item: DispatchVolunteerDTO): Volunteer {
     barangayName: item.barangay,
     municipality: item.municipality,
     avatarUrl: resolveAvatarUrl(item.avatarUrl),
+    role: item.role,
+    rating: item.rating,
+    reviewCount: item.reviewCount,
+    etaMinutes: item.etaMinutes,
+    recommendationScore: item.recommendationScore,
+    recommendationReasons: item.recommendationReasons,
   };
 }
 

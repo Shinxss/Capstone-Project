@@ -92,7 +92,10 @@ function applyResponderSearchFilter(match: Record<string, unknown>, query: strin
 function toDispatchAvailability(
   presence: ReturnType<typeof getVolunteerPresenceStatus>
 ): DispatchableResponderItem["status"] {
-  return presence === "OFFLINE" ? "offline" : "available";
+  if (presence === "ONLINE") return "available";
+  if (presence === "BUSY") return "busy";
+  if (presence === "IDLE") return "idle";
+  return "offline";
 }
 
 function mapResponderRow(

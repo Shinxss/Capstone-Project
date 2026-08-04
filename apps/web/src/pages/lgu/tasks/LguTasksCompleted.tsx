@@ -6,8 +6,8 @@ export default function LguTasksCompleted() {
   const vm = useLguTasksCompleted();
 
   return (
-    <LguShell title="Tasks" subtitle="Verified emergency dispatches (completed)">
-      <LguTasksCompletedView {...vm} loading={vm.loading} error={vm.error} onRefresh={vm.refetch} />
+    <LguShell title="Tasks" subtitle="Emergency dispatch operations">
+      <LguTasksCompletedView {...vm} />
     </LguShell>
   );
 }

@@ -18,6 +18,7 @@ export type TaskVolunteer = {
   id: string;
   lifelineId?: string | null;
   name: string;
+  role?: string | null;
   avatarUrl?: string | null;
 };
 

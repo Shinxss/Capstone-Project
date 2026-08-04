@@ -9,7 +9,6 @@ import {
   StyleSheet,
   Animated,
   Easing,
-  ScrollView,
   Image,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -997,25 +996,10 @@ export default function MapTab() {
     requestAnimationFrame(() => layersSheetRef.current?.snapToIndex(1));
   };
 
-  // chips (replace old status pill)
-  const chips = useMemo(
-    () => [
-      { key: "home", label: "Set home", icon: "home" as const },
-      { key: "evac", label: "Evacuation", icon: "flag" as const },
-      { key: "shelter", label: "Shelters", icon: "map-pin" as const },
-      { key: "hospital", label: "Hospitals", icon: "plus-square" as const },
-      { key: "hotline", label: "Hotlines", icon: "phone" as const },
-    ],
-    []
-  );
-
-  const [activeChip, setActiveChip] = useState<string>("home");
   const topUiPaddingTop = Math.max(10, insets.top + 8);
   const devOverrideTopBase =
     topUiPaddingTop +
     50 + // search bar height
-    10 + // chips top spacing
-    40 + // chip height
     8 + // layer row top margin
     46 + // layers button size
     10; // space below layers button
@@ -1310,45 +1294,6 @@ export default function MapTab() {
               </Pressable>
             </View>
 
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.chipsRow}
-            >
-              {chips.map((c) => {
-                const active = activeChip === c.key;
-                return (
-                  <Pressable
-                    key={c.key}
-                    onPress={() => setActiveChip(c.key)}
-                    style={[
-                      styles.chip,
-                      isDark ? styles.chipDark : null,
-                      active && styles.chipActive,
-                      active && isDark ? styles.chipActiveDark : null,
-                    ]}
-                  >
-                    <Feather
-                      name={c.icon}
-                      size={16}
-                      color={isDark ? (active ? "#E2E8F0" : "#94A3B8") : active ? "#111" : "#444"}
-                      style={{ marginRight: 8 }}
-                    />
-                    <Text
-                      style={[
-                        styles.chipText,
-                        isDark ? styles.chipTextDark : null,
-                        active && styles.chipTextActive,
-                        active && isDark ? styles.chipTextActiveDark : null,
-                      ]}
-                    >
-                      {c.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-
             <View style={styles.layerControlRow}>
               <Pressable
                 onPress={openLayersSheet}
@@ -1551,40 +1496,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#162544",
   },
 
-  // chips
-  chipsRow: {
-    paddingTop: 10,
-    paddingBottom: 2,
-    gap: 10,
-  },
-  chip: {
-    height: 40,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.92)",
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-  },
-  chipDark: {
-    backgroundColor: "rgba(14,22,38,0.95)",
-    borderWidth: 1,
-    borderColor: "#162544",
-  },
-  chipActive: {
-    backgroundColor: "#FFFFFF",
-  },
-  chipActiveDark: {
-    backgroundColor: "#0F1A2E",
-  },
-  chipText: { fontSize: 14, color: "#222", fontWeight: "600" },
-  chipTextDark: { color: "#94A3B8" },
-  chipTextActive: { color: "#111" },
-  chipTextActiveDark: { color: "#E2E8F0" },
   layerControlRow: {
     marginTop: 8,
     alignItems: "flex-end",

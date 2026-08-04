@@ -36,7 +36,7 @@ export type DispatchableResponderItem = {
   id: string;
   lifelineId?: string;
   name: string;
-  status: "available" | "offline";
+  status: "available" | "busy" | "idle" | "offline";
   skill: string;
   barangay?: string;
   municipality?: string;

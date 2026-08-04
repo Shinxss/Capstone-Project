@@ -16,6 +16,13 @@ export type Volunteer = {
   barangayName?: string;
   municipality?: string;
   avatarUrl?: string;
+  teamName?: string;
+  role?: string;
+  rating?: number;
+  reviewCount?: number;
+  etaMinutes?: number;
+  recommendationScore?: number;
+  recommendationReasons?: string[];
 };
 
 export type MapStyleKey = "satellite-streets-v12" | "streets-v12" | "dark-v11";
@@ -30,12 +37,14 @@ export type LguEmergencyDetails = {
   notes?: string | null;
   reportedAt?: string;
   barangayName?: string | null;
+  locationLabel?: string | null;
+  referenceNumber?: string | null;
 };
 
 export type HazardDraft = {
   geometry: {
     type: "Polygon" | "MultiPolygon";
-    coordinates: any;
+    coordinates: number[][][] | number[][][][];
   };
 };
 

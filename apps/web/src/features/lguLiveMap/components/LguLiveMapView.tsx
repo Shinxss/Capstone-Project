@@ -170,10 +170,15 @@ export default function LguLiveMapView(props: Props) {
 
     // responders dispatch + tracking
     volunteers,
+    volunteersLoading,
+    volunteersError,
+    refetchVolunteers,
+    presenceConnectionState,
     dispatchModalOpen,
     openDispatchResponders,
     closeDispatchResponders,
     dispatchSelection,
+    clearDispatchSelection,
     toggleDispatchResponder,
     confirmDispatchResponders,
     assignedResponders,
@@ -700,8 +705,14 @@ export default function LguLiveMapView(props: Props) {
         open={dispatchModalOpen}
         emergency={selectedEmergencyDetails}
         volunteers={volunteers}
+        tasks={selectedEmergencyTasks}
         selectedIds={dispatchSelection}
+        loading={volunteersLoading}
+        error={volunteersError}
+        connectionState={presenceConnectionState}
         onToggle={toggleDispatchResponder}
+        onClearSelection={clearDispatchSelection}
+        onRetry={() => void refetchVolunteers()}
         onClose={closeDispatchResponders}
         onConfirm={confirmDispatchResponders}
       />
