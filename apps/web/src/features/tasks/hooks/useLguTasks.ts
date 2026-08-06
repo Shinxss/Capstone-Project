@@ -13,8 +13,8 @@ export function useLguTasks(status: string) {
     try {
       const data = await fetchLguTasksByStatus(status);
       setTasks(data);
-    } catch (e: any) {
-      setError(e?.response?.data?.message ?? e?.message ?? "Failed to load");
+    } catch {
+      setError("Unable to load tasks. Please try again.");
     } finally {
       setLoading(false);
     }

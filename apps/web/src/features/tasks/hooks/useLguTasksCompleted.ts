@@ -9,7 +9,7 @@ import {
   paginateCompletedTasks,
   sortCompletedTasks,
 } from "../completed/utils/completedTask.utils";
-import { useLguTaskHistory, type TaskHistoryFilters } from "./useLguTaskHistory";
+import { useLguTaskHistory } from "./useLguTaskHistory";
 import { useLguTasks } from "./useLguTasks";
 
 export function useLguTasksCompleted() {
@@ -17,17 +17,29 @@ export function useLguTasksCompleted() {
   const overview = useLguTasks(TASK_OVERVIEW_STATUSES.join(","));
   const [sort, setSortState] = useState<CompletedTaskSort>("COMPLETED_NEWEST");
   const [page, setPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
   const {
-    setFilters: setHistoryFilters,
     clearFilters: clearHistoryFilters,
     refetch: refetchHistory,
   } = history;
   const { refetch: refetchOverview } = overview;
   const overviewTasks = overview.loading || overview.error ? null : overview.tasks;
 
+  const searched = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return history.filtered;
+    return history.filtered.filter((t) => {
+      const taskId = String(t.id || "").toLowerCase();
+      const volunteer = String(t.volunteer?.name || "").toLowerCase();
+      const barangay = String(t.emergency?.barangayName || "").toLowerCase();
+      const emergencyType = String(t.emergency?.emergencyType || "").toLowerCase();
+      return taskId.includes(q) || volunteer.includes(q) || barangay.includes(q) || emergencyType.includes(q);
+    });
+  }, [history.filtered, searchQuery]);
+
   const sorted = useMemo(
-    () => sortCompletedTasks(history.filtered, sort),
-    [history.filtered, sort],
+    () => sortCompletedTasks(searched, sort),
+    [searched, sort],
   );
   const { items: visibleTasks, pagination } = useMemo(
     () => paginateCompletedTasks(sorted, page, COMPLETED_TASKS_PAGE_SIZE),
@@ -46,16 +58,14 @@ export function useLguTasksCompleted() {
   );
   const { statistics, statusCounts } = useCompletedTaskStats(history.tasks, overviewTasks);
 
-  const updateFilter = useCallback(
-    (field: keyof TaskHistoryFilters, value: string) => {
-      setPage(1);
-      setHistoryFilters((previous) => ({ ...previous, [field]: value }));
-    },
-    [setHistoryFilters],
-  );
+  const updateSearchQuery = useCallback((value: string) => {
+    setPage(1);
+    setSearchQuery(value);
+  }, []);
 
   const clearFilters = useCallback(() => {
     setPage(1);
+    setSearchQuery("");
     clearHistoryFilters();
   }, [clearHistoryFilters]);
 
@@ -68,23 +78,20 @@ export function useLguTasksCompleted() {
     await Promise.allSettled([refetchHistory(), refetchOverview()]);
   }, [refetchHistory, refetchOverview]);
 
-  const hasActiveFilters = Object.entries(history.filters).some(
+  const hasActiveFilters = searchQuery.trim().length > 0 || Object.entries(history.filters).some(
     ([key, value]) => (key === "emergencyType" ? value !== "ALL" : Boolean(value)),
   );
-  const dateError =
-    history.filters.dateFrom &&
-    history.filters.dateTo &&
-    history.filters.dateFrom > history.filters.dateTo
-      ? "Date From must be on or before Date To."
-      : null;
+  const dateError = null;
 
   return {
     ...history,
     refetch,
     clearFilters,
-    updateFilter,
+    searchQuery,
+    updateSearchQuery,
     hasActiveFilters,
     dateError,
+    filtered: searched,
     barangayOptions,
     visibleTasks,
     pagination,

@@ -33,6 +33,7 @@ export type TaskEmergency = {
   notes?: string | null;
   reportedAt?: string;
   barangayName?: string | null;
+  priority?: string | null;
 };
 
 export type TaskLastKnownLocation = {

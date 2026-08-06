@@ -6,8 +6,8 @@ export default function LguAnnouncements() {
   const vm = useLguAnnouncements();
 
   return (
-    <LguShell title="Announcements" subtitle="Publish updates within LGU scope">
-      <LguAnnouncementsView {...vm} loading={vm.loading} error={vm.error} onRefresh={vm.refresh} />
+    <LguShell title="Announcements" subtitle="Create and manage emergency updates">
+      <LguAnnouncementsView {...vm} />
     </LguShell>
   );
 }

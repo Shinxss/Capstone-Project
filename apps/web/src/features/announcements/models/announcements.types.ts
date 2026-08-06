@@ -18,3 +18,27 @@ export type AnnouncementDraftInput = {
   body: string;
   audience: AnnouncementAudience;
 };
+
+export type AnnouncementStatusFilter = "ALL" | AnnouncementStatus | "SCHEDULED" | "ARCHIVED";
+
+export type AnnouncementFilters = {
+  status: AnnouncementStatusFilter;
+  audience: AnnouncementAudience | "";
+  search: string;
+};
+
+export type AnnouncementStatistics = {
+  total: number;
+  published: number;
+  drafts: number;
+  scheduled: number | null;
+};
+
+export type AnnouncementTemplate = {
+  id: string;
+  title: string;
+  description: string;
+  body: string;
+  audience: AnnouncementAudience;
+  category: "FLOOD" | "VOLUNTEER" | "EVACUATION" | "WEATHER" | "SAFETY";
+};

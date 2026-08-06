@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
-import type { Announcement, AnnouncementAudience, AnnouncementDraftInput } from "../models/announcements.types";
+import type { Announcement, AnnouncementAudience, AnnouncementDraftInput, AnnouncementFilters, AnnouncementStatistics } from "../models/announcements.types";
+import { EMPTY_ANNOUNCEMENT_FILTERS } from "../constants/announcementDashboard.constants";
+import { filterAnnouncements, hasAnnouncementFilters } from "../utils/announcementDashboard.utils";
 import {
   createAnnouncement,
   deleteAnnouncement,
@@ -20,8 +22,8 @@ const announcementSchema = z.object({
 export type AnnouncementFormErrors = Partial<Record<keyof AnnouncementDraftInput, string>>;
 
 function resolveErrorMessage(error: unknown, fallback: string) {
-  const typed = error as { response?: { data?: { message?: string } }; message?: string };
-  return typed?.response?.data?.message || typed?.message || fallback;
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
 }
 
 export function useLguAnnouncements() {
@@ -29,18 +31,23 @@ export function useLguAnnouncements() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [filters, setFilters] = useState<AnnouncementFilters>(EMPTY_ANNOUNCEMENT_FILTERS);
+  const [statistics, setStatistics] = useState<AnnouncementStatistics>({ total: 0, published: 0, drafts: 0, scheduled: null });
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
       setError(null);
-      const { items: nextItems } = await listAnnouncements({
-        page: 1,
-        limit: 100,
-      });
-      setItems(nextItems);
+      const [all, published, drafts] = await Promise.all([
+        listAnnouncements({ page: 1, limit: 100 }),
+        listAnnouncements({ page: 1, limit: 1, status: "PUBLISHED" }),
+        listAnnouncements({ page: 1, limit: 1, status: "DRAFT" }),
+      ]);
+      setItems(all.items);
+      setStatistics({ total: all.pagination.total, published: published.pagination.total, drafts: drafts.pagination.total, scheduled: null });
     } catch (error) {
-      setError(resolveErrorMessage(error, "Failed to load announcements"));
+      console.error("Failed to load announcements", error);
+      setError("Unable to load announcements. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -66,8 +73,10 @@ export function useLguAnnouncements() {
 
     const errors: AnnouncementFormErrors = {};
     for (const issue of parsed.error.issues) {
-      const key = issue.path[0] as keyof AnnouncementDraftInput;
-      if (!errors[key]) errors[key] = issue.message;
+      const key = issue.path[0];
+      if (key === "title" || key === "body" || key === "audience") {
+        if (!errors[key]) errors[key] = issue.message;
+      }
     }
     return { ok: false as const, value: input, errors };
   }, []);
@@ -160,9 +169,22 @@ export function useLguAnnouncements() {
     }
   }, [refresh]);
 
+  const updateFilter = useCallback(<K extends keyof AnnouncementFilters>(key: K, value: AnnouncementFilters[K]) => {
+    setFilters((current) => ({ ...current, [key]: value }));
+  }, []);
+
+  const clearFilters = useCallback(() => setFilters(EMPTY_ANNOUNCEMENT_FILTERS), []);
+  const filteredAnnouncements = useMemo(() => filterAnnouncements(items, filters), [filters, items]);
+
   return {
     loading,
-    announcements: items,
+    announcements: filteredAnnouncements,
+    allAnnouncements: items,
+    statistics,
+    filters,
+    filtersActive: hasAnnouncementFilters(filters),
+    updateFilter,
+    clearFilters,
     error,
     busyId,
     refresh,

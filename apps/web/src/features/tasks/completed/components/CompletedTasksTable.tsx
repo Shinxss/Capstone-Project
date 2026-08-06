@@ -32,7 +32,7 @@ export default function CompletedTasksTable({
       <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
           <ClipboardCheck size={16} className="text-red-600" aria-hidden="true" />
-          <span><strong className="text-slate-900 dark:text-white">{pagination.totalItems}</strong> results</span>
+          <span><strong className="text-slate-900 dark:text-white">Completed Tasks</strong> ({pagination.totalItems})</span>
         </div>
         <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
           Sort by:

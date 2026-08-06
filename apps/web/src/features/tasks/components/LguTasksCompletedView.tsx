@@ -6,10 +6,10 @@ import CompletedTaskStats from "../completed/components/CompletedTaskStats";
 import CompletedTasksEmptyState from "../completed/components/CompletedTasksEmptyState";
 import CompletedTasksErrorState from "../completed/components/CompletedTasksErrorState";
 import CompletedTasksFilters from "../completed/components/CompletedTasksFilters";
-import CompletedTasksHeader from "../completed/components/CompletedTasksHeader";
+
 import CompletedTasksSkeleton from "../completed/components/CompletedTasksSkeleton";
 import CompletedTasksTable from "../completed/components/CompletedTasksTable";
-import TaskStatusTabs from "../completed/components/TaskStatusTabs";
+
 
 type Props = ReturnType<typeof useLguTasksCompleted>;
 
@@ -20,15 +20,12 @@ export default function LguTasksCompletedView({
   exportCsv,
   filtered,
   visibleTasks,
-  filters,
-  updateFilter,
+  searchQuery,
+  updateSearchQuery,
   clearFilters,
-  emergencyTypeOptions,
-  barangayOptions,
   hasActiveFilters,
   dateError,
   statistics,
-  statusCounts,
   pagination,
   setPage,
   sort,
@@ -41,12 +38,6 @@ export default function LguTasksCompletedView({
 
   return (
     <main className="mx-auto w-full max-w-[1680px] space-y-5 px-4 py-5 sm:px-6 sm:py-6">
-      <CompletedTasksHeader
-        onRefresh={refresh}
-        onExport={exportCsv}
-        exportDisabled={exportDisabled}
-        refreshing={loading}
-      />
 
       {loading ? <CompletedTasksSkeleton /> : null}
 
@@ -55,21 +46,18 @@ export default function LguTasksCompletedView({
       {!loading && !error ? (
         <>
           <CompletedTaskStats statistics={statistics} />
-          <CompletedTasksFilters
-            filters={filters}
-            emergencyTypeOptions={emergencyTypeOptions}
-            barangayOptions={barangayOptions}
-            dateError={dateError}
-            hasActiveFilters={hasActiveFilters}
-            exportDisabled={exportDisabled}
-            onFilterChange={updateFilter}
-            onClear={clearFilters}
-            onRefresh={refresh}
-            onExport={exportCsv}
-          />
-
           <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-[#1C2940] dark:bg-[#0B1220]">
-            <TaskStatusTabs counts={statusCounts} />
+            <div className="p-4 sm:p-5">
+              <CompletedTasksFilters
+                searchQuery={searchQuery}
+                exportDisabled={exportDisabled}
+                hasActiveFilters={hasActiveFilters}
+                onSearchChange={updateSearchQuery}
+                onClear={clearFilters}
+                onExport={exportCsv}
+              />
+            </div>
+
             {filtered.length === 0 ? (
               <CompletedTasksEmptyState hasActiveFilters={hasActiveFilters} onClear={clearFilters} />
             ) : (
