@@ -7,6 +7,7 @@ import type {
 import type { EmergencyType, ReportLocation, ReportSubmitResult } from "../../report/models/report.types";
 
 const EMERGENCY_REPORTS_BASE = "/api/emergency/reports";
+const SOS_REQUEST_TIMEOUT_MS = 20_000;
 
 function unwrapData(payload: unknown): unknown {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
@@ -40,10 +41,12 @@ export async function createSosReport(payload: SosCreateRequest): Promise<Report
         latitude: payload.lat,
         longitude: payload.lng,
       },
+      ...(typeof payload.accuracy === "number" ? { accuracy: payload.accuracy } : {}),
       ...(locationLabel ? { label: locationLabel.slice(0, 160) } : {}),
     },
     description: payload.notes,
-  });
+    ...(payload.guestReporter ? { guestReporter: payload.guestReporter } : {}),
+  }, { timeout: SOS_REQUEST_TIMEOUT_MS });
 
   const data = res.data as ReportSubmitResult | undefined;
   if (!data?.incidentId || !data.referenceNumber) {

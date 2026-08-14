@@ -21,7 +21,7 @@ export function RefreshableScrollScreen({
 }: RefreshableScrollScreenProps) {
   const { isDark } = useTheme();
   const spinnerColor = isDark ? "#E2E8F0" : "#DC2626";
-  const progressViewOffset = refreshControlProps?.progressViewOffset ?? 170;
+  const progressViewOffset = refreshControlProps?.progressViewOffset ?? 72;
 
   return (
     <ScrollView

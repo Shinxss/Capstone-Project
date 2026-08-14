@@ -1,5 +1,6 @@
 import React from "react";
-import { Pressable, SafeAreaView, Text } from "react-native";
+import { Pressable, Text } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
 import type { EmergencyType } from "../models/report.types";
 

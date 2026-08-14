@@ -16,6 +16,7 @@ import AuthBackground from "../../../components/AuthBackground";
 import AuthCard from "../components/AuthCard";
 import PasswordChecklist from "../components/PasswordChecklist";
 import { useResetPassword } from "../hooks/useResetPassword";
+import { useResponsiveLayout } from "../../common/hooks/useResponsiveLayout";
 
 function normalizeParam(value: string | string[] | undefined) {
   const text = Array.isArray(value) ? value[0] : value;
@@ -27,6 +28,7 @@ export default function ResetPasswordScreen() {
   const email = normalizeParam(params.email).toLowerCase();
   const resetToken = normalizeParam(params.resetToken);
   const vm = useResetPassword(email, resetToken);
+  const { isCompactHeight } = useResponsiveLayout();
 
   if (!vm.email || !resetToken) {
     return (
@@ -54,11 +56,14 @@ export default function ResetPasswordScreen() {
 
   return (
     <AuthBackground>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} className="flex-1">
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} className="flex-1">
         <ScrollView
           bounces={false}
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={styles.contentContainer}
+          contentContainerStyle={[
+            styles.contentContainer,
+            { paddingTop: isCompactHeight ? 24 : 56 },
+          ]}
         >
           <Pressable onPress={vm.goBack} className="h-11 w-11 items-center justify-center rounded-full bg-white/90" style={styles.backShadow}>
             <ArrowLeft size={23} color="#334155" strokeWidth={2.4} />

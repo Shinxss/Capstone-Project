@@ -1,5 +1,5 @@
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -30,32 +30,37 @@ export function ReportEmergencySuccessScreen() {
 
   return (
     <SafeAreaView edges={["bottom"]} style={styles.screen}>
+      <ScrollView
+        bounces={false}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.content}
+      >
       <View style={styles.iconWrap}>
         <View style={styles.iconCircle}>
           <Ionicons name="checkmark-circle-outline" size={44} color="#16a34a" />
         </View>
       </View>
 
-      <Text allowFontScaling={false} style={styles.title}>
+      <Text maxFontSizeMultiplier={1.3} style={styles.title}>
         {sosMode ? "SOS Sent!" : "Report Submitted!"}
       </Text>
 
-      <Text allowFontScaling={false} style={styles.message}>
+      <Text maxFontSizeMultiplier={1.3} style={styles.message}>
         {sosMode
           ? "Your SOS has been received. Responders in your area have been alerted."
           : "Your emergency report has been received. Responders in your area have been alerted."}
       </Text>
 
       <View style={styles.referenceCard}>
-        <Text allowFontScaling={false} style={styles.referenceLabel}>
+        <Text maxFontSizeMultiplier={1.3} style={styles.referenceLabel}>
           Reference Number:
         </Text>
-        <Text allowFontScaling={false} style={styles.referenceValue}>
+        <Text maxFontSizeMultiplier={1.2} numberOfLines={2} style={styles.referenceValue}>
           {referenceNumber || "N/A"}
         </Text>
       </View>
 
-      <Text allowFontScaling={false} style={styles.helperText}>
+      <Text maxFontSizeMultiplier={1.3} style={styles.helperText}>
         Keep this reference number for tracking. You will receive updates about your report.
       </Text>
 
@@ -69,17 +74,18 @@ export function ReportEmergencySuccessScreen() {
           }
           style={styles.primaryBtn}
         >
-          <Text allowFontScaling={false} style={styles.primaryBtnText}>
+          <Text maxFontSizeMultiplier={1.2} style={styles.primaryBtnText}>
             View on Map
           </Text>
         </Pressable>
 
         <Pressable onPress={onBackHome} style={styles.secondaryBtn}>
-          <Text allowFontScaling={false} style={styles.secondaryBtnText}>
+          <Text maxFontSizeMultiplier={1.2} style={styles.secondaryBtnText}>
             Back to Home
           </Text>
         </Pressable>
       </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -88,6 +94,9 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: "#f4f4f5",
+  },
+  content: {
+    flexGrow: 1,
     paddingHorizontal: 20,
     paddingTop: 24,
     paddingBottom: 22,

@@ -1,10 +1,9 @@
 import React from "react";
-import { Dimensions, StyleSheet, View } from "react-native";
+import { StyleSheet, useWindowDimensions, View } from "react-native";
 import { BlurView } from "expo-blur";
 import Svg, { Circle, Defs, RadialGradient, Stop } from "react-native-svg";
+import { SafeAreaView } from "react-native-safe-area-context";
 import LoginBg from "../assets/login_lightbg.svg";
-
-const { width, height } = Dimensions.get("window");
 
 function SirenGlow({
   color,
@@ -37,6 +36,8 @@ function SirenGlow({
 }
 
 export default function AuthBackground({ children }: { children: React.ReactNode }) {
+  const { width, height } = useWindowDimensions();
+
   return (
     <View style={{ flex: 1, backgroundColor: "#FFFFFF", position: "relative" }}>
       <View pointerEvents="none" style={{ position: "absolute", inset: 0, zIndex: 0 }}>
@@ -61,7 +62,12 @@ export default function AuthBackground({ children }: { children: React.ReactNode
         style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(255,255,255,0.26)", zIndex: 3 }]}
       />
 
-      <View style={{ flex: 1, zIndex: 5 }}>{children}</View>
+      <SafeAreaView
+        edges={["top", "bottom", "left", "right"]}
+        style={{ flex: 1, zIndex: 5 }}
+      >
+        {children}
+      </SafeAreaView>
     </View>
   );
 }

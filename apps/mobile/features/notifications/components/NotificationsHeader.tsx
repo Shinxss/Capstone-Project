@@ -50,7 +50,7 @@ export function NotificationsHeader({
               size={20}
               color={isDark ? "#E2E8F0" : "#111827"}
             />
-            <Text style={[styles.selectAllLabel, isDark ? styles.selectAllLabelDark : null]}>
+            <Text numberOfLines={1} style={[styles.selectAllLabel, isDark ? styles.selectAllLabelDark : null]}>
               Select all
             </Text>
           </Pressable>
@@ -174,7 +174,9 @@ const styles = StyleSheet.create({
     color: "#F1F5F9",
   },
   selectAllButton: {
-    minWidth: 120,
+    minWidth: 0,
+    maxWidth: 112,
+    flexShrink: 1,
     height: 40,
     borderRadius: 10,
     flexDirection: "row",
@@ -183,6 +185,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   selectAllLabel: {
+    flexShrink: 1,
     marginLeft: 6,
     fontSize: 13,
     fontWeight: "700",

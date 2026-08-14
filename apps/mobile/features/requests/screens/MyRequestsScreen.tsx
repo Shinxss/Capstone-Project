@@ -55,7 +55,7 @@ function RequestRow({ item, onPress }: { item: MyRequestSummary; onPress: () => 
   return (
     <Pressable style={({ pressed }) => [styles.row, pressed ? styles.rowPressed : null]} onPress={onPress}>
       <View style={styles.rowHeader}>
-        <Text style={styles.rowTitle}>
+        <Text numberOfLines={2} style={styles.rowTitle}>
           {formatRequestType(item.type)} • {item.referenceNumber}
         </Text>
         <Ionicons name="chevron-forward" size={18} color="#6B7280" />
@@ -208,11 +208,15 @@ const styles = StyleSheet.create({
     opacity: 0.88,
   },
   rowHeader: {
+    minWidth: 0,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
   rowTitle: {
+    flex: 1,
+    minWidth: 0,
+    marginRight: 8,
     fontSize: 15,
     fontWeight: "800",
     color: "#111827",

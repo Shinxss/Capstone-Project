@@ -41,6 +41,10 @@ export interface IEmergencyReport {
   locationLabel?: string;
   referenceNumber?: string;
   reporterIsGuest?: boolean;
+  guestReporter?: {
+    fullName: string;
+    phoneNumber: string;
+  };
 
   reportedBy?: Types.ObjectId;
   reportedAt: Date;
@@ -89,6 +93,17 @@ const emergencyReportSchema = new Schema<IEmergencyReport>(
     locationLabel: { type: String },
     referenceNumber: { type: String, unique: true, sparse: true },
     reporterIsGuest: { type: Boolean, default: false },
+    guestReporter: {
+      type: new Schema(
+        {
+          fullName: { type: String, required: true, trim: true, maxlength: 80 },
+          phoneNumber: { type: String, required: true, trim: true, maxlength: 20 },
+        },
+        { _id: false }
+      ),
+      required: false,
+      default: undefined,
+    },
 
     reportedBy: { type: Schema.Types.ObjectId, ref: "User", required: false },
     reportedAt: { type: Date, required: true, default: Date.now },

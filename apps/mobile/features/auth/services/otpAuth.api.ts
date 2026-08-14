@@ -1,6 +1,8 @@
 import { api } from "../../../lib/api";
 import { normalizeEmail } from "../utils/authValidators";
 
+const AUTH_REQUEST_TIMEOUT_MS = 20_000;
+
 export type SignupRequestOtpPayload = {
   firstName: string;
   lastName: string;
@@ -66,10 +68,14 @@ function normalizeOtp(otp: string) {
 }
 
 export async function signupRequestOtp(payload: SignupRequestOtpPayload) {
-  const res = await api.post<ApiEnvelope>("/api/auth/signup", {
-    ...payload,
-    email: normalizeEmail(payload.email),
-  });
+  const res = await api.post<ApiEnvelope>(
+    "/api/auth/signup",
+    {
+      ...payload,
+      email: normalizeEmail(payload.email),
+    },
+    { timeout: AUTH_REQUEST_TIMEOUT_MS }
+  );
   return parseOtpStatus(res.data, "OTP sent");
 }
 

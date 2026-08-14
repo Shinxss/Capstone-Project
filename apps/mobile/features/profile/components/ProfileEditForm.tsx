@@ -6,6 +6,7 @@ import type { EditProfileFieldErrors } from "../hooks/useEditProfile";
 import type { EditableProfileFields } from "../models/profile";
 import { useTheme } from "../../theme/useTheme";
 import ProfileFieldRow from "./ProfileFieldRow";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type PickerKind = "gender" | "barangay" | null;
 
@@ -34,6 +35,7 @@ function PickerSheet({
   onSelect: (value: string) => void;
 }) {
   const { isDark } = useTheme();
+  const insets = useSafeAreaInsets();
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -54,7 +56,7 @@ function PickerSheet({
             backgroundColor: isDark ? "#0B1220" : "#FFFFFF",
             borderTopWidth: 1,
             borderColor: isDark ? "#162544" : "#E5E7EB",
-            paddingBottom: 10,
+            paddingBottom: Math.max(insets.bottom, 10),
           }}
         >
           <View style={{ alignItems: "center", paddingTop: 10 }}>

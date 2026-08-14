@@ -1,8 +1,8 @@
 import { io, type Socket } from "socket.io-client";
 
 type ServerToClientEvents = {
-  "request:tracking_snapshot": (payload: any) => void;
-  "request:tracking_update": (payload: any) => void;
+  "request:tracking_snapshot": (payload: unknown) => void;
+  "request:tracking_update": (payload: unknown) => void;
   "volunteers:snapshot": (payload: any) => void;
   "volunteers:presence_changed": (payload: any) => void;
   "volunteers:location_update": (payload: any) => void;

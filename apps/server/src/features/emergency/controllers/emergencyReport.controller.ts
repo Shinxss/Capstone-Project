@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import {
   approveEmergencyReport,
   cancelMyEmergencyReport,
+  canAccessEmergencyReporterContact,
   createEmergencyReport,
   getEmergencyReportById,
   getEmergencyReportByReference,
@@ -43,6 +44,12 @@ export async function postEmergencyReport(req: MaybeAuthedRequest, res: Response
     const input = req.body as CreateEmergencyReportInput;
     const reporterUserId = req.user?.id;
 
+    if (!reporterUserId && input.isSos && !input.guestReporter) {
+      return res.status(400).json({
+        message: "Please provide your full name and mobile number before sending an SOS.",
+      });
+    }
+
     const report = await createEmergencyReport(input, reporterUserId);
     await notifyRequestTrackingUpdated(
       report.incidentId,
@@ -68,10 +75,18 @@ export async function postEmergencyReport(req: MaybeAuthedRequest, res: Response
     });
   } catch (error: any) {
     const message = String(error?.message ?? "Failed to create emergency report");
-    if (message === "Invalid photo URL" || message === "At least 3 proof images are required.") {
+    if (
+      message === "Invalid photo URL" ||
+      message === "At least 3 proof images are required." ||
+      message === "Guest SOS requires a full name and mobile number."
+    ) {
       return res.status(400).json({ message });
     }
-    return res.status(500).json({ message });
+    console.error("[EMERGENCY] create report failed", {
+      name: error instanceof Error ? error.name : "UnknownError",
+      code: String(error?.code ?? "UNKNOWN"),
+    });
+    return res.status(500).json({ message: "Failed to create emergency report" });
   }
 }
 
@@ -96,7 +111,10 @@ export async function postEmergencyReportPhoto(req: MaybeAuthedRequest, res: Res
 export async function getEmergencyReportDetail(req: MaybeAuthedRequest, res: Response) {
   try {
     const reportId = String(req.params.id || "").trim();
-    const report = await getEmergencyReportById(reportId);
+    const includeReporterContact = req.user?.id
+      ? await canAccessEmergencyReporterContact(reportId, req.user.id, req.user.role)
+      : false;
+    const report = await getEmergencyReportById(reportId, { includeReporterContact });
 
     if (!report) {
       return res.status(404).json({ message: "Emergency report not found" });

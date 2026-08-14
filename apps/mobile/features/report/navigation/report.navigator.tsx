@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
 import { Stack, router, useGlobalSearchParams, useSegments } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { ReportDraftProvider } from "../hooks/useReportDraft";
 import { ReportEmergencyHeader } from "../components/ReportEmergencyHeader";
@@ -20,6 +20,7 @@ function getStepFromRoute(routeKey: string) {
 }
 
 export function ReportNavigator() {
+  const insets = useSafeAreaInsets();
   const segments = useSegments();
   const params = useGlobalSearchParams<{ isSos?: string }>();
   const routeKey = getReportRouteKey(segments);
@@ -89,6 +90,7 @@ export function ReportNavigator() {
             style={[
               styles.successToast,
               {
+                top: insets.top + 56,
                 opacity: toastOpacity,
                 transform: [{ translateX: toastTranslateX }],
               },
@@ -129,7 +131,6 @@ const styles = StyleSheet.create({
   successToast: {
     position: "absolute",
     right: 12,
-    top: 50,
     zIndex: 300,
     width: "66%",
     maxWidth: 320,

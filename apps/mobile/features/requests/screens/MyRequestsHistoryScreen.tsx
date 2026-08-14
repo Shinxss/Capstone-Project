@@ -230,7 +230,7 @@ export function MyRequestsHistoryScreen() {
         contentContainerStyle={{
           paddingHorizontal: 16,
           paddingTop: 14,
-          paddingBottom: Math.max(120, insets.bottom + 92),
+          paddingBottom: Math.max(32, insets.bottom + 24),
           gap: 12,
           flexGrow: filteredItems.length === 0 ? 1 : 0,
         }}

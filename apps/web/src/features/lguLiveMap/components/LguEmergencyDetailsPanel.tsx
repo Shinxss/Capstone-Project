@@ -182,17 +182,19 @@ export default function LguEmergencyDetailsPanel({
       return name || reportedBy.username || reportedBy.email || "Unknown";
     }
 
-    if (emergencyReport?.reporterIsGuest) return "Guest Reporter";
+    if (emergencyReport?.reporterIsGuest) {
+      return emergencyReport.guestReporter?.fullName || "Guest Reporter";
+    }
     return "Unknown";
-  }, [emergencyReport?.reportedBy, emergencyReport?.reporterIsGuest]);
+  }, [emergencyReport?.guestReporter?.fullName, emergencyReport?.reportedBy, emergencyReport?.reporterIsGuest]);
 
   const reporterContact = useMemo(() => {
     const reportedBy = emergencyReport?.reportedBy;
     if (reportedBy && typeof reportedBy === "object") {
       return reportedBy.contactNo || reportedBy.email || "-";
     }
-    return "-";
-  }, [emergencyReport?.reportedBy]);
+    return emergencyReport?.guestReporter?.phoneNumber || "-";
+  }, [emergencyReport?.guestReporter?.phoneNumber, emergencyReport?.reportedBy]);
 
   const reporterAddress = useMemo(() => {
     const reportedBy = emergencyReport?.reportedBy;
@@ -447,6 +449,9 @@ export default function LguEmergencyDetailsPanel({
               <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-[#22365D] dark:bg-[#0E1626]">
                 <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-500">Reporter</div>
                 <div className="mt-1 text-sm font-semibold text-gray-900 dark:text-slate-100">{reporterName}</div>
+                {emergencyReport?.reporterIsGuest ? (
+                  <div className="text-xs font-medium text-gray-500 dark:text-slate-400">Guest Reporter</div>
+                ) : null}
                 <div className="mt-2 text-xs text-gray-500 dark:text-slate-500">Contact</div>
                 <div className="text-sm text-gray-800 dark:text-slate-300">{reporterContact}</div>
                 <div className="mt-2 text-xs text-gray-500 dark:text-slate-500">Address</div>

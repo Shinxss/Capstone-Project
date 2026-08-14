@@ -50,13 +50,12 @@ function formatReportedAt(raw?: string) {
   return dt.toLocaleString();
 }
 
-function maskContact(value?: string) {
+function formatContact(value?: string) {
   const raw = String(value ?? "").trim();
   if (!raw) return "-";
 
-  const digits = raw.replace(/\D/g, "");
-  if (digits.length >= 8) {
-    return `${digits.slice(0, 4)}***${digits.slice(-4)}`;
+  if (/^\+639\d{9}$/.test(raw)) {
+    return `${raw.slice(0, 3)} ${raw.slice(3, 6)} ${raw.slice(6, 9)} ${raw.slice(9)}`;
   }
 
   return raw;
@@ -142,7 +141,7 @@ export function EmergencyOverviewSheet({
     if (reporter?.isGuest) return "Guest Reporter";
     return "Guest Reporter";
   }, [reporter?.firstName, reporter?.isGuest, reporter?.lastName]);
-  const reporterContact = maskContact(reporter?.contactNo);
+  const reporterContact = formatContact(reporter?.contactNo);
   const reporterLifelineId = String(reporter?.lifelineId ?? "").trim() || "-";
   const reporterAvatarUri = useMemo(
     () => toAbsoluteAssetUrl(String(reporter?.avatarUrl ?? "")),
@@ -290,7 +289,11 @@ export function EmergencyOverviewSheet({
               {loadingDetail ? "Loading..." : reporterName}
             </Text>
             <Text className="mt-1 text-[12px] text-slate-500" numberOfLines={1}>
-              Lifeline ID: {loadingDetail ? "Loading..." : reporterLifelineId}
+              {loadingDetail
+                ? "Loading..."
+                : reporter?.isGuest
+                  ? "Guest Reporter"
+                  : `Lifeline ID: ${reporterLifelineId}`}
             </Text>
           </View>
         </View>

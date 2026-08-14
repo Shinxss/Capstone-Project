@@ -3,6 +3,30 @@ import {
   EMERGENCY_REPORT_TYPES,
   EMERGENCY_REPORT_VERIFICATION_STATUSES,
 } from "../models/EmergencyReport.model";
+import {
+  normalizeGuestReporterName,
+  normalizeGuestReporterPhone,
+} from "../utils/guestReporter";
+
+const guestReporterSchema = z
+  .object({
+    fullName: z
+      .string()
+      .transform(normalizeGuestReporterName)
+      .pipe(z.string().min(2, "Full name must be at least 2 characters.").max(80)),
+    phoneNumber: z
+      .string()
+      .trim()
+      .max(24)
+      .transform((value) => normalizeGuestReporterPhone(value) ?? value)
+      .pipe(
+        z.string().regex(
+          /^\+639\d{9}$/,
+          "Mobile number must be a valid Philippine mobile number (09XXXXXXXXX or +639XXXXXXXXX)."
+        )
+      ),
+  })
+  .strict();
 
 export const createEmergencyReportSchema = z
   .object({
@@ -13,10 +37,12 @@ export const createEmergencyReportSchema = z
         latitude: z.number().min(-90).max(90),
         longitude: z.number().min(-180).max(180),
       }),
+      accuracy: z.number().nonnegative().max(100_000).optional(),
       label: z.string().trim().min(1).max(160).optional(),
     }),
     description: z.string().trim().max(1000).optional(),
     photos: z.array(z.string().trim().min(1).max(500)).min(3).max(5).optional(),
+    guestReporter: guestReporterSchema.optional(),
   })
   .strict()
   .superRefine((data, ctx) => {

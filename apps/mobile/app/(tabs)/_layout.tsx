@@ -3,25 +3,23 @@ import { Animated, BackHandler, Platform, Pressable, StyleSheet, Text, ToastAndr
 import { Tabs, usePathname, useRouter } from "expo-router";
 import { AlertTriangle } from "lucide-react-native";
 import { BlurView } from "expo-blur";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import BottomNav from "../../components/BottomNav";
 import AuthRequiredModal from "../../components/AuthRequiredModal";
 import { TASKS_GUARD_MODE } from "../../features/auth/constants/accessControl";
 import { useAuthRequiredPrompt } from "../../features/auth/hooks/useAuthRequiredPrompt";
 import { useSession } from "../../features/auth/hooks/useSession";
 import { useTasksAccess } from "../../features/auth/hooks/useTasksAccess";
+import { useBottomNavMetrics } from "../../features/common/hooks/useBottomNavMetrics";
 import { useReportPill } from "../../features/report/hooks/useReportPill";
 import { useTheme } from "../../features/theme/useTheme";
 
 export default function TabLayout() {
   const router = useRouter();
   const pathname = usePathname();
-  const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
   const authRequired = useAuthRequiredPrompt();
   const { isUser } = useSession();
-  const tabBarBottomPadding = Math.max(insets.bottom, 50);
-  const tabBarHeight = 64 + tabBarBottomPadding;
+  const { totalHeight: tabBarHeight } = useBottomNavMetrics();
   const { canAccessTasks, blockReason, role } = useTasksAccess();
   const normalizedRole = String(role ?? "").trim().toUpperCase();
   const isCommunityUser = normalizedRole === "COMMUNITY";
@@ -173,7 +171,7 @@ export default function TabLayout() {
           style={({ pressed }) => [styles.reportPill, pressed && styles.reportPillPressed]}
         >
           <AlertTriangle size={22} color="#FFFFFF" />
-          <Text style={styles.reportPillText}>
+          <Text numberOfLines={1} maxFontSizeMultiplier={1.2} style={styles.reportPillText}>
             Report Emergency
           </Text>
         </Pressable>
@@ -193,14 +191,15 @@ const styles = StyleSheet.create({
   },
   reportPillWrap: {
     position: "absolute",
-    left: 0,
-    right: 0,
+    left: 16,
+    right: 16,
     alignItems: "center",
     zIndex: 30,
   },
   reportPill: {
-    width: 286,
-    height: 72,
+    width: "100%",
+    maxWidth: 286,
+    minHeight: 64,
     borderRadius: 999,
     backgroundColor: "#DC2626",
     flexDirection: "row",
@@ -218,6 +217,7 @@ const styles = StyleSheet.create({
   },
   reportPillText: {
     marginLeft: 10,
+    flexShrink: 1,
     color: "#FFFFFF",
     fontSize: 18,
     fontWeight: "700",

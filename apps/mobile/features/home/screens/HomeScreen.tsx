@@ -10,6 +10,10 @@ import { useSession } from "../../auth/hooks/useSession";
 import { useSosHold } from "../../emergency/hooks/useSosHold";
 import { useSosReport } from "../../emergency/hooks/useSosReport";
 import { useGuestSosLimit } from "../../emergency/hooks/useGuestSosLimit";
+import { useGuestEmergencyContact } from "../../emergency/hooks/useGuestEmergencyContact";
+import { GuestEmergencyContactModal } from "../../emergency/components/GuestEmergencyContactModal";
+import { formatPhilippineMobileNumber } from "../../emergency/utils/guestEmergencyContactValidators";
+import { getSosSubmissionErrorMessage } from "../../emergency/utils/emergencyErrors";
 import { DispatchOfferModal } from "../../dispatch/components/DispatchOfferModal";
 import { useActiveDispatch } from "../../dispatch/hooks/useActiveDispatch";
 import { useDispatchModal } from "../../dispatch/hooks/useDispatchModal";
@@ -225,6 +229,7 @@ export default function HomeScreen() {
     used: guestSosUsed,
     saveUsed: markGuestSosUsed,
   } = useGuestSosLimit({ enabled: isGuest });
+  const guestEmergencyContact = useGuestEmergencyContact({ enabled: isGuest });
   const isDispatchAssignee = useMemo(() => session?.mode === "user" && ["VOLUNTEER", "RESPONDER"].includes(String(session.user.role ?? "").toUpperCase()), [session]);
   const { activeRequest: myActiveRequest, refresh: refreshMyActiveRequest } = useMyActiveRequest({
     pollMs: 8000,
@@ -255,6 +260,7 @@ export default function HomeScreen() {
   const { refreshing: refreshingHome, triggerRefresh: triggerRefreshHome } = usePullToRefresh(refreshHome);
 
   const [sosConfirmVisible, setSosConfirmVisible] = useState(false);
+  const [guestContactVisible, setGuestContactVisible] = useState(false);
 
   const weatherCard = useMemo(() => {
     if (locationMessage) {
@@ -362,8 +368,41 @@ export default function HomeScreen() {
 
   const onSosTriggered = useCallback(() => {
     if (!canProceedWithSos()) return;
+    if (isGuest && !guestEmergencyContact.loaded) {
+      Alert.alert("Please wait", "Preparing guest emergency contact details.");
+      return;
+    }
+    if (isGuest && !guestEmergencyContact.contact) {
+      setGuestContactVisible(true);
+      return;
+    }
     setSosConfirmVisible(true);
-  }, [canProceedWithSos]);
+  }, [canProceedWithSos, guestEmergencyContact.contact, guestEmergencyContact.loaded, isGuest]);
+
+  const onSaveGuestContact = useCallback(
+    async (value: { fullName: string; phoneNumber: string }) => {
+      try {
+        const result = await guestEmergencyContact.save(value);
+        if (!result.contact) return result.errors;
+        setGuestContactVisible(false);
+        setSosConfirmVisible(true);
+        return {};
+      } catch {
+        Alert.alert(
+          "Unable to save contact",
+          "Your contact details could not be saved on this device. Please try again."
+        );
+        return {};
+      }
+    },
+    [guestEmergencyContact]
+  );
+
+  const onEditGuestContact = useCallback(() => {
+    if (sosSending) return;
+    setSosConfirmVisible(false);
+    setGuestContactVisible(true);
+  }, [sosSending]);
 
   const onConfirmSos = useCallback(async () => {
     if (!canProceedWithSos()) {
@@ -372,7 +411,20 @@ export default function HomeScreen() {
     }
 
     try {
-      const result = await sendSos();
+      if (isGuest && !guestEmergencyContact.contact) {
+        setSosConfirmVisible(false);
+        setGuestContactVisible(true);
+        return;
+      }
+
+      const result = await sendSos(
+        isGuest && guestEmergencyContact.contact
+          ? {
+              fullName: guestEmergencyContact.contact.fullName,
+              phoneNumber: guestEmergencyContact.contact.phoneNumber,
+            }
+          : undefined
+      );
       if (isGuest) {
         await markGuestSosUsed().catch(() => undefined);
       }
@@ -387,10 +439,16 @@ export default function HomeScreen() {
           reportLat: String(result.lat),
         },
       });
-    } catch (e: any) {
-      Alert.alert("SOS failed", e?.message ?? "Please try again.");
+    } catch (error: unknown) {
+      Alert.alert("SOS failed", getSosSubmissionErrorMessage(error));
     }
-  }, [canProceedWithSos, isGuest, markGuestSosUsed, sendSos]);
+  }, [
+    canProceedWithSos,
+    guestEmergencyContact.contact,
+    isGuest,
+    markGuestSosUsed,
+    sendSos,
+  ]);
 
   const onCancelSosConfirm = useCallback(() => {
     if (sosSending) return;
@@ -403,14 +461,14 @@ export default function HomeScreen() {
   });
 
   const onStartSosHold = useCallback(() => {
-    if (sosSending || sosConfirmVisible) return;
+    if (sosSending || sosConfirmVisible || guestContactVisible) return;
     startHold();
-  }, [sosSending, sosConfirmVisible, startHold]);
+  }, [guestContactVisible, sosSending, sosConfirmVisible, startHold]);
 
   const onCancelSosHold = useCallback(() => {
-    if (sosSending || sosConfirmVisible) return;
+    if (sosSending || sosConfirmVisible || guestContactVisible) return;
     cancelHold();
-  }, [sosSending, sosConfirmVisible, cancelHold]);
+  }, [cancelHold, guestContactVisible, sosSending, sosConfirmVisible]);
 
   const onPressApplyVolunteer = useCallback(() => {
     if (!authRequired.requireAuth(isUser, { blockedAction: "access_volunteer_tools" })) return;
@@ -463,8 +521,24 @@ export default function HomeScreen() {
       <SosConfirmationModal
         visible={sosConfirmVisible}
         busy={sosSending}
+        contactNumber={
+          isGuest && guestEmergencyContact.contact
+            ? formatPhilippineMobileNumber(guestEmergencyContact.contact.phoneNumber)
+            : undefined
+        }
+        onEditContact={isGuest ? onEditGuestContact : undefined}
         onConfirm={onConfirmSos}
         onCancel={onCancelSosConfirm}
+      />
+
+      <GuestEmergencyContactModal
+        visible={guestContactVisible}
+        initialValue={guestEmergencyContact.contact}
+        saving={guestEmergencyContact.saving}
+        onContinue={onSaveGuestContact}
+        onCancel={() => {
+          if (!guestEmergencyContact.saving) setGuestContactVisible(false);
+        }}
       />
 
       <AuthRequiredModal

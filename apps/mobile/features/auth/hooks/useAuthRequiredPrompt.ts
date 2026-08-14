@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
 import { useAuth } from "../AuthProvider";
@@ -23,9 +23,10 @@ const INITIAL_STATE: AuthRequiredState = {
 
 export function useAuthRequiredPrompt() {
   const router = useRouter();
-  const { mode, signOut } = useAuth();
+  const { mode } = useAuth();
   const isFocused = useIsFocused();
   const [state, setState] = useState<AuthRequiredState>(INITIAL_STATE);
+  const navigatingToAuthRef = useRef(false);
 
   useEffect(() => {
     if (mode === "authed") return;
@@ -33,7 +34,10 @@ export function useAuthRequiredPrompt() {
   }, [mode]);
 
   useEffect(() => {
-    if (isFocused) return;
+    if (isFocused) {
+      navigatingToAuthRef.current = false;
+      return;
+    }
     setState((prev) => (prev.visible ? INITIAL_STATE : prev));
   }, [isFocused]);
 
@@ -41,11 +45,23 @@ export function useAuthRequiredPrompt() {
     setState(INITIAL_STATE);
   }, []);
 
+  const navigateToAuth = useCallback(
+    (path: "/(auth)/login" | "/(auth)/signup") => {
+      if (navigatingToAuthRef.current) return;
+
+      closeAuthRequired();
+      if (mode === "authed") return;
+
+      navigatingToAuthRef.current = true;
+      router.replace(path);
+    },
+    [closeAuthRequired, mode, router]
+  );
+
   const openAuthRequired = useCallback(
     (options?: AuthRequiredOpenOptions) => {
       if (mode === "anonymous") {
-        closeAuthRequired();
-        router.replace("/(auth)/login");
+        navigateToAuth("/(auth)/login");
         return;
       }
 
@@ -56,16 +72,7 @@ export function useAuthRequiredPrompt() {
         message: options?.message,
       });
     },
-    [closeAuthRequired, mode, router]
-  );
-
-  const navigateToAuth = useCallback(
-    async (path: "/(auth)/login" | "/(auth)/signup") => {
-      closeAuthRequired();
-      await signOut().catch(() => undefined);
-      router.replace(path);
-    },
-    [closeAuthRequired, router, signOut]
+    [mode, navigateToAuth]
   );
 
   const goToLogin = useCallback(() => {
@@ -80,13 +87,13 @@ export function useAuthRequiredPrompt() {
     (isAuthed: boolean, options?: AuthRequiredOpenOptions) => {
       if (isAuthed) return true;
       if (mode === "anonymous") {
-        router.replace("/(auth)/login");
+        navigateToAuth("/(auth)/login");
         return false;
       }
       openAuthRequired(options);
       return false;
     },
-    [mode, openAuthRequired, router]
+    [mode, navigateToAuth, openAuthRequired]
   );
 
   const modalProps = useMemo<AuthRequiredModalProps>(

@@ -592,6 +592,10 @@ export async function createEmergencyReport(
   input: CreateEmergencyReportInput,
   reporterUserId?: string
 ): Promise<CreateEmergencyReportResult> {
+  if (!reporterUserId && input.isSos && !input.guestReporter) {
+    throw new Error("Guest SOS requires a full name and mobile number.");
+  }
+
   const sanitizedPhotos = sanitizeEmergencyPhotoUrls(input.photos);
   if (!input.isSos && sanitizedPhotos.length < 3) {
     throw new Error("At least 3 proof images are required.");
@@ -635,12 +639,21 @@ export async function createEmergencyReport(
         location: {
           type: "Point",
           coordinates: [input.location.coords.longitude, input.location.coords.latitude],
+          ...(typeof input.location.accuracy === "number" ? { accuracy: input.location.accuracy } : {}),
         },
         locationLabel,
         notes: input.description,
         photos: sanitizedPhotos,
         ...(reporterUserId ? { reportedBy: reporterUserId } : {}),
         reporterIsGuest: !reporterUserId,
+        ...(!reporterUserId && input.guestReporter
+          ? {
+              guestReporter: {
+                fullName: input.guestReporter.fullName,
+                phoneNumber: input.guestReporter.phoneNumber,
+              },
+            }
+          : {}),
         reportedAt: new Date(),
         referenceNumber,
       });
@@ -677,12 +690,41 @@ export async function createEmergencyReport(
   };
 }
 
-export async function getEmergencyReportById(id: string) {
+export async function canAccessEmergencyReporterContact(
+  reportId: string,
+  userId: string,
+  role?: string
+): Promise<boolean> {
+  const normalizedRole = String(role ?? "").trim().toUpperCase();
+  if (normalizedRole === "ADMIN" || normalizedRole === "LGU") return true;
+  if (!isValidObjectId(reportId) || !Types.ObjectId.isValid(userId)) return false;
+
+  const report = await EmergencyReportModel.findById(reportId).select("reportedBy").lean();
+  if (!report) return false;
+  if (report.reportedBy && String(report.reportedBy) === userId) return true;
+
+  if (normalizedRole !== "VOLUNTEER" && normalizedRole !== "RESPONDER") return false;
+
+  const assignment = await DispatchOffer.findOne({
+    emergencyId: new Types.ObjectId(reportId),
+    volunteerId: new Types.ObjectId(userId),
+    status: { $in: ["PENDING", "ACCEPTED", "DONE", "VERIFIED"] },
+  })
+    .select("_id")
+    .lean();
+
+  return Boolean(assignment);
+}
+
+export async function getEmergencyReportById(
+  id: string,
+  options?: { includeReporterContact?: boolean }
+) {
   if (!isValidObjectId(id)) return null;
 
   const report = await EmergencyReportModel.findById(id)
     .select(
-      "isSos referenceNumber emergencyType status verification visibility location locationLabel notes photos reportedBy reporterIsGuest reportedAt createdAt updatedAt"
+      "isSos referenceNumber emergencyType status verification visibility location locationLabel notes photos reportedBy reporterIsGuest guestReporter reportedAt createdAt updatedAt"
     )
     .populate(
       "reportedBy",
@@ -693,6 +735,8 @@ export async function getEmergencyReportById(id: string) {
   if (!report) return null;
 
   const reporterRaw = report.reportedBy;
+  const includeReporterContact = options?.includeReporterContact === true;
+  const guestReporter = report.guestReporter;
   const reporter =
     reporterRaw && typeof reporterRaw === "object"
       ? {
@@ -701,14 +745,25 @@ export async function getEmergencyReportById(id: string) {
           lastName: String((reporterRaw as any).lastName ?? "").trim() || undefined,
           lifelineId: String((reporterRaw as any).lifelineId ?? "").trim() || undefined,
           avatarUrl: String((reporterRaw as any).avatarUrl ?? "").trim() || undefined,
-          contactNo: String((reporterRaw as any).contactNo ?? "").trim() || undefined,
-          barangay: String((reporterRaw as any).barangay ?? "").trim() || undefined,
-          municipality: String((reporterRaw as any).municipality ?? "").trim() || undefined,
-          country: String((reporterRaw as any).country ?? "").trim() || undefined,
-          postalCode: String((reporterRaw as any).postalCode ?? "").trim() || undefined,
+          ...(includeReporterContact
+            ? {
+                contactNo: String((reporterRaw as any).contactNo ?? "").trim() || undefined,
+                barangay: String((reporterRaw as any).barangay ?? "").trim() || undefined,
+                municipality: String((reporterRaw as any).municipality ?? "").trim() || undefined,
+                country: String((reporterRaw as any).country ?? "").trim() || undefined,
+                postalCode: String((reporterRaw as any).postalCode ?? "").trim() || undefined,
+              }
+            : {}),
         }
       : {
           isGuest: Boolean(report.reporterIsGuest) || !reporterRaw,
+          ...(includeReporterContact && guestReporter
+            ? {
+                firstName: String(guestReporter.fullName ?? "").trim() || undefined,
+                contactNo: String(guestReporter.phoneNumber ?? "").trim() || undefined,
+                reporterLabel: "Guest Reporter" as const,
+              }
+            : {}),
         };
 
   return {

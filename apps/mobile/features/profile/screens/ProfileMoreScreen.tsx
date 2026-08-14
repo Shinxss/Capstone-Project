@@ -22,12 +22,12 @@ import { useProfileNotificationPreferences } from "../hooks/useProfileNotificati
 import { useProfileAvatar } from "../hooks/useProfileAvatar";
 import { useProfileRequestShortcuts } from "../hooks/useProfileRequestShortcuts";
 import { useProfileSummary } from "../hooks/useProfileSummary";
+import { useAchievements } from "../../achievements/hooks/useAchievements";
 import { usePullToRefresh } from "../../common/hooks/usePullToRefresh";
 import { RefreshableScrollScreen } from "../../common/components/RefreshableScrollScreen";
 import {
   formatProfileRoleLabel,
   isApprovedVolunteer,
-  MOCK_PROFILE_ACHIEVEMENTS,
   type ProfileRequestShortcutTab,
 } from "../models/profile";
 
@@ -59,11 +59,19 @@ export default function MoreScreen() {
     Boolean(user?.passwordSet) || user?.authProvider === "local" || user?.authProvider === "both";
   const isGoogleLinked =
     Boolean(user?.googleLinked) || user?.authProvider === "google" || user?.authProvider === "both";
+  const isVolunteerAccount = isUser && String(user?.role ?? "").toUpperCase() === "VOLUNTEER";
 
   const { summary, refresh: refreshProfileSummary } = useProfileSummary({
     enabled: isUser,
     user,
   });
+  const {
+    summary: achievementSummary,
+    achievements,
+    loading: achievementsLoading,
+    error: achievementsError,
+    refresh: refreshAchievements,
+  } = useAchievements({ enabled: isVolunteerAccount, loadOnMount: false });
 
   const {
     showDotFor,
@@ -113,13 +121,11 @@ export default function MoreScreen() {
     },
   });
 
-  const onLogout = useCallback(() => {
-    if (!isUser) {
-      closeTransientUi();
-      void goToLogin();
-      return;
-    }
+  const onGuestSignIn = useCallback(() => {
+    goToLogin();
+  }, [goToLogin]);
 
+  const onAuthenticatedLogout = useCallback(() => {
     Alert.alert("Log out", "Are you sure you want to log out?", [
       { text: "Cancel", style: "cancel" },
       {
@@ -127,7 +133,6 @@ export default function MoreScreen() {
         style: "destructive",
         onPress: async () => {
           try {
-            closeTransientUi();
             await signOut();
           } catch {
             Alert.alert("Logout failed", "Please try again.");
@@ -135,7 +140,7 @@ export default function MoreScreen() {
         },
       },
     ]);
-  }, [closeTransientUi, goToLogin, isUser, signOut]);
+  }, [signOut]);
 
   const {
     avatarUrl: profileAvatarUrl,
@@ -246,12 +251,12 @@ export default function MoreScreen() {
 
   const onPressHeaderCta = useCallback(() => {
     if (!isUser) {
-      void goToLogin();
+      onGuestSignIn();
       return;
     }
 
     router.push("/profile/edit");
-  }, [goToLogin, isUser, router]);
+  }, [isUser, onGuestSignIn, router]);
 
   const onPressPersonalInfoRow = useCallback(
     (rowKey: "email" | "number" | "barangay" | "gender" | "skills") => {
@@ -315,8 +320,9 @@ export default function MoreScreen() {
       refreshRequestCounts(),
       refreshProfileSummary(),
       refreshNotificationPreferences(),
+      refreshAchievements(),
     ]);
-  }, [isUser, refreshNotificationPreferences, refreshProfileSummary, refreshRequestCounts]);
+  }, [isUser, refreshAchievements, refreshNotificationPreferences, refreshProfileSummary, refreshRequestCounts]);
   const { refreshing: refreshingProfilePage, triggerRefresh: triggerRefreshProfilePage } =
     usePullToRefresh(refreshProfilePage);
 
@@ -328,7 +334,7 @@ export default function MoreScreen() {
 
   const fullName = useMemo(() => {
     if (isUser) return summary.fullName || displayName;
-    return "Guest User";
+    return "Guest";
   }, [displayName, isUser, summary.fullName]);
 
   const roleLabel = useMemo(() => formatProfileRoleLabel(summary.role ?? user?.role), [summary.role, user?.role]);
@@ -371,12 +377,27 @@ export default function MoreScreen() {
         />
 
         <ProfileActivitiesGrid summary={summary} onPressApplyVolunteer={onPressApplyVolunteer} />
-        <ProfilePersonalInfoCard
-          summary={summary}
-          onPressHeader={onPressEditProfile}
-          onPressRow={onPressPersonalInfoRow}
-        />
-        <ProfileAchievementsCard achievements={MOCK_PROFILE_ACHIEVEMENTS} />
+        {isUser ? (
+          <>
+            {isVolunteerAccount ? (
+              <ProfileAchievementsCard
+                summary={achievementSummary}
+                achievements={achievements}
+                loading={achievementsLoading}
+                error={achievementsError}
+                onRetry={() => {
+                  void refreshAchievements();
+                }}
+                onViewAll={() => router.push("/achievements" as never)}
+              />
+            ) : null}
+            <ProfilePersonalInfoCard
+              summary={summary}
+              onPressHeader={onPressEditProfile}
+              onPressRow={onPressPersonalInfoRow}
+            />
+          </>
+        ) : null}
       </RefreshableScrollScreen>
 
       <ProfileMoreDrawer
@@ -394,7 +415,8 @@ export default function MoreScreen() {
         onToggleDarkMode={(nextValue) => setMode(nextValue ? "dark" : "light")}
         onPressResource={onComingSoon}
         onPressSupport={onComingSoon}
-        onPressSessionAction={onLogout}
+        onPressSignIn={onGuestSignIn}
+        onPressLogout={onAuthenticatedLogout}
       />
 
       <ProfileAvatarActionSheet

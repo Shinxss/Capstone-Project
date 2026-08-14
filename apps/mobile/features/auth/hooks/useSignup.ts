@@ -1,8 +1,8 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useRouter } from "expo-router";
 import { signupRequestOtp } from "../services/otpAuth.api";
 import { validateSignup } from "../utils/authValidators";
-import { getErrorMessage } from "../utils/authErrors";
+import { getSignupErrorMessage } from "../utils/authErrors";
 import { useGoogleLogin } from "./useGoogleLogin";
 
 export function useSignup() {
@@ -26,9 +26,10 @@ export function useSignup() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const submissionInFlightRef = useRef(false);
 
   const onSignup = useCallback(async () => {
-    if (loading || googleLoading) return;
+    if (loading || googleLoading || submissionInFlightRef.current) return;
     setError(null);
     clearGoogleError();
 
@@ -43,6 +44,7 @@ export function useSignup() {
       return;
     }
 
+    submissionInFlightRef.current = true;
     setLoading(true);
     try {
       const normalizedEmail = email.trim().toLowerCase();
@@ -58,8 +60,9 @@ export function useSignup() {
         params: { mode: "signup", email: normalizedEmail },
       });
     } catch (err) {
-      setError(getErrorMessage(err, "Signup failed"));
+      setError(getSignupErrorMessage(err));
     } finally {
+      submissionInFlightRef.current = false;
       setLoading(false);
     }
   }, [
@@ -103,6 +106,6 @@ export function useSignup() {
     toggleAgree: () => setAgree((v) => !v),
     onSignup,
     onGoogle,
-    goLogin: () => router.push("/login"),
+    goLogin: () => router.replace("/(auth)/login"),
   };
 }

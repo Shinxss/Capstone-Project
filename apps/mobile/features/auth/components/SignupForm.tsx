@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, TextInput, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import GoogleIcon from "../../../components/GoogleIcon";
+import { useResponsiveLayout } from "../../common/hooks/useResponsiveLayout";
 
 type Props = {
   firstName: string;
@@ -55,14 +56,15 @@ export default function SignupForm({
   onGoogle,
   onGoLogin,
 }: Props) {
+  const { isNarrow, isCompactHeight } = useResponsiveLayout();
   return (
-    <View className="flex-1 px-5 pt-40">
-      <Text className="mb-15 text-center text-[30px] font-bold text-gray-500">
+    <View style={{ width: "100%", maxWidth: 520, alignSelf: "center", paddingHorizontal: 20, paddingTop: isCompactHeight ? 28 : 72 }}>
+      <Text style={{ marginBottom: isCompactHeight ? 24 : 40, textAlign: "center", fontSize: isNarrow ? 27 : 30, fontWeight: "700", color: "#6B7280" }}>
         Create an account
       </Text>
 
       <View className="gap-3">
-        <View className="flex-row gap-3">
+        <View className={isNarrow ? "gap-3" : "flex-row gap-3"}>
           <TextInput
             placeholder="First Name"
             placeholderTextColor="#9CA3AF"
@@ -178,7 +180,7 @@ export default function SignupForm({
           })}
         >
           <Text style={{ color: "#fff", fontSize: 14, fontWeight: "600" }}>
-            {loading ? "Signing up..." : "Sign up"}
+            {loading ? "Sending verification code..." : "Sign up"}
           </Text>
         </Pressable>
 

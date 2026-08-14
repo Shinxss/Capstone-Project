@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   DAGUPAN_BARANGAY_OPTIONS,
   PROFILE_GENDER_OPTIONS,
@@ -58,6 +58,7 @@ function SelectionSheet({
   searchable = false,
   searchPlaceholder = "Search",
 }: SelectionSheetProps) {
+  const insets = useSafeAreaInsets();
   const [query, setQuery] = useState("");
 
   useEffect(() => {
@@ -77,7 +78,10 @@ function SelectionSheet({
   return (
     <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
       <Pressable style={styles.sheetBackdrop} onPress={onClose}>
-        <Pressable style={styles.sheetSurface} onPress={() => undefined}>
+        <Pressable
+          style={[styles.sheetSurface, { paddingBottom: Math.max(insets.bottom, 14) }]}
+          onPress={() => undefined}
+        >
           <View style={styles.sheetHandle} />
 
           <Text style={styles.sheetTitle}>{title}</Text>
@@ -460,7 +464,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
     backgroundColor: "#FFFFFF",
-    paddingBottom: Platform.OS === "ios" ? 22 : 14,
     borderTopWidth: 1,
     borderColor: "#E5E7EB",
   },

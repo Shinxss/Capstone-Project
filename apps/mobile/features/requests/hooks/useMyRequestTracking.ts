@@ -10,6 +10,22 @@ type Options = {
   enabled?: boolean;
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isTrackingDto(value: unknown): value is MyRequestTrackingDTO {
+  if (!isRecord(value)) return false;
+  return isRecord(value.request) && typeof value.request.id === "string" && isRecord(value.tracking) && isRecord(value.timeline);
+}
+
+function requestIdFromPayload(payload: unknown) {
+  if (!isRecord(payload)) return "";
+  if (typeof payload.requestId === "string") return payload.requestId.trim();
+  if (!isRecord(payload.data) || !isRecord(payload.data.request)) return "";
+  return typeof payload.data.request.id === "string" ? payload.data.request.id.trim() : "";
+}
+
 export function useMyRequestTracking(id: string | null | undefined, options?: Options) {
   const requestId = String(id ?? "").trim();
   const pollMs = options?.pollMs ?? 6000;
@@ -23,12 +39,12 @@ export function useMyRequestTracking(id: string | null | undefined, options?: Op
   const tickerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const applySocketPayload = useCallback(
-    (payload: any) => {
-      const payloadRequestId = String(payload?.requestId ?? payload?.data?.request?.id ?? "").trim();
+    (payload: unknown) => {
+      const payloadRequestId = requestIdFromPayload(payload);
       if (payloadRequestId && requestId && payloadRequestId !== requestId) return;
 
-      const next = (payload?.data ?? payload) as MyRequestTrackingDTO | null;
-      if (!next?.request?.id) return;
+      const next = isRecord(payload) && "data" in payload ? payload.data : payload;
+      if (!isTrackingDto(next)) return;
       setData(next);
       setError(null);
       setLoading(false);
@@ -47,8 +63,9 @@ export function useMyRequestTracking(id: string | null | undefined, options?: Op
       const next = await fetchMyRequestTracking(requestId);
       setData(next);
       setError(null);
-    } catch (e: any) {
-      setError(e?.response?.data?.message ?? e?.message ?? "Failed to fetch request tracking");
+    } catch (error) {
+      console.warn("Failed to refresh request tracking", error);
+      setError("Live tracking could not refresh.");
     }
   }, [enabled, requestId]);
 
@@ -72,11 +89,11 @@ export function useMyRequestTracking(id: string | null | undefined, options?: Op
     const socket = connectRealtime(token);
     if (!socket) return;
 
-    const onSnapshot = (payload: any) => {
+    const onSnapshot = (payload: unknown) => {
       applySocketPayload(payload);
     };
 
-    const onUpdate = (payload: any) => {
+    const onUpdate = (payload: unknown) => {
       applySocketPayload(payload);
     };
 

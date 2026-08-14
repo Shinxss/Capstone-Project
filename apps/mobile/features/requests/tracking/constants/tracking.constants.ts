@@ -1,0 +1,2 @@
+export const DEFAULT_EMERGENCY_HOTLINE = "911";
+export const EMERGENCY_HOTLINE = String(process.env.EXPO_PUBLIC_EMERGENCY_HOTLINE ?? "").trim() || DEFAULT_EMERGENCY_HOTLINE;

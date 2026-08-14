@@ -90,6 +90,7 @@ export type MyRequestTrackingDTO = {
     locationText: string;
     barangay?: string;
     notes?: string;
+    priority?: string | null;
   };
   timeline: TrackingTimeline;
   tracking: {
@@ -107,6 +108,8 @@ export type MyRequestTrackingDTO = {
       name: string;
       lifelineId?: string;
       phone?: string;
+      role?: string | null;
+      avatarUrl?: string | null;
     };
     responderLocation?: {
       lng: number;

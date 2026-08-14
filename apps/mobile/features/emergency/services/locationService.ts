@@ -7,6 +7,27 @@ export type DeviceLocation = {
   timestamp?: number;
 };
 
+const CURRENT_LOCATION_TIMEOUT_MS = 12_000;
+
+async function getCurrentPositionWithTimeout() {
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Highest,
+      }),
+      new Promise<never>((_resolve, reject) => {
+        timeoutHandle = setTimeout(
+          () => reject(new Error("Current location request timed out")),
+          CURRENT_LOCATION_TIMEOUT_MS
+        );
+      }),
+    ]);
+  } finally {
+    if (timeoutHandle) clearTimeout(timeoutHandle);
+  }
+}
+
 export async function getDeviceLocation(): Promise<DeviceLocation> {
   const { status } = await Location.requestForegroundPermissionsAsync();
 
@@ -16,9 +37,7 @@ export async function getDeviceLocation(): Promise<DeviceLocation> {
 
   // Try fresh GPS first
   try {
-    const pos = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Highest,
-    });
+    const pos = await getCurrentPositionWithTimeout();
 
     return {
       lat: pos.coords.latitude,

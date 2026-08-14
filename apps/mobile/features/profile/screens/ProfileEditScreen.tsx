@@ -1,7 +1,8 @@
 import React, { useCallback } from "react";
-import { Alert, Pressable, Text, View } from "react-native";
+import { Alert, KeyboardAvoidingView, Platform, Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useNavigation, usePreventRemove } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import GradientScreen from "../../../src/components/GradientScreen";
 import { RefreshableScrollScreen } from "../../common/components/RefreshableScrollScreen";
 import { useAuth } from "../../auth/AuthProvider";
@@ -19,6 +20,7 @@ export default function EditProfileScreen() {
   const { isUser, session } = useSession();
   const { isDark } = useTheme();
   const editProfile = useEditProfile();
+  const insets = useSafeAreaInsets();
 
   const authToken = session?.mode === "user" ? session.user.accessToken : null;
 
@@ -131,13 +133,15 @@ export default function EditProfileScreen() {
         }}
       />
 
-      <RefreshableScrollScreen
-        refreshing={editProfile.loading}
-        onRefresh={editProfile.refresh}
-        className="bg-transparent"
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 28 }}
-      >
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+        <RefreshableScrollScreen
+          refreshing={editProfile.loading}
+          onRefresh={editProfile.refresh}
+          keyboardShouldPersistTaps="handled"
+          className="bg-transparent"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 28 }}
+        >
         <ProfileEditForm
           fields={editProfile.fields}
           errors={editProfile.errors}
@@ -173,7 +177,8 @@ export default function EditProfileScreen() {
             {editProfile.saveError}
           </Text>
         ) : null}
-      </RefreshableScrollScreen>
+        </RefreshableScrollScreen>
+      </KeyboardAvoidingView>
     </GradientScreen>
   );
 }

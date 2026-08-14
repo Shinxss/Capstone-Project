@@ -21,12 +21,6 @@ export type ProfileSummary = {
   };
 };
 
-export type ProfileAchievement = {
-  id: string;
-  title: string;
-  icon: "flash-outline" | "shield-checkmark-outline" | "navigate-outline" | "people-outline";
-};
-
 export type ProfileRequestShortcutTab = "assigned" | "en_route" | "arrived" | "resolved";
 
 export type ProfileGender = "Male" | "Female" | "Prefer not to say";
@@ -59,13 +53,6 @@ export type UpdateMyProfilePayload = {
   gender?: ProfileGender | "";
   skills?: string;
 };
-
-export const MOCK_PROFILE_ACHIEVEMENTS: ProfileAchievement[] = [
-  { id: "first-responder", title: "First Responder", icon: "flash-outline" },
-  { id: "verified-volunteer", title: "Verified Volunteer", icon: "shield-checkmark-outline" },
-  { id: "route-ready", title: "Route Ready", icon: "navigate-outline" },
-  { id: "community-helper", title: "Community Helper", icon: "people-outline" },
-];
 
 function safeString(value: unknown) {
   if (typeof value !== "string") return null;

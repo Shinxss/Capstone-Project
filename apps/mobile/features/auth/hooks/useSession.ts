@@ -41,7 +41,7 @@ export function useSession() {
   const isUser = session?.mode === "user";
 
   const displayName = useMemo(() => {
-    if (isUser) return session.user.firstName || session.user.email || "User";
+    if (isUser) return String(session.user.firstName ?? "").trim() || "User";
     if (isGuest) return "Guest";
     return "Guest";
   }, [isGuest, isUser, session]);

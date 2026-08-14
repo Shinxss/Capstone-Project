@@ -1,0 +1,48 @@
+# Dependencies and package-manager caches
+node_modules/
+.pnpm-store/
+
+# Expo and generated build output
+.expo/
+.expo-shared/
+dist/
+web-build/
+dist-web-check/
+dist-android-check/
+.metro-cache/
+android/
+ios/
+
+# Explicit monorepo-relative paths (EAS archives from the repository root)
+apps/mobile/node_modules/
+apps/mobile/.expo/
+apps/mobile/.expo-shared/
+apps/mobile/dist/
+apps/mobile/web-build/
+apps/mobile/dist-web-check/
+apps/mobile/dist-android-check/
+apps/mobile/.metro-cache/
+apps/mobile/android/
+apps/mobile/ios/
+
+# Local configuration and credentials; preview variables come from EAS
+.env
+.env.*
+*.jks
+*.keystore
+*.p8
+*.p12
+*.key
+*.pem
+*.mobileprovision
+*-firebase-adminsdk-*.json
+
+# Development-only files
+.vscode/
+app-example/
+coverage/
+*.log
+*.orig.*
+*.tsbuildinfo
+.DS_Store
+Thumbs.db

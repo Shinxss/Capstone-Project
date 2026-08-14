@@ -14,6 +14,7 @@ import AuthBackground from "../../../components/AuthBackground";
 import AuthCard from "../components/AuthCard";
 import OtpCodeInput from "../components/OtpCodeInput";
 import { useOtpVerification, type OtpMode } from "../hooks/useOtpVerification";
+import { useResponsiveLayout } from "../../common/hooks/useResponsiveLayout";
 
 function normalizeMode(value: string | string[] | undefined): OtpMode {
   const mode = Array.isArray(value) ? value[0] : value;
@@ -31,6 +32,7 @@ export default function OtpVerificationScreen() {
   const mode = normalizeMode(params.mode);
   const email = normalizeParam(params.email).toLowerCase();
   const vm = useOtpVerification(mode, email);
+  const { isCompactHeight } = useResponsiveLayout();
   const isVerifyDisabled = !vm.canSubmit || vm.loading;
   const displayContact = vm.maskedContact || vm.contact;
 
@@ -60,11 +62,14 @@ export default function OtpVerificationScreen() {
 
   return (
     <AuthBackground>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} className="flex-1">
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} className="flex-1">
         <ScrollView
           bounces={false}
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={styles.contentContainer}
+          contentContainerStyle={[
+            styles.contentContainer,
+            { paddingTop: isCompactHeight ? 24 : 56 },
+          ]}
         >
           <Pressable onPress={vm.goBack} className="h-11 w-11 items-center justify-center rounded-full bg-white/90" style={styles.backShadow}>
             <ArrowLeft size={23} color="#334155" strokeWidth={2.4} />

@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -12,11 +13,20 @@ import { Ionicons } from "@expo/vector-icons";
 type Props = {
   visible: boolean;
   busy?: boolean;
+  contactNumber?: string;
+  onEditContact?: () => void;
   onConfirm: () => void;
   onCancel: () => void;
 };
 
-export function SosConfirmationModal({ visible, busy, onConfirm, onCancel }: Props) {
+export function SosConfirmationModal({
+  visible,
+  busy,
+  contactNumber,
+  onEditContact,
+  onConfirm,
+  onCancel,
+}: Props) {
   return (
     <Modal
       visible={visible}
@@ -27,14 +37,19 @@ export function SosConfirmationModal({ visible, busy, onConfirm, onCancel }: Pro
       }}
     >
       <View style={styles.backdrop}>
-        <View style={styles.card}>
+        <ScrollView
+          bounces={false}
+          showsVerticalScrollIndicator={false}
+          style={styles.card}
+          contentContainerStyle={styles.cardContent}
+        >
           <View style={styles.titleRow}>
             <Ionicons name="warning-outline" size={24} color="#DC2626" />
             <Text style={styles.title}>Confirm Emergency SOS</Text>
           </View>
 
           <Text style={styles.bodyText}>
-            You are about to send an emergency SOS alert.{"\n"}This will:
+            You are about to request emergency assistance.{"\n"}This will:
           </Text>
 
           <View style={styles.itemRow}>
@@ -43,13 +58,34 @@ export function SosConfirmationModal({ visible, busy, onConfirm, onCancel }: Pro
           </View>
 
           <View style={styles.itemRow}>
-            <Ionicons name="call-outline" size={20} color="#EF4444" />
-            <Text style={styles.itemText}>Alert nearby responders</Text>
+            <Ionicons name="warning-outline" size={20} color="#EF4444" />
+            <Text style={styles.itemText}>Alert emergency responders</Text>
           </View>
 
-          <Text style={styles.warningText}>
-            Only confirm if you need immediate help.
+          <View style={styles.itemRow}>
+            <Ionicons name="call-outline" size={20} color="#EF4444" />
+            <Text style={styles.itemText}>Allow responders to call or text you about this emergency</Text>
+          </View>
+
+          <Text style={styles.contactWarning}>
+            Keep your phone nearby. Responders may contact you to verify the emergency, confirm your location, or provide instructions.
           </Text>
+
+          {contactNumber ? (
+            <View style={styles.contactRow}>
+              <View style={styles.contactTextWrap}>
+                <Text style={styles.contactLabel}>Contact number</Text>
+                <Text style={styles.contactValue}>{contactNumber}</Text>
+              </View>
+              {onEditContact ? (
+                <Pressable onPress={onEditContact} disabled={Boolean(busy)} hitSlop={8}>
+                  <Text style={styles.editText}>Edit</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
+
+          <Text style={styles.warningText}>Only use SOS for a real emergency.</Text>
 
           <Pressable
             onPress={onConfirm}
@@ -78,7 +114,7 @@ export function SosConfirmationModal({ visible, busy, onConfirm, onCancel }: Pro
           >
             <Text style={styles.cancelBtnText}>Cancel</Text>
           </Pressable>
-        </View>
+        </ScrollView>
       </View>
     </Modal>
   );
@@ -94,8 +130,12 @@ const styles = StyleSheet.create({
   },
   card: {
     width: "100%",
+    maxWidth: 520,
+    maxHeight: "88%",
     borderRadius: 16,
     backgroundColor: "#FFFFFF",
+  },
+  cardContent: {
     paddingHorizontal: 25,
     paddingVertical: 14,
   },
@@ -123,6 +163,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   itemText: {
+    flex: 1,
+    minWidth: 0,
     fontSize: 13,
     color: "#4B5563",
     fontWeight: "500",
@@ -133,6 +175,31 @@ const styles = StyleSheet.create({
     color: "#111827",
     fontWeight: "700",
   },
+  contactWarning: {
+    marginTop: 13,
+    borderRadius: 10,
+    backgroundColor: "#FEF2F2",
+    padding: 11,
+    fontSize: 13,
+    color: "#7F1D1D",
+    lineHeight: 18,
+    fontWeight: "600",
+  },
+  contactRow: {
+    marginTop: 11,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  contactTextWrap: { flex: 1 },
+  contactLabel: { color: "#64748B", fontSize: 11, fontWeight: "700" },
+  contactValue: { marginTop: 2, color: "#0F172A", fontSize: 14, fontWeight: "700" },
+  editText: { color: "#DC2626", fontSize: 13, fontWeight: "800" },
   confirmBtn: {
     marginTop: 16,
     height: 50,

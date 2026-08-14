@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import axios from "axios";
+import { isAxiosError } from "axios";
 import { useRouter } from "expo-router";
 import { validateLogin } from "../utils/authValidators";
 import { getErrorMessage } from "../utils/authErrors";
@@ -23,7 +23,7 @@ function formatCooldown(seconds: number) {
 
 export function useLogin() {
   const router = useRouter();
-  const { signIn, continueAsGuest } = useAuth();
+  const { signIn, continueAsGuest, mode } = useAuth();
   const {
     start: onGoogle,
     loading: googleLoading,
@@ -36,6 +36,8 @@ export function useLogin() {
   const [showPassword, setShowPassword] = useState(false);
 
   const [loading, setLoading] = useState(false);
+  const [guestLoading, setGuestLoading] = useState(false);
+  const [guestNavigationPending, setGuestNavigationPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [cooldownEndsAt, setCooldownEndsAt] = useState<number | null>(null);
@@ -60,6 +62,13 @@ export function useLogin() {
     return () => clearInterval(timer);
   }, [cooldownEndsAt]);
 
+  useEffect(() => {
+    if (!guestNavigationPending || mode !== "guest") return;
+    router.replace("/(tabs)");
+    setGuestNavigationPending(false);
+    setGuestLoading(false);
+  }, [guestNavigationPending, mode, router]);
+
   const startCooldown = useCallback((seconds: number) => {
     setCooldownRemainingSeconds(seconds);
     setCooldownEndsAt(Date.now() + seconds * 1000);
@@ -71,7 +80,7 @@ export function useLogin() {
       : null;
 
   const onLogin = useCallback(async () => {
-    if (loading || googleLoading) return;
+    if (loading || googleLoading || guestLoading) return;
     if (cooldownRemainingSeconds > 0) {
       setError(cooldownMessage);
       return;
@@ -91,7 +100,7 @@ export function useLogin() {
       await signIn(identifier.trim(), password);
       setFailedAttempts(0);
     } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.status === 429) {
+      if (isAxiosError(err) && err.response?.status === 429) {
         const retryAfterRaw = err.response.headers?.["retry-after"];
         const retryAfter = Number.parseInt(String(retryAfterRaw ?? ""), 10);
         const cooldown =
@@ -118,6 +127,7 @@ export function useLogin() {
     password,
     loading,
     googleLoading,
+    guestLoading,
     cooldownRemainingSeconds,
     cooldownMessage,
     clearGoogleError,
@@ -127,16 +137,19 @@ export function useLogin() {
   ]);
 
   const skip = useCallback(async () => {
-    if (loading || googleLoading) return;
+    if (loading || googleLoading || guestLoading) return;
     setError(null);
     clearGoogleError();
+    setGuestLoading(true);
 
     try {
       await continueAsGuest();
+      setGuestNavigationPending(true);
     } catch (err) {
+      setGuestLoading(false);
       setError(getErrorMessage(err, "Failed to enter guest mode"));
     }
-  }, [loading, googleLoading, clearGoogleError, continueAsGuest]);
+  }, [clearGoogleError, continueAsGuest, googleLoading, guestLoading, loading]);
 
   return {
     identifier,
@@ -144,6 +157,7 @@ export function useLogin() {
     showPassword,
     loading,
     googleLoading,
+    guestLoading,
     error: cooldownMessage ?? error ?? googleError,
     loginCooldownSeconds: cooldownRemainingSeconds,
     setIdentifier,

@@ -1,5 +1,5 @@
 import React from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 type Props = {
@@ -11,7 +11,12 @@ export function VolunteerApplyModalView({ onClose, onContinue }: Props) {
   return (
     <Modal transparent animationType="fade" visible>
       <View style={styles.backdrop}>
-        <View style={styles.card}>
+        <ScrollView
+          bounces={false}
+          showsVerticalScrollIndicator={false}
+          style={styles.card}
+          contentContainerStyle={styles.cardContent}
+        >
           <Pressable style={styles.closeBtn} onPress={onClose}>
             <Ionicons name="close" size={20} color="#6B7280" />
           </Pressable>
@@ -53,7 +58,7 @@ export function VolunteerApplyModalView({ onClose, onContinue }: Props) {
           <Pressable style={styles.cancelBtn} onPress={onClose}>
             <Text style={styles.cancelText}>Cancel</Text>
           </Pressable>
-        </View>
+        </ScrollView>
       </View>
     </Modal>
   );
@@ -70,8 +75,11 @@ const styles = StyleSheet.create({
   card: {
     width: "100%",
     maxWidth: 360,
+    maxHeight: "88%",
     backgroundColor: "#fff",
     borderRadius: 18,
+  },
+  cardContent: {
     padding: 18,
   },
   closeBtn: {

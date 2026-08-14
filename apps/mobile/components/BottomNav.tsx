@@ -3,8 +3,9 @@ import { Ionicons } from "@expo/vector-icons";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { Siren } from "lucide-react-native";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../features/auth/AuthProvider";
+import { useBottomNavMetrics } from "../features/common/hooks/useBottomNavMetrics";
+import { useResponsiveLayout } from "../features/common/hooks/useResponsiveLayout";
 import { useTheme } from "../features/theme/useTheme";
 
 const ACTIVE = "#2563EB";
@@ -30,8 +31,8 @@ export default function BottomNav(props: Props) {
   const { state, navigation, onPressReportAction, onPressRegularTab } = props;
   const { isDark } = useTheme();
   const { user, isGuest } = useAuth();
-  const insets = useSafeAreaInsets();
-  const bottomPadding = Math.max(insets.bottom, 50);
+  const { bottomInset, contentHeight } = useBottomNavMetrics();
+  const { isNarrow } = useResponsiveLayout();
   const normalizedRole = String(user?.role ?? "").trim().toUpperCase();
   const tasksLabel = isGuest || normalizedRole === "COMMUNITY" ? "My Request" : "Tasks";
 
@@ -57,19 +58,28 @@ export default function BottomNav(props: Props) {
       style={[
         styles.wrap,
         {
-          paddingBottom: bottomPadding,
+          paddingBottom: bottomInset,
           backgroundColor: isDark ? "#0B1220" : "#FFFFFF",
           borderTopColor: isDark ? "#162544" : "#E5E7EB",
         },
       ]}
     >
-      <View style={styles.row}>
+      <View
+        style={[
+          styles.row,
+          {
+            height: contentHeight,
+            paddingHorizontal: isNarrow ? 4 : 8,
+          },
+        ]}
+      >
         <TabButton
           label={TABS[0].label}
           icon={TABS[0].icon}
           focused={isFocused("index")}
           isDark={isDark}
           onPress={() => goTo("index")}
+          isNarrow={isNarrow}
         />
 
         <TabButton
@@ -78,6 +88,7 @@ export default function BottomNav(props: Props) {
           focused={isFocused("map")}
           isDark={isDark}
           onPress={() => goTo("map")}
+          isNarrow={isNarrow}
         />
 
         <View style={styles.centerSlot}>
@@ -85,6 +96,7 @@ export default function BottomNav(props: Props) {
             onPress={onPressReportAction}
             style={({ pressed }) => [
               styles.fab,
+              isNarrow ? styles.fabNarrow : null,
               { borderColor: isDark ? "#0B1220" : "#FFFFFF" },
               pressed && { opacity: 0.9 },
             ]}
@@ -99,6 +111,7 @@ export default function BottomNav(props: Props) {
           focused={isFocused("tasks")}
           isDark={isDark}
           onPress={() => goTo("tasks")}
+          isNarrow={isNarrow}
         />
 
         <TabButton
@@ -107,6 +120,7 @@ export default function BottomNav(props: Props) {
           focused={isFocused("more")}
           isDark={isDark}
           onPress={() => goTo("more")}
+          isNarrow={isNarrow}
         />
       </View>
     </View>
@@ -119,19 +133,29 @@ function TabButton({
   focused,
   isDark,
   onPress,
+  isNarrow = false,
 }: {
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
   focused: boolean;
   isDark: boolean;
   onPress: () => void;
+  isNarrow?: boolean;
 }) {
   const color = focused ? ACTIVE : isDark ? INACTIVE_DARK : INACTIVE_LIGHT;
 
   return (
     <Pressable onPress={onPress} style={styles.tab}>
       <Ionicons name={icon} size={22} color={color} />
-      <Text style={[styles.label, { color }]}>{label}</Text>
+      <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.86}
+        maxFontSizeMultiplier={1.15}
+        style={[styles.label, isNarrow ? styles.labelNarrow : null, { color }]}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -141,25 +165,27 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
   },
   row: {
-    height: 64,
     flexDirection: "row",
     alignItems: "flex-end",
-    justifyContent: "space-around",
-    paddingHorizontal: 16,
     paddingTop: 8,
   },
   tab: {
-    width: 70,
+    flex: 1,
+    minWidth: 0,
     alignItems: "center",
     justifyContent: "center",
     paddingBottom: 2,
   },
   label: {
     marginTop: 4,
-    fontSize: 12,
+    fontSize: 11,
+    textAlign: "center",
   },
+  labelNarrow: { fontSize: 10 },
   centerSlot: {
-    width: 90,
+    flex: 0.95,
+    minWidth: 68,
+    maxWidth: 84,
     alignItems: "center",
   },
   fab: {
@@ -181,5 +207,12 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 6 },
       },
     }),
+  },
+  fabNarrow: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 6,
+    marginTop: -30,
   },
 });

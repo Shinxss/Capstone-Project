@@ -18,6 +18,7 @@ import routingRoutes from "./routing/routing.routes";
 import weatherRoutes from "./weather/weather.routes";
 import responderRoutes from "./responders/responder.routes";
 import responderTeamRoutes from "./responderTeams/responderTeam.routes";
+import achievementRoutes from "./achievements/achievement.routes";
 const router = Router();
 
 // feature routes
@@ -40,5 +41,6 @@ router.use("/routing", routingRoutes);
 router.use("/weather", weatherRoutes);
 router.use("/responders", responderRoutes);
 router.use("/responders/teams", responderTeamRoutes);
+router.use("/achievements", achievementRoutes);
 
 export default router;

@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -185,10 +187,13 @@ export function ReportEmergencyDetailsScreen() {
 
   return (
     <SafeAreaView edges={["bottom"]} className="flex-1 bg-zinc-100">
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.flex}>
       <ScrollView
+        style={styles.flex}
+        keyboardShouldPersistTaps="handled"
         scrollEnabled={!showMapPicker}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 220 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 24 }}
       >
         <Text className="text-3xl font-semibold text-zinc-900">Provide details</Text>
         <Text className="mt-1 text-base text-zinc-500">Help responders understand the situation</Text>
@@ -368,7 +373,10 @@ export function ReportEmergencyDetailsScreen() {
         onRequestClose={() => setProofSheetVisible(false)}
       >
         <Pressable style={styles.sheetBackdrop} onPress={() => setProofSheetVisible(false)}>
-          <Pressable style={styles.sheetCard} onPress={() => { }}>
+          <Pressable
+            style={[styles.sheetCard, { paddingBottom: Math.max(insets.bottom, 12) + 12 }]}
+            onPress={() => { }}
+          >
             <Text style={styles.sheetTitle}>Add Proof</Text>
 
             <Pressable onPress={onTakePhoto} style={styles.sheetAction}>
@@ -391,7 +399,7 @@ export function ReportEmergencyDetailsScreen() {
         </Pressable>
       </Modal>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 40 }]}>
+      <View style={styles.footer}>
         <View style={styles.footerRow}>
           <Pressable
             onPress={() => router.back()}
@@ -411,17 +419,17 @@ export function ReportEmergencyDetailsScreen() {
           </Pressable>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   footer: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
     paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 12,
     backgroundColor: "transparent",
   },
   footerRow: {

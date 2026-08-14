@@ -3,6 +3,7 @@ import { View, Text, TextInput, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import LifelineLogo from "../../../components/LifelineLogo";
 import GoogleIcon from "../../../components/GoogleIcon";
+import { useResponsiveLayout } from "../../common/hooks/useResponsiveLayout";
 
 type Props = {
   identifier: string;
@@ -37,11 +38,12 @@ export default function LoginForm({
   onGoogle,
   onGoSignup,
 }: Props) {
+  const { isCompactHeight } = useResponsiveLayout();
   const actionDisabled = loading || googleLoading || loginCooldownSeconds > 0;
   const actionText = loading ? "Logging in..." : "Login";
 
   return (
-    <View className="flex-1 px-5 pt-45">
+    <View style={{ width: "100%", maxWidth: 520, alignSelf: "center", paddingHorizontal: 20, paddingTop: isCompactHeight ? 32 : 160 }}>
       <View className="mb-10">
         <LifelineLogo />
       </View>

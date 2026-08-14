@@ -3,17 +3,18 @@ import {
   Animated,
   Image,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import type { WeatherSeverity } from "../../weather/services/weatherApi";
 import { useTheme } from "../../theme/useTheme";
 import { resolveAvatarUri } from "../../profile/utils/avatarUrl";
 import { RefreshableScrollScreen } from "../../common/components/RefreshableScrollScreen";
+import { useBottomNavMetrics } from "../../common/hooks/useBottomNavMetrics";
+import { useResponsiveLayout } from "../../common/hooks/useResponsiveLayout";
 
 type AlertIconName = React.ComponentProps<typeof Ionicons>["name"];
 type AlertTheme = {
@@ -147,8 +148,15 @@ export function HomeView({
   onPressApplyVolunteer,
   showVolunteerCta = true,
 }: Props) {
-  const insets = useSafeAreaInsets();
+  const { width, isNarrow, isCompactHeight, isLargePhone } = useResponsiveLayout();
+  const { screenContentBottomPadding } = useBottomNavMetrics();
   const { isDark } = useTheme();
+  const headingFontSize = isNarrow ? 34 : isCompactHeight ? 36 : isLargePhone ? 40 : 39;
+  const sosSize = Math.min(
+    isCompactHeight ? 204 : 224,
+    Math.max(isCompactHeight ? 184 : 190, width * 0.55)
+  );
+  const sosInnerSize = sosSize - (isNarrow ? 26 : 30);
   const weatherCardBackground = withOpacity(alertTheme.cardBackgroundColor, 0.1);
   const weatherBaseColor = alertTheme.headlineColor;
   const weatherTitleColor = isDark
@@ -163,6 +171,7 @@ export function HomeView({
   const pulseScale = useRef(new Animated.Value(1)).current;
   const pulseOpacity = useRef(new Animated.Value(0)).current;
   const resolvedAvatarUri = useMemo(() => resolveAvatarUri(avatarUrl), [avatarUrl]);
+  const safeDisplayName = String(displayName ?? "").trim() || "Guest";
 
   useEffect(() => {
     if (!holding) {
@@ -215,6 +224,7 @@ export function HomeView({
     <SafeAreaView
       style={[styles.safe, isDark ? styles.safeDark : styles.safeLight]}
       className="bg-lgu-lightBg dark:bg-lgu-darkBg"
+      edges={["top", "left", "right"]}
     >
       <RefreshableScrollScreen
         refreshing={refreshing}
@@ -222,7 +232,10 @@ export function HomeView({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.container,
-          { paddingBottom: 1 + insets.bottom },
+          {
+            paddingTop: isCompactHeight ? 10 : 16,
+            paddingBottom: screenContentBottomPadding,
+          },
         ]}
       >
         {/* Top bar */}
@@ -254,9 +267,21 @@ export function HomeView({
                 <Ionicons name="person" size={16} color={isDark ? "#E2E8F0" : "#111827"} />
               )}
             </Pressable>
-            <View>
-              <Text style={[styles.hello, isDark ? styles.helloDark : null]}>Hi, {displayName}</Text>
-              <Text style={[styles.sub, isDark ? styles.subDark : null]}>How are you today</Text>
+            <View style={styles.profileText}>
+              <Text
+                numberOfLines={1}
+                maxFontSizeMultiplier={1.2}
+                style={[styles.hello, isDark ? styles.helloDark : null]}
+              >
+                Hello, {safeDisplayName}!
+              </Text>
+              <Text
+                numberOfLines={1}
+                maxFontSizeMultiplier={1.2}
+                style={[styles.sub, isDark ? styles.subDark : null]}
+              >
+                How are you doing today?
+              </Text>
             </View>
           </View>
 
@@ -266,18 +291,40 @@ export function HomeView({
         </View>
 
         {/* Heading */}
-        <View style={styles.headerBlock}>
-          <Text style={[styles.h1, isDark ? styles.h1Dark : null]}>Emergency help{"\n"}needed?</Text>
-          <Text style={[styles.h2, isDark ? styles.h2Dark : null]}>
-            Press the button below and help{"\n"}reach you shortly.
+        <View style={[styles.headerBlock, { marginTop: isCompactHeight ? 24 : 40 }]}>
+          <Text
+            numberOfLines={2}
+            maxFontSizeMultiplier={1.15}
+            style={[
+              styles.h1,
+              { fontSize: headingFontSize, lineHeight: Math.round(headingFontSize * 0.98) },
+              isDark ? styles.h1Dark : null,
+            ]}
+          >
+            Emergency help{"\n"}needed?
+          </Text>
+          <Text
+            maxFontSizeMultiplier={1.25}
+            style={[
+              styles.h2,
+              { marginTop: isCompactHeight ? 16 : 24 },
+              isDark ? styles.h2Dark : null,
+            ]}
+          >
+            Press the button below and help reach you shortly.
           </Text>
         </View>
 
         {/* SOS */}
-        <View style={styles.sosBlock}>
+        <View style={[styles.sosBlock, { marginTop: isCompactHeight ? 14 : 20 }]}>
           <View
             style={[
               styles.sosOuter,
+              {
+                width: sosSize,
+                height: sosSize,
+                borderRadius: sosSize / 2,
+              },
               isDark ? styles.sosOuterDark : null,
               holding && styles.sosOuterHolding,
               holding && isDark ? styles.sosOuterHoldingDark : null,
@@ -288,6 +335,9 @@ export function HomeView({
               style={[
                 styles.sosPulse,
                 {
+                  width: sosSize,
+                  height: sosSize,
+                  borderRadius: sosSize / 2,
                   opacity: pulseOpacity,
                   transform: [{ scale: pulseScale }],
                 },
@@ -299,6 +349,11 @@ export function HomeView({
               onPressOut={onCancelHold}
               style={[
                 styles.sosInner,
+                {
+                  width: sosInnerSize,
+                  height: sosInnerSize,
+                  borderRadius: sosInnerSize / 2,
+                },
                 isDark ? styles.sosInnerShadow : null,
                 isDark ? styles.sosInnerDark : null,
                 holding && styles.sosInnerHolding,
@@ -309,14 +364,21 @@ export function HomeView({
                 <Ionicons name="warning" size={18} color="#fff" />
               </View>
 
-              <Text style={styles.sosText}>SOS</Text>
+              <Text style={[styles.sosText, isCompactHeight ? styles.sosTextCompact : null]}>SOS</Text>
               <Text style={styles.sosHint}>
                 {holding ? `Keep holding... ${remainingSeconds}s` : "Hold for 3s"}
               </Text>
             </Pressable>
           </View>
 
-          <Text style={[styles.locationNote, isDark ? styles.locationNoteDark : null]}>
+          <Text
+            maxFontSizeMultiplier={1.25}
+            style={[
+              styles.locationNote,
+              { marginTop: isCompactHeight ? 18 : 24 },
+              isDark ? styles.locationNoteDark : null,
+            ]}
+          >
             Your location will be shared with emergency responders
           </Text>
         </View>
@@ -327,7 +389,7 @@ export function HomeView({
           disabled={!onPressAlert}
           style={({ pressed }) => [
             styles.card,
-            { marginTop: 60 },
+            { marginTop: isCompactHeight ? 28 : 40 },
             {
               backgroundColor: weatherCardBackground,
               borderColor: alertTheme.cardBorderColor,
@@ -342,7 +404,7 @@ export function HomeView({
               color={alertTheme.iconColor}
             />
           </View>
-          <View style={{ flex: 1 }}>
+          <View style={styles.cardContent}>
             <Text style={[styles.cardHeadline, { color: weatherTitleColor }]}>
               {alertTitle}
             </Text>
@@ -389,7 +451,7 @@ export function HomeView({
             </View>
 
             <Text style={styles.volSub}>
-              Join our community responders and help{"\n"}save lives in your barangays
+              Join our community responders and help save lives in your barangays
             </Text>
 
             <Pressable style={styles.applyBtn} onPress={onPressApplyVolunteer}>
@@ -406,14 +468,20 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   safeLight: { backgroundColor: "#F6F7F9" },
   safeDark: { backgroundColor: "#060C18" },
-  container: { paddingHorizontal: 16, paddingTop: 60 },
+  container: {
+    width: "100%",
+    maxWidth: 520,
+    alignSelf: "center",
+    paddingHorizontal: 16,
+  },
 
   topRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  profile: { flexDirection: "row", alignItems: "center", gap: 10 },
+  profile: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 10 },
+  profileText: { flex: 1, minWidth: 0 },
   avatar: {
     width: 50,
     height: 50,
@@ -443,15 +511,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginRight: 6,
     borderColor: "#E5E7EB",
+    flexShrink: 0,
   },
   bellBtnDark: {
     backgroundColor: "#0E1626",
     borderColor: "#162544",
   },
 
-  headerBlock: { marginTop: 60, alignItems: "center" },
+  headerBlock: { alignItems: "center", paddingHorizontal: 8 },
   h1: {
-    fontSize: 40,
+    width: "100%",
+    maxWidth: 430,
     fontWeight: "900",
     color: "#6B7280",
     textAlign: "center",
@@ -461,21 +531,18 @@ const styles = StyleSheet.create({
     color: "#E2E8F0",
   },
   h2: {
+    maxWidth: 320,
     fontSize: 15,
     color: "#9CA3AF",
     textAlign: "center",
-    marginTop: 40,
-    lineHeight: 16,
+    lineHeight: 20,
   },
   h2Dark: {
     color: "#94A3B8",
   },
 
-  sosBlock: { marginTop: 22, alignItems: "center" },
+  sosBlock: { alignItems: "center" },
   sosOuter: {
-    width: 220,
-    height: 220,
-    borderRadius: 110,
     backgroundColor: "#FEE2E2",
     alignItems: "center",
     justifyContent: "center",
@@ -493,15 +560,9 @@ const styles = StyleSheet.create({
   },
   sosPulse: {
     position: "absolute",
-    width: 220,
-    height: 220,
-    borderRadius: 110,
     backgroundColor: "#EF4444",
   },
   sosInner: {
-    width: 190,
-    height: 190,
-    borderRadius: 95,
     backgroundColor: "#EF4444",
     alignItems: "center",
     justifyContent: "center",
@@ -535,9 +596,10 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   sosText: { fontSize: 46, fontWeight: "600", color: "#fff" },
+  sosTextCompact: { fontSize: 42 },
   sosHint: { fontSize: 13, color: "rgba(255,255,255,0.92)", marginTop: 2 },
   locationNote: {
-    marginTop: 30,
+    maxWidth: 330,
     fontSize: 14,
     color: "#9CA3AF",
     textAlign: "center",
@@ -566,6 +628,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  cardContent: { flex: 1, minWidth: 0 },
   cardHeadline: { fontSize: 16, fontWeight: "900", marginTop: 2 },
   cardSub: { fontSize: 12, color: "#6B7280", marginTop: 2, lineHeight: 15 },
   cardRetry: { fontSize: 11, marginTop: 4, fontWeight: "700" },
@@ -635,7 +698,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     overflow: "hidden",
-    height: 230,
+    minHeight: 230,
   },
   volCircle1: {
     position: "absolute",
@@ -664,8 +727,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  volTitle: { color: "#fff", fontSize: 25, fontWeight: "900" },
-  volSub: { color: "rgba(255,255,255,0.85)", fontSize: 15, marginTop: 10, lineHeight: 15 },
+  volTitle: { color: "#fff", fontSize: 25, fontWeight: "900", flexShrink: 1 },
+  volSub: { color: "rgba(255,255,255,0.85)", fontSize: 15, marginTop: 10, lineHeight: 20, maxWidth: 310 },
 
   applyBtn: {
     marginTop: 20,

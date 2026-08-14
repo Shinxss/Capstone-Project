@@ -96,6 +96,7 @@ function RootLayoutInner() {
               <Stack.Screen name="profile/edit" />
               <Stack.Screen name="profile/skills" />
               <Stack.Screen name="notifications" />
+              <Stack.Screen name="achievements" />
               <Stack.Screen name="profile-completion" />
               <Stack.Screen
                 name="volunteer-apply-modal"

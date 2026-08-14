@@ -117,7 +117,11 @@ export function EmergencyBottomSheetContainer({
             />
           </BottomSheetScrollView>
         ) : (
-          <BottomSheetView>
+          <BottomSheetScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.scrollContent}
+          >
             <EmergencyDirectionsSheet
               emergency={controller.selectedEmergency}
               travelMode={controller.travelMode}
@@ -131,7 +135,7 @@ export function EmergencyBottomSheetContainer({
               onBack={controller.goToOverview}
               onClose={controller.closeSheet}
             />
-          </BottomSheetView>
+          </BottomSheetScrollView>
         )
       ) : (
         <BottomSheetView>

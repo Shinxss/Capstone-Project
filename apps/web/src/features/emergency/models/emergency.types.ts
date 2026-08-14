@@ -40,4 +40,8 @@ export type EmergencyReport = {
   locationLabel?: string;
   referenceNumber?: string;
   reporterIsGuest?: boolean;
+  guestReporter?: {
+    fullName: string;
+    phoneNumber: string;
+  };
 };

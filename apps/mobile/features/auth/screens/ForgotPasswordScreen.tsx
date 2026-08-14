@@ -13,18 +13,23 @@ import { ArrowLeft, KeyRound } from "lucide-react-native";
 import AuthBackground from "../../../components/AuthBackground";
 import AuthCard from "../components/AuthCard";
 import { useForgotPassword } from "../hooks/useForgotPassword";
+import { useResponsiveLayout } from "../../common/hooks/useResponsiveLayout";
 
 export default function ForgotPasswordScreen() {
   const vm = useForgotPassword();
+  const { isCompactHeight } = useResponsiveLayout();
   const isDisabled = !vm.canSubmit || vm.loading;
 
   return (
     <AuthBackground>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} className="flex-1">
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} className="flex-1">
         <ScrollView
           bounces={false}
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={styles.contentContainer}
+          contentContainerStyle={[
+            styles.contentContainer,
+            { paddingTop: isCompactHeight ? 24 : 56 },
+          ]}
         >
           <Pressable onPress={vm.goBack} className="h-11 w-11 items-center justify-center rounded-full bg-white/90" style={styles.backShadow}>
             <ArrowLeft size={23} color="#334155" strokeWidth={2.4} />

@@ -1,14 +1,13 @@
 import React, { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { EMERGENCY_TYPE_OPTIONS } from "../constants/emergencyTypes.constants";
 import { EmergencyTypeTile } from "../components/EmergencyTypeTile";
 import type { EmergencyType } from "../models/report.types";
 import { useReportDraft } from "../hooks/useReportDraft";
 
 export function ReportEmergencyTypeScreen() {
-  const insets = useSafeAreaInsets();
   const { draft, setType } = useReportDraft();
   const [selectedType, setSelectedType] = useState<EmergencyType | null>(draft.type ?? null);
 
@@ -25,7 +24,8 @@ export function ReportEmergencyTypeScreen() {
   return (
     <SafeAreaView edges={["bottom"]} style={styles.screen} className="bg-lgu-lightBg dark:bg-lgu-darkBg">
       <ScrollView
-        contentContainerClassName="px-5 pb-36 pt-2"
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
         <Text className="text-2xl font-extrabold text-slate-900 dark:text-slate-100">What type of emergency?</Text>
@@ -45,7 +45,7 @@ export function ReportEmergencyTypeScreen() {
         </View>
       </ScrollView>
 
-      <View style={[styles.footer, { bottom: Math.max(insets.bottom, 30) + 40 }]}>
+      <View style={styles.footer}>
         <Pressable
           onPress={onContinue}
           disabled={!canContinue}
@@ -66,14 +66,12 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
+  scroll: { flex: 1 },
+  content: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 24 },
   footer: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
     paddingHorizontal: 20,
-    paddingTop: 0,
-    paddingBottom: 0,
+    paddingTop: 8,
+    paddingBottom: 12,
     backgroundColor: "transparent",
   },
   continueButton: {

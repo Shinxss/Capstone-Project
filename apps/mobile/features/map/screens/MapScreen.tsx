@@ -41,6 +41,7 @@ import { getEffectiveLocation } from "../../location/utils/getEffectiveLocation"
 import { useVolunteerMapFeed } from "../../realtime/hooks/useVolunteerMapFeed";
 import { connectRealtime } from "../../realtime/socketClient";
 import { useTheme } from "../../theme/useTheme";
+import { useResponsiveLayout } from "../../common/hooks/useResponsiveLayout";
 import {
   getMobileEmergencyVisual,
   mobileEmergencyTitle,
@@ -63,6 +64,8 @@ type MapRouteSearchParams = {
   reportLng?: string | string[];
   reportLat?: string | string[];
 };
+
+type LocationFixKind = "last_known" | "fresh";
 
 const DAGUPAN: [number, number] = [120.34, 16.043];
 const TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? "";
@@ -337,6 +340,7 @@ function PulseMarker({ type }: { type: EmergencyType }) {
 
 export default function MapTab() {
   const insets = useSafeAreaInsets();
+  const { isCompactHeight } = useResponsiveLayout();
   const { isDark } = useTheme();
   const isFocused = useIsFocused();
   const { mode, user, token } = useAuth();
@@ -369,7 +373,11 @@ export default function MapTab() {
     if (lng === null || lat === null) return null;
     return [lng, lat];
   }, [mapRouteParams.reportLat, mapRouteParams.reportLng]);
-  const { activeDispatch, refresh: refreshActiveDispatch } = useActiveDispatch({
+  const {
+    activeDispatch,
+    loading: activeDispatchLoading,
+    refresh: refreshActiveDispatch,
+  } = useActiveDispatch({
     pollMs: 10000,
     enabled: isDispatchAssignee,
   });
@@ -379,6 +387,8 @@ export default function MapTab() {
   });
 
   const [myLocation, setMyLocation] = useState<[number, number] | null>(null);
+  const [locationFixKind, setLocationFixKind] = useState<LocationFixKind | null>(null);
+  const [locationAccessMessage, setLocationAccessMessage] = useState<string | null>(null);
   const [hazardZones, setHazardZones] = useState<HazardZone[]>([]);
   const [reports, setReports] = useState<Emergency[]>([]);
   const [selectedCommunityMarker, setSelectedCommunityMarker] =
@@ -534,30 +544,76 @@ export default function MapTab() {
     };
   }, [canViewEmergencies, loadEmergencyReports]);
 
-  // Keep current location for routing (Direction button)
+  // Keep current location for routing and initial map centering.
   useEffect(() => {
     let sub: Location.LocationSubscription | null = null;
+    let alive = true;
 
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== "granted") return;
+        if (status !== "granted") {
+          if (alive) {
+            setLocationAccessMessage(
+              "Location access is off. Showing the fallback map; enable location to center on your position."
+            );
+          }
+          return;
+        }
+
+        const lastKnown = await Location.getLastKnownPositionAsync().catch(() => null);
+        if (alive && lastKnown) {
+          setMyLocation([lastKnown.coords.longitude, lastKnown.coords.latitude]);
+          setLocationFixKind("last_known");
+          setLocationAccessMessage(null);
+        }
+
+        const servicesEnabled = await Location.hasServicesEnabledAsync();
+        if (!servicesEnabled) {
+          if (alive) {
+            setLocationAccessMessage(
+              lastKnown
+                ? "Location services are off. Showing your last known position."
+                : "Location services are off. Showing the fallback map."
+            );
+          }
+          return;
+        }
+
+        sub = await Location.watchPositionAsync(
+          { accuracy: Location.Accuracy.Balanced, timeInterval: 5000, distanceInterval: 10 },
+          (loc) => {
+            if (!alive) return;
+            setMyLocation([loc.coords.longitude, loc.coords.latitude]);
+            setLocationFixKind("fresh");
+            setLocationAccessMessage(null);
+          }
+        );
+        if (!alive) {
+          sub.remove();
+          sub = null;
+          return;
+        }
 
         const current = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.Balanced,
         });
-        setMyLocation([current.coords.longitude, current.coords.latitude]);
-
-        sub = await Location.watchPositionAsync(
-          { accuracy: Location.Accuracy.Balanced, timeInterval: 5000, distanceInterval: 10 },
-          (loc) => setMyLocation([loc.coords.longitude, loc.coords.latitude])
-        );
+        if (alive) {
+          setMyLocation([current.coords.longitude, current.coords.latitude]);
+          setLocationFixKind("fresh");
+          setLocationAccessMessage(null);
+        }
       } catch {
-        // ignore
+        if (alive) {
+          setLocationAccessMessage(
+            "Current location is unavailable. You can still view the map and try again."
+          );
+        }
       }
     })();
 
     return () => {
+      alive = false;
       try {
         sub?.remove();
       } catch {
@@ -623,8 +679,54 @@ export default function MapTab() {
   const lastSocketLocationUpdateAtRef = useRef(0);
   const lastAutoFocusedDispatchIdRef = useRef<string>("");
   const lastRouteFocusedKeyRef = useRef<string>("");
+  const userMovedMapRef = useRef(false);
+  const centeredLastKnownRef = useRef(false);
+  const centeredFreshLocationRef = useRef(false);
   const zoomInTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isMapReady, setIsMapReady] = useState(false);
+  const [mapFocusSequence, setMapFocusSequence] = useState(0);
+
+  const recenterOnUser = useCallback(async () => {
+    userMovedMapRef.current = false;
+
+    if (effectiveUserLocation) {
+      centeredFreshLocationRef.current = true;
+      cameraRef.current?.setCamera({
+        centerCoordinate: effectiveUserLocation,
+        zoomLevel: 14.5,
+        animationDuration: 650,
+      });
+      if (devLocationEnabled || locationFixKind === "fresh") return;
+    }
+
+    try {
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (permission.status !== "granted") {
+        setLocationAccessMessage(
+          "Location access is off. Enable it in device settings to center on your position."
+        );
+        return;
+      }
+
+      const current = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      const coords: [number, number] = [current.coords.longitude, current.coords.latitude];
+      setMyLocation(coords);
+      setLocationFixKind("fresh");
+      setLocationAccessMessage(null);
+      centeredFreshLocationRef.current = true;
+      cameraRef.current?.setCamera({
+        centerCoordinate: coords,
+        zoomLevel: 14.5,
+        animationDuration: 650,
+      });
+    } catch {
+      setLocationAccessMessage(
+        "Current location is unavailable. You can still view the map and try again."
+      );
+    }
+  }, [devLocationEnabled, effectiveUserLocation, locationFixKind]);
 
   useEffect(() => {
     if (!isFocused || !isDispatchAssignee) return;
@@ -682,10 +784,10 @@ export default function MapTab() {
         bounds: {
           ne: [maxLng, maxLat],
           sw: [minLng, minLat],
-          paddingTop: 140,
-          paddingBottom: 260,
-          paddingLeft: 60,
-          paddingRight: 60,
+          paddingTop: isCompactHeight ? 110 : 140,
+          paddingBottom: isCompactHeight ? 190 : 260,
+          paddingLeft: 48,
+          paddingRight: 48,
         },
         animationDuration: 900,
       });
@@ -774,6 +876,46 @@ export default function MapTab() {
     resolveOrigin: resolveStartLocation,
     getWeatherContext,
   });
+
+  useEffect(() => {
+    if (!isFocused || !isMapReady || !effectiveUserLocation) return;
+    if (emergencySheet.sheetMode === "directions") return;
+
+    const hasExplicitIncidentFocus = Boolean(focusIncidentId || focusReportCoordinate);
+    const dispatchHasPriority =
+      isDispatchAssignee && (activeDispatchLoading || Boolean(activeDispatch?.id));
+    if (hasExplicitIncidentFocus || dispatchHasPriority || userMovedMapRef.current) return;
+
+    const effectiveFixKind: LocationFixKind = devLocationEnabled
+      ? "fresh"
+      : (locationFixKind ?? "fresh");
+
+    if (effectiveFixKind === "last_known") {
+      if (centeredLastKnownRef.current) return;
+      centeredLastKnownRef.current = true;
+    } else {
+      if (centeredFreshLocationRef.current) return;
+      centeredFreshLocationRef.current = true;
+    }
+
+    cameraRef.current?.setCamera({
+      centerCoordinate: effectiveUserLocation,
+      zoomLevel: 14.5,
+      animationDuration: effectiveFixKind === "last_known" ? 350 : 700,
+    });
+  }, [
+    activeDispatch?.id,
+    activeDispatchLoading,
+    devLocationEnabled,
+    effectiveUserLocation,
+    emergencySheet.sheetMode,
+    focusIncidentId,
+    focusReportCoordinate,
+    isDispatchAssignee,
+    isFocused,
+    isMapReady,
+    locationFixKind,
+  ]);
   const refreshSelectedEmergency = emergencySheet.refreshSelectedEmergency;
   const closeEmergencySheet = emergencySheet.closeSheet;
   const refreshSelectedEmergencyRef = useRef(refreshSelectedEmergency);
@@ -831,6 +973,7 @@ export default function MapTab() {
     isFocused,
     isMapReady,
     isDispatchAssignee,
+    mapFocusSequence,
   ]);
 
   useEffect(() => {
@@ -860,6 +1003,12 @@ export default function MapTab() {
 
   useFocusEffect(
     useCallback(() => {
+      userMovedMapRef.current = false;
+      centeredLastKnownRef.current = false;
+      centeredFreshLocationRef.current = false;
+      lastAutoFocusedDispatchIdRef.current = "";
+      lastRouteFocusedKeyRef.current = "";
+      setMapFocusSequence((current) => current + 1);
       void (async () => {
         await Promise.allSettled([
           loadHazardZonesRef.current(),
@@ -912,6 +1061,7 @@ export default function MapTab() {
     setSelectedCommunityMarker(null);
   }, [
     canViewEmergencies,
+    emergencySheet,
     emergencySheet.minimizeSheet,
     emergencySheet.selectedEmergency,
     emergencySheet.sheetMode,
@@ -920,6 +1070,7 @@ export default function MapTab() {
     isCommunityUser,
     isFocused,
     isMapReady,
+    mapFocusSequence,
     visibleEmergencyMarkers,
   ]);
 
@@ -1025,6 +1176,12 @@ export default function MapTab() {
             setSelectedCommunityMarker(null);
             if (emergencySheet.selectedEmergency) {
               emergencySheet.minimizeSheet();
+            }
+          }}
+          onCameraChanged={(state) => {
+            if (state.gestures.isGestureActive) {
+              userMovedMapRef.current = true;
+              centeredFreshLocationRef.current = true;
             }
           }}
           onDidFinishLoadingStyle={() => console.log("[Mapbox] style loaded", styleKey)}
@@ -1302,7 +1459,25 @@ export default function MapTab() {
               >
                 <Feather name="layers" size={20} color={isDark ? "#E2E8F0" : "#0F172A"} />
               </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Center map on my location"
+                onPress={() => void recenterOnUser()}
+                style={[styles.layerControlBtn, isDark ? styles.layerControlBtnDark : null]}
+                hitSlop={10}
+              >
+                <Feather name="crosshair" size={20} color={isDark ? "#E2E8F0" : "#0F172A"} />
+              </Pressable>
             </View>
+
+            {locationAccessMessage ? (
+              <View style={[styles.locationMessage, isDark ? styles.locationMessageDark : null]}>
+                <Feather name="map-pin" size={15} color={isDark ? "#FCA5A5" : "#B91C1C"} />
+                <Text style={[styles.locationMessageText, isDark ? styles.locationMessageTextDark : null]}>
+                  {locationAccessMessage}
+                </Text>
+              </View>
+            ) : null}
           </View>
         </View>
 
@@ -1520,6 +1695,33 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(14,22,38,0.95)",
     borderColor: "#162544",
   },
+  locationMessage: {
+    marginTop: 9,
+    marginRight: 56,
+    alignSelf: "flex-start",
+    maxWidth: 330,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 7,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    backgroundColor: "rgba(255,255,255,0.96)",
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+  },
+  locationMessageDark: {
+    borderColor: "#7F1D1D",
+    backgroundColor: "rgba(14,22,38,0.96)",
+  },
+  locationMessageText: {
+    flex: 1,
+    color: "#7F1D1D",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "600",
+  },
+  locationMessageTextDark: { color: "#FCA5A5" },
   layersSheetBg: {
     backgroundColor: "#FFFFFF",
   },

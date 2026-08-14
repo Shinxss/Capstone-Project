@@ -110,7 +110,8 @@ type ProfileMoreDrawerProps = {
   onToggleDarkMode: (nextValue: boolean) => void;
   onPressResource: (title: string) => void;
   onPressSupport: (title: string) => void;
-  onPressSessionAction: () => void;
+  onPressSignIn: () => void;
+  onPressLogout: () => void;
 };
 
 export default function ProfileMoreDrawer({
@@ -128,7 +129,8 @@ export default function ProfileMoreDrawer({
   onToggleDarkMode,
   onPressResource,
   onPressSupport,
-  onPressSessionAction,
+  onPressSignIn,
+  onPressLogout,
 }: ProfileMoreDrawerProps) {
   const { isDark } = useTheme();
   const insets = useSafeAreaInsets();
@@ -136,7 +138,12 @@ export default function ProfileMoreDrawer({
   const drawerWidth = useMemo(() => Math.min(Math.max(width * 0.82, 292), 360), [width]);
   const slideAnim = useRef(new Animated.Value(-drawerWidth)).current;
   const overlayAnim = useRef(new Animated.Value(0)).current;
+  const sessionActionPendingRef = useRef(false);
   const [mounted, setMounted] = useState(visible);
+
+  useEffect(() => {
+    if (visible) sessionActionPendingRef.current = false;
+  }, [visible]);
 
   useEffect(() => {
     if (!visible) {
@@ -183,6 +190,13 @@ export default function ProfileMoreDrawer({
   const closeThen = (action: () => void) => {
     onClose();
     action();
+  };
+
+  const handleSessionAction = () => {
+    if (sessionActionPendingRef.current) return;
+
+    sessionActionPendingRef.current = true;
+    closeThen(isUser ? onPressLogout : onPressSignIn);
   };
 
   const sessionActionLabel = isUser ? "Log Out" : "Sign In";
@@ -354,7 +368,7 @@ export default function ProfileMoreDrawer({
 
             <View style={{ paddingHorizontal: 18, paddingTop: 18 }}>
               <Pressable
-                onPress={() => closeThen(onPressSessionAction)}
+                onPress={handleSessionAction}
                 style={({ pressed }) => ({
                   minHeight: 48,
                   borderRadius: 16,

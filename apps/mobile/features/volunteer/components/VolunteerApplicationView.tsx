@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from "react";
 import {
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import type { VolunteerApplicationInput } from "../models/volunteerApplication.model";
 import type {
   VolunteerValidationErrors,
@@ -165,7 +168,8 @@ export function VolunteerApplicationView({
   };
 
   return (
-    <View style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={["top", "bottom", "left", "right"]}>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.safe}>
       {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={onBack} style={styles.backBtn}>
@@ -178,8 +182,9 @@ export function VolunteerApplicationView({
       </View>
 
       <ScrollView
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[styles.container, { paddingBottom: 32 }]}
       >
         {!!error && (
           <View style={styles.errorBox}>
@@ -496,6 +501,7 @@ export function VolunteerApplicationView({
           </Text>
         </Pressable>
       </ScrollView>
+      </KeyboardAvoidingView>
 
       <OptionPickerSheet
         visible={barangayPickerOpen}
@@ -523,7 +529,7 @@ export function VolunteerApplicationView({
         onChangeOtherSkillText={onChangeOtherSkillText}
         onClose={() => setSkillsPickerOpen(false)}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -620,6 +626,7 @@ function OptionPickerSheet(props: {
   onClose: () => void;
   onSelect: (value: string) => void;
 }) {
+  const insets = useSafeAreaInsets();
   return (
     <Modal
       visible={props.visible}
@@ -628,7 +635,7 @@ function OptionPickerSheet(props: {
       onRequestClose={props.onClose}
     >
       <Pressable style={styles.sheetBackdrop} onPress={props.onClose}>
-        <Pressable style={styles.sheetCard} onPress={() => undefined}>
+        <Pressable style={[styles.sheetCard, { paddingBottom: Math.max(insets.bottom, 12) }]} onPress={() => undefined}>
           <View style={styles.sheetHandleWrap}>
             <View style={styles.sheetHandle} />
           </View>
@@ -681,6 +688,7 @@ function SkillsPickerSheet(props: {
   onChangeOtherSkillText: (value: string) => void;
   onClose: () => void;
 }) {
+  const insets = useSafeAreaInsets();
   return (
     <Modal
       visible={props.visible}
@@ -689,7 +697,7 @@ function SkillsPickerSheet(props: {
       onRequestClose={props.onClose}
     >
       <Pressable style={styles.sheetBackdrop} onPress={props.onClose}>
-        <Pressable style={styles.sheetCard} onPress={() => undefined}>
+        <Pressable style={[styles.sheetCard, { paddingBottom: Math.max(insets.bottom, 12) }]} onPress={() => undefined}>
           <View style={styles.sheetHandleWrap}>
             <View style={styles.sheetHandle} />
           </View>
@@ -826,7 +834,7 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 18, fontWeight: "900", color: "#111827" },
   headerSub: { fontSize: 12, color: "#6B7280", marginTop: 1 },
 
-  container: { padding: 16, paddingBottom: 140 },
+  container: { padding: 16 },
 
   errorBox: {
     backgroundColor: "#B91C1C",

@@ -6,6 +6,26 @@ function mustEnv(name: string) {
   return v;
 }
 
+function positiveTimeoutFromEnv(name: string, fallbackMs: number) {
+  const parsed = Number(process.env[name]);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallbackMs;
+  return Math.min(Math.floor(parsed), 18_000);
+}
+
+const SMTP_CONNECTION_TIMEOUT_MS = positiveTimeoutFromEnv("SMTP_CONNECTION_TIMEOUT_MS", 8_000);
+const SMTP_GREETING_TIMEOUT_MS = positiveTimeoutFromEnv("SMTP_GREETING_TIMEOUT_MS", 8_000);
+const SMTP_SOCKET_TIMEOUT_MS = positiveTimeoutFromEnv("SMTP_SOCKET_TIMEOUT_MS", 12_000);
+const SMTP_DELIVERY_TIMEOUT_MS = positiveTimeoutFromEnv("SMTP_DELIVERY_TIMEOUT_MS", 12_000);
+
+export class MailDeliveryError extends Error {
+  readonly code = "MAIL_DELIVERY_FAILED";
+
+  constructor() {
+    super("Email delivery failed");
+    this.name = "MailDeliveryError";
+  }
+}
+
 export function createTransporter() {
   const host = mustEnv("SMTP_HOST");
   const port = Number(mustEnv("SMTP_PORT"));
@@ -19,6 +39,9 @@ export function createTransporter() {
       user: mustEnv("SMTP_USER"),
       pass: mustEnv("SMTP_PASS"),
     },
+    connectionTimeout: SMTP_CONNECTION_TIMEOUT_MS,
+    greetingTimeout: SMTP_GREETING_TIMEOUT_MS,
+    socketTimeout: SMTP_SOCKET_TIMEOUT_MS,
   });
 }
 
@@ -152,23 +175,36 @@ function hasSmtpConfig() {
 async function sendMailWithDevFallback(payload: MailPayload) {
   if (!hasSmtpConfig()) {
     if (process.env.NODE_ENV !== "production") {
-      console.info(`[mailer] SMTP not configured. OTP for ${payload.to}: ${payload.otp}`);
+      console.info("[mailer] SMTP not configured; email delivery skipped outside production.");
       return;
     }
 
-    throw new Error("SMTP is not configured.");
+    throw new MailDeliveryError();
   }
 
   const transporter = createTransporter();
   const fromEmail = process.env.SMTP_FROM || mustEnv("SMTP_USER");
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
 
-  await transporter.sendMail({
-    from: `Lifeline <${fromEmail}>`,
-    to: payload.to,
-    subject: payload.subject,
-    text: payload.text,
-    html: payload.html,
-  });
+  try {
+    await Promise.race([
+      transporter.sendMail({
+        from: `Lifeline <${fromEmail}>`,
+        to: payload.to,
+        subject: payload.subject,
+        text: payload.text,
+        html: payload.html,
+      }),
+      new Promise<never>((_resolve, reject) => {
+        timeoutHandle = setTimeout(() => reject(new MailDeliveryError()), SMTP_DELIVERY_TIMEOUT_MS);
+      }),
+    ]);
+  } catch {
+    throw new MailDeliveryError();
+  } finally {
+    if (timeoutHandle) clearTimeout(timeoutHandle);
+    transporter.close();
+  }
 }
 
 export async function sendOtpEmail(params: SendOtpEmailParams) {

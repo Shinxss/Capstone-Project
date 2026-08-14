@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { Image, Modal, Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { resolveAvatarUri } from "../utils/avatarUrl";
 
 type ProfileAvatarViewerModalProps = {
@@ -17,6 +18,7 @@ export default function ProfileAvatarViewerModal({
   onClose,
 }: ProfileAvatarViewerModalProps) {
   const resolvedAvatarUri = useMemo(() => resolveAvatarUri(avatarUrl), [avatarUrl]);
+  const insets = useSafeAreaInsets();
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -25,8 +27,8 @@ export default function ProfileAvatarViewerModal({
           flex: 1,
           backgroundColor: "rgba(2,6,23,0.92)",
           paddingHorizontal: 18,
-          paddingTop: 52,
-          paddingBottom: 28,
+          paddingTop: insets.top + 16,
+          paddingBottom: insets.bottom + 16,
         }}
       >
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>

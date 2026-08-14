@@ -175,8 +175,9 @@ const styles = StyleSheet.create({
     borderRadius: 30,
   },
   cardContainer: {
-    width: 340,
-    maxHeight: "48%",
+    width: "100%",
+    maxWidth: 340,
+    maxHeight: "85%",
   },
   cardContent: {
     paddingHorizontal: 16,

@@ -8,6 +8,10 @@ export type SosCreateRequest = {
   accuracy?: number;
   notes?: string;
   locationLabel?: string;
+  guestReporter?: {
+    fullName: string;
+    phoneNumber: string;
+  };
 };
 
 export type EmergencyReport = {
@@ -66,6 +70,7 @@ export type EmergencyReportDetail = {
     firstName?: string;
     lastName?: string;
     contactNo?: string;
+    reporterLabel?: "Guest Reporter";
     barangay?: string;
     municipality?: string;
     country?: string;

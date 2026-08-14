@@ -1,5 +1,6 @@
 import React from "react";
-import { Pressable, SafeAreaView, Text, TextInput, View } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useSetPassword } from "../hooks/useSetPassword";
 
@@ -7,8 +8,14 @@ export default function SetPasswordScreen() {
   const vm = useSetPassword();
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#F3F4F6", padding: 16 }}>
-      <View
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#F3F4F6" }}>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+        <ScrollView
+          bounces={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ flexGrow: 1, padding: 16 }}
+        >
+          <View
         style={{
           backgroundColor: "#fff",
           borderRadius: 14,
@@ -113,7 +120,9 @@ export default function SetPasswordScreen() {
             </Text>
           </Pressable>
         </View>
-      </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
