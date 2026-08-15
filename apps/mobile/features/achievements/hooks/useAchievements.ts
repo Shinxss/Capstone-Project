@@ -14,7 +14,7 @@ type UseAchievementsOptions = {
 
 const EMPTY_SUMMARY: AchievementSummary = {
   unlocked: 0,
-  total: 10,
+  total: 0,
   percent: 0,
 };
 

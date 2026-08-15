@@ -59,7 +59,8 @@ export default function MoreScreen() {
     Boolean(user?.passwordSet) || user?.authProvider === "local" || user?.authProvider === "both";
   const isGoogleLinked =
     Boolean(user?.googleLinked) || user?.authProvider === "google" || user?.authProvider === "both";
-  const isVolunteerAccount = isUser && String(user?.role ?? "").toUpperCase() === "VOLUNTEER";
+  const achievementRole = isUser ? String(user?.role ?? "").toUpperCase() : "";
+  const isAchievementAccount = achievementRole === "VOLUNTEER" || achievementRole === "COMMUNITY";
 
   const { summary, refresh: refreshProfileSummary } = useProfileSummary({
     enabled: isUser,
@@ -71,7 +72,7 @@ export default function MoreScreen() {
     loading: achievementsLoading,
     error: achievementsError,
     refresh: refreshAchievements,
-  } = useAchievements({ enabled: isVolunteerAccount, loadOnMount: false });
+  } = useAchievements({ enabled: isAchievementAccount, loadOnMount: false });
 
   const {
     showDotFor,
@@ -379,7 +380,7 @@ export default function MoreScreen() {
         <ProfileActivitiesGrid summary={summary} onPressApplyVolunteer={onPressApplyVolunteer} />
         {isUser ? (
           <>
-            {isVolunteerAccount ? (
+            {isAchievementAccount ? (
               <ProfileAchievementsCard
                 summary={achievementSummary}
                 achievements={achievements}

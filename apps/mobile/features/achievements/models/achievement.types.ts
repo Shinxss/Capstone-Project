@@ -9,10 +9,61 @@ export const ACHIEVEMENT_IDS = [
   "community-protector",
   "response-veteran",
   "trusted-responder",
+  "dependable-hand",
+  "always-ready",
+  "trusted-lifeline",
+  "response-certified",
+  "chain-of-trust",
+  "immutable-impact",
+  "team-player",
+  "helping-together",
+  "community-connector",
+  "response-partner",
+  "united-we-respond",
+  "response-leader",
+  "first-step",
+  "getting-started",
+  "making-a-difference",
+  "service-starter",
+  "community-supporter",
+  "service-champion",
+  "community-guardian",
+  "lifeline-veteran",
+  "legacy-responder",
+  "medical-aid-responder",
+  "flood-response-ready",
+  "fire-response-ready",
+  "rescue-ready",
+  "evacuation-supporter",
+  "relief-coordinator",
+  "navigation-specialist",
+  "field-support-specialist",
+  "community-ready",
+  "safety-aware",
+  "verified-reporter",
+  "community-watch",
+  "prepared-citizen",
+  "lifeline-supporter",
+  "heart-of-lifeline",
+  "guardian-of-the-community",
+  "beacon-of-hope",
+  "above-and-beyond",
+  "pillar-of-service",
 ] as const;
 
+export const COMMUNITY_ACHIEVEMENT_IDS = ACHIEVEMENT_IDS.slice(39, 45) as readonly AchievementId[];
+
 export type AchievementId = (typeof ACHIEVEMENT_IDS)[number];
-export type AchievementCategory = "verification" | "response" | "service" | "trust";
+export type AchievementCategory =
+  | "verification"
+  | "response"
+  | "service"
+  | "trust"
+  | "blockchain"
+  | "teamwork"
+  | "specialty"
+  | "community"
+  | "recognition";
 export type AchievementFilter = "all" | "unlocked" | "locked";
 
 export type AchievementProgress = {

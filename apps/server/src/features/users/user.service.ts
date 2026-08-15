@@ -1,9 +1,9 @@
 import { Types } from "mongoose";
 import { User } from "./user.model";
 import { VolunteerApplication } from "../volunteerApplications/volunteerApplication.model";
-import { DispatchOffer } from "../dispatches/dispatch.model";
 import { getVolunteerPresenceStatus } from "../../realtime/notificationsSocket";
 import { ResponderTeam } from "../responderTeams/responderTeam.model";
+import { getVolunteerServiceStats } from "../dispatches/dispatch.volunteerStats";
 
 export type DispatchVolunteer = {
   id: string;
@@ -67,10 +67,6 @@ export type UserProfileSummary = {
 
 function safeStr(v: unknown) {
   return typeof v === "string" ? v.trim() : "";
-}
-
-function roundToSingleDecimal(value: number) {
-  return Math.round(value * 10) / 10;
 }
 
 function toNullableString(value: unknown) {
@@ -318,95 +314,14 @@ export async function getUserProfileSummary(userId: string): Promise<UserProfile
   const role = safeStr(user.role).toUpperCase() || "COMMUNITY";
   const isVolunteer = role === "VOLUNTEER";
 
-  let completedTasks = 0;
-  let verifiedTasks = 0;
-  let volunteerHours = 0;
-  let avgResponseTimeMinutes: number | null = null;
-
-  if (isVolunteer) {
-    const [completedCount, verifiedCount, statOffers] = await Promise.all([
-      DispatchOffer.countDocuments({
-        volunteerId: objectId,
-        status: { $in: ["DONE", "VERIFIED"] },
-      }),
-      DispatchOffer.countDocuments({
-        volunteerId: objectId,
-        status: "VERIFIED",
-      }),
-      DispatchOffer.find({
-        volunteerId: objectId,
-        status: { $in: ["ACCEPTED", "DONE", "VERIFIED"] },
-      })
-        .select("createdAt respondedAt completedAt verifiedAt updatedAt status")
-        .lean(),
-    ]);
-
-    completedTasks = completedCount;
-    verifiedTasks = verifiedCount;
-
-    let responseDeltaSum = 0;
-    let responseDeltaCount = 0;
-    let totalVolunteerHours = 0;
-
-    for (const offer of statOffers) {
-      const createdAt = offer.createdAt instanceof Date ? offer.createdAt : new Date(offer.createdAt);
-      const respondedAt =
-        offer.respondedAt instanceof Date
-          ? offer.respondedAt
-          : offer.respondedAt
-            ? new Date(offer.respondedAt)
-            : null;
-
-      const completedAtForResponse =
-        offer.completedAt instanceof Date
-          ? offer.completedAt
-          : offer.completedAt
-            ? new Date(offer.completedAt)
-            : null;
-
-      // "Average response time" in volunteer profile is measured as:
-      // assignment (dispatch createdAt) -> arrived on scene (completedAt / DONE).
-      if (
-        completedAtForResponse &&
-        Number.isFinite(createdAt.getTime()) &&
-        Number.isFinite(completedAtForResponse.getTime())
-      ) {
-        const diffMinutes = (completedAtForResponse.getTime() - createdAt.getTime()) / 60_000;
-        if (diffMinutes >= 0) {
-          responseDeltaSum += diffMinutes;
-          responseDeltaCount += 1;
-        }
-      }
-
-      if (!respondedAt || !["DONE", "VERIFIED"].includes(String(offer.status ?? ""))) {
-        continue;
-      }
-
-      const completedAt =
-        offer.completedAt instanceof Date
-          ? offer.completedAt
-          : offer.completedAt
-            ? new Date(offer.completedAt)
-            : null;
-      const verifiedAt =
-        offer.verifiedAt instanceof Date
-          ? offer.verifiedAt
-          : offer.verifiedAt
-            ? new Date(offer.verifiedAt)
-            : null;
-      const updatedAt = offer.updatedAt instanceof Date ? offer.updatedAt : new Date(offer.updatedAt);
-      const endAt = completedAt ?? verifiedAt ?? updatedAt;
-
-      if (!Number.isFinite(endAt.getTime())) continue;
-
-      const durationHours = Math.max(0, (endAt.getTime() - respondedAt.getTime()) / 3_600_000);
-      totalVolunteerHours += durationHours;
-    }
-
-    volunteerHours = roundToSingleDecimal(totalVolunteerHours);
-    avgResponseTimeMinutes =
-      responseDeltaCount > 0 ? roundToSingleDecimal(responseDeltaSum / responseDeltaCount) : null;
-  }
+  const serviceStats = isVolunteer
+    ? await getVolunteerServiceStats(objectId)
+    : {
+        completedTasks: 0,
+        verifiedTasks: 0,
+        volunteerHours: 0,
+        avgResponseTimeMinutes: null,
+      };
 
   const applicationAddress = joinAddressParts([
     latestVerifiedApplication?.street,
@@ -433,10 +348,10 @@ export async function getUserProfileSummary(userId: string): Promise<UserProfile
       : toNullableString(user.skills),
     avatarUrl: toNullableString(user.avatarUrl),
     stats: {
-      completedTasks,
-      volunteerHours,
-      avgResponseTimeMinutes,
-      verifiedTasks,
+      completedTasks: serviceStats.completedTasks,
+      volunteerHours: serviceStats.volunteerHours,
+      avgResponseTimeMinutes: serviceStats.avgResponseTimeMinutes,
+      verifiedTasks: serviceStats.verifiedTasks,
     },
   };
 }
