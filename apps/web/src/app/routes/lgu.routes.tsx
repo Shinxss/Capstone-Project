@@ -20,11 +20,13 @@ import LguProfile from "@/pages/lgu/LguProfile";
 import LguSettings from "@/pages/lgu/LguSettings";
 import LguNotificationSettings from "@/pages/lgu/LguNotificationSettings";
 import LguPrivacyPolicy from "@/pages/lgu/LguPrivacyPolicy";
+import LguSearchPage from "@/pages/lgu/LguSearchPage";
 import { RequireLguAuth } from "./guards";
 
 export function renderLguRoutes() {
   return (
     <Route element={<RequireLguAuth />}>
+      <Route path="/lgu/search" element={<LguSearchPage />} />
       <Route path="/lgu/dashboard" element={<LguDashboard />} />
       <Route path="/lgu/notifications" element={<LguNotifications />} />
       <Route path="/lgu/emergencies" element={<LguEmergencies />} />

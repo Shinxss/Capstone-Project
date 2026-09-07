@@ -5,6 +5,7 @@ import { fetchLguTasksByStatus } from "../../tasks/services/tasksApi";
 import { DAGUPAN_BARANGAYS } from "../constants/dagupanBarangays.constants";
 import type {
   SearchCategory,
+  SearchCategoryGroup,
   SearchResultBadgeTone,
   SearchResultItem,
 } from "../models/globalSearch.types";
@@ -25,17 +26,51 @@ function getResponderBadgeTone(onDuty: boolean, status?: string): SearchResultBa
   return "gray";
 }
 
-export function getNavigationItems(portalPathPrefix = "/lgu"): SearchResultItem[] {
+export function getReportAndNavItems(portalPathPrefix = "/lgu"): SearchResultItem[] {
   const isLgu = portalPathPrefix.startsWith("/lgu");
+
+  const reports: SearchResultItem[] = [
+    {
+      id: "rep-incident-analytics",
+      category: "REPORT",
+      title: "Incident Analytics & Response Times",
+      subtitle: "Review emergency response trends, resolution metrics, and dispatch efficiency",
+      meta: "Reports & Analytics",
+      badge: { label: "Analytics", tone: "blue" },
+      path: `${portalPathPrefix}/reports`,
+      iconType: "report",
+    },
+    {
+      id: "rep-summary-reports",
+      category: "REPORT",
+      title: "Disaster Operations Summary Report",
+      subtitle: "Exportable PDF and operational audit of recent emergency responses",
+      meta: "Reports / Export",
+      badge: { label: "Monthly", tone: "blue" },
+      path: `${portalPathPrefix}/reports`,
+      iconType: "report",
+    },
+    {
+      id: "rep-task-completion-metrics",
+      category: "REPORT",
+      title: "Task Completion & Responder Logs",
+      subtitle: "Detailed performance breakdown of deployed teams and verified tasks",
+      meta: "Reports / Dispatch",
+      badge: { label: "Logs", tone: "emerald" },
+      path: `${portalPathPrefix}/reports`,
+      iconType: "report",
+    },
+  ];
 
   if (isLgu) {
     return [
+      ...reports,
       {
         id: "nav-lgu-dashboard",
         category: "NAVIGATION",
-        title: "Dashboard",
-        subtitle: "Overview of operations, emergency status, and quick stats",
-        meta: "Core / Analytics",
+        title: "Dashboard Overview",
+        subtitle: "Main control panel, stats, and real-time operational status",
+        meta: "Navigation",
         badge: { label: "Main", tone: "blue" },
         path: "/lgu/dashboard",
         iconType: "navigation",
@@ -43,109 +78,19 @@ export function getNavigationItems(portalPathPrefix = "/lgu"): SearchResultItem[
       {
         id: "nav-lgu-live-map",
         category: "NAVIGATION",
-        title: "Live Map & Dispatch",
-        subtitle: "Real-time incident tracking, live responder presence, and zone hazards",
-        meta: "Operations / Geospatial",
+        title: "Live Map & Geospatial Dispatch",
+        subtitle: "Active incidents, responder tracks, and hazard zones",
+        meta: "Operations",
         badge: { label: "Live", tone: "red" },
         path: "/lgu/live-map",
         iconType: "location",
       },
       {
-        id: "nav-lgu-emergencies",
-        category: "NAVIGATION",
-        title: "Active Emergencies",
-        subtitle: "Manage reported incidents, SOS dispatches, and emergency calls",
-        meta: "Operations / SOS",
-        badge: { label: "Priority", tone: "red" },
-        path: "/lgu/emergencies",
-        iconType: "emergency",
-      },
-      {
-        id: "nav-lgu-responders-accounts",
-        category: "NAVIGATION",
-        title: "Responder Accounts",
-        subtitle: "Personnel directory, credentials, duty status, and contact details",
-        meta: "Operations / Responders",
-        badge: { label: "Directory", tone: "emerald" },
-        path: "/lgu/responders/accounts",
-        iconType: "responder",
-      },
-      {
-        id: "nav-lgu-responders-teams",
-        category: "NAVIGATION",
-        title: "Responder Teams",
-        subtitle: "Manage rescue units, medical teams, and emergency squads",
-        meta: "Operations / Teams",
-        badge: { label: "Teams", tone: "emerald" },
-        path: "/lgu/responders/teams",
-        iconType: "responder",
-      },
-      {
-        id: "nav-lgu-volunteers-verified",
-        category: "NAVIGATION",
-        title: "Verified Volunteers",
-        subtitle: "List of vetted community volunteers ready for deployment",
-        meta: "Operations / Volunteers",
-        badge: { label: "Volunteers", tone: "emerald" },
-        path: "/lgu/volunteers/verified",
-        iconType: "volunteer",
-      },
-      {
-        id: "nav-lgu-volunteers-applicants",
-        category: "NAVIGATION",
-        title: "Volunteer Applicants",
-        subtitle: "Review incoming volunteer registrations and background submissions",
-        meta: "Operations / Review",
-        badge: { label: "Queue", tone: "amber" },
-        path: "/lgu/volunteers/applicants",
-        iconType: "volunteer",
-      },
-      {
-        id: "nav-lgu-tasks-in-progress",
-        category: "NAVIGATION",
-        title: "Tasks In Progress",
-        subtitle: "Active assignments, dispatches underway, and live tracking",
-        meta: "Operations / Tasks",
-        badge: { label: "Active", tone: "blue" },
-        path: "/lgu/tasks/in-progress",
-        iconType: "task",
-      },
-      {
-        id: "nav-lgu-tasks-for-review",
-        category: "NAVIGATION",
-        title: "Tasks For Review",
-        subtitle: "Inspect submitted proofs of completion and verified dispatches",
-        meta: "Operations / Review",
-        badge: { label: "Verification", tone: "amber" },
-        path: "/lgu/tasks/for-review",
-        iconType: "task",
-      },
-      {
-        id: "nav-lgu-tasks-completed",
-        category: "NAVIGATION",
-        title: "Completed Tasks",
-        subtitle: "Archive of resolved operations and verified disaster responses",
-        meta: "Operations / History",
-        badge: { label: "Archive", tone: "emerald" },
-        path: "/lgu/tasks/completed",
-        iconType: "task",
-      },
-      {
-        id: "nav-lgu-approvals",
-        category: "NAVIGATION",
-        title: "Approvals & Verification",
-        subtitle: "Pending approvals for community reports and emergency escalations",
-        meta: "Admin / Workflow",
-        badge: { label: "Workflow", tone: "purple" },
-        path: "/lgu/approvals",
-        iconType: "navigation",
-      },
-      {
         id: "nav-lgu-audit-log",
         category: "NAVIGATION",
-        title: "Audit Log & Activity",
+        title: "Audit Trail & Activity Log",
         subtitle: "System audit logs, operator activities, and security history",
-        meta: "Security / Compliance",
+        meta: "Security",
         badge: { label: "Audit", tone: "gray" },
         path: "/lgu/audit-log",
         iconType: "navigation",
@@ -153,48 +98,28 @@ export function getNavigationItems(portalPathPrefix = "/lgu"): SearchResultItem[
       {
         id: "nav-lgu-announcements",
         category: "NAVIGATION",
-        title: "Announcements & Advisories",
-        subtitle: "Broadcast public alerts, weather updates, and safety notices",
-        meta: "Updates / Public Info",
-        badge: { label: "Broadcast", tone: "blue" },
+        title: "Announcements & Public Advisories",
+        subtitle: "Broadcast public alerts, weather bulletins, and disaster warnings",
+        meta: "Broadcasts",
+        badge: { label: "Public", tone: "blue" },
         path: "/lgu/announcements",
         iconType: "navigation",
       },
       {
-        id: "nav-lgu-reports",
+        id: "nav-lgu-approvals",
         category: "NAVIGATION",
-        title: "Operational Reports",
-        subtitle: "Incident reports, response time metrics, and dispatch summaries",
-        meta: "Analytics / Reporting",
-        badge: { label: "Reports", tone: "blue" },
-        path: "/lgu/reports",
-        iconType: "navigation",
-      },
-      {
-        id: "nav-lgu-notifications",
-        category: "NAVIGATION",
-        title: "Notifications Center",
-        subtitle: "View all real-time alerts, SOS dispatches, and system updates",
-        meta: "Inbox",
-        badge: { label: "Alerts", tone: "amber" },
-        path: "/lgu/notifications",
-        iconType: "navigation",
-      },
-      {
-        id: "nav-lgu-profile",
-        category: "NAVIGATION",
-        title: "My Profile",
-        subtitle: "Account information, credentials, and municipal assignment",
-        meta: "Account",
-        badge: { label: "User", tone: "gray" },
-        path: "/lgu/profile",
+        title: "Approvals & Verifications",
+        subtitle: "Review pending submissions and citizen reports",
+        meta: "Workflow",
+        badge: { label: "Review", tone: "amber" },
+        path: "/lgu/approvals",
         iconType: "navigation",
       },
       {
         id: "nav-lgu-settings",
         category: "NAVIGATION",
         title: "System Settings",
-        subtitle: "Configure portal preferences, alerts, and notifications",
+        subtitle: "Configure portal preferences and notification thresholds",
         meta: "Preferences",
         badge: { label: "Config", tone: "gray" },
         path: "/lgu/settings",
@@ -205,11 +130,12 @@ export function getNavigationItems(portalPathPrefix = "/lgu"): SearchResultItem[
 
   // Admin portal
   return [
+    ...reports,
     {
       id: "nav-admin-dashboard",
       category: "NAVIGATION",
       title: "Admin Dashboard",
-      subtitle: "City-wide overview of emergency operations and system statistics",
+      subtitle: "City-wide operational metrics and disaster response health",
       meta: "Overview",
       badge: { label: "Admin", tone: "blue" },
       path: "/admin/dashboard",
@@ -218,121 +144,31 @@ export function getNavigationItems(portalPathPrefix = "/lgu"): SearchResultItem[
     {
       id: "nav-admin-live-map",
       category: "NAVIGATION",
-      title: "Live Map Operations",
-      subtitle: "Geospatial incident overview, hazard zones, and responder tracks",
-      meta: "Geospatial",
+      title: "Admin Live Map",
+      subtitle: "Geospatial operations, boundary monitoring, and incident tracker",
+      meta: "Operations",
       badge: { label: "Live", tone: "red" },
       path: "/admin/live-map",
       iconType: "location",
     },
     {
-      id: "nav-admin-emergency-reports",
-      category: "NAVIGATION",
-      title: "Emergency Reports",
-      subtitle: "City emergency reports registry and triage management",
-      meta: "Incidents",
-      badge: { label: "Priority", tone: "red" },
-      path: "/admin/emergency-reports",
-      iconType: "emergency",
-    },
-    {
-      id: "nav-admin-tasks",
-      category: "NAVIGATION",
-      title: "Tasks Management",
-      subtitle: "Dispatch task queues, assignments, and resolution status",
-      meta: "Operations",
-      badge: { label: "Tasks", tone: "blue" },
-      path: "/admin/tasks",
-      iconType: "task",
-    },
-    {
-      id: "nav-admin-announcements",
-      category: "NAVIGATION",
-      title: "Admin Announcements",
-      subtitle: "Broadcast city-wide advisories and disaster bulletins",
-      meta: "Broadcasts",
-      badge: { label: "Public", tone: "blue" },
-      path: "/admin/announcements",
-      iconType: "navigation",
-    },
-    {
       id: "nav-admin-analytics",
-      category: "NAVIGATION",
-      title: "Analytics & Statistics",
-      subtitle: "Response rates, incident distribution, and performance data",
+      category: "REPORT",
+      title: "City Emergency Analytics",
+      subtitle: "High-level response times, casualty statistics, and triage distributions",
       meta: "Analytics",
-      badge: { label: "Data", tone: "purple" },
+      badge: { label: "Analytics", tone: "purple" },
       path: "/admin/analytics",
-      iconType: "navigation",
+      iconType: "report",
     },
     {
       id: "nav-admin-audit-trails",
       category: "NAVIGATION",
-      title: "Audit Trails",
-      subtitle: "System security events, user logins, and operational logs",
+      title: "Admin Audit Trails",
+      subtitle: "Detailed tamper-evident operator and administrator action records",
       meta: "Security",
-      badge: { label: "Security", tone: "gray" },
+      badge: { label: "Audit", tone: "gray" },
       path: "/admin/audit-trails",
-      iconType: "navigation",
-    },
-    {
-      id: "nav-admin-users",
-      category: "NAVIGATION",
-      title: "User Management",
-      subtitle: "Manage accounts, roles, access levels, and tiers",
-      meta: "Administration",
-      badge: { label: "Users", tone: "emerald" },
-      path: "/admin/console/users",
-      iconType: "navigation",
-    },
-    {
-      id: "nav-admin-barangays",
-      category: "NAVIGATION",
-      title: "Barangay Coverage & Boundaries",
-      subtitle: "Dagupan City barangay registry, geofences, and coverage areas",
-      meta: "Administration",
-      badge: { label: "Coverage", tone: "emerald" },
-      path: "/admin/console/barangays",
-      iconType: "location",
-    },
-    {
-      id: "nav-admin-roles",
-      category: "NAVIGATION",
-      title: "Roles & Permissions",
-      subtitle: "Role-based access control matrix and permission scopes",
-      meta: "Security",
-      badge: { label: "RBAC", tone: "purple" },
-      path: "/admin/console/roles",
-      iconType: "navigation",
-    },
-    {
-      id: "nav-admin-master-data",
-      category: "NAVIGATION",
-      title: "Master Data Management",
-      subtitle: "Emergency types, disaster tags, and system taxonomies",
-      meta: "System",
-      badge: { label: "Config", tone: "gray" },
-      path: "/admin/console/master-data",
-      iconType: "navigation",
-    },
-    {
-      id: "nav-admin-profile",
-      category: "NAVIGATION",
-      title: "Admin Profile",
-      subtitle: "Administrator details and credentials",
-      meta: "Account",
-      badge: { label: "Profile", tone: "gray" },
-      path: "/admin/profile",
-      iconType: "navigation",
-    },
-    {
-      id: "nav-admin-settings",
-      category: "NAVIGATION",
-      title: "Settings",
-      subtitle: "Portal configurations and preferences",
-      meta: "Preferences",
-      badge: { label: "Config", tone: "gray" },
-      path: "/admin/settings",
       iconType: "navigation",
     },
   ];
@@ -359,7 +195,7 @@ export function getLocationItems(portalPathPrefix = "/lgu"): SearchResultItem[] 
   });
 }
 
-// In-memory cache for live operational records to avoid redundant rapid API calls
+// In-memory cache for live operational records
 let cachedOperationalData: {
   emergencies: SearchResultItem[];
   responders: SearchResultItem[];
@@ -368,11 +204,11 @@ let cachedOperationalData: {
   timestamp: number;
 } | null = null;
 
-const CACHE_TTL_MS = 15000; // 15 seconds
+const CACHE_TTL_MS = 15000; // 15s cache
 
 export async function fetchSearchDataset(portalPathPrefix = "/lgu"): Promise<SearchResultItem[]> {
   const now = Date.now();
-  const navItems = getNavigationItems(portalPathPrefix);
+  const reportsAndNav = getReportAndNavItems(portalPathPrefix);
   const locationItems = getLocationItems(portalPathPrefix);
 
   if (cachedOperationalData && now - cachedOperationalData.timestamp < CACHE_TTL_MS) {
@@ -382,11 +218,11 @@ export async function fetchSearchDataset(portalPathPrefix = "/lgu"): Promise<Sea
       ...cachedOperationalData.volunteers,
       ...cachedOperationalData.tasks,
       ...locationItems,
-      ...navItems,
+      ...reportsAndNav,
     ];
   }
 
-  // Load operational data concurrently with resilience
+  // Load live data concurrently
   const [emergenciesRes, volunteersRes, respondersRes, tasksRes] = await Promise.allSettled([
     fetchEmergencyReports(100),
     fetchDispatchVolunteers(),
@@ -411,7 +247,7 @@ export async function fetchSearchDataset(portalPathPrefix = "/lgu"): Promise<Sea
         category: "EMERGENCY",
         title: `${type} Emergency ${ref}`.trim(),
         subtitle: `${barangay}${notes}`,
-        meta: reporter ? `Reported by ${reporter}` : `Status: ${report.status}`,
+        meta: reporter ? `Reporter: ${reporter}` : `Status: ${report.status}`,
         badge: {
           label: report.status ? report.status.toUpperCase() : type,
           tone: getEmergencyBadgeTone(type, report.status),
@@ -506,13 +342,10 @@ export async function fetchSearchDataset(portalPathPrefix = "/lgu"): Promise<Sea
     ...volunteerItems,
     ...taskItems,
     ...locationItems,
-    ...navItems,
+    ...reportsAndNav,
   ];
 }
 
-/**
- * Perform ranked keyword scoring on an item against search tokens
- */
 export function scoreSearchItem(item: SearchResultItem, tokens: string[]): number {
   if (tokens.length === 0) return 1;
 
@@ -525,7 +358,6 @@ export function scoreSearchItem(item: SearchResultItem, tokens: string[]): numbe
   for (const token of tokens) {
     let tokenScore = 0;
 
-    // Exact full title match
     if (title === token) {
       tokenScore += 100;
     } else if (title.startsWith(token)) {
@@ -536,14 +368,12 @@ export function scoreSearchItem(item: SearchResultItem, tokens: string[]): numbe
       tokenScore += 30;
     }
 
-    // Subtitle match (barangay, description, skills)
     if (subtitle.startsWith(token)) {
       tokenScore += 25;
     } else if (subtitle.includes(token)) {
       tokenScore += 15;
     }
 
-    // Meta or badge match (e.g. "SOS", "fire", "available", "reports")
     if (badge.includes(token)) {
       tokenScore += 20;
     }
@@ -551,7 +381,6 @@ export function scoreSearchItem(item: SearchResultItem, tokens: string[]): numbe
       tokenScore += 10;
     }
 
-    // Token must match at least something to be valid
     if (tokenScore === 0) {
       return 0;
     }
@@ -559,37 +388,82 @@ export function scoreSearchItem(item: SearchResultItem, tokens: string[]): numbe
     totalScore += tokenScore;
   }
 
-  // Slight boost for emergency priority items
   if (item.category === "EMERGENCY") totalScore += 5;
 
   return totalScore;
 }
 
-/**
- * Filter and rank items based on search query and category filter
- */
 export function filterAndRankItems(
   items: SearchResultItem[],
-  query: string,
-  category: SearchCategory
+  query: string
 ): SearchResultItem[] {
   const cleanQuery = query.trim().toLowerCase();
   const tokens = cleanQuery ? cleanQuery.split(/\s+/).filter(Boolean) : [];
 
-  let pool = items;
-  if (category !== "ALL") {
-    pool = pool.filter((item) => item.category === category);
-  }
-
   if (tokens.length === 0) {
-    // When no query is typed, return curated recommendations
-    return pool.slice(0, 15);
+    return items.slice(0, 15);
   }
 
-  const scored = pool
+  return items
     .map((item) => ({ item, score: scoreSearchItem(item, tokens) }))
     .filter((entry) => entry.score > 0)
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => b.score - a.score)
+    .map((entry) => entry.item);
+}
 
-  return scored.map((entry) => entry.item);
+const CATEGORY_META: Record<
+  SearchCategory,
+  { label: string; iconType: SearchResultItem["iconType"]; order: number }
+> = {
+  EMERGENCY: { label: "Emergencies", iconType: "emergency", order: 1 },
+  RESPONDER: { label: "Responders", iconType: "responder", order: 2 },
+  VOLUNTEER: { label: "Volunteers", iconType: "volunteer", order: 3 },
+  TASK: { label: "Tasks", iconType: "task", order: 4 },
+  LOCATION: { label: "Locations", iconType: "location", order: 5 },
+  REPORT: { label: "Reports & Analytics", iconType: "report", order: 6 },
+  NAVIGATION: { label: "Pages & Quick Jump", iconType: "navigation", order: 7 },
+  ALL: { label: "All", iconType: "navigation", order: 99 },
+};
+
+/**
+ * Groups a flat list of results into structured category sections
+ * formatted specifically for the anchored results dropdown.
+ */
+export function groupResultsByCategory(
+  items: SearchResultItem[],
+  maxPerCategory = 4
+): { groups: SearchCategoryGroup[]; totalMatches: number } {
+  const map = new Map<SearchCategory, SearchResultItem[]>();
+
+  for (const item of items) {
+    const list = map.get(item.category) ?? [];
+    list.push(item);
+    map.set(item.category, list);
+  }
+
+  const groups: SearchCategoryGroup[] = [];
+
+  const categories = Array.from(map.keys()).sort(
+    (a, b) => (CATEGORY_META[a]?.order ?? 99) - (CATEGORY_META[b]?.order ?? 99)
+  );
+
+  for (const cat of categories) {
+    if (cat === "ALL") continue;
+    const catItems = map.get(cat) ?? [];
+    if (catItems.length === 0) continue;
+
+    const meta = CATEGORY_META[cat] ?? {
+      label: cat,
+      iconType: "navigation",
+    };
+
+    groups.push({
+      category: cat,
+      label: meta.label,
+      iconType: meta.iconType,
+      items: catItems.slice(0, maxPerCategory),
+    });
+  }
+
+  return { groups, totalMatches: items.length };
 }

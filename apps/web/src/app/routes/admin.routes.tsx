@@ -13,12 +13,14 @@ import AdminUserManagement from "@/pages/admin/AdminUserManagement";
 import AdminBarangaysCoverage from "@/pages/admin/AdminBarangaysCoverage";
 import AdminRolesPermissions from "@/pages/admin/AdminRolesPermissions";
 import AdminMasterData from "@/pages/admin/AdminMasterData";
+import AdminSearchPage from "@/pages/admin/AdminSearchPage";
 import { RequireAdminAuth } from "./guards";
 
 export function renderAdminRoutes() {
   return (
     <Route element={<RequireAdminAuth />}>
       <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+      <Route path="/admin/search" element={<AdminSearchPage />} />
       <Route path="/admin/dashboard" element={<AdminDashboard />} />
       <Route path="/admin/notifications" element={<AdminNotifications />} />
       <Route path="/admin/live-map" element={<AdminLiveMap />} />
