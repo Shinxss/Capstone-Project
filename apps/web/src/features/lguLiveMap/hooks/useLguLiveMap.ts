@@ -328,6 +328,7 @@ export function useLguLiveMap() {
   // Prevent re-opening details if the user already closed it manually.
   const autoFocusedIdRef = useRef<string | null>(null);
   const autoFlewIdRef = useRef<string | null>(null);
+  const autoFlewCoordsRef = useRef<string | null>(null);
 
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const volunteerMarkersRef = useRef<mapboxgl.Marker[]>([]);
@@ -869,6 +870,31 @@ export function useLguLiveMap() {
       }
     }
   }, [focusEmergencyId, activeReports, mapReady]);
+
+  // ✅ Fly to custom target coordinates (e.g. from global search /live-map?lng=...&lat=...)
+  const targetLngParam = searchParams.get("lng");
+  const targetLatParam = searchParams.get("lat");
+  const targetZoomParam = searchParams.get("zoom");
+
+  useEffect(() => {
+    if (!mapReady || focusEmergencyId) return;
+    if (!targetLngParam || !targetLatParam) {
+      autoFlewCoordsRef.current = null;
+      return;
+    }
+
+    const lng = Number(targetLngParam);
+    const lat = Number(targetLatParam);
+    const zoom = Number(targetZoomParam) || 15;
+
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return;
+
+    const key = `${lng.toFixed(5)},${lat.toFixed(5)}`;
+    if (autoFlewCoordsRef.current === key) return;
+    autoFlewCoordsRef.current = key;
+
+    mapRef.current?.flyTo({ center: [lng, lat], zoom, essential: true });
+  }, [mapReady, focusEmergencyId, targetLngParam, targetLatParam, targetZoomParam]);
 
   // ✅ only mark ready after map load (prevents style-related nulls)
   // IMPORTANT: must be stable (useCallback) so EmergencyMap won't recreate the whole map on every render.

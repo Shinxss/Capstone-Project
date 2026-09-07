@@ -12,8 +12,8 @@ import {
   markNotificationsRead,
 } from "../features/notifications/services/notifications.service";
 
+import GlobalSearch from "../features/globalSearch/components/GlobalSearch";
 import {
-  Search,
   Moon,
   Sun,
   Bell,
@@ -133,8 +133,9 @@ export default function Header({
     try {
       const data = await fetchLguNotifications();
       setNotifications(data);
-    } catch (e: any) {
-      setNotificationsError(e?.response?.data?.message || e?.message || "Failed to load notifications");
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } }; message?: string };
+      setNotificationsError(err?.response?.data?.message || err?.message || "Failed to load notifications");
     } finally {
       setNotificationsLoading(false);
     }
@@ -251,18 +252,9 @@ export default function Header({
           </div>
         </div>
 
-        {/* Center: Search */}
+        {/* Center: Global Search */}
         <div className="flex-1 px-8">
-          <div className="relative max-w-180 mx-auto">
-            <Search
-              size={18}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
-            />
-            <input
-              className="w-full h-11 rounded-lg border border-gray-300 bg-white pl-12 pr-4 text-base outline-none focus:border-gray-400 dark:border-[#162544] dark:bg-[#0E1626] dark:text-slate-100 dark:placeholder:text-slate-400"
-              placeholder="Search"
-            />
-          </div>
+          <GlobalSearch portalPathPrefix={portalPathPrefix} />
         </div>
 
         {/* Right: icons + profile */}

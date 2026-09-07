@@ -187,7 +187,7 @@ export function ReportEmergencyDetailsScreen() {
 
   return (
     <SafeAreaView edges={["bottom"]} className="flex-1 bg-zinc-100">
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.flex}>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.flex}>
       <ScrollView
         style={styles.flex}
         keyboardShouldPersistTaps="handled"
