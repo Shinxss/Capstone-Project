@@ -1,6 +1,10 @@
 import { fetchEmergencyReports } from "../../emergency/services/emergency.service";
 import { fetchDispatchVolunteers } from "../../lguLiveMap/services/volunteers.service";
-import { listResponderAccounts } from "../../responderAccounts/services/responderAccounts.service";
+import {
+  listResponderAccounts,
+  listDispatchableResponders,
+} from "../../responderAccounts/services/responderAccounts.service";
+import { listVolunteerApplications } from "../../volunteer/services/lguVolunteerApplications.service";
 import { fetchLguTasksByStatus } from "../../tasks/services/tasksApi";
 import { DAGUPAN_BARANGAYS } from "../constants/dagupanBarangays.constants";
 import type {
@@ -222,11 +226,20 @@ export async function fetchSearchDataset(portalPathPrefix = "/lgu"): Promise<Sea
     ];
   }
 
-  // Load live data concurrently
-  const [emergenciesRes, volunteersRes, respondersRes, tasksRes] = await Promise.allSettled([
+  // Load live data concurrently across all operational domains
+  const [
+    emergenciesRes,
+    volunteerAppsRes,
+    dispatchVolunteersRes,
+    respondersRes,
+    dispatchRespondersRes,
+    tasksRes,
+  ] = await Promise.allSettled([
     fetchEmergencyReports(100),
+    listVolunteerApplications({ page: 1, limit: 200 }),
     fetchDispatchVolunteers(),
-    listResponderAccounts({ page: 1, limit: 100 }),
+    listResponderAccounts({ page: 1, limit: 200 }),
+    listDispatchableResponders(),
     fetchLguTasksByStatus("PENDING,ACCEPTED,DECLINED,DONE,VERIFIED"),
   ]);
 
@@ -260,19 +273,28 @@ export async function fetchSearchDataset(portalPathPrefix = "/lgu"): Promise<Sea
     }
   }
 
+  // Responders from both account records and dispatchable operational rosters
   const responderItems: SearchResultItem[] = [];
+  const seenResponderIds = new Set<string>();
+
   if (respondersRes.status === "fulfilled" && Array.isArray(respondersRes.value?.items)) {
     for (const responder of respondersRes.value.items) {
+      const id = String(responder.id || "");
+      if (!id || seenResponderIds.has(id)) continue;
+      seenResponderIds.add(id);
+
       const fullName = responder.fullName || `${responder.firstName} ${responder.lastName}`.trim();
-      const team = responder.team?.name ? ` • Team: ${responder.team.name}` : "";
+      const team = responder.team?.name ? `Team: ${responder.team.name}` : "";
       const skills = responder.skills ? `[${responder.skills}]` : "";
+      const barangay = responder.barangay ? `Barangay ${responder.barangay}` : "Dagupan City";
+      const contact = responder.contactNo || responder.email || responder.username || "";
 
       responderItems.push({
         id: `responder-${responder.id}`,
         category: "RESPONDER",
-        title: fullName,
-        subtitle: `${responder.barangay || "Dagupan City"}${team} ${skills}`.trim(),
-        meta: responder.contactNo || responder.email || "Official Responder",
+        title: fullName || "Responder",
+        subtitle: [barangay, team, skills].filter(Boolean).join(" • "),
+        meta: [contact, "Official Responder User"].filter(Boolean).join(" • "),
         badge: {
           label: responder.onDuty ? "ON DUTY" : responder.isActive ? "ACTIVE" : "OFFLINE",
           tone: getResponderBadgeTone(responder.onDuty),
@@ -283,20 +305,93 @@ export async function fetchSearchDataset(portalPathPrefix = "/lgu"): Promise<Sea
     }
   }
 
+  if (dispatchRespondersRes.status === "fulfilled" && Array.isArray(dispatchRespondersRes.value)) {
+    for (const r of dispatchRespondersRes.value) {
+      const id = String(r.id || "");
+      if (id && seenResponderIds.has(id)) continue;
+      if (id) seenResponderIds.add(id);
+
+      const isAvailable = String(r.status || "").toLowerCase() === "available";
+      const barangay = r.barangay ? `Barangay ${r.barangay}` : "Dagupan City";
+      const team = r.teamName ? `Team: ${r.teamName}` : "";
+
+      responderItems.push({
+        id: `responder-${r.id}`,
+        category: "RESPONDER",
+        title: r.name || "Responder",
+        subtitle: [barangay, team, r.skill].filter(Boolean).join(" • "),
+        meta: "Official Responder User",
+        badge: {
+          label: isAvailable ? "AVAILABLE" : "OFFLINE",
+          tone: isAvailable ? "emerald" : "gray",
+        },
+        path: `${portalPathPrefix}/responders/accounts`,
+        iconType: "responder",
+      });
+    }
+  }
+
+  // Volunteers from Volunteer Applications (verified & applicants) + Dispatch pool
   const volunteerItems: SearchResultItem[] = [];
-  if (volunteersRes.status === "fulfilled" && Array.isArray(volunteersRes.value)) {
-    for (const volunteer of volunteersRes.value) {
-      const isAvailable = String(volunteer.status || "").toLowerCase() === "available";
-      const barangay = volunteer.barangayName ? ` • ${volunteer.barangayName}` : "";
+  const seenVolunteerIds = new Set<string>();
+
+  if (volunteerAppsRes.status === "fulfilled" && Array.isArray(volunteerAppsRes.value?.items)) {
+    for (const app of volunteerAppsRes.value.items) {
+      const id = String(app._id || app.userId || "");
+      if (!id || seenVolunteerIds.has(id)) continue;
+      seenVolunteerIds.add(id);
+
+      const status = String(app.status || "").toLowerCase();
+      const isVerified = status === "verified";
+      const isPending = status === "pending_verification" || status === "needs_info";
+
+      const subtitleParts = [
+        app.barangay ? `Barangay ${app.barangay}` : "Dagupan City",
+        app.skillsOther || "Community Volunteer",
+      ].filter(Boolean);
+
+      const metaParts = [
+        app.mobile || app.email || "",
+        app.completedTasks !== undefined ? `${app.completedTasks} tasks` : "",
+        isVerified ? "Verified Volunteer User" : "Applicant Volunteer User",
+      ].filter(Boolean);
 
       volunteerItems.push({
-        id: `volunteer-${volunteer.id}`,
+        id: `volunteer-app-${app._id}`,
         category: "VOLUNTEER",
-        title: volunteer.name || "Volunteer",
-        subtitle: `${volunteer.skill || "General Volunteer"}${barangay}`,
-        meta: volunteer.teamName ? `Team: ${volunteer.teamName}` : "Community Volunteer",
+        title: app.fullName || "Volunteer",
+        subtitle: subtitleParts.join(" • "),
+        meta: metaParts.join(" • "),
         badge: {
-          label: String(volunteer.status || "OFFLINE").toUpperCase(),
+          label: isVerified ? "VERIFIED" : isPending ? "APPLICANT" : status.toUpperCase(),
+          tone: isVerified ? "emerald" : isPending ? "amber" : "gray",
+        },
+        path: isVerified
+          ? `${portalPathPrefix}/volunteers/verified`
+          : `${portalPathPrefix}/volunteers/applicants`,
+        iconType: "volunteer",
+        rawStatus: app.status,
+      });
+    }
+  }
+
+  if (dispatchVolunteersRes.status === "fulfilled" && Array.isArray(dispatchVolunteersRes.value)) {
+    for (const v of dispatchVolunteersRes.value) {
+      const id = String(v.id || "");
+      if (id && seenVolunteerIds.has(id)) continue;
+      if (id) seenVolunteerIds.add(id);
+
+      const isAvailable = String(v.status || "").toLowerCase() === "available";
+      const barangay = v.barangayName ? `Barangay ${v.barangayName}` : "";
+
+      volunteerItems.push({
+        id: `volunteer-${v.id}`,
+        category: "VOLUNTEER",
+        title: v.name || "Volunteer",
+        subtitle: [barangay, v.skill || "General Volunteer"].filter(Boolean).join(" • "),
+        meta: [v.teamName ? `Team: ${v.teamName}` : "", "Community Volunteer User"].filter(Boolean).join(" • "),
+        badge: {
+          label: String(v.status || "OFFLINE").toUpperCase(),
           tone: isAvailable ? "emerald" : "gray",
         },
         path: `${portalPathPrefix}/volunteers/verified`,
@@ -346,6 +441,17 @@ export async function fetchSearchDataset(portalPathPrefix = "/lgu"): Promise<Sea
   ];
 }
 
+const CATEGORY_SEARCH_SYNONYMS: Record<SearchCategory, string> = {
+  EMERGENCY: "emergency emergencies incident incidents sos alert reports report",
+  RESPONDER: "responder responders personnel officer firefighter police medic bfp pnp cdrrmo account accounts user users",
+  VOLUNTEER: "volunteer volunteers applicant applicants member members citizen community user users",
+  TASK: "task tasks dispatch mission assignment missions assignments",
+  LOCATION: "location locations barangay barangays place landmark dagupan city address",
+  REPORT: "report reports analytics statistics metrics export",
+  NAVIGATION: "navigation page pages link menu dashboard view",
+  ALL: "",
+};
+
 export function scoreSearchItem(item: SearchResultItem, tokens: string[]): number {
   if (tokens.length === 0) return 1;
 
@@ -354,33 +460,48 @@ export function scoreSearchItem(item: SearchResultItem, tokens: string[]): numbe
   const subtitle = item.subtitle.toLowerCase();
   const meta = (item.meta ?? "").toLowerCase();
   const badge = (item.badge?.label ?? "").toLowerCase();
+  const categoryStr = item.category.toLowerCase();
+  const categorySynonyms = CATEGORY_SEARCH_SYNONYMS[item.category] || "";
 
   for (const token of tokens) {
     let tokenScore = 0;
 
+    // Title match
     if (title === token) {
       tokenScore += 100;
     } else if (title.startsWith(token)) {
-      tokenScore += 60;
+      tokenScore += 70;
     } else if (title.includes(` ${token}`) || title.includes(`-${token}`)) {
-      tokenScore += 45;
+      tokenScore += 55;
     } else if (title.includes(token)) {
-      tokenScore += 30;
+      tokenScore += 40;
     }
 
+    // Subtitle match (e.g. barangay, skill)
     if (subtitle.startsWith(token)) {
-      tokenScore += 25;
+      tokenScore += 30;
     } else if (subtitle.includes(token)) {
-      tokenScore += 15;
-    }
-
-    if (badge.includes(token)) {
       tokenScore += 20;
     }
+
+    // Metadata match (e.g. contact, email, user)
     if (meta.includes(token)) {
-      tokenScore += 10;
+      tokenScore += 25;
     }
 
+    // Badge match (e.g. "ON DUTY", "VERIFIED", "OPEN")
+    if (badge.includes(token)) {
+      tokenScore += 25;
+    }
+
+    // Category or role synonym match (e.g. user typed "volunteer", "responder", "user")
+    if (categoryStr.includes(token)) {
+      tokenScore += 35;
+    } else if (categorySynonyms.includes(token)) {
+      tokenScore += 25;
+    }
+
+    // If a token failed to match ANY of the item's fields, item does not match query
     if (tokenScore === 0) {
       return 0;
     }

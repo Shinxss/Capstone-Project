@@ -4,7 +4,7 @@ import SearchResultsView from "@/features/globalSearch/components/SearchResultsV
 export default function LguSearchPage() {
   return (
     <LguShell
-      title="Global Search"
+      title="Search Result"
       subtitle="Comprehensive query across emergencies, personnel, tasks, and Dagupan locations"
     >
       <SearchResultsView portalPathPrefix="/lgu" />

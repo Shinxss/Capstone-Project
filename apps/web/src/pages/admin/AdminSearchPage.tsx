@@ -4,7 +4,7 @@ import SearchResultsView from "@/features/globalSearch/components/SearchResultsV
 export default function AdminSearchPage() {
   return (
     <AdminShell
-      title="Global Search"
+      title="Search Result"
       subtitle="City-wide query across incident reports, personnel, tasks, and master records"
     >
       <SearchResultsView portalPathPrefix="/admin" />
