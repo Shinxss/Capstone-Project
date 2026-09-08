@@ -173,12 +173,84 @@ function hasSmtpConfig() {
 }
 
 async function sendMailWithDevFallback(payload: MailPayload) {
+  // 1. Check if an HTTPS-based mail provider is configured (e.g., Resend, Brevo).
+  // This bypasses cloud provider firewall restrictions on outbound SMTP ports (such as Render Free tier blocking ports 25, 465, and 587).
+  const resendApiKey = process.env.RESEND_API_KEY;
+  if (resendApiKey) {
+    const fromEmail = process.env.RESEND_FROM || process.env.SMTP_FROM || "Lifeline <onboarding@resend.dev>";
+    try {
+      const response = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${resendApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: fromEmail,
+          to: [payload.to],
+          subject: payload.subject,
+          text: payload.text,
+          html: payload.html,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("[mailer] Resend API error:", response.status, errorText);
+        throw new MailDeliveryError();
+      }
+
+      console.info(`[mailer] Email sent via Resend HTTPS API to ${payload.to}`);
+      return;
+    } catch (err) {
+      if (err instanceof MailDeliveryError) throw err;
+      console.error("[mailer] Resend dispatch error:", err);
+      throw new MailDeliveryError();
+    }
+  }
+
+  const brevoApiKey = process.env.BREVO_API_KEY;
+  if (brevoApiKey) {
+    const fromEmail = process.env.SMTP_USER || "lifelinelgu@gmail.com";
+    try {
+      const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: {
+          "api-key": brevoApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          sender: { name: "Lifeline", email: fromEmail },
+          to: [{ email: payload.to }],
+          subject: payload.subject,
+          textContent: payload.text,
+          htmlContent: payload.html,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("[mailer] Brevo API error:", response.status, errorText);
+        throw new MailDeliveryError();
+      }
+
+      console.info(`[mailer] Email sent via Brevo HTTPS API to ${payload.to}`);
+      return;
+    } catch (err) {
+      if (err instanceof MailDeliveryError) throw err;
+      console.error("[mailer] Brevo dispatch error:", err);
+      throw new MailDeliveryError();
+    }
+  }
+
+  // 2. Traditional SMTP transport
   if (!hasSmtpConfig()) {
     if (process.env.NODE_ENV !== "production") {
       console.info("[mailer] SMTP not configured; email delivery skipped outside production.");
       return;
     }
 
+    console.error("[mailer] No SMTP or HTTPS email configuration found in production.");
     throw new MailDeliveryError();
   }
 
@@ -199,7 +271,8 @@ async function sendMailWithDevFallback(payload: MailPayload) {
         timeoutHandle = setTimeout(() => reject(new MailDeliveryError()), SMTP_DELIVERY_TIMEOUT_MS);
       }),
     ]);
-  } catch {
+  } catch (err) {
+    console.error("[mailer] SMTP transport error:", err);
     throw new MailDeliveryError();
   } finally {
     if (timeoutHandle) clearTimeout(timeoutHandle);
