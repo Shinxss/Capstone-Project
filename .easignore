@@ -13,7 +13,15 @@ dist-android-check/
 android/
 ios/
 
-# Explicit monorepo-relative paths (EAS archives from the repository root)
+# Non-mobile monorepo apps and tooling
+apps/server/
+apps/web/
+apps/ai/
+apps/blockchain/
+tools/
+docs/
+
+# Explicit mobile paths
 apps/mobile/node_modules/
 apps/mobile/.expo/
 apps/mobile/.expo-shared/
@@ -24,14 +32,6 @@ apps/mobile/dist-android-check/
 apps/mobile/.metro-cache/
 apps/mobile/android/
 apps/mobile/ios/
-
-# Non-mobile monorepo apps and tooling
-apps/server/
-apps/web/
-apps/ai/
-apps/blockchain/
-tools/
-docs/
 
 # Local configuration and credentials; preview variables come from EAS
 .env
