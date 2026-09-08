@@ -121,6 +121,7 @@ export function ReportPickLocationScreen() {
           styleURL={MapboxGL.StyleURL.Street}
           scaleBarEnabled={false}
           compassEnabled
+          surfaceView={false}
           onPress={(event) => {
             if (event.geometry.type !== "Point") return;
             const coordinates = event.geometry.coordinates;

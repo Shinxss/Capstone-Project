@@ -15,7 +15,7 @@ import {
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MapboxGL from "@rnmapbox/maps";
 import { useSubmitReport } from "../hooks/useSubmitReport";
 import { useReportDraft } from "../hooks/useReportDraft";
@@ -186,14 +186,18 @@ export function ReportEmergencyDetailsScreen() {
   };
 
   return (
-    <SafeAreaView edges={["bottom"]} className="flex-1 bg-zinc-100">
+    <View className="flex-1 bg-zinc-100">
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.flex}>
       <ScrollView
         style={styles.flex}
         keyboardShouldPersistTaps="handled"
-        scrollEnabled={!showMapPicker}
+        scrollEnabled={true}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 24 }}
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingTop: 8,
+          paddingBottom: Math.max(insets.bottom, 24) + 24,
+        }}
       >
         <Text className="text-3xl font-semibold text-zinc-900">Provide details</Text>
         <Text className="mt-1 text-base text-zinc-500">Help responders understand the situation</Text>
@@ -231,6 +235,8 @@ export function ReportEmergencyDetailsScreen() {
                   styleURL={MapboxGL.StyleURL.Street}
                   scaleBarEnabled={false}
                   compassEnabled
+                  surfaceView={false}
+                  requestDisallowInterceptTouchEvent={true}
                   onPress={(event) => {
                     if (event.geometry.type !== "Point") return;
                     const coordinates = event.geometry.coordinates;
@@ -271,6 +277,17 @@ export function ReportEmergencyDetailsScreen() {
                     className="h-10 flex-1 items-center justify-center rounded-xl border border-zinc-300 bg-white"
                   >
                     <Text className="text-sm font-semibold text-zinc-700">Close Map</Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => {
+                      setShowMapPicker(false);
+                      router.push("/report/pick-location");
+                    }}
+                    className="h-10 w-10 items-center justify-center rounded-xl border border-zinc-300 bg-white"
+                    accessibilityLabel="Open Fullscreen Map"
+                  >
+                    <Ionicons name="expand-outline" size={18} color="#374151" />
                   </Pressable>
 
                   <Pressable
@@ -399,7 +416,7 @@ export function ReportEmergencyDetailsScreen() {
         </Pressable>
       </Modal>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
         <View style={styles.footerRow}>
           <Pressable
             onPress={() => router.back()}
@@ -420,7 +437,7 @@ export function ReportEmergencyDetailsScreen() {
         </View>
       </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 

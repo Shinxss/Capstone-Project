@@ -1,13 +1,14 @@
 import React, { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EMERGENCY_TYPE_OPTIONS } from "../constants/emergencyTypes.constants";
 import { EmergencyTypeTile } from "../components/EmergencyTypeTile";
 import type { EmergencyType } from "../models/report.types";
 import { useReportDraft } from "../hooks/useReportDraft";
 
 export function ReportEmergencyTypeScreen() {
+  const insets = useSafeAreaInsets();
   const { draft, setType } = useReportDraft();
   const [selectedType, setSelectedType] = useState<EmergencyType | null>(draft.type ?? null);
 
@@ -22,10 +23,10 @@ export function ReportEmergencyTypeScreen() {
   };
 
   return (
-    <SafeAreaView edges={["bottom"]} style={styles.screen} className="bg-lgu-lightBg dark:bg-lgu-darkBg">
+    <View style={styles.screen} className="bg-lgu-lightBg dark:bg-lgu-darkBg">
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 24) + 16 }]}
         showsVerticalScrollIndicator={false}
       >
         <Text className="text-2xl font-extrabold text-slate-900 dark:text-slate-100">What type of emergency?</Text>
@@ -45,7 +46,7 @@ export function ReportEmergencyTypeScreen() {
         </View>
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
         <Pressable
           onPress={onContinue}
           disabled={!canContinue}
@@ -58,7 +59,7 @@ export function ReportEmergencyTypeScreen() {
           <Text className="text-[16.5px] font-semibold text-white">Continue</Text>
         </Pressable>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
