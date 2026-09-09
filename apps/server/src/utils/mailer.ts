@@ -177,7 +177,17 @@ async function sendMailWithDevFallback(payload: MailPayload) {
   // This bypasses cloud provider firewall restrictions on outbound SMTP ports (such as Render Free tier blocking ports 25, 465, and 587).
   const resendApiKey = process.env.RESEND_API_KEY;
   if (resendApiKey) {
-    const fromEmail = process.env.RESEND_FROM || process.env.SMTP_FROM || "Lifeline <onboarding@resend.dev>";
+    let fromEmail = process.env.RESEND_FROM;
+    if (!fromEmail) {
+      const smtpFrom = process.env.SMTP_FROM || "";
+      // Resend strictly forbids sending from unverified public mailboxes like @gmail.com or @yahoo.com
+      if (smtpFrom && !smtpFrom.toLowerCase().includes("gmail.com") && !smtpFrom.toLowerCase().includes("yahoo.com")) {
+        fromEmail = smtpFrom;
+      } else {
+        fromEmail = "Lifeline <onboarding@resend.dev>";
+      }
+    }
+
     try {
       const response = await fetch("https://api.resend.com/emails", {
         method: "POST",
@@ -196,11 +206,16 @@ async function sendMailWithDevFallback(payload: MailPayload) {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error("[mailer] Resend API error:", response.status, errorText);
+        console.error(`[mailer] Resend API error (${response.status}):`, errorText);
+        if (errorText.includes("only send testing emails to your own email address")) {
+          console.error(
+            "[mailer] Resend Sandbox limitation: onboarding@resend.dev can only send to the Resend account owner's email address. To send to any user, verify a custom domain on Resend or use Brevo."
+          );
+        }
         throw new MailDeliveryError();
       }
 
-      console.info(`[mailer] Email sent via Resend HTTPS API to ${payload.to}`);
+      console.info(`[mailer] Email sent via Resend HTTPS API to ${payload.to} from ${fromEmail}`);
       return;
     } catch (err) {
       if (err instanceof MailDeliveryError) throw err;
