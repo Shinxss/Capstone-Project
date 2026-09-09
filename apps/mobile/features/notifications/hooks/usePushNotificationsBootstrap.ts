@@ -12,6 +12,7 @@ import {
   registerPushToken,
   unregisterPushToken,
 } from "../services/pushRegistrationApi";
+import { playDispatchAlert } from "../services/dispatchAlertService";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -23,8 +24,8 @@ Notifications.setNotificationHandler({
   }),
 });
 
-const DISPATCH_CHANNEL_ID = "lifeline_dispatch_v6";
-const ALERTS_CHANNEL_ID = "lifeline_alerts_v2";
+export const DISPATCH_CHANNEL_ID = "lifeline_dispatch_v7";
+export const ALERTS_CHANNEL_ID = "lifeline_alerts_v2";
 
 function normalizeStep(raw: unknown) {
   return String(raw ?? "")
@@ -64,17 +65,35 @@ function getProjectId(): string | undefined {
   return undefined;
 }
 
-async function ensureNotificationChannels() {
+export async function ensureNotificationChannels() {
   if (Platform.OS !== "android") return;
 
   try {
+    // Delete legacy channel so Android picks up fresh sound & vibration settings
+    await Notifications.deleteNotificationChannelAsync("lifeline_dispatch_v6").catch(() => undefined);
+  } catch {}
+
+  try {
     await Notifications.setNotificationChannelAsync(DISPATCH_CHANNEL_ID, {
-      name: "Dispatch Alerts",
+      name: "Emergency Dispatch Alerts",
+      description: "Critical alarms when deployed to an emergency response",
       importance: Notifications.AndroidImportance.MAX,
       sound: "alarm.wav",
-      vibrationPattern: [0, 250, 250, 250],
+      audioAttributes: {
+        usage: Notifications.AndroidAudioUsage.NOTIFICATION_EVENT,
+        contentType: Notifications.AndroidAudioContentType.SONIFICATION,
+        flags: {
+          enforceAudibility: true,
+          requestHardwareAudioVideoSynchronization: false,
+        },
+      },
+      enableVibrate: true,
+      vibrationPattern: [0, 500, 250, 500],
+      enableLights: true,
+      lightColor: "#DC2626",
       lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       bypassDnd: true,
+      showBadge: true,
     });
   } catch (error) {
     console.warn("[push] dispatch channel setup failed", error);
@@ -85,6 +104,7 @@ async function ensureNotificationChannels() {
       name: "General Alerts",
       importance: Notifications.AndroidImportance.HIGH,
       sound: "default",
+      enableVibrate: true,
     });
   } catch (error) {
     console.warn("[push] alerts channel setup failed", error);
@@ -226,11 +246,23 @@ export function usePushNotificationsBootstrap() {
       const body = String(notification.request.content.body ?? "").trim();
       if (!title && !body) return;
 
+      const kind = String(data?.type ?? "").trim().toUpperCase();
+      const isDispatch = kind === "DISPATCH_OFFER" || kind === "DISPATCH_OFFER".toLowerCase();
+
+      if (isDispatch) {
+        void playDispatchAlert({
+          title,
+          body,
+          dispatchId: String(data?.dispatchId ?? ""),
+          requestId: String(data?.requestId ?? data?.emergencyId ?? ""),
+        });
+      }
+
       showInAppNotification({
         title: title || "Lifeline update",
         body,
         target: target ?? undefined,
-        tone: "info",
+        tone: isDispatch ? "warning" : "info",
       });
     });
 

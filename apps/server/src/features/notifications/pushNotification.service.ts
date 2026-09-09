@@ -7,7 +7,7 @@ const expo = new Expo({
   accessToken: process.env.EXPO_ACCESS_TOKEN,
 });
 
-const DISPATCH_CHANNEL_ID = "lifeline_dispatch_v6";
+const DISPATCH_CHANNEL_ID = "lifeline_dispatch_v7";
 const ALERTS_CHANNEL_ID = "lifeline_alerts_v2";
 
 function resolveExpoPushToken(row: { expoPushToken?: unknown; token?: unknown }) {
@@ -393,11 +393,12 @@ export async function sendDispatchOfferPush(input: DispatchPushInput) {
 
     return {
       to: token,
-      title: "New dispatch assignment",
-      body: `You have a new ${typeLabel} dispatch. Tap to respond.`,
+      title: "🚨 Emergency Dispatch Alert",
+      body: `You have been deployed to an emergency (${typeLabel}). Tap to respond immediately.`,
       sound: "alarm.wav",
       channelId: DISPATCH_CHANNEL_ID,
       priority: "high",
+      badge: 1,
       data: {
         type: "DISPATCH_OFFER",
         dispatchId: dispatchId || undefined,

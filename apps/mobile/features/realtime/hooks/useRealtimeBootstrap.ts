@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useAuth } from "../../auth/AuthProvider";
 import { showInAppNotification } from "../../notifications/components/InAppNotificationHost";
 import { addMobileNotification } from "../../notifications/services/mobileNotificationsStore";
+import { playDispatchAlert } from "../../notifications/services/dispatchAlertService";
 import {
   connectRealtime,
   disconnectRealtime,
@@ -158,22 +159,32 @@ export function useRealtimeBootstrap() {
     };
 
     const onDispatchOffer = (payload: DispatchOfferPayload) => {
+      const dispatchId = String(payload?.dispatchId ?? "").trim();
+      const requestId = String(payload?.requestId ?? "").trim();
+      const title = String(payload?.title ?? "🚨 Emergency Dispatch Alert");
+      const body = String(payload?.body ?? "LGU assigned you to a new emergency. Open Tasks to respond.");
+
+      void playDispatchAlert({
+        title,
+        body,
+        dispatchId,
+        requestId,
+      });
+
       showInAppNotification({
-        title: String(payload?.title ?? "New dispatch assignment"),
-        body: String(payload?.body ?? "Open Tasks to respond."),
+        title,
+        body,
         target: normalizeDispatchTarget(payload),
         tone: "warning",
       });
 
-      const dispatchId = String(payload?.dispatchId ?? "").trim();
-      const requestId = String(payload?.requestId ?? "").trim();
       const dedupeId = `dispatch-offer:${dispatchId || requestId || Date.now()}`;
 
       void addMobileNotification({
         id: dedupeId,
         type: "NEW_TASK_ASSIGNED",
-        title: "New dispatch assignment",
-        body: "LGU assigned you to a new emergency. Open Tasks to respond.",
+        title,
+        body,
         createdAt: new Date().toISOString(),
         routeName: "/(tabs)/tasks",
         relatedEntityType: "TASK",
