@@ -1,4 +1,5 @@
 import { fetchEmergencyReports } from "../../emergency/services/emergency.service";
+import type { EmergencyReport } from "../../emergency/models/emergency.types";
 import { fetchDispatchVolunteers } from "../../lguLiveMap/services/volunteers.service";
 import {
   listResponderAccounts,
@@ -28,6 +29,20 @@ function getResponderBadgeTone(onDuty: boolean, status?: string): SearchResultBa
   if (status === "available" || onDuty) return "emerald";
   if (status === "busy") return "amber";
   return "gray";
+}
+
+function getEmergencySeverity(type: string): "High" | "Medium" {
+  const normalized = String(type || "").trim().toUpperCase();
+  return normalized === "SOS" || normalized === "FIRE" || normalized === "FLOOD"
+    ? "High"
+    : "Medium";
+}
+
+function splitSkills(value?: string): string[] {
+  return String(value ?? "")
+    .split(/[|,;]+/)
+    .map((skill) => skill.trim())
+    .filter(Boolean);
 }
 
 export function getReportAndNavItems(portalPathPrefix = "/lgu"): SearchResultItem[] {
@@ -209,6 +224,7 @@ let cachedOperationalData: {
 } | null = null;
 
 const CACHE_TTL_MS = 15000; // 15s cache
+const HIDDEN_TASK_SEARCH_STATUSES = new Set(["DONE", "VERIFIED", "RESOLVED", "COMPLETED"]);
 
 export async function fetchSearchDataset(portalPathPrefix = "/lgu"): Promise<SearchResultItem[]> {
   const now = Date.now();
@@ -243,13 +259,37 @@ export async function fetchSearchDataset(portalPathPrefix = "/lgu"): Promise<Sea
     fetchLguTasksByStatus("PENDING,ACCEPTED,DECLINED,DONE,VERIFIED"),
   ]);
 
+  const emergencyReportsById = new Map<string, EmergencyReport>();
+  if (emergenciesRes.status === "fulfilled" && Array.isArray(emergenciesRes.value)) {
+    emergenciesRes.value.forEach((report) => {
+      emergencyReportsById.set(String(report._id), report);
+    });
+  }
+
+  const assignedRespondersByEmergency = new Map<string, number>();
+  const hasDispatchTaskData = tasksRes.status === "fulfilled" && Array.isArray(tasksRes.value);
+  if (hasDispatchTaskData) {
+    for (const task of tasksRes.value) {
+      const emergencyId = String(task.emergency?.id ?? "");
+      if (!emergencyId || !task.volunteer) continue;
+      assignedRespondersByEmergency.set(
+        emergencyId,
+        (assignedRespondersByEmergency.get(emergencyId) ?? 0) + 1
+      );
+    }
+  }
+
   const emergencyItems: SearchResultItem[] = [];
   if (emergenciesRes.status === "fulfilled" && Array.isArray(emergenciesRes.value)) {
     for (const report of emergenciesRes.value) {
       const type = String(report.emergencyType || "Emergency").toUpperCase();
       const ref = report.referenceNumber ? `#${report.referenceNumber}` : "";
-      const barangay = report.barangayName || report.locationLabel || "Dagupan City";
-      const notes = report.notes ? ` - "${report.notes.slice(0, 45)}..."` : "";
+      const location =
+        report.locationLabel ||
+        [report.barangayName ? `Barangay ${report.barangayName}` : "", report.barangayCity, report.barangayProvince]
+          .filter(Boolean)
+          .join(", ") ||
+        "Dagupan City";
       const reporter =
         typeof report.reportedBy === "object" && report.reportedBy
           ? `${report.reportedBy.firstName ?? ""} ${report.reportedBy.lastName ?? ""}`.trim()
@@ -259,8 +299,8 @@ export async function fetchSearchDataset(portalPathPrefix = "/lgu"): Promise<Sea
         id: `emergency-${report._id}`,
         category: "EMERGENCY",
         title: `${type} Emergency ${ref}`.trim(),
-        subtitle: `${barangay}${notes}`,
-        meta: reporter ? `Reporter: ${reporter}` : `Status: ${report.status}`,
+        subtitle: location,
+        meta: [report.notes, reporter ? `Reported by ${reporter}` : ""].filter(Boolean).join(" • "),
         badge: {
           label: report.status ? report.status.toUpperCase() : type,
           tone: getEmergencyBadgeTone(type, report.status),
@@ -269,6 +309,17 @@ export async function fetchSearchDataset(portalPathPrefix = "/lgu"): Promise<Sea
         coordinates: report.location?.coordinates,
         iconType: "emergency",
         rawStatus: report.status,
+        details: {
+          emergencyType: type,
+          severity: getEmergencySeverity(type),
+          reportedBy: reporter || undefined,
+          reportedAt: report.reportedAt || report.createdAt,
+          photoUrls: Array.isArray(report.photos) ? report.photos.filter(Boolean) : undefined,
+          assignedResponders: hasDispatchTaskData
+            ? assignedRespondersByEmergency.get(String(report._id)) ?? 0
+            : undefined,
+          location,
+        },
       });
     }
   }
@@ -301,6 +352,14 @@ export async function fetchSearchDataset(portalPathPrefix = "/lgu"): Promise<Sea
         },
         path: `${portalPathPrefix}/responders/accounts`,
         iconType: "responder",
+        details: {
+          roleLabel: "Responder",
+          skills: splitSkills(responder.skills),
+          phone: responder.contactNo || undefined,
+          email: responder.email || undefined,
+          location: responder.barangay ? `Barangay ${responder.barangay}` : undefined,
+          availability: responder.onDuty ? "available" : responder.isActive ? "active" : "offline",
+        },
       });
     }
   }
@@ -327,6 +386,15 @@ export async function fetchSearchDataset(portalPathPrefix = "/lgu"): Promise<Sea
         },
         path: `${portalPathPrefix}/responders/accounts`,
         iconType: "responder",
+        details: {
+          avatarUrl: r.avatarUrl,
+          roleLabel: "Responder",
+          skills: splitSkills(r.skill),
+          location: [r.barangay ? `Barangay ${r.barangay}` : "", r.municipality]
+            .filter(Boolean)
+            .join(", ") || undefined,
+          availability: r.status,
+        },
       });
     }
   }
@@ -371,6 +439,21 @@ export async function fetchSearchDataset(portalPathPrefix = "/lgu"): Promise<Sea
           : `${portalPathPrefix}/volunteers/applicants`,
         iconType: "volunteer",
         rawStatus: app.status,
+        details: {
+          avatarUrl: app.avatarUrl,
+          roleLabel: "Volunteer",
+          skills: splitSkills(app.skillsOther),
+          phone: app.mobile || undefined,
+          email: app.email || undefined,
+          location:
+            [app.street, app.barangay ? `Barangay ${app.barangay}` : "", app.city, app.province]
+              .filter(Boolean)
+              .join(", ") || undefined,
+          completedTasks: app.completedTasks,
+          rating: app.avgRating,
+          reviewCount: app.reviewCount,
+          availability: isVerified ? "active" : status,
+        },
       });
     }
   }
@@ -396,6 +479,17 @@ export async function fetchSearchDataset(portalPathPrefix = "/lgu"): Promise<Sea
         },
         path: `${portalPathPrefix}/volunteers/verified`,
         iconType: "volunteer",
+        details: {
+          avatarUrl: v.avatarUrl,
+          roleLabel: v.role || "Volunteer",
+          skills: splitSkills(v.skill),
+          location: [v.barangayName ? `Barangay ${v.barangayName}` : "", v.municipality]
+            .filter(Boolean)
+            .join(", ") || undefined,
+          rating: v.rating,
+          reviewCount: v.reviewCount,
+          availability: v.status,
+        },
       });
     }
   }
@@ -403,9 +497,30 @@ export async function fetchSearchDataset(portalPathPrefix = "/lgu"): Promise<Sea
   const taskItems: SearchResultItem[] = [];
   if (tasksRes.status === "fulfilled" && Array.isArray(tasksRes.value)) {
     for (const task of tasksRes.value) {
+      const taskStatus = String(task.status ?? "").trim().toUpperCase();
+      const sourceEmergency = emergencyReportsById.get(String(task.emergency?.id ?? ""));
+      const emergencyStatus = String(
+        sourceEmergency?.status ?? task.emergency?.status ?? ""
+      ).trim().toUpperCase();
+
+      if (
+        HIDDEN_TASK_SEARCH_STATUSES.has(taskStatus) ||
+        emergencyStatus === "RESOLVED"
+      ) {
+        continue;
+      }
+
       const emType = task.emergency?.emergencyType || "Emergency";
       const emLoc = task.emergency?.barangayName || "Dagupan";
       const assigned = task.volunteer?.name ? `Assigned to: ${task.volunteer.name}` : "Unassigned";
+      const sourceReporter =
+        typeof sourceEmergency?.reportedBy === "object" && sourceEmergency.reportedBy
+          ? `${sourceEmergency.reportedBy.firstName ?? ""} ${sourceEmergency.reportedBy.lastName ?? ""}`.trim()
+          : sourceEmergency?.guestReporter?.fullName || "";
+      const taskLng = Number(task.emergency?.lng);
+      const taskLat = Number(task.emergency?.lat);
+      const hasCoordinates =
+        Number.isFinite(taskLng) && Number.isFinite(taskLat) && (taskLng !== 0 || taskLat !== 0);
 
       taskItems.push({
         id: `task-${task.id}`,
@@ -418,7 +533,23 @@ export async function fetchSearchDataset(portalPathPrefix = "/lgu"): Promise<Sea
           tone: task.status === "ACCEPTED" ? "blue" : task.status === "DONE" ? "emerald" : "amber",
         },
         path: `${portalPathPrefix}/tasks/in-progress`,
+        coordinates: hasCoordinates ? [taskLng, taskLat] : undefined,
         iconType: "task",
+        details: {
+          emergencyType: emType,
+          severity: getEmergencySeverity(emType),
+          location:
+            sourceEmergency?.locationLabel ||
+            (sourceEmergency?.barangayName ? `Barangay ${sourceEmergency.barangayName}` : undefined) ||
+            task.emergency?.barangayName ||
+            undefined,
+          reportedAt: sourceEmergency?.reportedAt || sourceEmergency?.createdAt,
+          reportedBy: sourceReporter || undefined,
+          assignedTo: task.volunteer?.name || undefined,
+          photoUrls: Array.isArray(sourceEmergency?.photos)
+            ? sourceEmergency.photos.filter(Boolean)
+            : undefined,
+        },
       });
     }
   }
@@ -460,6 +591,18 @@ export function scoreSearchItem(item: SearchResultItem, tokens: string[]): numbe
   const subtitle = item.subtitle.toLowerCase();
   const meta = (item.meta ?? "").toLowerCase();
   const badge = (item.badge?.label ?? "").toLowerCase();
+  const details = [
+    item.details?.roleLabel,
+    item.details?.phone,
+    item.details?.email,
+    item.details?.location,
+    item.details?.emergencyType,
+    item.details?.reportedBy,
+    ...(item.details?.skills ?? []),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
   const categoryStr = item.category.toLowerCase();
   const categorySynonyms = CATEGORY_SEARCH_SYNONYMS[item.category] || "";
 
@@ -486,6 +629,10 @@ export function scoreSearchItem(item: SearchResultItem, tokens: string[]): numbe
 
     // Metadata match (e.g. contact, email, user)
     if (meta.includes(token)) {
+      tokenScore += 25;
+    }
+
+    if (details.includes(token)) {
       tokenScore += 25;
     }
 

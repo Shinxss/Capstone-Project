@@ -15,6 +15,11 @@ import { resolveAvatarUri } from "../../profile/utils/avatarUrl";
 import { RefreshableScrollScreen } from "../../common/components/RefreshableScrollScreen";
 import { useBottomNavMetrics } from "../../common/hooks/useBottomNavMetrics";
 import { useResponsiveLayout } from "../../common/hooks/useResponsiveLayout";
+import type {
+  MyRequestSummary,
+  MyRequestTrackingDTO,
+} from "../../requests/models/myRequests";
+import { ActiveEmergencyRequestCard } from "./ActiveEmergencyRequestCard";
 
 type AlertIconName = React.ComponentProps<typeof Ionicons>["name"];
 type AlertTheme = {
@@ -106,12 +111,8 @@ type Props = {
   alertTheme: AlertTheme;
   alertRetryEnabled?: boolean;
   refreshing?: boolean;
-  activeRequest?: {
-    id: string;
-    trackingLabel: string;
-    etaText: string;
-    lastUpdatedText: string;
-  };
+  activeRequest?: MyRequestSummary;
+  activeRequestTracking?: MyRequestTrackingDTO | null;
   onStartHold: () => void;
   onCancelHold: () => void;
   onRefresh?: () => void;
@@ -138,6 +139,7 @@ export function HomeView({
   alertRetryEnabled,
   refreshing,
   activeRequest,
+  activeRequestTracking,
   onStartHold,
   onCancelHold,
   onRefresh,
@@ -414,28 +416,11 @@ export function HomeView({
         </Pressable>
 
         {activeRequest ? (
-          <Pressable
-            onPress={onPressTracking}
-            disabled={!onPressTracking}
-            style={({ pressed }) => [
-              styles.activeRequestCard,
-              pressed && onPressTracking ? styles.activeRequestCardPressed : null,
-            ]}
-          >
-            <Text style={styles.activeRequestTitle}>Active Emergency Request</Text>
-
-            <View style={styles.activeStatusPill}>
-              <Text style={styles.activeStatusPillText}>{activeRequest.trackingLabel}</Text>
-            </View>
-
-            <Text style={styles.activeEta}>{activeRequest.etaText}</Text>
-
-            <View style={styles.activeRequestButton}>
-              <Text style={styles.activeRequestButtonText}>View Tracking Details</Text>
-            </View>
-
-            <Text style={styles.activeLiveText}>LIVE • updated {activeRequest.lastUpdatedText}</Text>
-          </Pressable>
+          <ActiveEmergencyRequestCard
+            request={activeRequest}
+            tracking={activeRequestTracking}
+            onPressTracking={onPressTracking}
+          />
         ) : null}
 
         {showVolunteerCta ? (
@@ -632,65 +617,6 @@ const styles = StyleSheet.create({
   cardHeadline: { fontSize: 16, fontWeight: "900", marginTop: 2 },
   cardSub: { fontSize: 12, color: "#6B7280", marginTop: 2, lineHeight: 15 },
   cardRetry: { fontSize: 11, marginTop: 4, fontWeight: "700" },
-
-  activeRequestCard: {
-    marginTop: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "#FECACA",
-    backgroundColor: "#FEF2F2",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  activeRequestCardPressed: {
-    opacity: 0.9,
-  },
-  activeRequestTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#7F1D1D",
-  },
-  activeStatusPill: {
-    marginTop: 8,
-    alignSelf: "flex-start",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: "#DC2626",
-  },
-  activeStatusPillText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "900",
-  },
-  activeEta: {
-    marginTop: 10,
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#111827",
-  },
-  activeRequestButton: {
-    marginTop: 12,
-    height: 38,
-    borderRadius: 10,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#FCA5A5",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  activeRequestButtonText: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: "#B91C1C",
-  },
-  activeLiveText: {
-    marginTop: 8,
-    fontSize: 12,
-    color: "#DC2626",
-    fontWeight: "700",
-  },
-
 
   volunteer: {
     marginTop: 25,

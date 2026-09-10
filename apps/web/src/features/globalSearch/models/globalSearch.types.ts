@@ -25,6 +25,25 @@ export type SearchResultItem = {
   coordinates?: [number, number]; // [lng, lat]
   iconType: "emergency" | "responder" | "volunteer" | "task" | "location" | "report" | "navigation";
   rawStatus?: string;
+  details?: {
+    avatarUrl?: string;
+    availability?: string;
+    roleLabel?: string;
+    skills?: string[];
+    phone?: string;
+    email?: string;
+    location?: string;
+    completedTasks?: number;
+    rating?: number;
+    reviewCount?: number;
+    emergencyType?: string;
+    severity?: "High" | "Medium";
+    reportedBy?: string;
+    reportedAt?: string;
+    assignedTo?: string;
+    photoUrls?: string[];
+    assignedResponders?: number;
+  };
 };
 
 export type SearchCategoryGroup = {

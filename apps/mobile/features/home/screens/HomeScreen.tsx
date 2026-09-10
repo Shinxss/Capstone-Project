@@ -21,12 +21,8 @@ import { usePendingDispatch } from "../../dispatch/hooks/usePendingDispatch";
 import { useWeatherSummary } from "../../weather/hooks/useWeatherSummary";
 import type { WeatherSeverity } from "../../weather/services/weatherApi";
 import { useMyActiveRequest } from "../../requests/hooks/useMyActiveRequest";
+import { useRequestLiveTracking } from "../../requests/hooks/useRequestLiveTracking";
 import { usePullToRefresh } from "../../common/hooks/usePullToRefresh";
-import {
-  formatEtaText,
-  formatRelativeTime,
-  formatTrackingHeadline,
-} from "../../requests/utils/formatters";
 
 type AlertIconName = React.ComponentProps<typeof Ionicons>["name"];
 type AlertTheme = {
@@ -236,6 +232,13 @@ export default function HomeScreen() {
     enabled: isUser,
   });
   const {
+    data: activeRequestTracking,
+    refresh: refreshActiveRequestTracking,
+  } = useRequestLiveTracking(myActiveRequest?.id, {
+    pollMs: 6000,
+    enabled: isUser && Boolean(myActiveRequest?.id),
+  });
+  const {
     summary: weatherSummary,
     loading: weatherLoading,
     locationMessage,
@@ -249,14 +252,25 @@ export default function HomeScreen() {
     enabled: isDispatchAssignee,
   });
   const refreshHome = useCallback(async () => {
-    const refreshJobs: Promise<unknown>[] = [refreshMyActiveRequest(), retryWeather()];
+    const refreshJobs: Promise<unknown>[] = [
+      refreshMyActiveRequest(),
+      refreshActiveRequestTracking(),
+      retryWeather(),
+    ];
 
     if (isDispatchAssignee) {
       refreshJobs.push(refreshPending(), refreshActive());
     }
 
     await Promise.allSettled(refreshJobs);
-  }, [isDispatchAssignee, refreshActive, refreshMyActiveRequest, refreshPending, retryWeather]);
+  }, [
+    isDispatchAssignee,
+    refreshActive,
+    refreshActiveRequestTracking,
+    refreshMyActiveRequest,
+    refreshPending,
+    retryWeather,
+  ]);
   const { refreshing: refreshingHome, triggerRefresh: triggerRefreshHome } = usePullToRefresh(refreshHome);
 
   const [sosConfirmVisible, setSosConfirmVisible] = useState(false);
@@ -322,27 +336,17 @@ export default function HomeScreen() {
     };
   }, [locationMessage, weatherErrorMessage, weatherSummary, weatherLoading]);
 
-  const homeActiveRequest = useMemo(() => {
-    if (!myActiveRequest) return undefined;
-    return {
-      id: myActiveRequest.id,
-      trackingLabel: formatTrackingHeadline(myActiveRequest.trackingStatus),
-      etaText: formatEtaText(myActiveRequest.etaSeconds ?? null, myActiveRequest.trackingStatus),
-      lastUpdatedText: formatRelativeTime(myActiveRequest.lastUpdatedAt ?? null),
-    };
-  }, [myActiveRequest]);
-
   const onPressWeatherCard = useCallback(() => {
     void retryWeather();
   }, [retryWeather]);
 
   const onPressTracking = useCallback(() => {
-    if (!homeActiveRequest?.id) return;
+    if (!myActiveRequest?.id) return;
     router.push({
       pathname: "/my-request-tracking",
-      params: { id: homeActiveRequest.id },
+      params: { id: myActiveRequest.id },
     });
-  }, [homeActiveRequest?.id]);
+  }, [myActiveRequest?.id]);
 
   const openGuestSosLimitPrompt = useCallback(() => {
     authRequired.openAuthRequired({
@@ -504,10 +508,11 @@ export default function HomeScreen() {
         alertTheme={weatherCard.theme}
         alertRetryEnabled={weatherCard.retryEnabled}
         refreshing={refreshingHome}
-        activeRequest={homeActiveRequest}
+        activeRequest={myActiveRequest ?? undefined}
+        activeRequestTracking={activeRequestTracking}
         onRefresh={triggerRefreshHome}
         onPressAlert={weatherCard.retryEnabled ? onPressWeatherCard : undefined}
-        onPressTracking={homeActiveRequest ? onPressTracking : undefined}
+        onPressTracking={myActiveRequest ? onPressTracking : undefined}
         onStartHold={onStartSosHold}
         onCancelHold={onCancelSosHold}
         onPressNotifications={() => {
