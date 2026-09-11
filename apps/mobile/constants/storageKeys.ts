@@ -10,4 +10,5 @@ export const STORAGE_KEYS = {
   DEV_LOCATION_OVERRIDE: "lifeline.dev.location_override.v1",
   MOBILE_NOTIFICATIONS: "lifeline.mobile.notifications.v1",
   MOBILE_NOTIFICATIONS_META: "lifeline.mobile.notifications.meta.v1",
+  ONBOARDING_COMPLETED: "lifeline_onboarding_completed",
 } as const;

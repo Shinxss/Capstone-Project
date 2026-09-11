@@ -1,5 +1,5 @@
 import React from "react";
-import { Redirect, Stack, usePathname } from "expo-router";
+import { Redirect, Stack, usePathname, type Href } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as WebBrowser from "expo-web-browser";
 import { StatusBar } from "expo-status-bar";
@@ -11,13 +11,23 @@ import { usePushNotificationsBootstrap } from "../features/notifications/hooks/u
 import { useNotificationsBootstrap } from "../features/notifications/hooks/useNotificationsBootstrap";
 import { useRealtimeBootstrap } from "../features/realtime/hooks/useRealtimeBootstrap";
 import SplashScreen from "../screens/SplashScreen";
+import {
+  OnboardingProvider,
+  useOnboarding,
+} from "../features/onboarding/OnboardingProvider";
 import "../global.css";
 
 WebBrowser.maybeCompleteAuthSession();
 
+const ONBOARDING_ROUTE = "/onboarding" as Href;
+
 function AuthGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { hydrated, mode, user } = useAuth();
+  const {
+    hydrated: onboardingHydrated,
+    completed: onboardingCompleted,
+  } = useOnboarding();
   usePushNotificationsBootstrap();
   useNotificationsBootstrap();
   useRealtimeBootstrap();
@@ -32,11 +42,29 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     currentPath === "/reset-password";
   const inProfileCompletionFlow = currentPath === "/profile-completion";
   const inSetPasswordFlow = currentPath === "/set-password";
+  const inOnboardingFlow = currentPath === "/onboarding";
 
   const profileCompletionRequired = mode === "authed" && user?.profileCompletionRequired === true;
 
-  if (!hydrated) {
+  if (!hydrated || !onboardingHydrated) {
     return <SplashScreen />;
+  }
+
+  if (!onboardingCompleted) {
+    if (!inOnboardingFlow) {
+      return <Redirect href={ONBOARDING_ROUTE} />;
+    }
+    return <>{children}</>;
+  }
+
+  if (inOnboardingFlow) {
+    if (mode === "anonymous") {
+      return <Redirect href="/(auth)/login" />;
+    }
+    if (mode === "authed" && user?.profileCompletionRequired === true) {
+      return <Redirect href="/profile-completion" />;
+    }
+    return <Redirect href="/(tabs)" />;
   }
 
   if (mode === "anonymous" && !inAuthFlow) {
@@ -89,6 +117,10 @@ function RootLayoutInner() {
                   gestureEnabled: false,
                 }}
               />
+              <Stack.Screen
+                name="onboarding"
+                options={{ animation: "none", gestureEnabled: false }}
+              />
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="report" />
               <Stack.Screen name="my-requests" />
@@ -117,7 +149,9 @@ function RootLayoutInner() {
 export default function RootLayout() {
   return (
     <ThemeProvider>
-      <RootLayoutInner />
+      <OnboardingProvider>
+        <RootLayoutInner />
+      </OnboardingProvider>
     </ThemeProvider>
   );
 }
