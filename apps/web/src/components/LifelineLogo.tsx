@@ -10,6 +10,7 @@ type Props = {
   collapsed?: boolean; // only used for sidebar variant
   iconSize?: number; // px
   textClassName?: string; // tailwind class for text size
+  textWeightClassName?: string; // tailwind class for text weight
   className?: string;
   showText?: boolean; // override (optional)
   logoColor?: LogoColor; // ✅ choose which logo svg to use
@@ -20,6 +21,7 @@ export function LifelineLogo({
   collapsed = false,
   iconSize = 40,
   textClassName = "text-5xl",
+  textWeightClassName = "font-extrabold",
   className = "",
   showText,
   logoColor = "red",
@@ -57,7 +59,7 @@ export function LifelineLogo({
       />
 
       {textVisible && (
-        <div className={`${textClassName} font-extrabold leading-none tracking-tight`}>
+        <div className={`${textClassName} ${textWeightClassName} leading-none tracking-tight`}>
           <span
             className={
               logoColor === "blue"

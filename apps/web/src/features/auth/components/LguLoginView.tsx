@@ -81,6 +81,7 @@ export default function LguLoginView({
               variant="full"
               iconSize={44}
               textClassName="text-5xl"
+              textWeightClassName="font-bold"
               logoColor={isDark ? "blue" : "red"}
             />
           </div>

@@ -28,7 +28,7 @@ export function VolunteerApplyModalView({ onClose, onContinue }: Props) {
           <Text style={styles.title}>Become a Lifeline Volunteer</Text>
 
           <Text style={styles.desc}>
-            You're about to fill out the Volunteer Application Form. Please
+            You&apos;re about to fill out the Volunteer Application Form. Please
             prepare your basic details, emergency contact, and any certificates
             (e.g., First Aid/BLS) if available.
           </Text>
@@ -73,6 +73,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   card: {
+    flexGrow: 0,
     width: "100%",
     maxWidth: 360,
     maxHeight: "88%",

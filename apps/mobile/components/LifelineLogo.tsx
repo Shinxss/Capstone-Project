@@ -1,21 +1,19 @@
 import React from "react";
 import { View, Text } from "react-native";
-import Svg, { Path } from "react-native-svg";
+import LifelineLogoRed from "../assets/lifeline-logo_red.svg";
+import LifelineLogoBlue from "../assets/lifeline-logo_blue.svg";
+import { useTheme } from "../features/theme/useTheme";
 
 export default function LifelineLogo() {
+  const { isDark } = useTheme();
+  const LogoIcon = isDark ? LifelineLogoBlue : LifelineLogoRed;
+
   return (
-    <View className="flex-row items-center justify-center gap-2">
-      <Svg width={50} height={50} viewBox="0 0 24 24">
-        <Path
-          d="M12 2l8 4v6c0 5-3.4 9.4-8 10-4.6-.6-8-5-8-10V6l8-4z"
-          stroke="#ef4444"
-          strokeWidth={2}
-          fill="white"
-        />
-      </Svg>
+    <View className="flex-row items-center justify-center gap-1">
+      <LogoIcon width={50} height={50} accessibilityLabel="Lifeline" />
       <Text className="text-[40px] font-bold">
-        <Text className="text-red-500">Life</Text>
-        <Text className="text-gray-400">line</Text>
+        <Text style={{ color: isDark ? "#3C83F6" : "#DC2626" }}>ife</Text>
+        <Text className="text-gray-500 dark:text-slate-300">line</Text>
       </Text>
     </View>
   );

@@ -67,6 +67,7 @@ export function TrackingMapCard({
         zoomEnabled={!isPreview}
         pitchEnabled={!isPreview}
         rotateEnabled={!isPreview}
+        requestDisallowInterceptTouchEvent={!isPreview}
       >
         <MapboxGL.Camera
           ref={cameraRef}
