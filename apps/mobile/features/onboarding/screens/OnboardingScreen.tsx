@@ -1,6 +1,6 @@
-import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { ArrowRight } from "lucide-react-native";
 import React, { useCallback, useRef, useState } from "react";
 import {
   Alert,
@@ -34,7 +34,7 @@ export function OnboardingScreen() {
   const [completing, setCompleting] = useState(false);
   const compact = height < 720 || width < 360;
   const currentSlide = ONBOARDING_SLIDES[activeIndex] ?? ONBOARDING_SLIDES[0];
-  const logoHeight = compact ? 104 : 126;
+  const logoHeight = compact ? 94 : 118;
   const logoWidth = Math.round((logoHeight * 269) / 274);
 
   const updateActiveIndex = useCallback(
@@ -137,7 +137,7 @@ export function OnboardingScreen() {
           <Text style={styles.buttonLabel} maxFontSizeMultiplier={1.15}>
             {completing ? "Getting Started..." : currentSlide.buttonLabel}
           </Text>
-          <Ionicons name="arrow-forward" size={25} color="#FFFFFF" style={styles.arrow} />
+          <ArrowRight size={25} strokeWidth={2.4} color="#FFFFFF" style={styles.arrow} />
         </Pressable>
       </View>
     </SafeAreaView>
@@ -150,13 +150,13 @@ const styles = StyleSheet.create({
     backgroundColor: ONBOARDING_COLORS.background,
   },
   logoArea: {
-    height: 138,
+    height: 126,
     alignItems: "center",
     justifyContent: "center",
     paddingTop: 4,
   },
   logoAreaCompact: {
-    height: 110,
+    height: 100,
     paddingTop: 0,
   },
   pages: {
@@ -170,9 +170,9 @@ const styles = StyleSheet.create({
     maxWidth: 560,
     alignSelf: "center",
     paddingHorizontal: 22,
-    paddingTop: 8,
-    paddingBottom: 10,
-    gap: 14,
+    paddingTop: 4,
+    paddingBottom: 8,
+    gap: 10,
   },
   footerCompact: {
     paddingTop: 4,
