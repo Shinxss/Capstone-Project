@@ -43,6 +43,18 @@ export type TrackingLabel =
   | "Resolved"
   | "Cancelled";
 
+const ACTIVE_REQUEST_TRACKING_LABELS: readonly TrackingLabel[] = [
+  "Submitted",
+  "Verification",
+  "Assigned",
+  "En Route",
+  "Arrived",
+];
+
+export function isActiveRequestTrackingLabel(label: TrackingLabel): boolean {
+  return ACTIVE_REQUEST_TRACKING_LABELS.includes(label);
+}
+
 export type MyRequestScope = "active" | "history";
 
 export type MyRequestSummary = {

@@ -47,7 +47,26 @@ type SubItem = {
   to: string;
   icon?: React.ComponentType<{ size?: number; className?: string }>;
   badgeCount?: number;
+  onActivate?: () => void;
 };
+
+type SidebarBadgeKey = "notifications" | "applicants" | "tasks" | "emergencies" | "approvals";
+
+const BADGE_ACKNOWLEDGEMENT_KEY = "lifeline_lgu_sidebar_badges_seen_v1";
+
+function readBadgeAcknowledgements(): Partial<Record<SidebarBadgeKey, number>> {
+  try {
+    if (typeof window === "undefined") return {};
+    const parsed = JSON.parse(sessionStorage.getItem(BADGE_ACKNOWLEDGEMENT_KEY) || "{}");
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function toSafeBadgeCount(value: number) {
+  return Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+}
 
 const navSections: NavSection[] = [
   {
@@ -96,10 +115,12 @@ function SidebarItem({
   item,
   collapsed,
   badgeCount = 0,
+  onActivate,
 }: {
   item: NavItem;
   collapsed: boolean;
   badgeCount?: number;
+  onActivate?: () => void;
 }) {
   const Icon = item.icon;
   const safeCount = Number.isFinite(badgeCount) ? Math.max(0, Math.floor(badgeCount)) : 0;
@@ -109,6 +130,7 @@ function SidebarItem({
   return (
     <NavLink
       to={item.to}
+      onClick={onActivate}
       title={collapsed ? item.label : undefined}
       className={({ isActive }) =>
         [
@@ -132,10 +154,13 @@ function SidebarItem({
           </span>
         ) : null}
       </span>
-      {!collapsed && <span className="truncate">{item.label}</span>}
+      {!collapsed && <span className="min-w-0 flex-1 truncate">{item.label}</span>}
       {!collapsed && showBadge ? (
-        <span className="ml-auto inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold text-white">
-          {badgeLabel}
+        <span className="ml-auto grid w-[52px] shrink-0 grid-cols-[28px_16px] items-center gap-2">
+          <span className="inline-flex h-5 min-w-[20px] items-center justify-center justify-self-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold text-white">
+            {badgeLabel}
+          </span>
+          <span aria-hidden="true" />
         </span>
       ) : null}
     </NavLink>
@@ -149,6 +174,7 @@ function SidebarSubmenu({
   collapsed,
   items,
   badgeCount = 0,
+  onBadgeActivate,
 }: {
   label: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
@@ -156,6 +182,7 @@ function SidebarSubmenu({
   collapsed: boolean;
   items: SubItem[];
   badgeCount?: number;
+  onBadgeActivate?: () => void;
 }) {
   const location = useLocation();
   const safeBadgeCount = Number.isFinite(badgeCount) ? Math.max(0, Math.floor(badgeCount)) : 0;
@@ -236,7 +263,11 @@ function SidebarSubmenu({
           type="button"
           onMouseEnter={openFlyout}
           onMouseLeave={closeFlyout}
-          onClick={() => (flyoutOpen ? setFlyoutOpen(false) : openFlyout())}
+          onClick={() => {
+            onBadgeActivate?.();
+            if (flyoutOpen) setFlyoutOpen(false);
+            else openFlyout();
+          }}
           title={label}
           aria-haspopup="menu"
           aria-expanded={flyoutOpen}
@@ -291,6 +322,7 @@ function SidebarSubmenu({
                       <NavLink
                         key={s.to}
                         to={s.to}
+                        onClick={s.onActivate}
                         role="menuitem"
                         className={({ isActive }) =>
                           [
@@ -306,7 +338,7 @@ function SidebarSubmenu({
                         }
                       >
                         {SubIcon ? <SubIcon size={16} className="text-gray-900 dark:text-slate-200" /> : null}
-                        <span className="truncate">{s.label}</span>
+                        <span className="min-w-0 flex-1 truncate">{s.label}</span>
                         {showSubBadge ? (
                           <span className="ml-auto inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold text-white">
                             {subBadgeLabel}
@@ -331,7 +363,10 @@ function SidebarSubmenu({
     <div>
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          onBadgeActivate?.();
+          setOpen((v) => !v);
+        }}
         className={[
           "relative w-full flex items-center rounded-md transition-colors",
           "py-2 text-sm font-medium text-gray-800 hover:bg-gray-100 dark:text-slate-200 dark:hover:bg-[#0E1A30]",
@@ -342,14 +377,16 @@ function SidebarSubmenu({
             : "",
         ].join(" ")}
       >
-        <Icon size={18} className="text-gray-900 dark:text-slate-200" />
-        <span className="truncate">{label}</span>
-        {showBadge ? (
-          <span className="ml-auto inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold text-white">
-            {badgeLabel}
-          </span>
-        ) : null}
-        <span className={showBadge ? "ml-2" : "ml-auto"}>
+        <Icon size={18} className="shrink-0 text-gray-900 dark:text-slate-200" />
+        <span className="min-w-0 flex-1 truncate text-left">{label}</span>
+        <span className="ml-auto grid w-[52px] shrink-0 grid-cols-[28px_16px] items-center gap-2">
+          {showBadge ? (
+            <span className="inline-flex h-5 min-w-[20px] items-center justify-center justify-self-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold text-white">
+              {badgeLabel}
+            </span>
+          ) : (
+            <span aria-hidden="true" />
+          )}
           <ChevronDown
             size={16}
             className={["transition-transform", open ? "rotate-180" : "rotate-0"].join(" ")}
@@ -359,7 +396,7 @@ function SidebarSubmenu({
 
       {open && (
         <div className="mt-1">
-          <div className="relative px-3">
+          <div className="relative pl-3">
             <div className="absolute left-[21px] top-1 bottom-1 w-px bg-gray-200 dark:bg-[#162544]" />
 
             <div className="space-y-1">
@@ -376,6 +413,7 @@ function SidebarSubmenu({
                   <NavLink
                     key={s.to}
                     to={s.to}
+                    onClick={s.onActivate}
                     className={({ isActive }) =>
                       [
                         "relative flex items-center gap-2 rounded-md",
@@ -389,10 +427,13 @@ function SidebarSubmenu({
                     <span className="absolute left-[21px] top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gray-300 dark:bg-slate-500" />
                     <span className="w-6 shrink-0" />
                     {SubIcon ? <SubIcon size={16} className="text-gray-800 dark:text-slate-300" /> : null}
-                    <span className="truncate">{s.label}</span>
+                    <span className="min-w-0 flex-1 truncate">{s.label}</span>
                     {showSubBadge ? (
-                      <span className="ml-auto inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold text-white">
-                        {subBadgeLabel}
+                      <span className="ml-auto grid w-[52px] shrink-0 grid-cols-[28px_16px] items-center gap-2">
+                        <span className="inline-flex h-5 min-w-[20px] items-center justify-center justify-self-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold text-white">
+                          {subBadgeLabel}
+                        </span>
+                        <span aria-hidden="true" />
                       </span>
                     ) : null}
                   </NavLink>
@@ -423,10 +464,59 @@ export default function Sidebar({
   pendingEmergencyApprovals?: number;
 }) {
   const location = useLocation();
-  const w = collapsed ? "w-[78px]" : "w-[255px]";
   const { isDark } = useThemeMode();
   const [moreOpen, setMoreOpen] = React.useState(false);
   const moreRef = React.useRef<HTMLDivElement | null>(null);
+  const [badgeAcknowledgements, setBadgeAcknowledgements] = React.useState(readBadgeAcknowledgements);
+
+  const rawBadgeCounts = React.useMemo<Record<SidebarBadgeKey, number>>(
+    () => ({
+      notifications: toSafeBadgeCount(unreadNotifications),
+      applicants: toSafeBadgeCount(pendingApplicants),
+      tasks: toSafeBadgeCount(forReviewTasks),
+      emergencies: toSafeBadgeCount(pendingEmergencies),
+      approvals: toSafeBadgeCount(pendingEmergencyApprovals),
+    }),
+    [
+      forReviewTasks,
+      pendingApplicants,
+      pendingEmergencies,
+      pendingEmergencyApprovals,
+      unreadNotifications,
+    ]
+  );
+
+  const visibleBadgeCount = React.useCallback(
+    (key: SidebarBadgeKey) => {
+      const acknowledged = badgeAcknowledgements[key];
+      const safeAcknowledged = toSafeBadgeCount(acknowledged ?? 0);
+      return Math.max(0, rawBadgeCounts[key] - safeAcknowledged);
+    },
+    [badgeAcknowledgements, rawBadgeCounts]
+  );
+
+  const acknowledgeBadge = React.useCallback(
+    (key: SidebarBadgeKey) => {
+      setBadgeAcknowledgements((current) => {
+        const next = { ...current, [key]: rawBadgeCounts[key] };
+        try {
+          sessionStorage.setItem(BADGE_ACKNOWLEDGEMENT_KEY, JSON.stringify(next));
+        } catch {
+          // Badge acknowledgement is optional UI state.
+        }
+        return next;
+      });
+    },
+    [rawBadgeCounts]
+  );
+
+  React.useEffect(() => {
+    try {
+      sessionStorage.setItem(BADGE_ACKNOWLEDGEMENT_KEY, JSON.stringify(badgeAcknowledgements));
+    } catch {
+      // Badge acknowledgement is optional UI state.
+    }
+  }, [badgeAcknowledgements]);
 
   const moreActive = React.useMemo(
     () =>
@@ -461,7 +551,7 @@ export default function Sidebar({
   return (
     <aside
       className={[
-        w,
+        collapsed ? "w-[78px]" : "w-[300px]",
         "bg-white border-r border-gray-300 h-screen shrink-0 flex flex-col dark:bg-[#0B1220] dark:border-[#162544]",
         "transition-[width] duration-200 ease-in-out",
       ].join(" ")}
@@ -517,7 +607,8 @@ export default function Sidebar({
                     icon={Users}
                     basePath="/lgu/volunteers"
                     collapsed={collapsed}
-                    badgeCount={pendingApplicants}
+                    badgeCount={visibleBadgeCount("applicants")}
+                    onBadgeActivate={() => acknowledgeBadge("applicants")}
                     items={[
                       {
                         label: "Verified Volunteers",
@@ -528,7 +619,8 @@ export default function Sidebar({
                         label: "Applicants",
                         to: "/lgu/volunteers/applicants",
                         icon: UserPlus,
-                        badgeCount: pendingApplicants,
+                        badgeCount: visibleBadgeCount("applicants"),
+                        onActivate: () => acknowledgeBadge("applicants"),
                       },
                     ]}
                   />
@@ -538,14 +630,16 @@ export default function Sidebar({
                     icon={ClipboardList}
                     basePath="/lgu/tasks"
                     collapsed={collapsed}
-                    badgeCount={forReviewTasks}
+                    badgeCount={visibleBadgeCount("tasks")}
+                    onBadgeActivate={() => acknowledgeBadge("tasks")}
                     items={[
                       { label: "In Progress", to: "/lgu/tasks/in-progress", icon: CircleDot },
                       {
                         label: "For Review",
                         to: "/lgu/tasks/for-review",
                         icon: Clock4,
-                        badgeCount: forReviewTasks,
+                        badgeCount: visibleBadgeCount("tasks"),
+                        onActivate: () => acknowledgeBadge("tasks"),
                       },
                       { label: "Completed", to: "/lgu/tasks/completed", icon: CheckCircle2 },
                       { label: "Canceled", to: "/lgu/tasks/canceled", icon: ArchiveX },
@@ -561,12 +655,21 @@ export default function Sidebar({
                   collapsed={collapsed}
                   badgeCount={
                     item.to === "/lgu/notifications"
-                      ? unreadNotifications
+                      ? visibleBadgeCount("notifications")
                       : item.to === "/lgu/emergencies"
-                        ? pendingEmergencies
+                        ? visibleBadgeCount("emergencies")
                       : item.to === "/lgu/approvals"
-                        ? pendingEmergencyApprovals
+                        ? visibleBadgeCount("approvals")
                         : 0
+                  }
+                  onActivate={
+                    item.to === "/lgu/notifications"
+                      ? () => acknowledgeBadge("notifications")
+                      : item.to === "/lgu/emergencies"
+                        ? () => acknowledgeBadge("emergencies")
+                        : item.to === "/lgu/approvals"
+                          ? () => acknowledgeBadge("approvals")
+                          : undefined
                   }
                 />
               ))}

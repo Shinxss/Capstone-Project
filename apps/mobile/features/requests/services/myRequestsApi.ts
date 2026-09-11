@@ -1,4 +1,4 @@
-import axios from "axios";
+import { isAxiosError } from "axios";
 import { api } from "../../../lib/api";
 import type {
   MyRequestCountsByStatus,
@@ -8,7 +8,11 @@ import type {
   MyRequestTrackingDTO,
   TrackingLabel,
 } from "../models/myRequests";
-import { normalizeMyRequestStatusTab, toMyRequestStatusTabFromLabel } from "../models/myRequests";
+import {
+  isActiveRequestTrackingLabel,
+  normalizeMyRequestStatusTab,
+  toMyRequestStatusTabFromLabel,
+} from "../models/myRequests";
 
 const MY_REQUESTS_BASE = "/api/emergency/reports";
 
@@ -305,10 +309,15 @@ export async function fetchMyActiveRequest(): Promise<MyRequestSummary | null> {
     if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
 
     const normalized = normalizeSummary(payload);
-    if (isCancelledLikeSummary(normalized)) return null;
+    if (
+      isCancelledLikeSummary(normalized) ||
+      !isActiveRequestTrackingLabel(normalized.trackingLabel)
+    ) {
+      return null;
+    }
     return normalized;
   } catch (error) {
-    if (axios.isAxiosError(error) && error.response?.status === 404) return null;
+    if (isAxiosError(error) && error.response?.status === 404) return null;
     throw error;
   }
 }

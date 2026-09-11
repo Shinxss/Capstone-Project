@@ -1,9 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useMemo } from "react";
 import { Alert, Linking, Pressable, StyleSheet, Text, View } from "react-native";
-import type {
-  MyRequestSummary,
-  MyRequestTrackingDTO,
+import {
+  isActiveRequestTrackingLabel,
+  type MyRequestSummary,
+  type MyRequestTrackingDTO,
 } from "../../requests/models/myRequests";
 import { TrackingMapCard } from "../../requests/tracking/components/TrackingMapCard";
 import {
@@ -69,6 +70,10 @@ export function ActiveEmergencyRequestCard({
       },
     ]);
   }, [responderPhone]);
+
+  if (!isActiveRequestTrackingLabel(trackingLabel)) {
+    return null;
+  }
 
   return (
     <View style={styles.card}>
