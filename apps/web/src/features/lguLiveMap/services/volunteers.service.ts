@@ -104,25 +104,28 @@ async function fetchLegacyDispatchVolunteers(): Promise<Volunteer[]> {
 }
 
 export async function fetchDispatchVolunteers(): Promise<Volunteer[]> {
-  try {
-    const responderRes = await api.get<{ data: DispatchResponderDTO[] }>(
-      "/api/responders/accounts/dispatchable/list"
-    );
+  const [responderResult, volunteerResult] = await Promise.allSettled([
+    api.get<{ data: DispatchResponderDTO[] }>("/api/responders/accounts/dispatchable/list"),
+    fetchLegacyDispatchVolunteers(),
+  ]);
 
-    const responders = (responderRes.data.data ?? []).map(mapResponderToVolunteer);
-    if (responders.length > 0) {
-      return responders;
-    }
-
-    // Backward-compatible fallback:
-    // if no responder accounts exist yet, keep volunteer dispatch source available
-    // so legacy LGU environments can still dispatch while migrating.
-    return fetchLegacyDispatchVolunteers();
-  } catch (responderError) {
-    try {
-      return await fetchLegacyDispatchVolunteers();
-    } catch {
-      throw responderError;
-    }
+  if (responderResult.status === "rejected" && volunteerResult.status === "rejected") {
+    throw responderResult.reason;
   }
+
+  const responders =
+    responderResult.status === "fulfilled"
+      ? (responderResult.value.data.data ?? []).map(mapResponderToVolunteer)
+      : [];
+  const volunteers = volunteerResult.status === "fulfilled" ? volunteerResult.value : [];
+
+  // Presence events contain only an account ID. Keep both account directories in
+  // the client so an online volunteer can be matched to their real profile name
+  // even when dedicated responder accounts also exist.
+  const accountsById = new Map<string, Volunteer>();
+  for (const account of [...responders, ...volunteers]) {
+    if (!accountsById.has(account.id)) accountsById.set(account.id, account);
+  }
+
+  return Array.from(accountsById.values());
 }

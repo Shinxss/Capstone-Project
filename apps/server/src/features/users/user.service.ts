@@ -158,7 +158,7 @@ export async function listDispatchVolunteers(
     userId: { $in: userIds },
     status: "verified",
   })
-    .select("userId skillsOther barangay city")
+    .select("userId fullName skillsOther barangay city")
     .sort({ createdAt: -1 })
     .lean();
 
@@ -172,7 +172,8 @@ export async function listDispatchVolunteers(
     const id = String(u._id);
     const app = appByUserId.get(id);
 
-    const name = [safeStr(u.firstName), safeStr(u.lastName)].filter(Boolean).join(" ") || "Volunteer";
+    const accountName = [safeStr(u.firstName), safeStr(u.lastName)].filter(Boolean).join(" ");
+    const name = accountName || safeStr(app?.fullName) || "Volunteer";
     const skill = safeStr(app?.skillsOther) || "General Volunteer";
 
     const barangay = safeStr(app?.barangay) || safeStr(u.barangay) || undefined;
