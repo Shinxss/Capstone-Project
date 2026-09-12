@@ -27,7 +27,7 @@ export default function ApprovalEvidenceLightbox({
               </>
             ) : null}
           </div>
-          <p className="mt-3 text-center text-xs text-slate-500">{activeIndex! + 1} of {photos.length}</p>
+          <p className="mt-3 text-center text-xs text-slate-500 dark:text-slate-400">{activeIndex! + 1} of {photos.length}</p>
         </div>
       ) : null}
     </Modal>

@@ -1,12 +1,11 @@
 import { useState } from "react";
 import { CalendarDays, Check, ChevronRight, Clipboard, MapPin, ShieldCheck } from "lucide-react";
 import type { DispatchTask } from "../../models/tasks.types";
+import TaskVolunteerAvatar from "../../components/TaskVolunteerAvatar";
 import {
   formatCoordinates,
   formatTaskDateTime,
   formatVolunteerRole,
-  getInitials,
-  resolveTaskAvatarUrl,
   shortenTaskId,
 } from "../utils/completedTask.utils";
 import EmergencyTypeBadge from "./EmergencyTypeBadge";
@@ -44,12 +43,11 @@ function TaskId({ taskId }: { taskId: string }) {
 }
 
 function Volunteer({ task }: { task: DispatchTask }) {
-  const avatarUrl = resolveTaskAvatarUrl(task.volunteer?.avatarUrl);
   const name = task.volunteer?.name?.trim() || "Volunteer unavailable";
   return (
     <div className="flex min-w-0 items-center gap-2.5">
       <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-red-50 text-xs font-bold text-red-700 ring-1 ring-red-100 dark:bg-red-500/15 dark:text-red-300 dark:ring-red-500/20">
-        {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : getInitials(name)}
+        <TaskVolunteerAvatar name={name} avatarUrl={task.volunteer?.avatarUrl} />
       </div>
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100" title={name}>{name}</p>

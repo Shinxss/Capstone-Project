@@ -32,7 +32,7 @@ export default function ApprovalRejectModal({ open, busy, onClose, onConfirm, va
             type="button"
             onClick={close}
             disabled={busy}
-            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-[#2A3954] dark:bg-[#0E1626] dark:text-slate-200 dark:hover:bg-[#122036]"
           >
             Cancel
           </button>
@@ -56,7 +56,7 @@ export default function ApprovalRejectModal({ open, busy, onClose, onConfirm, va
         </div>
       }
     >
-      <label className="block text-sm font-semibold text-slate-800" htmlFor="approval-rejection-reason">
+      <label className="block text-sm font-semibold text-slate-800 dark:text-slate-200" htmlFor="approval-rejection-reason">
         Rejection reason
       </label>
       <textarea
@@ -66,11 +66,11 @@ export default function ApprovalRejectModal({ open, busy, onClose, onConfirm, va
         rows={4}
         maxLength={500}
         placeholder="Explain why this emergency report cannot be approved..."
-        className="mt-2 w-full resize-none rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-red-400 focus:ring-2 focus:ring-red-100"
+        className="mt-2 w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-red-400 focus:ring-2 focus:ring-red-100 dark:border-[#24324A] dark:bg-[#0E1626] dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:ring-red-500/20"
       />
       <div className="mt-1 flex justify-between gap-3">
-        <p className="text-xs text-red-600">{reasonError}</p>
-        <span className="ml-auto text-xs text-slate-400">{reason.length}/500</span>
+        <p className="text-xs text-red-600 dark:text-red-300">{reasonError}</p>
+        <span className="ml-auto text-xs text-slate-400 dark:text-slate-500">{reason.length}/500</span>
       </div>
     </Modal>
   );

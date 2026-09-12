@@ -1,7 +1,8 @@
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
-import { encryptBuffer } from "../../utils/aesGcm";
+import { decryptBuffer, encryptBuffer } from "../../utils/aesGcm";
+import { ProfileAvatarAsset } from "./profileAvatarAsset.model";
 
 const MAX_PROFILE_AVATAR_BYTES = 3 * 1024 * 1024; // 3MB after base64 decoding
 const PROFILE_AVATAR_URL_PREFIX = "/uploads/profile-avatars/";
@@ -33,6 +34,24 @@ export async function uploadUserAvatar(params: {
   const encrypted = encryptBuffer(parsed.buffer);
   await fs.promises.writeFile(absolutePath, encrypted);
 
+  try {
+    await ProfileAvatarAsset.findOneAndUpdate(
+      { filename },
+      {
+        $set: {
+          filename,
+          userId: params.userId,
+          mimeType: parsed.mimeType,
+          payload: encrypted,
+        },
+      },
+      { upsert: true, setDefaultsOnInsert: true },
+    );
+  } catch (error) {
+    await fs.promises.unlink(absolutePath).catch(() => undefined);
+    throw error;
+  }
+
   return {
     url: `${PROFILE_AVATAR_URL_PREFIX}${filename}`,
     mimeType: parsed.mimeType,
@@ -52,6 +71,64 @@ export async function removeLocalProfileAvatarFileByUrl(avatarUrl?: string | nul
       throw error;
     }
   }
+
+  await ProfileAvatarAsset.deleteOne({ filename });
+}
+
+export async function readProfileAvatar(filename: string): Promise<{
+  buffer: Buffer;
+  mimeType: DetectedAvatarType["mimeType"];
+} | null> {
+  const requested = String(filename ?? "");
+  const safeFilename = path.basename(requested);
+  if (!safeFilename || safeFilename !== requested) return null;
+
+  const absolutePath = path.join(ensureAvatarUploadsDir(), safeFilename);
+  let encrypted: Buffer | null = null;
+  let storedMimeType: DetectedAvatarType["mimeType"] | null = null;
+
+  try {
+    encrypted = await fs.promises.readFile(absolutePath);
+  } catch (error: any) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+
+  if (!encrypted) {
+    const stored = await ProfileAvatarAsset.findOne({ filename: safeFilename })
+      .select("+payload mimeType")
+      .lean();
+    if (!stored?.payload) return null;
+    encrypted = Buffer.from(stored.payload as Buffer);
+    storedMimeType = stored.mimeType as DetectedAvatarType["mimeType"];
+  } else {
+    storedMimeType = mimeTypeForAvatarFilename(safeFilename);
+
+    // Transparently migrate legacy filesystem-only avatars to durable storage.
+    await ProfileAvatarAsset.updateOne(
+      { filename: safeFilename },
+      {
+        $setOnInsert: {
+          filename: safeFilename,
+          userId: userIdFromAvatarFilename(safeFilename),
+          mimeType: storedMimeType,
+          payload: encrypted,
+        },
+      },
+      { upsert: true },
+    ).catch(() => undefined);
+  }
+
+  let buffer: Buffer;
+  try {
+    buffer = decryptBuffer(encrypted);
+  } catch {
+    buffer = encrypted;
+  }
+
+  return {
+    buffer,
+    mimeType: storedMimeType ?? mimeTypeForAvatarFilename(safeFilename),
+  };
 }
 
 function ensureAvatarUploadsDir() {
@@ -72,6 +149,18 @@ function sanitizeToken(value: string) {
     .replace(/[^a-z0-9_-]/g, "")
     .slice(0, 24);
   return cleaned || "user";
+}
+
+function userIdFromAvatarFilename(filename: string) {
+  const match = filename.match(/^avatar_([^_]+)_/i);
+  return match?.[1] || "legacy";
+}
+
+function mimeTypeForAvatarFilename(filename: string): DetectedAvatarType["mimeType"] {
+  const ext = path.extname(filename).toLowerCase();
+  if (ext === ".png") return "image/png";
+  if (ext === ".heic") return "image/heic";
+  return "image/jpeg";
 }
 
 function parseAndValidateAvatar(input: {

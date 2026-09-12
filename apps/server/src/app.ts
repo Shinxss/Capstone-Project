@@ -17,6 +17,7 @@ import { AUDIT_EVENT } from "./features/audit/audit.constants";
 import { logSecurityEvent } from "./features/audit/audit.service";
 import { DispatchOffer } from "./features/dispatches/dispatch.model";
 import { EmergencyReportModel } from "./features/emergency/models/EmergencyReport.model";
+import { readProfileAvatar } from "./features/users/userAvatar.service";
 
 export const app = express();
 
@@ -240,7 +241,7 @@ app.get(
 
 app.get(
   "/uploads/profile-avatars/:filename",
-  (req, res) => {
+  async (req, res) => {
     try {
       const requested = String(req.params.filename || "");
       const filename = path.basename(requested);
@@ -248,24 +249,12 @@ app.get(
         return res.status(400).json({ message: "Invalid filename" });
       }
 
-      const abs = path.join(profileAvatarsDir, filename);
-      if (!fs.existsSync(abs)) return res.status(404).end();
+      const avatar = await readProfileAvatar(filename);
+      if (!avatar) return res.status(404).end();
 
-      const raw = fs.readFileSync(abs);
-      let plain: Buffer;
-      try {
-        plain = decryptBuffer(raw);
-      } catch {
-        plain = raw;
-      }
-
-      const ext = path.extname(filename).toLowerCase();
-      if (ext === ".png") res.type("png");
-      else if (ext === ".jpg" || ext === ".jpeg") res.type("jpeg");
-      else if (ext === ".heic") res.type("heic");
-      else res.type("application/octet-stream");
-
-      return res.send(plain);
+      res.type(avatar.mimeType);
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      return res.send(avatar.buffer);
     } catch {
       return res.status(500).end();
     }

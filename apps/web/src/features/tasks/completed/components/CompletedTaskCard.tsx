@@ -1,11 +1,10 @@
 import { CalendarDays, ChevronRight, Clipboard, MapPin, ShieldCheck, UserRound } from "lucide-react";
 import type { DispatchTask } from "../../models/tasks.types";
+import TaskVolunteerAvatar from "../../components/TaskVolunteerAvatar";
 import {
   formatCoordinates,
   formatTaskDateTime,
   formatVolunteerRole,
-  getInitials,
-  resolveTaskAvatarUrl,
   shortenTaskId,
 } from "../utils/completedTask.utils";
 import EmergencyTypeBadge from "./EmergencyTypeBadge";
@@ -15,7 +14,6 @@ type Props = { task: DispatchTask; onViewDetails: (task: DispatchTask) => void }
 
 export default function CompletedTaskCard({ task, onViewDetails }: Props) {
   const volunteerName = task.volunteer?.name?.trim() || "Volunteer unavailable";
-  const avatarUrl = resolveTaskAvatarUrl(task.volunteer?.avatarUrl);
   const completed = formatTaskDateTime(task.completedAt);
   const verified = formatTaskDateTime(task.verifiedAt);
   const coordinates = formatCoordinates(task.emergency?.lat, task.emergency?.lng);
@@ -29,7 +27,7 @@ export default function CompletedTaskCard({ task, onViewDetails }: Props) {
 
       <div className="mt-4 flex items-center gap-3 border-b border-slate-100 pb-4 dark:border-[#1C2940]">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-red-50 text-sm font-bold text-red-700 ring-1 ring-red-100 dark:bg-red-500/15 dark:text-red-300 dark:ring-red-500/20">
-          {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : getInitials(volunteerName)}
+          <TaskVolunteerAvatar name={volunteerName} avatarUrl={task.volunteer?.avatarUrl} />
         </div>
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-slate-950 dark:text-white">{volunteerName}</p>

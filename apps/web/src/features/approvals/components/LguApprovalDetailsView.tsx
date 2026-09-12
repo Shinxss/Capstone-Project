@@ -28,11 +28,11 @@ type Props = {
 function DetailsSkeleton() {
   return (
     <div className="space-y-4 animate-pulse">
-      <div className="h-10 w-60 rounded-lg bg-slate-200" />
-      <div className="h-36 rounded-xl border border-slate-200 bg-white" />
+      <div className="h-10 w-60 rounded-lg bg-slate-200 dark:bg-[#18243A]" />
+      <div className="h-36 rounded-xl border border-slate-200 bg-white dark:border-[#1C2940] dark:bg-[#0B1220]" />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.9fr)_minmax(320px,1fr)]">
-        <div className="h-80 rounded-xl border border-slate-200 bg-white" />
-        <div className="h-80 rounded-xl border border-slate-200 bg-white" />
+        <div className="h-80 rounded-xl border border-slate-200 bg-white dark:border-[#1C2940] dark:bg-[#0B1220]" />
+        <div className="h-80 rounded-xl border border-slate-200 bg-white dark:border-[#1C2940] dark:bg-[#0B1220]" />
       </div>
     </div>
   );
@@ -54,15 +54,15 @@ export default function LguApprovalDetailsView({
   const [activePhotoIndex, setActivePhotoIndex] = useState<number | null>(null);
   const { photos, loading: photosLoading } = useApprovalEvidence(item?.photos || []);
 
-  if (loading && !item) return <div className="min-h-full bg-slate-50 p-6"><DetailsSkeleton /></div>;
+  if (loading && !item) return <div className="min-h-full bg-slate-50 p-6 dark:bg-[#060C18]"><DetailsSkeleton /></div>;
 
   if (!item || error) {
     return (
-      <div className="grid min-h-full place-items-center bg-slate-50 p-6">
-        <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-8 text-center">
-          <FileQuestion size={38} className="mx-auto text-slate-400" />
-          <h1 className="mt-4 text-lg font-bold text-slate-950">Report not found</h1>
-          <p className="mt-1 text-sm text-slate-500">{error || "This emergency report is no longer available."}</p>
+      <div className="grid min-h-full place-items-center bg-slate-50 p-6 dark:bg-[#060C18]">
+        <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-8 text-center dark:border-[#1C2940] dark:bg-[#0B1220]">
+          <FileQuestion size={38} className="mx-auto text-slate-400 dark:text-slate-500" />
+          <h1 className="mt-4 text-lg font-bold text-slate-950 dark:text-white">Report not found</h1>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{error || "This emergency report is no longer available."}</p>
           <button type="button" onClick={onBack} className="mt-5 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
             <ArrowLeft size={16} /> Back to Approvals
           </button>
@@ -73,10 +73,10 @@ export default function LguApprovalDetailsView({
 
   const pending = item.status === "pending";
   return (
-    <div className="min-h-full bg-slate-50 px-5 py-4 text-slate-900 lg:px-6">
+    <div className="min-h-full bg-slate-50 px-5 py-4 text-slate-900 dark:bg-[#060C18] dark:text-slate-100 lg:px-6">
       <div className="mx-auto max-w-[1500px] space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <button type="button" onClick={onBack} className="inline-flex h-10 w-fit items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 text-sm font-semibold text-blue-700 hover:bg-blue-100">
+          <button type="button" onClick={onBack} className="inline-flex h-10 w-fit items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 text-sm font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/15">
             <ArrowLeft size={17} /> Back to Approvals / Verification
           </button>
           {pending ? (

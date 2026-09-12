@@ -13,32 +13,32 @@ const cards = [
     label: "Pending Reports",
     support: "For verification",
     icon: Clock3,
-    cardClass: "border-amber-200/80 bg-amber-50/45",
-    iconClass: "bg-amber-100 text-amber-600",
+    cardClass: "border-amber-200/80 bg-amber-50/45 dark:border-amber-500/25 dark:bg-amber-500/10",
+    iconClass: "bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300",
   },
   {
     key: "approvedToday" as const,
     label: "Approved Today",
     support: "Verified today",
     icon: CircleCheck,
-    cardClass: "border-emerald-200/80 bg-emerald-50/45",
-    iconClass: "bg-emerald-100 text-emerald-600",
+    cardClass: "border-emerald-200/80 bg-emerald-50/45 dark:border-emerald-500/25 dark:bg-emerald-500/10",
+    iconClass: "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300",
   },
   {
     key: "rejectedToday" as const,
     label: "Rejected Today",
     support: "Reviewed today",
     icon: CircleX,
-    cardClass: "border-rose-200/80 bg-rose-50/45",
-    iconClass: "bg-rose-100 text-rose-600",
+    cardClass: "border-rose-200/80 bg-rose-50/45 dark:border-rose-500/25 dark:bg-rose-500/10",
+    iconClass: "bg-rose-100 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300",
   },
   {
     key: "totalThisWeek" as const,
     label: "Total Reports",
     support: "This week",
     icon: FileText,
-    cardClass: "border-blue-200/80 bg-blue-50/45",
-    iconClass: "bg-blue-100 text-blue-600",
+    cardClass: "border-blue-200/80 bg-blue-50/45 dark:border-blue-500/25 dark:bg-blue-500/10",
+    iconClass: "bg-blue-100 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300",
   },
 ];
 
@@ -53,9 +53,9 @@ export default function ApprovalStats(props: Props) {
               <Icon size={25} strokeWidth={2} />
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-slate-600">{card.label}</p>
-              <p className="mt-0.5 text-2xl font-extrabold leading-none text-slate-950">{props[card.key]}</p>
-              <p className="mt-2 text-xs text-slate-500">{card.support}</p>
+              <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">{card.label}</p>
+              <p className="mt-0.5 text-2xl font-extrabold leading-none text-slate-950 dark:text-white">{props[card.key]}</p>
+              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{card.support}</p>
             </div>
           </div>
         );

@@ -42,17 +42,28 @@ export function formatVolunteerRole(role?: string | null) {
 export function resolveTaskAvatarUrl(value?: string | null) {
   const avatar = String(value ?? "").trim();
   if (!avatar) return null;
-  if (/^https?:\/\//i.test(avatar)) return avatar;
-
-  const base = String(api.defaults.baseURL ?? "").trim();
-  if (!base) return avatar;
 
   try {
-    const baseUrl = new URL(base);
-    return new URL(avatar, `${baseUrl.protocol}//${baseUrl.host}`).toString();
+    const browserOrigin = typeof window !== "undefined" ? window.location.origin : undefined;
+    const configuredBase = String(api.defaults.baseURL ?? "").trim();
+    const apiUrl = configuredBase
+      ? new URL(configuredBase, browserOrigin)
+      : browserOrigin
+        ? new URL(browserOrigin)
+        : null;
+    const avatarUrl = new URL(avatar, apiUrl ?? undefined);
+
+    // Uploaded avatars belong to the API even when an older database value
+    // contains a localhost/stale origin or VITE_API_URL is a relative `/api` URL.
+    const uploadPathIndex = avatarUrl.pathname.indexOf("/uploads/profile-avatars/");
+    if (uploadPathIndex >= 0 && apiUrl) {
+      const uploadPath = avatarUrl.pathname.slice(uploadPathIndex);
+      return new URL(`${uploadPath}${avatarUrl.search}${avatarUrl.hash}`, apiUrl.origin).toString();
+    }
+
+    return avatarUrl.toString();
   } catch {
-    const normalizedBase = base.endsWith("/") ? base.slice(0, -1) : base;
-    return `${normalizedBase}${avatar.startsWith("/") ? avatar : `/${avatar}`}`;
+    return avatar;
   }
 }
 
