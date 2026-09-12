@@ -18,10 +18,7 @@ export default function LifelineLogo({ variant = "adaptive" }: LifelineLogoProps
       <LogoIcon width={50} height={50} accessibilityLabel="Lifeline" />
       <Text className="text-[40px] font-bold">
         <Text style={{ color: useRedLogo ? "#DC2626" : "#3C83F6" }}>ife</Text>
-        <Text
-          className={variant === "red" ? undefined : "text-gray-500 dark:text-slate-300"}
-          style={variant === "red" ? { color: "#6B7280" } : undefined}
-        >
+        <Text style={{ color: variant === "red" || !isDark ? "#6B7280" : "#CBD5E1" }}>
           {"line"}
         </Text>
       </Text>

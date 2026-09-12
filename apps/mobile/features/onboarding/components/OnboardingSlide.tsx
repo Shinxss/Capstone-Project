@@ -12,7 +12,13 @@ type Props = {
 
 export function OnboardingSlide({ item, width, compact }: Props) {
   const { Illustration } = item;
-  const illustrationWidth = Math.min(440, Math.max(280, width));
+  const isRoutesSlide = item.id === "routes";
+  const illustrationWidth = isRoutesSlide
+    ? Math.min(404, Math.max(264, width - (compact ? 24 : 32)))
+    : Math.min(440, Math.max(280, width));
+  const illustrationHeight = isRoutesSlide
+    ? Math.round((illustrationWidth * 315) / 440)
+    : "100%";
 
   return (
     <View style={[styles.slide, { width }]}>
@@ -31,10 +37,15 @@ export function OnboardingSlide({ item, width, compact }: Props) {
         </Text>
       </View>
 
-      <View style={styles.illustrationArea}>
+      <View
+        style={[
+          styles.illustrationArea,
+          isRoutesSlide && styles.routesIllustrationArea,
+        ]}
+      >
         <Illustration
           width={illustrationWidth}
-          height="100%"
+          height={illustrationHeight}
           preserveAspectRatio="xMidYMid meet"
           accessibilityRole="image"
           accessibilityLabel={item.illustrationLabel}
@@ -57,6 +68,10 @@ const styles = StyleSheet.create({
     width: "100%",
     alignItems: "center",
     justifyContent: "center",
+  },
+  routesIllustrationArea: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
   copy: {
     minHeight: 88,

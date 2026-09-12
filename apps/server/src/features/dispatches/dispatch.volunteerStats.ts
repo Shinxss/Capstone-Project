@@ -14,6 +14,7 @@ export type VolunteerServiceStats = {
   completedTasks: number;
   verifiedTasks: number;
   volunteerHours: number;
+  verifiedVolunteerHours: number;
   avgResponseTimeMinutes: number | null;
 };
 
@@ -39,6 +40,7 @@ export function calculateVolunteerServiceStats(
   let completedTasks = 0;
   let verifiedTasks = 0;
   let totalVolunteerHours = 0;
+  let totalVerifiedVolunteerHours = 0;
   let responseDeltaSum = 0;
   let responseDeltaCount = 0;
 
@@ -65,16 +67,19 @@ export function calculateVolunteerServiceStats(
     const endAt = completedAt ?? validDate(offer.verifiedAt) ?? validDate(offer.updatedAt);
     if (!endAt) continue;
 
-    totalVolunteerHours += Math.max(
+    const contributedHours = Math.max(
       0,
       (endAt.getTime() - respondedAt.getTime()) / 3_600_000
     );
+    totalVolunteerHours += contributedHours;
+    if (status === "VERIFIED") totalVerifiedVolunteerHours += contributedHours;
   }
 
   return {
     completedTasks,
     verifiedTasks,
     volunteerHours: roundToSingleDecimal(totalVolunteerHours),
+    verifiedVolunteerHours: roundToSingleDecimal(totalVerifiedVolunteerHours),
     avgResponseTimeMinutes:
       responseDeltaCount > 0
         ? roundToSingleDecimal(responseDeltaSum / responseDeltaCount)

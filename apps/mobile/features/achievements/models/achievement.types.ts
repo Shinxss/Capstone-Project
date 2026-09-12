@@ -65,6 +65,13 @@ export type AchievementCategory =
   | "community"
   | "recognition";
 export type AchievementFilter = "all" | "unlocked" | "locked";
+export type LevelNumber = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+
+export type LevelDefinition = {
+  level: LevelNumber;
+  title: string;
+  requiredXp: number;
+};
 
 export type AchievementProgress = {
   current: number;
@@ -90,7 +97,23 @@ export type AchievementSummary = {
   percent: number;
 };
 
+export type UserProgression = {
+  lifetimeXp: number;
+  currentLevel: LevelNumber;
+  currentLevelTitle: string;
+  currentLevelStartXp: number;
+  nextLevel: LevelNumber | null;
+  nextLevelTitle: string | null;
+  nextLevelRequiredXp: number | null;
+  xpIntoCurrentLevel: number;
+  xpRequiredForNextLevel: number;
+  xpRemainingToNextLevel: number;
+  progressPercent: number;
+  maxLevel: boolean;
+};
+
 export type AchievementsResponse = {
   summary: AchievementSummary;
+  progression: UserProgression;
   achievements: Achievement[];
 };

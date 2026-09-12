@@ -18,6 +18,7 @@ import {
   VOLUNTEER_HOUR_TARGETS,
 } from "./achievement.constants";
 import { UserAchievement } from "./achievement.model";
+import { buildUserProgression } from "./achievement.progression";
 import type {
   AchievementAudience,
   AchievementAwardMetadata,
@@ -173,6 +174,7 @@ function emptyMetrics(role: string, volunteerStatus: string): AchievementMetrics
     completedTasks: 0,
     verifiedTasks: 0,
     volunteerHours: 0,
+    verifiedVolunteerHours: 0,
     reviewCount: 0,
     averageRating: 0,
     verifiedProofTaskCount: 0,
@@ -527,12 +529,24 @@ export function buildAchievementsResponse(
 
   const unlocked = achievements.filter((achievement) => achievement.unlocked).length;
   const total = achievements.length;
+  const role = normalizedUpper(metrics.role);
+  const supportedRole = audienceForRole(role) !== null;
+  const volunteerProgression = role === "VOLUNTEER";
   return {
     summary: {
       unlocked,
       total,
       percent: total > 0 ? clampPercent((unlocked / total) * 100) : 0,
     },
+    progression: buildUserProgression({
+      profileComplete: supportedRole && metrics.profileComplete,
+      approvedVolunteer:
+        volunteerProgression && normalizedUpper(metrics.volunteerStatus) === "APPROVED",
+      verifiedTasks: volunteerProgression ? metrics.verifiedTasks : 0,
+      verifiedVolunteerHours: volunteerProgression ? metrics.verifiedVolunteerHours : 0,
+      approvedReports: supportedRole ? metrics.approvedReportCount : 0,
+      permanentAchievements: supportedRole ? earnedById.size : 0,
+    }),
     achievements,
   };
 }
@@ -691,6 +705,7 @@ export async function loadAchievementMetrics(
   metrics.completedTasks = serviceStats.completedTasks;
   metrics.verifiedTasks = serviceStats.verifiedTasks;
   metrics.volunteerHours = serviceStats.volunteerHours;
+  metrics.verifiedVolunteerHours = serviceStats.verifiedVolunteerHours;
   metrics.reviewCount = integer(reviewRow?.reviewCount);
   metrics.averageRating = roundRating(reviewRow?.averageRating);
   metrics.teamVerifiedEmergencyCount = teamCount;

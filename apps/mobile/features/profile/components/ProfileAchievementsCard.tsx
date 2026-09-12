@@ -2,11 +2,12 @@ import React, { useMemo } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import AchievementBadge from "../../achievements/components/AchievementBadge";
-import type { Achievement, AchievementSummary } from "../../achievements/models/achievement.types";
+import type { Achievement, AchievementSummary, UserProgression } from "../../achievements/models/achievement.types";
 import { useTheme } from "../../theme/useTheme";
 
 type ProfileAchievementsCardProps = {
   summary: AchievementSummary;
+  progression: UserProgression;
   achievements: Achievement[];
   loading: boolean;
   error: string | null;
@@ -22,6 +23,7 @@ function unlockedTimestamp(achievement: Achievement) {
 
 export default function ProfileAchievementsCard({
   summary,
+  progression,
   achievements,
   loading,
   error,
@@ -51,6 +53,11 @@ export default function ProfileAchievementsCard({
           <Text style={{ marginTop: 2, color: isDark ? "#94A3B8" : "#64748B", fontSize: 12, fontWeight: "600" }}>
             {summary.unlocked} of {summary.total} unlocked
           </Text>
+          {!loading && !error ? (
+            <Text style={{ marginTop: 2, color: isDark ? "#CBD5E1" : "#475569", fontSize: 11, fontWeight: "700" }}>
+              Level {progression.currentLevel} · {progression.currentLevelTitle}
+            </Text>
+          ) : null}
         </View>
         <Pressable
           accessibilityRole="button"

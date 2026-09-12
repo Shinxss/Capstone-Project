@@ -68,6 +68,7 @@ export default function MoreScreen() {
   });
   const {
     summary: achievementSummary,
+    progression: achievementProgression,
     achievements,
     loading: achievementsLoading,
     error: achievementsError,
@@ -383,6 +384,7 @@ export default function MoreScreen() {
             {isAchievementAccount ? (
               <ProfileAchievementsCard
                 summary={achievementSummary}
+                progression={achievementProgression}
                 achievements={achievements}
                 loading={achievementsLoading}
                 error={achievementsError}

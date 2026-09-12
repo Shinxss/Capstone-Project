@@ -1,4 +1,4 @@
-import type { AchievementDefinition, AchievementId } from "./achievement.types";
+import type { AchievementDefinition, AchievementId, LevelDefinition } from "./achievement.types";
 
 const VOLUNTEER = ["VOLUNTEER"] as const;
 const MOBILE_USERS = ["VOLUNTEER", "COMMUNITY"] as const;
@@ -87,3 +87,25 @@ export const TRUSTED_RESPONDER_REVIEW_TARGET = 5;
 export const TRUSTED_RESPONDER_RATING_TARGET = 4.5;
 export const TRUSTED_LIFELINE_REVIEW_TARGET = 20;
 export const TRUSTED_LIFELINE_RATING_TARGET = 4.7;
+
+export const LEVEL_DEFINITIONS: readonly LevelDefinition[] = [
+  { level: 1, title: "First Step", requiredXp: 0 },
+  { level: 2, title: "Community Helper", requiredXp: 150 },
+  { level: 3, title: "Trusted Helper", requiredXp: 400 },
+  { level: 4, title: "Prepared Responder", requiredXp: 800 },
+  { level: 5, title: "Active Responder", requiredXp: 1_400 },
+  { level: 6, title: "Community Champion", requiredXp: 2_200 },
+  { level: 7, title: "Lifesaver", requiredXp: 3_200 },
+  { level: 8, title: "Rapid Responder", requiredXp: 4_500 },
+  { level: 9, title: "Community Guardian", requiredXp: 6_200 },
+  { level: 10, title: "Lifeline Hero", requiredXp: 8_500 },
+] as const;
+
+export const XP_AWARDS = {
+  completedProfile: 50,
+  approvedVolunteer: 100,
+  verifiedTask: 120,
+  verifiedServiceHour: 10,
+  approvedReport: 40,
+  permanentAchievement: 25,
+} as const;

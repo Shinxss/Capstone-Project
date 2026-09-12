@@ -6,7 +6,10 @@ import {
   type AchievementCategory,
   type AchievementId,
   type AchievementsResponse,
+  type LevelNumber,
+  type UserProgression,
 } from "../models/achievement.types";
+import { LEVEL_DEFINITIONS } from "../constants/levelUi.constants";
 
 const ACHIEVEMENT_ID_SET = new Set<string>(ACHIEVEMENT_IDS);
 const COMMUNITY_ID_SET = new Set<string>(COMMUNITY_ACHIEVEMENT_IDS);
@@ -33,6 +36,15 @@ function asFiniteNumber(value: unknown): number | null {
 
 function clampPercent(value: number) {
   return Math.min(100, Math.max(0, Math.round(value)));
+}
+
+function asNonNegativeInteger(value: unknown): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : null;
+}
+
+function asLevelNumber(value: unknown): LevelNumber | null {
+  const parsed = asNonNegativeInteger(value);
+  return parsed !== null && parsed >= 1 && parsed <= 10 ? (parsed as LevelNumber) : null;
 }
 
 function asAchievementId(value: unknown): AchievementId | null {
@@ -105,12 +117,115 @@ function isExactIdSet(achievements: readonly Achievement[], expected: ReadonlySe
   return achievements.length === expected.size && achievements.every(({ id }) => expected.has(id));
 }
 
+function normalizeProgression(value: unknown): UserProgression {
+  if (!isRecord(value)) throw new Error("Invalid achievement progression");
+
+  const lifetimeXp = asNonNegativeInteger(value.lifetimeXp);
+  const currentLevel = asLevelNumber(value.currentLevel);
+  const currentLevelStartXp = asNonNegativeInteger(value.currentLevelStartXp);
+  const nextLevel = value.nextLevel === null ? null : asLevelNumber(value.nextLevel);
+  const nextLevelRequiredXp = value.nextLevelRequiredXp === null
+    ? null
+    : asNonNegativeInteger(value.nextLevelRequiredXp);
+  const xpIntoCurrentLevel = asNonNegativeInteger(value.xpIntoCurrentLevel);
+  const xpRequiredForNextLevel = asNonNegativeInteger(value.xpRequiredForNextLevel);
+  const xpRemainingToNextLevel = asNonNegativeInteger(value.xpRemainingToNextLevel);
+  const progressPercent = asNonNegativeInteger(value.progressPercent);
+  const currentLevelTitle = typeof value.currentLevelTitle === "string"
+    ? value.currentLevelTitle.trim()
+    : "";
+  const nextLevelTitle = value.nextLevelTitle === null
+    ? null
+    : typeof value.nextLevelTitle === "string"
+      ? value.nextLevelTitle.trim()
+      : "";
+
+  if (
+    lifetimeXp === null ||
+    currentLevel === null ||
+    currentLevelStartXp === null ||
+    xpIntoCurrentLevel === null ||
+    xpRequiredForNextLevel === null ||
+    xpRemainingToNextLevel === null ||
+    progressPercent === null ||
+    progressPercent > 100 ||
+    typeof value.maxLevel !== "boolean"
+  ) {
+    throw new Error("Malformed achievement progression values");
+  }
+
+  const expectedCurrent = [...LEVEL_DEFINITIONS]
+    .reverse()
+    .find(({ requiredXp }) => requiredXp <= lifetimeXp) ?? LEVEL_DEFINITIONS[0];
+  if (
+    currentLevel !== expectedCurrent.level ||
+    currentLevelTitle !== expectedCurrent.title ||
+    currentLevelStartXp !== expectedCurrent.requiredXp
+  ) {
+    throw new Error("Inconsistent current achievement level");
+  }
+
+  const expectedNext = LEVEL_DEFINITIONS.find(({ level }) => level === currentLevel + 1) ?? null;
+  if (!expectedNext) {
+    if (
+      !value.maxLevel ||
+      nextLevel !== null ||
+      nextLevelTitle !== null ||
+      nextLevelRequiredXp !== null ||
+      xpIntoCurrentLevel !== lifetimeXp - currentLevelStartXp ||
+      xpRequiredForNextLevel !== 0 ||
+      xpRemainingToNextLevel !== 0 ||
+      progressPercent !== 100
+    ) {
+      throw new Error("Inconsistent maximum achievement level");
+    }
+  } else {
+    const expectedRequired = expectedNext.requiredXp - currentLevelStartXp;
+    const expectedInto = lifetimeXp - currentLevelStartXp;
+    const expectedRemaining = expectedNext.requiredXp - lifetimeXp;
+    const expectedPercent = clampPercent((expectedInto / expectedRequired) * 100);
+    if (
+      value.maxLevel ||
+      nextLevel !== expectedNext.level ||
+      nextLevelTitle !== expectedNext.title ||
+      nextLevelRequiredXp !== expectedNext.requiredXp ||
+      xpIntoCurrentLevel !== expectedInto ||
+      xpRequiredForNextLevel !== expectedRequired ||
+      xpRemainingToNextLevel !== expectedRemaining ||
+      progressPercent !== expectedPercent
+    ) {
+      throw new Error("Inconsistent next achievement level");
+    }
+  }
+
+  return {
+    lifetimeXp,
+    currentLevel,
+    currentLevelTitle,
+    currentLevelStartXp,
+    nextLevel,
+    nextLevelTitle,
+    nextLevelRequiredXp,
+    xpIntoCurrentLevel,
+    xpRequiredForNextLevel,
+    xpRemainingToNextLevel,
+    progressPercent,
+    maxLevel: value.maxLevel,
+  };
+}
+
 function normalizeAchievementsResponse(payload: unknown): AchievementsResponse {
-  if (!isRecord(payload) || !isRecord(payload.summary) || !Array.isArray(payload.achievements)) {
+  if (
+    !isRecord(payload) ||
+    !isRecord(payload.summary) ||
+    !isRecord(payload.progression) ||
+    !Array.isArray(payload.achievements)
+  ) {
     throw new Error("Invalid achievements response");
   }
 
   const achievements = payload.achievements.map(normalizeAchievement);
+  const progression = normalizeProgression(payload.progression);
   const ids = new Set(achievements.map(({ id }) => id));
   const sortOrders = new Set(achievements.map(({ sortOrder }) => sortOrder));
   if (ids.size !== achievements.length || sortOrders.size !== achievements.length) {
@@ -140,7 +255,7 @@ function normalizeAchievementsResponse(payload: unknown): AchievementsResponse {
     throw new Error("Inconsistent achievement summary");
   }
 
-  return { summary: { unlocked, total, percent }, achievements };
+  return { summary: { unlocked, total, percent }, progression, achievements };
 }
 
 export async function getMyAchievements(): Promise<AchievementsResponse> {

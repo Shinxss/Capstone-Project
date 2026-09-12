@@ -2,7 +2,6 @@ import React from "react";
 import { Text, View } from "react-native";
 import { useTheme } from "../../theme/useTheme";
 import type { AchievementSummary } from "../models/achievement.types";
-import AchievementProgressBar from "./AchievementProgressBar";
 
 type AchievementSummaryCardProps = {
   summary: AchievementSummary;
@@ -10,39 +9,43 @@ type AchievementSummaryCardProps = {
 
 export default function AchievementSummaryCard({ summary }: AchievementSummaryCardProps) {
   const { isDark } = useTheme();
+  const stats = [
+    { label: "Badges", value: summary.total },
+    { label: "Unlocked", value: summary.unlocked },
+    { label: "Locked", value: Math.max(0, summary.total - summary.unlocked) },
+  ] as const;
 
   return (
     <View
+      accessible
+      accessibilityLabel={`${summary.total} badges, ${summary.unlocked} unlocked, ${Math.max(0, summary.total - summary.unlocked)} locked`}
       style={{
-        borderRadius: 22,
+        borderRadius: 18,
         borderWidth: 1,
-        borderColor: isDark ? "#24324A" : "#FECACA",
+        borderColor: isDark ? "#24324A" : "#E2E8F0",
         backgroundColor: isDark ? "#0E1626" : "#FFFFFF",
-        padding: 18,
+        flexDirection: "row",
+        paddingVertical: 13,
       }}
     >
-      <Text style={{ color: isDark ? "#F8FAFC" : "#0F172A", fontSize: 16, fontWeight: "800" }}>
-        Achievement Progress
-      </Text>
-      <View style={{ marginTop: 10, flexDirection: "row", alignItems: "baseline", justifyContent: "space-between" }}>
-        <Text style={{ color: isDark ? "#F8FAFC" : "#111827", fontSize: 24, fontWeight: "900" }}>
-          {summary.unlocked} / {summary.total} Unlocked
-        </Text>
-        <Text style={{ color: "#DC2626", fontSize: 16, fontWeight: "900" }}>{summary.percent}%</Text>
-      </View>
-      <View style={{ marginTop: 13 }}>
-        <AchievementProgressBar percent={summary.percent} height={9} />
-      </View>
-      <Text
-        style={{
-          marginTop: 12,
-          color: isDark ? "#A8B4C8" : "#64748B",
-          fontSize: 13,
-          lineHeight: 19,
-        }}
-      >
-        Keep responding and supporting your community to unlock more badges.
-      </Text>
+      {stats.map((stat, index) => (
+        <View
+          key={stat.label}
+          style={{
+            flex: 1,
+            alignItems: "center",
+            borderLeftWidth: index === 0 ? 0 : 1,
+            borderLeftColor: isDark ? "#24324A" : "#E2E8F0",
+          }}
+        >
+          <Text style={{ color: stat.label === "Unlocked" ? "#DC2626" : isDark ? "#F8FAFC" : "#0F172A", fontSize: 19, fontWeight: "900" }}>
+            {stat.value}
+          </Text>
+          <Text style={{ marginTop: 2, color: isDark ? "#94A3B8" : "#64748B", fontSize: 11, fontWeight: "700" }}>
+            {stat.label}
+          </Text>
+        </View>
+      ))}
     </View>
   );
 }

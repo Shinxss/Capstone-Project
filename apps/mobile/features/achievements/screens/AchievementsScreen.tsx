@@ -9,16 +9,13 @@ import { useResponsiveLayout } from "../../common/hooks/useResponsiveLayout";
 import { useTheme } from "../../theme/useTheme";
 import AchievementCard from "../components/AchievementCard";
 import AchievementDetailModal from "../components/AchievementDetailModal";
+import AchievementFilterTabs from "../components/AchievementFilterTabs";
 import AchievementSummaryCard from "../components/AchievementSummaryCard";
 import AchievementsSkeleton from "../components/AchievementsSkeleton";
+import LevelHeroCard from "../components/LevelHeroCard";
+import LevelProgressionStrip from "../components/LevelProgressionStrip";
 import { useAchievements } from "../hooks/useAchievements";
 import type { Achievement, AchievementFilter } from "../models/achievement.types";
-
-const FILTERS: ReadonlyArray<{ id: AchievementFilter; label: string }> = [
-  { id: "all", label: "All" },
-  { id: "unlocked", label: "Unlocked" },
-  { id: "locked", label: "Locked" },
-];
 
 export default function AchievementsScreen() {
   const router = useRouter();
@@ -34,9 +31,9 @@ export default function AchievementsScreen() {
 
   const maxContentWidth = Math.min(width, 600);
   const horizontalPadding = 16;
-  const gridGap = 12;
-  const cardWidth = Math.floor((maxContentWidth - horizontalPadding * 2 - gridGap) / 2);
-  const badgeSize = Math.min(124, Math.max(96, cardWidth * 0.68));
+  const gridGap = 8;
+  const cardWidth = Math.floor((maxContentWidth - horizontalPadding * 2 - gridGap * 2) / 3);
+  const badgeSize = Math.min(88, Math.max(62, cardWidth - 18));
 
   const filteredAchievements = useMemo(() => {
     if (filter === "unlocked") return achievementsModel.unlockedAchievements;
@@ -74,25 +71,23 @@ export default function AchievementsScreen() {
         </View>
       ) : achievementsModel.loading && achievementsModel.achievements.length === 0 ? (
         <View style={{ marginTop: 22 }}><AchievementsSkeleton cardWidth={cardWidth} /></View>
+      ) : achievementsModel.error && achievementsModel.achievements.length === 0 ? (
+        <View style={{ marginTop: 24, borderRadius: 20, borderWidth: 1, borderColor: isDark ? "#7F1D1D" : "#FCA5A5", backgroundColor: isDark ? "#3B1C28" : "#FEF2F2", paddingHorizontal: 18, paddingVertical: 22, alignItems: "center" }}>
+          <Ionicons name="alert-circle-outline" size={32} color={isDark ? "#FCA5A5" : "#B91C1C"} />
+          <Text style={{ marginTop: 10, color: isDark ? "#FECACA" : "#991B1B", fontSize: 16, fontWeight: "900" }}>Unable to load achievements</Text>
+          <Text style={{ marginTop: 6, textAlign: "center", color: isDark ? "#FCA5A5" : "#B91C1C", fontSize: 13, lineHeight: 19 }}>{achievementsModel.error}</Text>
+          <Pressable accessibilityRole="button" onPress={() => { void achievementsModel.refresh(); }} style={({ pressed }) => ({ marginTop: 14, minHeight: 40, borderRadius: 20, backgroundColor: "#DC2626", paddingHorizontal: 18, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.78 : 1 })}>
+            <Text style={{ color: "#FFFFFF", fontSize: 13, fontWeight: "900" }}>Try Again</Text>
+          </Pressable>
+        </View>
       ) : (
         <>
-          <View style={{ marginTop: 22 }}><AchievementSummaryCard summary={achievementsModel.summary} /></View>
-          <View style={{ marginTop: 18, marginBottom: 16, flexDirection: "row", gap: 9 }}>
-            {FILTERS.map((item) => {
-              const selected = filter === item.id;
-              return (
-                <Pressable
-                  key={item.id}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  onPress={() => setFilter(item.id)}
-                  style={({ pressed }) => ({ minHeight: 40, paddingHorizontal: 17, borderRadius: 20, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: selected ? "#DC2626" : isDark ? "#334155" : "#CBD5E1", backgroundColor: selected ? "#DC2626" : isDark ? "#0E1626" : "#FFFFFF", opacity: pressed ? 0.8 : 1 })}
-                >
-                  <Text style={{ color: selected ? "#FFFFFF" : isDark ? "#CBD5E1" : "#475569", fontSize: 13, fontWeight: "800" }}>{item.label}</Text>
-                </Pressable>
-              );
-            })}
+          <View style={{ marginTop: 22 }}>
+            <LevelHeroCard progression={achievementsModel.progression} />
           </View>
+          <LevelProgressionStrip currentLevel={achievementsModel.progression.currentLevel} />
+          <View style={{ marginTop: 14 }}><AchievementSummaryCard summary={achievementsModel.summary} /></View>
+          <AchievementFilterTabs filter={filter} summary={achievementsModel.summary} onChange={setFilter} />
           {achievementsModel.error ? (
             <View style={{ marginBottom: 16, borderRadius: 16, borderWidth: 1, borderColor: isDark ? "#7F1D1D" : "#FCA5A5", backgroundColor: isDark ? "#3B1C28" : "#FEF2F2", padding: 13, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
               <Text style={{ flex: 1, color: isDark ? "#FCA5A5" : "#B91C1C", fontSize: 13, fontWeight: "700" }}>Unable to load achievements.</Text>
@@ -111,9 +106,9 @@ export default function AchievementsScreen() {
       <FlatList
         data={isAchievementAccount ? filteredAchievements : []}
         keyExtractor={(achievement) => achievement.id}
-        numColumns={2}
-        initialNumToRender={8}
-        maxToRenderPerBatch={8}
+        numColumns={3}
+        initialNumToRender={12}
+        maxToRenderPerBatch={12}
         windowSize={7}
         removeClippedSubviews
         showsVerticalScrollIndicator={false}

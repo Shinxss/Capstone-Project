@@ -4,6 +4,7 @@ import type {
   Achievement,
   AchievementSummary,
   AchievementsResponse,
+  UserProgression,
 } from "../models/achievement.types";
 import { getMyAchievements } from "../services/achievementsApi";
 
@@ -16,6 +17,21 @@ const EMPTY_SUMMARY: AchievementSummary = {
   unlocked: 0,
   total: 0,
   percent: 0,
+};
+
+const INITIAL_PROGRESSION: UserProgression = {
+  lifetimeXp: 0,
+  currentLevel: 1,
+  currentLevelTitle: "First Step",
+  currentLevelStartXp: 0,
+  nextLevel: 2,
+  nextLevelTitle: "Community Helper",
+  nextLevelRequiredXp: 150,
+  xpIntoCurrentLevel: 0,
+  xpRequiredForNextLevel: 150,
+  xpRemainingToNextLevel: 150,
+  progressPercent: 0,
+  maxLevel: false,
 };
 
 function getLoadErrorMessage(error: unknown) {
@@ -74,6 +90,7 @@ export function useAchievements(options?: UseAchievementsOptions) {
 
   return {
     summary: data?.summary ?? EMPTY_SUMMARY,
+    progression: data?.progression ?? INITIAL_PROGRESSION,
     achievements,
     unlockedAchievements,
     lockedAchievements,
@@ -82,6 +99,7 @@ export function useAchievements(options?: UseAchievementsOptions) {
     refresh,
   } satisfies {
     summary: AchievementSummary;
+    progression: UserProgression;
     achievements: Achievement[];
     unlockedAchievements: Achievement[];
     lockedAchievements: Achievement[];

@@ -93,6 +93,7 @@ export type AchievementMetrics = {
   completedTasks: number;
   verifiedTasks: number;
   volunteerHours: number;
+  verifiedVolunteerHours: number;
   reviewCount: number;
   averageRating: number;
   verifiedProofTaskCount: number;
@@ -105,6 +106,38 @@ export type AchievementMetrics = {
   reportCount: number;
   approvedReportCount: number;
   distinctApprovedReportTypes: number;
+};
+
+export type LevelNumber = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+
+export type LevelDefinition = {
+  level: LevelNumber;
+  title: string;
+  requiredXp: number;
+};
+
+export type ProgressionXpSource = {
+  profileComplete: boolean;
+  approvedVolunteer: boolean;
+  verifiedTasks: number;
+  verifiedVolunteerHours: number;
+  approvedReports: number;
+  permanentAchievements: number;
+};
+
+export type UserProgressionDto = {
+  lifetimeXp: number;
+  currentLevel: LevelNumber;
+  currentLevelTitle: string;
+  currentLevelStartXp: number;
+  nextLevel: LevelNumber | null;
+  nextLevelTitle: string | null;
+  nextLevelRequiredXp: number | null;
+  xpIntoCurrentLevel: number;
+  xpRequiredForNextLevel: number;
+  xpRemainingToNextLevel: number;
+  progressPercent: number;
+  maxLevel: boolean;
 };
 
 // Backward-compatible alias for the original 1-10 unit-test/public helper surface.
@@ -129,5 +162,6 @@ export type AchievementsResponseDto = {
     total: number;
     percent: number;
   };
+  progression: UserProgressionDto;
   achievements: AchievementDto[];
 };

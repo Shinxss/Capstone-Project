@@ -19,6 +19,7 @@ function metrics(overrides: Partial<AchievementMetrics> = {}): AchievementMetric
     completedTasks: 0,
     verifiedTasks: 0,
     volunteerHours: 0,
+    verifiedVolunteerHours: 0,
     reviewCount: 0,
     averageRating: 0,
     verifiedProofTaskCount: 0,
@@ -54,17 +55,39 @@ test("eligible response sets are 50 for volunteers, 6 for community, and empty f
 });
 
 test("community users cannot qualify for volunteer badges from forged-looking metrics", () => {
-  const eligible = getEligibleAchievementIds(metrics({
+  const forgedMetrics = metrics({
     role: "COMMUNITY",
     volunteerStatus: "APPROVED",
     respondedDispatchCount: 500,
     verifiedTasks: 500,
     volunteerHours: 1000,
+    verifiedVolunteerHours: 1000,
     reviewCount: 50,
     averageRating: 5,
-  }));
+    approvedReportCount: 1,
+  });
+  const eligible = getEligibleAchievementIds(forgedMetrics);
   assert.equal(eligible.some((id) => ACHIEVEMENT_IDS.slice(0, 39).includes(id)), false);
   assert.equal(eligible.some((id) => ACHIEVEMENT_IDS.slice(45).includes(id)), false);
+  assert.equal(buildAchievementsResponse(forgedMetrics, []).progression.lifetimeXp, 40);
+});
+
+test("progression response combines trusted metrics with permanent achievement records", () => {
+  const unlockedAt = new Date("2026-08-14T08:30:00.000Z");
+  const response = buildAchievementsResponse(metrics({
+    volunteerStatus: "APPROVED",
+    profileComplete: true,
+    verifiedTasks: 2,
+    verifiedVolunteerHours: 3.5,
+    approvedReportCount: 1,
+  }), [
+    { achievementId: "verified-volunteer", unlockedAt },
+    { achievementId: "community-ready", unlockedAt },
+  ]);
+
+  assert.equal(response.progression.lifetimeXp, 515);
+  assert.equal(response.progression.currentLevel, 3);
+  assert.equal(response.progression.currentLevelTitle, "Trusted Helper");
 });
 
 test("existing achievements 1-10 retain historical milestone behavior", () => {
@@ -183,6 +206,7 @@ test("profile and achievements can share the same volunteer-hour calculation", (
     { status: "DECLINED", respondedAt: new Date("2026-01-03T01:00:00Z"), updatedAt: new Date("2026-01-03T02:00:00Z") },
   ]);
   assert.deepEqual({ completedTasks: stats.completedTasks, verifiedTasks: stats.verifiedTasks, volunteerHours: stats.volunteerHours }, { completedTasks: 2, verifiedTasks: 1, volunteerHours: 5 });
+  assert.equal(stats.verifiedVolunteerHours, 3.5);
 });
 
 test("the earned-achievement model keeps the unique user and achievement index", () => {
