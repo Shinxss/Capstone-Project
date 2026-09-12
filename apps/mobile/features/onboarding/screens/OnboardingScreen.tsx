@@ -13,8 +13,8 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import LifelineLogo from "../../../assets/lifeline_logo_trans.svg";
+import AuthBackground from "../../../components/AuthBackground";
+import LifelineLogo from "../../../components/LifelineLogo";
 import { OnboardingPagination } from "../components/OnboardingPagination";
 import { OnboardingSlide } from "../components/OnboardingSlide";
 import {
@@ -34,8 +34,6 @@ export function OnboardingScreen() {
   const [completing, setCompleting] = useState(false);
   const compact = height < 720 || width < 360;
   const currentSlide = ONBOARDING_SLIDES[activeIndex] ?? ONBOARDING_SLIDES[0];
-  const logoHeight = compact ? 94 : 118;
-  const logoWidth = Math.round((logoHeight * 269) / 274);
 
   const updateActiveIndex = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -86,68 +84,63 @@ export function OnboardingScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top", "bottom", "left", "right"]}>
-      <StatusBar style="dark" backgroundColor={ONBOARDING_COLORS.background} />
+    <AuthBackground>
+      <View style={styles.screen}>
+        <StatusBar style="dark" backgroundColor="transparent" translucent />
 
-      <View style={[styles.logoArea, compact && styles.logoAreaCompact]}>
-        <LifelineLogo
-          width={logoWidth}
-          height={logoHeight}
-          preserveAspectRatio="xMidYMid meet"
-          accessibilityRole="image"
-          accessibilityLabel="Lifeline"
-        />
-      </View>
+        <View style={[styles.logoArea, compact && styles.logoAreaCompact]}>
+          <LifelineLogo variant="red" />
+        </View>
 
-      <FlatList
-        ref={listRef}
-        data={ONBOARDING_SLIDES}
-        renderItem={renderSlide}
-        keyExtractor={(item) => item.id}
-        horizontal
-        pagingEnabled
-        bounces={false}
-        decelerationRate="fast"
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={updateActiveIndex}
-        getItemLayout={(_, index) => ({ length: width, offset: width * index, index })}
-        style={styles.pages}
-        contentContainerStyle={styles.pagesContent}
-        accessibilityLabel="Lifeline onboarding pages"
-      />
-
-      <View style={[styles.footer, compact && styles.footerCompact]}>
-        <OnboardingPagination
-          activeIndex={activeIndex}
-          count={ONBOARDING_SLIDES.length}
+        <FlatList
+          ref={listRef}
+          data={ONBOARDING_SLIDES}
+          renderItem={renderSlide}
+          keyExtractor={(item) => item.id}
+          horizontal
+          pagingEnabled
+          bounces={false}
+          decelerationRate="fast"
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={updateActiveIndex}
+          getItemLayout={(_, index) => ({ length: width, offset: width * index, index })}
+          style={styles.pages}
+          contentContainerStyle={styles.pagesContent}
+          accessibilityLabel="Lifeline onboarding pages"
         />
 
-        <Pressable
-          onPress={handlePrimaryPress}
-          disabled={completing}
-          accessibilityRole="button"
-          accessibilityLabel={currentSlide.buttonLabel}
-          style={({ pressed }) => [
-            styles.button,
-            compact && styles.buttonCompact,
-            pressed && !completing ? styles.buttonPressed : null,
-            completing ? styles.buttonDisabled : null,
-          ]}
-        >
-          <Text style={styles.buttonLabel} maxFontSizeMultiplier={1.15}>
-            {completing ? "Getting Started..." : currentSlide.buttonLabel}
-          </Text>
-          <ArrowRight size={25} strokeWidth={2.4} color="#FFFFFF" style={styles.arrow} />
-        </Pressable>
+        <View style={[styles.footer, compact && styles.footerCompact]}>
+          <OnboardingPagination
+            activeIndex={activeIndex}
+            count={ONBOARDING_SLIDES.length}
+          />
+
+          <Pressable
+            onPress={handlePrimaryPress}
+            disabled={completing}
+            accessibilityRole="button"
+            accessibilityLabel={currentSlide.buttonLabel}
+            style={({ pressed }) => [
+              styles.button,
+              compact && styles.buttonCompact,
+              pressed && !completing ? styles.buttonPressed : null,
+              completing ? styles.buttonDisabled : null,
+            ]}
+          >
+            <Text style={styles.buttonLabel} maxFontSizeMultiplier={1.15}>
+              {completing ? "Getting Started..." : currentSlide.buttonLabel}
+            </Text>
+            <ArrowRight size={25} strokeWidth={2.4} color="#FFFFFF" style={styles.arrow} />
+          </Pressable>
+        </View>
       </View>
-    </SafeAreaView>
+    </AuthBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  screen: {
     flex: 1,
-    backgroundColor: ONBOARDING_COLORS.background,
   },
   logoArea: {
     height: 126,

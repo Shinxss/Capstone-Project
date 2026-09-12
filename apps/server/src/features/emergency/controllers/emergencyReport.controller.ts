@@ -31,6 +31,7 @@ import type {
   UploadEmergencyReportPhotoInput,
 } from "../schemas/emergencyReport.schema";
 import type { UpsertVolunteerReviewInput } from "../../volunteerReviews/volunteerReview.validation";
+import { EMERGENCY_REPORT_PROOF_ERROR } from "../emergencyReport.constants";
 
 type MaybeAuthedRequest = Request & {
   user?: {
@@ -51,13 +52,11 @@ export async function postEmergencyReport(req: MaybeAuthedRequest, res: Response
     }
 
     const report = await createEmergencyReport(input, reporterUserId);
-    await notifyRequestTrackingUpdated(
-      report.incidentId,
-      report.isSos ? "request_submitted" : "verification_started",
-      {
-        stepOverride: report.isSos ? "Submitted" : "Verification",
-      }
-    ).catch(() => undefined);
+    if (!report.isSos) {
+      await notifyRequestTrackingUpdated(report.incidentId, "verification_started", {
+        stepOverride: "Verification",
+      }).catch(() => undefined);
+    }
 
     emitNotificationsRefresh("emergency_reported", ["LGU", "ADMIN"]);
 
@@ -77,7 +76,7 @@ export async function postEmergencyReport(req: MaybeAuthedRequest, res: Response
     const message = String(error?.message ?? "Failed to create emergency report");
     if (
       message === "Invalid photo URL" ||
-      message === "At least 3 proof images are required." ||
+      message === EMERGENCY_REPORT_PROOF_ERROR ||
       message === "Guest SOS requires a full name and mobile number."
     ) {
       return res.status(400).json({ message });

@@ -4,16 +4,26 @@ import LifelineLogoRed from "../assets/lifeline-logo_red.svg";
 import LifelineLogoBlue from "../assets/lifeline-logo_blue.svg";
 import { useTheme } from "../features/theme/useTheme";
 
-export default function LifelineLogo() {
+type LifelineLogoProps = {
+  variant?: "adaptive" | "red";
+};
+
+export default function LifelineLogo({ variant = "adaptive" }: LifelineLogoProps) {
   const { isDark } = useTheme();
-  const LogoIcon = isDark ? LifelineLogoBlue : LifelineLogoRed;
+  const useRedLogo = variant === "red" || !isDark;
+  const LogoIcon = useRedLogo ? LifelineLogoRed : LifelineLogoBlue;
 
   return (
     <View className="flex-row items-center justify-center gap-1">
       <LogoIcon width={50} height={50} accessibilityLabel="Lifeline" />
       <Text className="text-[40px] font-bold">
-        <Text style={{ color: isDark ? "#3C83F6" : "#DC2626" }}>ife</Text>
-        <Text className="text-gray-500 dark:text-slate-300">line</Text>
+        <Text style={{ color: useRedLogo ? "#DC2626" : "#3C83F6" }}>ife</Text>
+        <Text
+          className={variant === "red" ? undefined : "text-gray-500 dark:text-slate-300"}
+          style={variant === "red" ? { color: "#6B7280" } : undefined}
+        >
+          {"line"}
+        </Text>
       </Text>
     </View>
   );

@@ -22,9 +22,19 @@ export type Reporter = {
 
 export type EmergencyReport = {
   _id: string;
+  isSos?: boolean;
   emergencyType: string;
   source: string;
   status: string;
+  verification?: {
+    status?: "not_required" | "pending" | "approved" | "rejected";
+    reviewedBy?: string | Reporter;
+    reviewedAt?: string;
+    reason?: string;
+  };
+  visibility?: {
+    isVisibleOnMap?: boolean;
+  };
   progressLabel?: "Submitted" | "Assigned" | "En Route" | "Arrived" | "Resolved" | "Cancelled";
   progressPercent?: number;
   location: GeoPoint;

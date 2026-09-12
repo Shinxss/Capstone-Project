@@ -1,6 +1,10 @@
 import { useCallback, useState } from "react";
 import { createEmergencyReport } from "../../emergency/services/emergencyApi";
 import type { ReportDraft, ReportSubmitResult } from "../models/report.types";
+import {
+  PROOF_PHOTO_REQUIRED_ERROR,
+  REQUIRED_PROOF_IMAGES,
+} from "../constants/report.constants";
 
 export function useSubmitReport() {
   const [loading, setLoading] = useState(false);
@@ -31,8 +35,8 @@ export function useSubmitReport() {
 
     const locationLabel = draft.locationText?.trim() || draft.location?.label?.trim();
     const photoUrls = photos.map((photo) => photo.url).filter((url): url is string => Boolean(url));
-    if (photoUrls.length < 3) {
-      const message = "Please upload at least 3 proof images.";
+    if (photoUrls.length !== REQUIRED_PROOF_IMAGES) {
+      const message = PROOF_PHOTO_REQUIRED_ERROR;
       setError(message);
       throw new Error(message);
     }

@@ -13,6 +13,10 @@ import type { VerificationStatus } from "../emergency.model";
 import { findBarangayByPoint } from "../../barangays/barangay.service";
 import { DispatchOffer } from "../../dispatches/dispatch.model";
 import { getReviewedEmergencyIdSet } from "../../volunteerReviews/volunteerReview.service";
+import {
+  EMERGENCY_REPORT_PROOF_ERROR,
+  REQUIRED_EMERGENCY_REPORT_PROOF_IMAGES,
+} from "../emergencyReport.constants";
 
 const EMERGENCY_REPORT_PHOTO_URL_PREFIX = "/uploads/emergency-report-photos/";
 const DISPATCH_PROOF_URL_PREFIX = "/uploads/dispatch-proofs/";
@@ -551,7 +555,7 @@ function sanitizeEmergencyPhotoUrls(photoUrls?: string[]) {
     throw new Error("Invalid photo URL");
   }
 
-  return sanitized.slice(0, 5);
+  return sanitized;
 }
 
 function toTrackingProofs(rawProofs: unknown, fallbackDate: unknown) {
@@ -597,8 +601,8 @@ export async function createEmergencyReport(
   }
 
   const sanitizedPhotos = sanitizeEmergencyPhotoUrls(input.photos);
-  if (!input.isSos && sanitizedPhotos.length < 3) {
-    throw new Error("At least 3 proof images are required.");
+  if (!input.isSos && sanitizedPhotos.length !== REQUIRED_EMERGENCY_REPORT_PROOF_IMAGES) {
+    throw new Error(EMERGENCY_REPORT_PROOF_ERROR);
   }
 
   let locationLabel = String(input.location.label ?? "").trim() || undefined;

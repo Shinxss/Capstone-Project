@@ -3,6 +3,7 @@ import { useAuth } from "../../auth/AuthProvider";
 import { showInAppNotification } from "../../notifications/components/InAppNotificationHost";
 import { addMobileNotification } from "../../notifications/services/mobileNotificationsStore";
 import { playDispatchAlert } from "../../notifications/services/dispatchAlertService";
+import { getRequestUpdateNotificationId } from "../../notifications/utils/notificationIds";
 import {
   connectRealtime,
   disconnectRealtime,
@@ -129,17 +130,19 @@ export function useRealtimeBootstrap() {
     const isDispatchAssignee = normalizedRole === "VOLUNTEER" || normalizedRole === "RESPONDER";
 
     const onRequestUpdate = (payload: RequestUpdatePayload) => {
+      const copy = requestFeedCopy(payload);
+      const requestId = String(payload?.requestId ?? "").trim();
+      const fallbackId = Date.now().toString();
+      const dedupeId = `${copy.idPrefix}:${requestId || fallbackId}`;
+      const inAppId = getRequestUpdateNotificationId(requestId, payload?.step, fallbackId);
+
       showInAppNotification({
+        id: inAppId,
         title: String(payload?.title ?? "Request update"),
         body: String(payload?.body ?? "").trim(),
         target: normalizeRequestTarget(payload),
         tone: "info",
       });
-
-      const copy = requestFeedCopy(payload);
-      const requestId = String(payload?.requestId ?? "").trim();
-      const fallbackId = Date.now().toString();
-      const dedupeId = `${copy.idPrefix}:${requestId || fallbackId}`;
 
       void addMobileNotification({
         id: dedupeId,

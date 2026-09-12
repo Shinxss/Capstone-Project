@@ -7,12 +7,13 @@ import { useLguSidebarIndicators } from "./hooks/useLguSidebarIndicators";
 type Props = {
   title: string;
   subtitle?: string;
+  hideHeaderContext?: boolean;
   children: React.ReactNode;
 };
 
 const STORAGE_KEY = "lifeline_lgu_sidebar_collapsed";
 
-export default function LguShell({ title, subtitle, children }: Props) {
+export default function LguShell({ title, subtitle, hideHeaderContext = false, children }: Props) {
   // ✅ read collapsed state once (so it survives page changes)
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try {
@@ -57,6 +58,7 @@ export default function LguShell({ title, subtitle, children }: Props) {
           unreadNotifications={unreadNotifications}
           sidebarCollapsed={collapsed}
           onToggleSidebar={() => setCollapsed((v) => !v)}
+          hideContext={hideHeaderContext}
         />
 
         {/* ✅ only page content scrolls */}

@@ -32,6 +32,7 @@ apps/ai/
 apps/blockchain/
 tools/
 docs/
+reference/
 
 # Local configuration and credentials; preview variables come from EAS
 .env

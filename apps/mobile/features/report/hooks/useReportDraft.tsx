@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
 import type { EmergencyType, ReportDraft, ReportLocation, ReportPhoto } from "../models/report.types";
+import { MAX_PROOF_IMAGES } from "../constants/report.constants";
 
 function toCoordsLabel(coords: ReportLocation["coords"]) {
   return `Lat: ${coords.latitude.toFixed(5)}, Lng: ${coords.longitude.toFixed(5)}`;
@@ -53,7 +54,11 @@ export function ReportDraftProvider({ children }: { children: React.ReactNode })
   }, []);
 
   const addPhotoLocal = useCallback((asset: ReportPhoto) => {
-    setDraft((current) => ({ ...current, photos: [...(current.photos ?? []), asset] }));
+    setDraft((current) => {
+      const photos = current.photos ?? [];
+      if (photos.length >= MAX_PROOF_IMAGES) return current;
+      return { ...current, photos: [...photos, asset] };
+    });
   }, []);
 
   const updatePhoto = useCallback((index: number, patch: Partial<ReportPhoto>) => {

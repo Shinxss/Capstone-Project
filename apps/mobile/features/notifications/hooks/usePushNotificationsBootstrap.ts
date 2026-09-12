@@ -13,6 +13,7 @@ import {
   unregisterPushToken,
 } from "../services/pushRegistrationApi";
 import { playDispatchAlert } from "../services/dispatchAlertService";
+import { getRequestUpdateNotificationId } from "../utils/notificationIds";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -248,6 +249,10 @@ export function usePushNotificationsBootstrap() {
 
       const kind = String(data?.type ?? "").trim().toUpperCase();
       const isDispatch = kind === "DISPATCH_OFFER" || kind === "DISPATCH_OFFER".toLowerCase();
+      const requestId = String(data?.requestId ?? "").trim();
+      const inAppId = requestId
+        ? getRequestUpdateNotificationId(requestId, data?.step)
+        : String(data?.notificationId ?? "").trim() || undefined;
 
       if (isDispatch) {
         void playDispatchAlert({
@@ -259,6 +264,7 @@ export function usePushNotificationsBootstrap() {
       }
 
       showInAppNotification({
+        id: inAppId,
         title: title || "Lifeline update",
         body,
         target: target ?? undefined,

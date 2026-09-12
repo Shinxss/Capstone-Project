@@ -122,7 +122,10 @@ function SidebarItem({
   badgeCount?: number;
   onActivate?: () => void;
 }) {
+  const location = useLocation();
   const Icon = item.icon;
+  const isActive = location.pathname === item.to || location.pathname.startsWith(`${item.to}/`);
+  const isApprovals = item.to === "/lgu/approvals";
   const safeCount = Number.isFinite(badgeCount) ? Math.max(0, Math.floor(badgeCount)) : 0;
   const showBadge = safeCount > 0;
   const badgeLabel = safeCount > 99 ? "99+" : String(safeCount);
@@ -132,22 +135,22 @@ function SidebarItem({
       to={item.to}
       onClick={onActivate}
       title={collapsed ? item.label : undefined}
-      className={({ isActive }) =>
-        [
+      className={[
           "relative flex items-center rounded-md transition-colors",
           "py-2 text-sm font-medium",
           collapsed ? "justify-center px-2.5" : "gap-3 px-3",
           isActive
-            ? "bg-gray-200 text-gray-900 dark:bg-[#0F1A2E] dark:text-slate-100"
+            ? isApprovals
+              ? "bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-300"
+              : "bg-gray-200 text-gray-900 dark:bg-[#0F1A2E] dark:text-slate-100"
             : "text-gray-800 hover:bg-gray-100 dark:text-slate-200 dark:hover:bg-[#0E1A30] dark:text-slate-200 dark:hover:bg-[#0E1A30]",
           isActive
-            ? "before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:rounded-r before:bg-blue-600 dark:before:bg-blue-500"
+            ? `before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:rounded-r ${isApprovals ? "before:bg-red-600" : "before:bg-blue-600 dark:before:bg-blue-500"}`
             : "",
-        ].join(" ")
-      }
+        ].join(" ")}
     >
       <span className="relative shrink-0">
-        <Icon size={18} className="text-gray-900 dark:text-slate-200" />
+        <Icon size={18} className={isActive && isApprovals ? "text-red-600 dark:text-red-300" : "text-gray-900 dark:text-slate-200"} />
         {collapsed && showBadge ? (
           <span className="absolute -right-2 -top-2 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
             {badgeLabel}

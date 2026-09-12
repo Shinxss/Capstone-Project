@@ -13,6 +13,7 @@ import LguTasksForReview from "@/pages/lgu/tasks/LguTasksForReview";
 import LguTasksCompleted from "@/pages/lgu/tasks/LguTasksCompleted";
 import LguTasksCanceled from "@/pages/lgu/tasks/LguTasksCanceled";
 import LguApprovals from "@/pages/lgu/LguApprovals";
+import LguApprovalDetails from "@/pages/lgu/LguApprovalDetails";
 import LguActivityLog from "@/pages/lgu/LguActivityLog";
 import LguAnnouncements from "@/pages/lgu/LguAnnouncements";
 import LguReports from "@/pages/lgu/LguReports";
@@ -47,6 +48,7 @@ export function renderLguRoutes() {
       <Route path="/lgu/tasks/archived" element={<Navigate to="/lgu/tasks/canceled" replace />} />
 
       <Route path="/lgu/approvals" element={<LguApprovals />} />
+      <Route path="/lgu/approvals/:reportId" element={<LguApprovalDetails />} />
 
       <Route path="/lgu/audit-log" element={<LguActivityLog />} />
       <Route path="/lgu/activity-log" element={<Navigate to="/lgu/audit-log" replace />} />

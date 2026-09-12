@@ -18,6 +18,7 @@ import {
 type QueueItem = InAppNotificationPayload & { id: string };
 
 const SHOW_MS = 3400;
+const DEDUPE_WINDOW_MS = 10_000;
 
 function toneStyles(tone: InAppNotificationPayload["tone"]) {
   if (tone === "success") {
@@ -59,17 +60,36 @@ export function InAppNotificationHost() {
   const [active, setActive] = useState<QueueItem | null>(null);
   const opacity = useRef(new Animated.Value(0)).current;
   const translateX = useRef(new Animated.Value(26)).current;
+  const recentlySeenIds = useRef(new Set<string>());
+  const dedupeTimers = useRef(new Set<ReturnType<typeof setTimeout>>());
 
   useEffect(() => {
-    return subscribeInAppNotification((payload) => {
+    const unsubscribe = subscribeInAppNotification((payload) => {
+      const id = payload.id ?? `${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
+      if (recentlySeenIds.current.has(id)) return;
+
+      recentlySeenIds.current.add(id);
+      const dedupeTimer = setTimeout(() => {
+        recentlySeenIds.current.delete(id);
+        dedupeTimers.current.delete(dedupeTimer);
+      }, DEDUPE_WINDOW_MS);
+      dedupeTimers.current.add(dedupeTimer);
+
       setQueue((prev) => [
         ...prev,
         {
           ...payload,
-          id: payload.id ?? `${Date.now()}_${Math.random().toString(16).slice(2, 8)}`,
+          id,
         },
       ]);
     });
+
+    return () => {
+      unsubscribe();
+      dedupeTimers.current.forEach(clearTimeout);
+      dedupeTimers.current.clear();
+      recentlySeenIds.current.clear();
+    };
   }, []);
 
   useEffect(() => {

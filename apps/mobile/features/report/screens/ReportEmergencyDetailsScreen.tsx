@@ -14,13 +14,17 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MapboxGL from "@rnmapbox/maps";
 import { useSubmitReport } from "../hooks/useSubmitReport";
 import { useReportDraft } from "../hooks/useReportDraft";
 import { useReportPhotos } from "../hooks/useReportPhotos";
 import { getCurrentCoords, reverseGeocodeCoords } from "../../../shared/services/locationService";
+import { ProofUploader } from "../components/ProofUploader";
+import {
+  MAX_PROOF_IMAGES,
+  REQUIRED_PROOF_IMAGES,
+} from "../constants/report.constants";
 
 const DAGUPAN_CENTER: [number, number] = [120.34, 16.043];
 const FALLBACK_CENTER: [number, number] = DAGUPAN_CENTER;
@@ -62,7 +66,8 @@ export function ReportEmergencyDetailsScreen() {
   const hasMissingPhotoUrl = photos.some((photo) => !photo.url);
   const canSubmit =
     Boolean(draft.type && hasCoords) &&
-    uploadedProofCount >= 3 &&
+    uploadedProofCount === REQUIRED_PROOF_IMAGES &&
+    photos.length === MAX_PROOF_IMAGES &&
     !loading &&
     !hasUploading &&
     !hasError &&
@@ -149,6 +154,7 @@ export function ReportEmergencyDetailsScreen() {
   };
 
   const onAddPhoto = () => {
+    if (photos.length >= MAX_PROOF_IMAGES) return;
     setProofSheetVisible(true);
   };
 
@@ -319,68 +325,12 @@ export function ReportEmergencyDetailsScreen() {
           />
         </View>
 
-        <View className="mt-8">
-          <Text className="text-xl font-semibold text-zinc-900">Proof *</Text>
-          <View className="mt-3 flex-row flex-wrap gap-3">
-            <Pressable
-              onPress={onAddPhoto}
-              disabled={photos.length >= 5}
-              className={`h-24 w-24 items-center justify-center rounded-2xl border border-dashed border-zinc-300 ${photos.length >= 5 ? "opacity-40" : ""
-                }`}
-            >
-              <Ionicons name="camera-outline" size={20} color="#71717a" />
-              <Text className="mt-1 text-sm text-zinc-500">Add</Text>
-            </Pressable>
-
-            {photos.map((photo, index) => (
-              <View
-                key={`${photo.localUri}-${index}`}
-                className="h-24 w-24 overflow-hidden rounded-2xl border border-zinc-300 bg-zinc-200"
-              >
-                <Image
-                  source={{ uri: photo.localUri }}
-                  style={{ width: "100%", height: "100%" }}
-                  contentFit="cover"
-                />
-
-                <Pressable
-                  onPress={() => removePhoto(index)}
-                  className="absolute right-1 top-1 h-6 w-6 items-center justify-center rounded-full bg-black/70"
-                >
-                  <Ionicons name="close" size={14} color="#ffffff" />
-                </Pressable>
-
-                {photo.uploading ? (
-                  <View className="absolute inset-0 items-center justify-center bg-black/45">
-                    <Text className="rounded-md bg-black/70 px-2 py-1 text-xs font-medium text-white">
-                      Uploading...
-                    </Text>
-                  </View>
-                ) : null}
-
-                {photo.error ? (
-                  <View className="absolute bottom-1 left-1 right-1 rounded-md bg-red-500 px-1 py-0.5">
-                    <Text className="text-center text-[10px] font-medium text-white">Upload failed</Text>
-                  </View>
-                ) : null}
-              </View>
-            ))}
-          </View>
-
-          {hasError ? (
-            <Text className="mt-2 text-xs text-red-500">
-              Remove failed photo uploads before submitting your report.
-            </Text>
-          ) : uploadedProofCount < 3 ? (
-            <Text className="mt-2 text-xs text-red-500">
-              Upload at least 3 proof images before submitting.
-            </Text>
-          ) : (
-            <Text className="mt-2 text-xs text-zinc-500">
-              Upload at least 3 proof images (max 5).
-            </Text>
-          )}
-        </View>
+        <ProofUploader
+          photos={photos}
+          hasError={hasError}
+          onAddPhoto={onAddPhoto}
+          onRemovePhoto={removePhoto}
+        />
       </ScrollView>
 
       <Modal
@@ -394,7 +344,7 @@ export function ReportEmergencyDetailsScreen() {
             style={[styles.sheetCard, { paddingBottom: Math.max(insets.bottom, 12) + 12 }]}
             onPress={() => { }}
           >
-            <Text style={styles.sheetTitle}>Add Proof</Text>
+            <Text style={styles.sheetTitle}>Add Proof Photo</Text>
 
             <Pressable onPress={onTakePhoto} style={styles.sheetAction}>
               <Ionicons name="camera-outline" size={20} color="#111827" />

@@ -7,6 +7,11 @@ import {
   normalizeGuestReporterName,
   normalizeGuestReporterPhone,
 } from "../utils/guestReporter";
+import {
+  EMERGENCY_REPORT_PROOF_ERROR,
+  MAX_EMERGENCY_REPORT_PROOF_IMAGES,
+  REQUIRED_EMERGENCY_REPORT_PROOF_IMAGES,
+} from "../emergencyReport.constants";
 
 const guestReporterSchema = z
   .object({
@@ -41,16 +46,22 @@ export const createEmergencyReportSchema = z
       label: z.string().trim().min(1).max(160).optional(),
     }),
     description: z.string().trim().max(1000).optional(),
-    photos: z.array(z.string().trim().min(1).max(500)).min(3).max(5).optional(),
+    photos: z
+      .array(z.string().trim().min(1).max(500))
+      .max(MAX_EMERGENCY_REPORT_PROOF_IMAGES, EMERGENCY_REPORT_PROOF_ERROR)
+      .optional(),
     guestReporter: guestReporterSchema.optional(),
   })
   .strict()
   .superRefine((data, ctx) => {
-    if (!data.isSos && (!Array.isArray(data.photos) || data.photos.length < 3)) {
+    if (
+      !data.isSos &&
+      (!Array.isArray(data.photos) || data.photos.length < REQUIRED_EMERGENCY_REPORT_PROOF_IMAGES)
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["photos"],
-        message: "At least 3 proof images are required.",
+        message: EMERGENCY_REPORT_PROOF_ERROR,
       });
     }
   });

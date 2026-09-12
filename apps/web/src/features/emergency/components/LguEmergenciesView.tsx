@@ -289,12 +289,6 @@ export default function LguEmergenciesView(props: Props) {
 
   return (
     <div className="space-y-5 p-6">
-      <div className="min-w-0">
-        <div className="text-4xl font-bold leading-tight text-gray-900 dark:text-slate-100">Emergencies</div>
-        <div className="mt-1 text-base text-gray-400 dark:text-slate-400">Monitor and manage active emergency situations</div>
-        <div className="mt-2 text-sm font-semibold text-gray-600 dark:text-slate-300">Priority: SOS first, then latest reports.</div>
-      </div>
-
       {activeSosCount > 0 ? (
         <div className="heartbeat-alert flex items-center justify-between rounded-2xl border border-red-300 px-6 py-5 dark:border-red-500/25 dark:bg-red-500/10">
           <div className="flex items-center gap-4">

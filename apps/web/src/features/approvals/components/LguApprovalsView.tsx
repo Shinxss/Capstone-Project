@@ -1,9 +1,12 @@
-import { useMemo, useState } from "react";
-import { ShieldCheck } from "lucide-react";
-import Modal from "../../../components/ui/Modal";
-import EmptyState from "../../../components/ui/EmptyState";
-import { useLguApprovals } from "../hooks/useLguApprovals";
+import { useState } from "react";
+import { ChevronDown, ShieldCheck } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import type { EmergencyApprovalItem } from "../models/approvals.types";
+import { useLguApprovals } from "../hooks/useLguApprovals";
+import ApprovalFilters from "./ApprovalFilters";
+import ApprovalRejectModal from "./ApprovalRejectModal";
+import ApprovalReportCard from "./ApprovalReportCard";
+import ApprovalStats from "./ApprovalStats";
 
 type Props = ReturnType<typeof useLguApprovals> & {
   loading: boolean;
@@ -11,242 +14,134 @@ type Props = ReturnType<typeof useLguApprovals> & {
   onRefresh: () => void;
 };
 
-function LoadingPanel() {
+function ApprovalListSkeleton() {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 text-gray-600 dark:bg-[#0B1220] dark:border-[#162544] dark:text-slate-300">
-      Loading...
+    <div className="space-y-2" aria-label="Loading emergency reports">
+      {Array.from({ length: 5 }, (_, index) => (
+        <div key={index} className="h-[108px] animate-pulse rounded-xl border border-slate-200 bg-white p-3">
+          <div className="flex h-full gap-4">
+            <div className="w-36 rounded-lg bg-slate-100" />
+            <div className="flex-1 space-y-3 py-2">
+              <div className="h-3 w-1/3 rounded bg-slate-100" />
+              <div className="h-2.5 w-1/2 rounded bg-slate-100" />
+              <div className="h-2.5 w-3/4 rounded bg-slate-100" />
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
-}
-
-function ErrorPanel({ error, onRetry }: { error: string; onRetry: () => void }) {
-  return (
-    <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-500/10 dark:border-red-500/25 dark:text-red-200">
-      <div className="flex items-center justify-between gap-3">
-        <span>{error}</span>
-        <button
-          type="button"
-          onClick={onRetry}
-          className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
-        >
-          Retry
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function rowLocation(row: EmergencyApprovalItem) {
-  return row.locationLabel?.trim() || row.barangay || "-";
 }
 
 export default function LguApprovalsView(props: Props) {
+  const navigate = useNavigate();
   const {
     loading,
     error,
     onRefresh,
     filtered,
+    stats,
     filters,
     setFilters,
     clearFilters,
     emergencyTypeOptions,
+    barangayOptions,
     verify,
     reject,
     validateRejectReason,
     verifyingId,
     rejectingId,
   } = props;
-
-  const rows = useMemo(() => filtered, [filtered]);
-
-  const [rejectOpen, setRejectOpen] = useState(false);
-  const [rejectId, setRejectId] = useState("");
-  const [rejectReason, setRejectReason] = useState("");
-  const [rejectReasonError, setRejectReasonError] = useState("");
-
-  if (loading) return <LoadingPanel />;
-  if (error) return <ErrorPanel error={error} onRetry={onRefresh} />;
+  const [rejectTarget, setRejectTarget] = useState<EmergencyApprovalItem | null>(null);
 
   return (
-    <>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
-        <div className="md:col-span-2 rounded-lg border border-gray-200 bg-white p-3 dark:bg-[#0B1220] dark:border-[#162544]">
-          <div className="text-xs font-semibold uppercase text-gray-500 dark:text-slate-400">Search</div>
-          <input
-            value={filters.q}
-            onChange={(e) => setFilters((prev) => ({ ...prev, q: e.target.value }))}
-            placeholder="Reference no, type, barangay, reporter..."
-            className="mt-2 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-gray-300 dark:bg-[#0E1626] dark:border-[#162544] dark:text-slate-100 dark:placeholder:text-slate-500"
-          />
+    <div className="min-h-full bg-slate-50 px-5 py-4 text-slate-900 lg:px-6">
+      <div className="mx-auto max-w-[1500px] space-y-4">
+        <div>
+          <h1 className="text-2xl font-extrabold tracking-tight text-slate-950">Approvals / Verification</h1>
+          <p className="mt-0.5 text-sm text-slate-500">
+            Review and verify reported emergencies before they appear on the live map.
+          </p>
         </div>
 
-        <div className="rounded-lg border border-gray-200 bg-white p-3 dark:bg-[#0B1220] dark:border-[#162544]">
-          <div className="text-xs font-semibold uppercase text-gray-500 dark:text-slate-400">Emergency type</div>
-          <select
-            value={filters.emergencyType}
-            onChange={(e) => setFilters((prev) => ({ ...prev, emergencyType: e.target.value }))}
-            className="mt-2 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-gray-300 dark:bg-[#0E1626] dark:border-[#162544] dark:text-slate-100"
-          >
-            {emergencyTypeOptions.map((type) => (
-              <option key={type} value={type}>
-                {type === "ALL" ? "All" : type}
-              </option>
-            ))}
-          </select>
-        </div>
+        <ApprovalStats {...stats} />
 
-        <div className="rounded-lg border border-gray-200 bg-white p-3 dark:bg-[#0B1220] dark:border-[#162544]">
-          <div className="text-xs font-semibold uppercase text-gray-500 dark:text-slate-400">Barangay / Location</div>
-          <input
-            value={filters.barangay}
-            onChange={(e) => setFilters((prev) => ({ ...prev, barangay: e.target.value }))}
-            placeholder="Filter barangay"
-            className="mt-2 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-gray-300 dark:bg-[#0E1626] dark:border-[#162544] dark:text-slate-100 dark:placeholder:text-slate-500"
-          />
-        </div>
+        <ApprovalFilters
+          filters={filters}
+          emergencyTypeOptions={emergencyTypeOptions}
+          barangayOptions={barangayOptions}
+          onChange={setFilters}
+          onClear={clearFilters}
+        />
 
-        <div className="rounded-lg border border-gray-200 bg-white p-3 dark:bg-[#0B1220] dark:border-[#162544]">
-          <div className="text-xs font-semibold uppercase text-gray-500 dark:text-slate-400">Date range</div>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <input
-              type="date"
-              value={filters.dateFrom}
-              onChange={(e) => setFilters((prev) => ({ ...prev, dateFrom: e.target.value }))}
-              className="w-full rounded-md border border-gray-200 bg-white px-2 py-2 text-sm outline-none focus:border-gray-300 dark:bg-[#0E1626] dark:border-[#162544] dark:text-slate-100"
-            />
-            <input
-              type="date"
-              value={filters.dateTo}
-              onChange={(e) => setFilters((prev) => ({ ...prev, dateTo: e.target.value }))}
-              className="w-full rounded-md border border-gray-200 bg-white px-2 py-2 text-sm outline-none focus:border-gray-300 dark:bg-[#0E1626] dark:border-[#162544] dark:text-slate-100"
-            />
+        <section>
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-lg font-extrabold text-slate-950">Reported Emergencies</h2>
+            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+              <span>Showing {filtered.length === 0 ? 0 : `1–${filtered.length}`} of {filtered.length} reports</span>
+              <span className="hidden h-4 w-px bg-slate-200 sm:block" />
+              <label className="flex items-center gap-2">
+                <span>Sort by</span>
+                <span className="relative">
+                  <select
+                    value={filters.sort}
+                    onChange={(event) => setFilters((previous) => ({ ...previous, sort: event.target.value as typeof filters.sort }))}
+                    className="h-9 appearance-none rounded-lg border border-slate-200 bg-white pl-3 pr-8 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  >
+                    <option value="LATEST">Latest First</option>
+                    <option value="OLDEST">Oldest First</option>
+                    <option value="SEVERITY">Severity</option>
+                  </select>
+                  <ChevronDown size={13} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2" />
+                </span>
+              </label>
+            </div>
           </div>
-          <div className="mt-2 flex items-center justify-end">
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm font-semibold text-gray-800 hover:bg-gray-100 dark:bg-[#0E1626] dark:border-[#162544] dark:text-slate-200 dark:hover:bg-[#122036]"
-            >
-              Clear
-            </button>
-          </div>
-        </div>
+
+          {error ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <div className="flex items-center justify-between gap-3">
+                <span>{error}</span>
+                <button type="button" onClick={onRefresh} className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white">
+                  Retry
+                </button>
+              </div>
+            </div>
+          ) : loading ? (
+            <ApprovalListSkeleton />
+          ) : filtered.length === 0 ? (
+            <div className="grid min-h-52 place-items-center rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center">
+              <div>
+                <ShieldCheck size={34} className="mx-auto text-slate-400" />
+                <h3 className="mt-3 text-sm font-bold text-slate-900">No reports found</h3>
+                <p className="mt-1 text-xs text-slate-500">Try clearing or adjusting the active filters.</p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {filtered.map((item) => (
+                <ApprovalReportCard
+                  key={item.incidentId}
+                  item={item}
+                  approving={verifyingId === item.incidentId}
+                  rejecting={rejectingId === item.incidentId}
+                  onView={() => navigate(`/lgu/approvals/${encodeURIComponent(item.incidentId)}`)}
+                  onApprove={() => void verify(item.incidentId)}
+                  onReject={() => setRejectTarget(item)}
+                />
+              ))}
+            </div>
+          )}
+        </section>
       </div>
 
-      {rows.length === 0 ? (
-        <EmptyState className="mt-4" icon={ShieldCheck} title="No pending emergency reports." />
-      ) : (
-        <div className="mt-4 overflow-hidden rounded-lg border border-gray-200 bg-white dark:bg-[#0B1220] dark:border-[#162544]">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-gray-50 text-xs font-semibold uppercase text-gray-500 dark:bg-[#0E1626] dark:text-slate-400">
-              <tr>
-                <th className="px-4 py-3">Reference No</th>
-                <th className="px-4 py-3">Emergency Type</th>
-                <th className="px-4 py-3">Barangay / Location</th>
-                <th className="px-4 py-3">Date/Time Reported</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-[#162544]">
-              {rows.map((row) => (
-                <tr key={row.incidentId} className="hover:bg-gray-50 dark:hover:bg-[#0E1626]">
-                  <td className="px-4 py-3 font-mono text-xs text-gray-800 dark:text-slate-200">{row.referenceNumber}</td>
-                  <td className="px-4 py-3 font-semibold uppercase text-gray-900 dark:text-slate-100">{row.type}</td>
-                  <td className="px-4 py-3 text-xs text-gray-700 dark:text-slate-300">{rowLocation(row)}</td>
-                  <td className="px-4 py-3 text-xs text-gray-700 dark:text-slate-300">
-                    {row.createdAt ? new Date(row.createdAt).toLocaleString() : "-"}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="inline-flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void verify(row.incidentId)}
-                        disabled={verifyingId === row.incidentId}
-                        className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
-                      >
-                        {verifyingId === row.incidentId ? "Approving..." : "Approve"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setRejectId(row.incidentId);
-                          setRejectReason("");
-                          setRejectReasonError("");
-                          setRejectOpen(true);
-                        }}
-                        disabled={rejectingId === row.incidentId}
-                        className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60"
-                      >
-                        Reject
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <Modal
-        open={rejectOpen && !!rejectId}
-        title="Reject Emergency Report"
-        subtitle="Reason is required"
-        onClose={() => {
-          setRejectOpen(false);
-          setRejectId("");
-          setRejectReason("");
-          setRejectReasonError("");
-        }}
-        footer={
-          <div className="flex items-center justify-end gap-2">
-            <button
-              type="button"
-              className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 dark:bg-[#0E1626] dark:border-[#162544] dark:text-slate-200 dark:hover:bg-[#122036]"
-              onClick={() => {
-                setRejectOpen(false);
-                setRejectId("");
-                setRejectReason("");
-                setRejectReasonError("");
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={rejectingId === rejectId}
-              onClick={async () => {
-                const validation = validateRejectReason(rejectReason);
-                if (!validation.ok) {
-                  setRejectReasonError(validation.error);
-                  return;
-                }
-
-                setRejectReasonError("");
-                await reject(rejectId, rejectReason);
-                setRejectOpen(false);
-                setRejectId("");
-                setRejectReason("");
-              }}
-              className="rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
-            >
-              {rejectingId === rejectId ? "Rejecting..." : "Reject"}
-            </button>
-          </div>
-        }
-      >
-        <div className="space-y-2">
-          <label className="text-sm font-semibold text-gray-800 dark:text-slate-200">Reason</label>
-          <textarea
-            value={rejectReason}
-            onChange={(e) => setRejectReason(e.target.value)}
-            rows={4}
-            className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-gray-300 dark:bg-[#0E1626] dark:border-[#162544] dark:text-slate-100"
-            placeholder="Provide a clear reason for rejection"
-          />
-          {rejectReasonError ? <p className="text-xs text-red-600">{rejectReasonError}</p> : null}
-        </div>
-      </Modal>
-    </>
+      <ApprovalRejectModal
+        open={Boolean(rejectTarget)}
+        busy={Boolean(rejectTarget && rejectingId === rejectTarget.incidentId)}
+        validate={validateRejectReason}
+        onClose={() => setRejectTarget(null)}
+        onConfirm={(reason) => rejectTarget ? reject(rejectTarget.incidentId, reason) : Promise.resolve(false)}
+      />
+    </div>
   );
 }

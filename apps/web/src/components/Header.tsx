@@ -38,6 +38,7 @@ type HeaderProps = {
 
   sidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
+  hideContext?: boolean;
 };
 
 type NotificationsTab = "UNREAD" | "READ";
@@ -73,6 +74,7 @@ export default function Header({
   loginPath = "/lgu/login",
   sidebarCollapsed = false,
   onToggleSidebar,
+  hideContext = false,
 }: HeaderProps) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -229,7 +231,7 @@ export default function Header({
     <header className="sticky top-0 z-40 bg-white border-b border-gray-300 dark:bg-[#0B1220] dark:border-[#162544]">
       <div className="h-16 px-3 flex items-center justify-between">
         {/* Left: sidebar toggle + title */}
-        <div className="min-w-65">
+        <div className={hideContext ? "" : "min-w-65"}>
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -245,10 +247,12 @@ export default function Header({
               />
             </button>
 
-            <div className="leading-tight">
-              <div className="text-xl font-bold text-gray-900 dark:text-slate-100">{title}</div>
-              <div className="text-sm text-gray-500 dark:text-slate-400">{displaySubtitle}</div>
-            </div>
+            {!hideContext ? (
+              <div className="leading-tight">
+                <div className="text-xl font-bold text-gray-900 dark:text-slate-100">{title}</div>
+                <div className="text-sm text-gray-500 dark:text-slate-400">{displaySubtitle}</div>
+              </div>
+            ) : null}
           </div>
         </div>
 

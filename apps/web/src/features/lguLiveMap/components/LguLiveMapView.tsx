@@ -29,6 +29,7 @@ import {
 
 import DispatchRespondersModal from "./DispatchRespondersModal";
 import LguEmergencyDetailsPanel from "./LguEmergencyDetailsPanel";
+import MapLegend from "./MapLegend";
 
 import {
   HAZARD_TYPE_COLOR,
@@ -343,53 +344,11 @@ export default function LguLiveMapView(props: Props) {
 
       {/* Floating Legend (outside layers) */}
       <div className="absolute top-16 right-3 z-20 pointer-events-none">
-        <div className="pointer-events-auto rounded-xl bg-white/70 text-gray-900 backdrop-blur shadow-lg border border-white/70 overflow-hidden dark:bg-black/65 dark:text-white dark:border-white/10">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-white/70 dark:border-white/10">
-            <div className="text-xs font-extrabold">Legend</div>
-            <button
-              onClick={() => setLegendMinimized((v) => !v)}
-              className="h-7 w-7 rounded-md hover:bg-white/60 dark:hover:bg-white/10 grid place-items-center"
-              aria-label={legendMinimized ? "Expand legend" : "Minimize legend"}
-              title={legendMinimized ? "Expand" : "Minimize"}
-            >
-              <span className="text-sm leading-none font-black">
-                {legendMinimized ? "+" : "–"}
-              </span>
-            </button>
-          </div>
-
-          {!legendMinimized ? (
-            <div className="px-3 py-3 w-65">
-              <div className="text-[11px] font-bold text-gray-600 mb-2 dark:text-white/85">Hazard Zones</div>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[12px]">
-                {HAZARD_TYPES.map((t) => (
-                  <div key={t} className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full" style={{ background: HAZARD_TYPE_COLOR[t] }} />
-                    <span>{HAZARD_TYPE_LABEL[t]}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-3 text-[11px] font-bold text-gray-600 mb-2 dark:text-white/85">Responders & Volunteers</div>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[12px]">
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                  <span>Available</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-orange-500" />
-                  <span>Busy</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-slate-500" />
-                  <span>Idle</span>
-                </div>
-
-              </div>
-            </div>
-          ) : (
-            <div className="px-3 py-2 text-[12px] text-gray-600 dark:text-white/80">Legend minimized</div>
-          )}
+        <div className="pointer-events-auto">
+          <MapLegend
+            minimized={legendMinimized}
+            onToggle={() => setLegendMinimized((value) => !value)}
+          />
         </div>
       </div>
 

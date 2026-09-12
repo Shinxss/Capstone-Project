@@ -3,9 +3,8 @@ import { Alert } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { uploadEmergencyReportPhoto } from "../../emergency/services/emergencyApi";
 import type { ReportPhoto } from "../models/report.types";
+import { MAX_PROOF_IMAGES } from "../constants/report.constants";
 import { useReportDraft } from "./useReportDraft";
-
-const MAX_PHOTOS = 5;
 
 function normalizeMimeType(value?: string | null) {
   const mime = String(value ?? "").trim().toLowerCase();
@@ -35,13 +34,13 @@ export function useReportPhotos() {
     photosRef.current = photos;
   }, [photos]);
 
-  const remainingSlots = MAX_PHOTOS - photos.length;
+  const remainingSlots = MAX_PROOF_IMAGES - photos.length;
   const hasUploading = useMemo(() => photos.some((photo) => Boolean(photo.uploading)), [photos]);
   const hasError = useMemo(() => photos.some((photo) => Boolean(photo.error)), [photos]);
 
   const ensureSlotAvailable = useCallback(() => {
     if (remainingSlots > 0) return true;
-    Alert.alert("Photo limit reached", `You can upload up to ${MAX_PHOTOS} photos.`);
+    Alert.alert("Photo already added", "Remove the current proof photo before adding another one.");
     return false;
   }, [remainingSlots]);
 
@@ -109,19 +108,15 @@ export function useReportPhotos() {
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: true,
-      selectionLimit: Math.max(1, remainingSlots),
+      allowsMultipleSelection: false,
+      selectionLimit: 1,
       quality: 0.65,
       base64: true,
     });
 
     if (result.canceled) return;
-    const selectedAssets = (result.assets ?? []).slice(0, Math.max(0, remainingSlots));
+    const selectedAssets = (result.assets ?? []).slice(0, 1);
     if (selectedAssets.length === 0) return;
-
-    if ((result.assets?.length ?? 0) > selectedAssets.length) {
-      Alert.alert("Photo limit reached", `Only ${selectedAssets.length} photo(s) were added.`);
-    }
 
     for (const asset of selectedAssets) {
       await uploadAsset(asset);

@@ -6,9 +6,11 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Props = {
   visible: boolean;
@@ -27,6 +29,12 @@ export function SosConfirmationModal({
   onConfirm,
   onCancel,
 }: Props) {
+  const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const safeTop = Math.max(insets.top, 16);
+  const safeBottom = Math.max(insets.bottom, 16);
+  const maxCardHeight = Math.max(0, windowHeight - safeTop - safeBottom - 32);
+
   return (
     <Modal
       visible={visible}
@@ -36,13 +44,14 @@ export function SosConfirmationModal({
         if (!busy) onCancel();
       }}
     >
-      <View style={styles.backdrop}>
-        <ScrollView
-          bounces={false}
-          showsVerticalScrollIndicator={false}
-          style={styles.card}
-          contentContainerStyle={styles.cardContent}
-        >
+      <View style={[styles.backdrop, { paddingTop: safeTop, paddingBottom: safeBottom }]}>
+        <View style={[styles.card, { maxHeight: maxCardHeight }]}>
+          <ScrollView
+            bounces={false}
+            showsVerticalScrollIndicator={false}
+            style={styles.scrollView}
+            contentContainerStyle={styles.cardContent}
+          >
           <View style={styles.titleRow}>
             <Ionicons name="warning-outline" size={24} color="#DC2626" />
             <Text style={styles.title}>Confirm Emergency SOS</Text>
@@ -114,7 +123,8 @@ export function SosConfirmationModal({
           >
             <Text style={styles.cancelBtnText}>Cancel</Text>
           </Pressable>
-        </ScrollView>
+          </ScrollView>
+        </View>
       </View>
     </Modal>
   );
@@ -126,14 +136,17 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.50)",
     alignItems: "center",
     justifyContent: "center",
-    padding: 16,
+    paddingHorizontal: 16,
   },
   card: {
     width: "100%",
     maxWidth: 520,
-    maxHeight: "88%",
     borderRadius: 16,
     backgroundColor: "#FFFFFF",
+    overflow: "hidden",
+  },
+  scrollView: {
+    flexGrow: 0,
   },
   cardContent: {
     paddingHorizontal: 25,

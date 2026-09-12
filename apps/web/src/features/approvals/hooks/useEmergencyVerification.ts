@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
-import type { EmergencyApprovalItem, EmergencyVerificationFilters } from "../models/approvals.types";
+import type {
+  EmergencyApprovalItem,
+  EmergencyVerificationFilters,
+} from "../models/approvals.types";
 import {
   approveEmergencyReport,
+  fetchApprovalReportFeed,
   fetchPendingEmergencyVerifications,
   rejectEmergencyReport,
 } from "../services/approvalsApi";
+import { toApprovalItem } from "../utils/approval.utils";
 import { toastError, toastSuccess } from "@/services/feedback/toast.service";
 import { appendActivityLog } from "../../activityLog/services/activityLog.service";
 
@@ -16,27 +21,44 @@ const rejectSchema = z.object({
 const defaultFilters: EmergencyVerificationFilters = {
   q: "",
   emergencyType: "ALL",
-  barangay: "",
+  barangay: "ALL",
   dateFrom: "",
   dateTo: "",
+  status: "ALL",
+  sort: "LATEST",
 };
 
-function toStartOfDayIso(dateYmd: string) {
-  const d = new Date(`${dateYmd}T00:00:00.000`);
-  return d.toISOString();
+function toStartOfDay(dateYmd: string) {
+  return new Date(`${dateYmd}T00:00:00`).getTime();
 }
 
-function toEndOfDayIso(dateYmd: string) {
-  const d = new Date(`${dateYmd}T23:59:59.999`);
-  return d.toISOString();
+function toEndOfDay(dateYmd: string) {
+  return new Date(`${dateYmd}T23:59:59.999`).getTime();
 }
 
-function safeIso(v?: string | null) {
-  const s = String(v || "").trim();
-  if (!s) return "";
-  const d = new Date(s);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toISOString();
+function timestamp(value?: string) {
+  const result = new Date(value || "").getTime();
+  return Number.isFinite(result) ? result : 0;
+}
+
+function severityRank(item: EmergencyApprovalItem) {
+  if (item.severity === "high") return 0;
+  if (item.severity === "medium") return 1;
+  return 2;
+}
+
+function startOfToday() {
+  const value = new Date();
+  value.setHours(0, 0, 0, 0);
+  return value.getTime();
+}
+
+function startOfWeek() {
+  const value = new Date();
+  const day = value.getDay();
+  value.setDate(value.getDate() - (day === 0 ? 6 : day - 1));
+  value.setHours(0, 0, 0, 0);
+  return value.getTime();
 }
 
 export function useEmergencyVerification() {
@@ -44,7 +66,6 @@ export function useEmergencyVerification() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<EmergencyVerificationFilters>(defaultFilters);
-
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
 
@@ -52,10 +73,19 @@ export function useEmergencyVerification() {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchPendingEmergencyVerifications();
-      setItems(data);
-    } catch (e: any) {
-      const message = e?.response?.data?.message || e?.message || "Failed to load pending reports";
+      const [reports, pending] = await Promise.all([
+        fetchApprovalReportFeed(),
+        fetchPendingEmergencyVerifications(),
+      ]);
+      const pendingById = new Map(pending.map((item) => [String(item.incidentId), item]));
+      const mapped = reports
+        .map((report) => toApprovalItem(report, pendingById.get(String(report._id))))
+        .filter((item): item is EmergencyApprovalItem => Boolean(item))
+        .sort((a, b) => timestamp(b.reportedAt || b.createdAt) - timestamp(a.reportedAt || a.createdAt));
+      setItems(mapped);
+    } catch (caught: unknown) {
+      const withResponse = caught as { response?: { data?: { message?: string } }; message?: string };
+      const message = withResponse.response?.data?.message || withResponse.message || "Failed to load reports";
       setError(message);
       toastError(message);
     } finally {
@@ -68,51 +98,67 @@ export function useEmergencyVerification() {
   }, [refresh]);
 
   const emergencyTypeOptions = useMemo(() => {
-    const set = new Set<string>();
-    for (const item of items) {
-      const v = String(item.type || "").trim();
-      if (v) set.add(v);
-    }
-    return ["ALL", ...Array.from(set).sort((a, b) => a.localeCompare(b))];
+    const values = new Set(items.map((item) => item.type).filter(Boolean));
+    return ["ALL", ...Array.from(values).sort((a, b) => a.localeCompare(b))];
+  }, [items]);
+
+  const barangayOptions = useMemo(() => {
+    const values = new Set(items.map((item) => item.barangay).filter((value) => value && value !== "Unknown"));
+    return ["ALL", ...Array.from(values).sort((a, b) => a.localeCompare(b))];
   }, [items]);
 
   const filtered = useMemo(() => {
-    const q = filters.q.trim().toLowerCase();
-    const barangayQ = filters.barangay.trim().toLowerCase();
-    const type = String(filters.emergencyType || "ALL");
+    const query = filters.q.trim().toLowerCase();
+    const from = filters.dateFrom ? toStartOfDay(filters.dateFrom) : 0;
+    const to = filters.dateTo ? toEndOfDay(filters.dateTo) : Number.POSITIVE_INFINITY;
 
-    const fromIso = filters.dateFrom ? toStartOfDayIso(filters.dateFrom) : "";
-    const toIso = filters.dateTo ? toEndOfDayIso(filters.dateTo) : "";
+    const matches = items.filter((item) => {
+      const reported = timestamp(item.reportedAt || item.createdAt);
+      if (reported < from || reported > to) return false;
+      if (filters.emergencyType !== "ALL" && item.type !== filters.emergencyType) return false;
+      if (filters.barangay !== "ALL" && item.barangay !== filters.barangay) return false;
+      if (filters.status !== "ALL" && item.status !== filters.status) return false;
+      if (!query) return true;
 
-    return items.filter((item) => {
-      const createdAtIso = safeIso(item.createdAt);
-      if (fromIso && createdAtIso && createdAtIso < fromIso) return false;
-      if (toIso && createdAtIso && createdAtIso > toIso) return false;
-
-      const itemType = String(item.type || "").trim();
-      if (type !== "ALL" && itemType !== type) return false;
-
-      const barangay = String(item.barangay || "").toLowerCase();
-      const locationLabel = String(item.locationLabel || "").toLowerCase();
-      if (barangayQ && !barangay.includes(barangayQ) && !locationLabel.includes(barangayQ)) return false;
-
-      if (q) {
-        const hay = [
-          item.incidentId,
-          item.referenceNumber,
-          item.type,
-          item.barangay,
-          item.locationLabel,
-          item.reporter?.name,
-        ]
-          .map((x) => String(x || "").toLowerCase())
-          .join(" | ");
-        if (!hay.includes(q)) return false;
-      }
-
-      return true;
+      return [
+        item.incidentId,
+        item.referenceNumber,
+        item.type,
+        item.title,
+        item.barangay,
+        item.locationLabel,
+        item.description,
+        item.reporter.name,
+      ]
+        .map((value) => String(value || "").toLowerCase())
+        .some((value) => value.includes(query));
     });
-  }, [items, filters]);
+
+    return matches.sort((a, b) => {
+      if (filters.sort === "SEVERITY") {
+        const difference = severityRank(a) - severityRank(b);
+        if (difference !== 0) return difference;
+      }
+      const aTime = timestamp(a.reportedAt || a.createdAt);
+      const bTime = timestamp(b.reportedAt || b.createdAt);
+      return filters.sort === "OLDEST" ? aTime - bTime : bTime - aTime;
+    });
+  }, [filters, items]);
+
+  const stats = useMemo(() => {
+    const today = startOfToday();
+    const week = startOfWeek();
+    return {
+      pending: items.filter((item) => item.status === "pending").length,
+      approvedToday: items.filter(
+        (item) => item.status === "approved" && timestamp(item.reviewedAt || item.updatedAt) >= today
+      ).length,
+      rejectedToday: items.filter(
+        (item) => item.status === "rejected" && timestamp(item.reviewedAt || item.updatedAt) >= today
+      ).length,
+      totalThisWeek: items.filter((item) => timestamp(item.reportedAt || item.createdAt) >= week).length,
+    };
+  }, [items]);
 
   const verify = useCallback(
     async (incidentId: string) => {
@@ -120,7 +166,7 @@ export function useEmergencyVerification() {
         setError(null);
         setVerifyingId(incidentId);
         await approveEmergencyReport(incidentId);
-        const approved = items.find((item) => String(item.incidentId) === String(incidentId));
+        const approved = items.find((item) => item.incidentId === incidentId);
         appendActivityLog({
           action: "Approved emergency report",
           entityType: "emergency",
@@ -133,10 +179,13 @@ export function useEmergencyVerification() {
         });
         toastSuccess("Emergency report approved.");
         await refresh();
-      } catch (e: any) {
-        const message = e?.response?.data?.message || e?.message || "Failed to approve report";
+        return true;
+      } catch (caught: unknown) {
+        const withResponse = caught as { response?: { data?: { message?: string } }; message?: string };
+        const message = withResponse.response?.data?.message || withResponse.message || "Failed to approve report";
         setError(message);
         toastError(message);
+        return false;
       } finally {
         setVerifyingId(null);
       }
@@ -152,14 +201,14 @@ export function useEmergencyVerification() {
 
   const reject = useCallback(
     async (incidentId: string, reason: string) => {
-      const v = validateRejectReason(reason);
-      if (!v.ok) throw new Error(v.error);
+      const validation = validateRejectReason(reason);
+      if (!validation.ok) throw new Error(validation.error);
 
       try {
         setError(null);
         setRejectingId(incidentId);
         await rejectEmergencyReport(incidentId, reason.trim());
-        const rejected = items.find((item) => String(item.incidentId) === String(incidentId));
+        const rejected = items.find((item) => item.incidentId === incidentId);
         appendActivityLog({
           action: "Rejected emergency report",
           entityType: "emergency",
@@ -173,10 +222,13 @@ export function useEmergencyVerification() {
         });
         toastSuccess("Emergency report rejected.");
         await refresh();
-      } catch (e: any) {
-        const message = e?.response?.data?.message || e?.message || "Failed to reject report";
+        return true;
+      } catch (caught: unknown) {
+        const withResponse = caught as { response?: { data?: { message?: string } }; message?: string };
+        const message = withResponse.response?.data?.message || withResponse.message || "Failed to reject report";
         setError(message);
         toastError(message);
+        return false;
       } finally {
         setRejectingId(null);
       }
@@ -187,12 +239,14 @@ export function useEmergencyVerification() {
   return {
     items,
     filtered,
+    stats,
     loading,
     error,
     filters,
     setFilters,
     clearFilters: () => setFilters(defaultFilters),
     emergencyTypeOptions,
+    barangayOptions,
     refresh,
     verifyingId,
     rejectingId,
