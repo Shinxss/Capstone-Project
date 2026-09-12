@@ -57,13 +57,6 @@ export default function LguApprovalsView(props: Props) {
   return (
     <div className="min-h-full bg-slate-50 px-5 py-4 text-slate-900 lg:px-6">
       <div className="mx-auto max-w-[1500px] space-y-4">
-        <div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-slate-950">Approvals / Verification</h1>
-          <p className="mt-0.5 text-sm text-slate-500">
-            Review and verify reported emergencies before they appear on the live map.
-          </p>
-        </div>
-
         <ApprovalStats {...stats} />
 
         <ApprovalFilters
