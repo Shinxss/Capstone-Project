@@ -6,8 +6,8 @@ export default function LguReports() {
   const vm = useLguReports();
 
   return (
-    <LguShell title="Reports" subtitle="Operational summaries (derived)">
-      <LguReportsView {...vm} loading={vm.loading} error={vm.error} onRefresh={vm.refresh} />
+    <LguShell title="Reports & Analytics" subtitle="Barangay emergency response overview">
+      <LguReportsView {...vm} />
     </LguShell>
   );
 }

@@ -1,61 +1,42 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLguSession } from "../../auth/hooks/useLguSession";
 import type { EmergencyReport } from "../../emergency/models/emergency.types";
 import type { DispatchTask } from "../../tasks/models/tasks.types";
-import type { ReportsFilters, ReportsSummary } from "../models/reports.types";
+import { DEFAULT_REPORTS_FILTERS } from "../constants/reports.constants";
+import type { ReportsFilters } from "../models/reports.types";
 import { fetchReportsData } from "../services/reports.service";
-
-const defaultFilters: ReportsFilters = { dateFrom: "", dateTo: "", emergencyType: "ALL" };
-
-function toStartOfDayIso(dateYmd: string) {
-  const d = new Date(`${dateYmd}T00:00:00.000`);
-  return d.toISOString();
-}
-
-function toEndOfDayIso(dateYmd: string) {
-  const d = new Date(`${dateYmd}T23:59:59.999`);
-  return d.toISOString();
-}
-
-function safeIso(v?: string | null) {
-  const s = String(v || "").trim();
-  if (!s) return "";
-  const d = new Date(s);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toISOString();
-}
-
-function emergencyDate(e: EmergencyReport) {
-  return safeIso(e.reportedAt) || safeIso(e.createdAt) || safeIso(e.updatedAt) || "";
-}
-
-function taskEmergencyReportedAt(t: DispatchTask) {
-  return safeIso(t.emergency?.reportedAt) || "";
-}
+import { buildReportsDashboard, filterEmergencies, filterTasks } from "../utils/reports.utils";
 
 function downloadTextFile(filename: string, content: string, mime = "text/plain") {
   const blob = new Blob([content], { type: mime });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
   URL.revokeObjectURL(url);
 }
 
-function csvEscape(v: unknown) {
-  const s = String(v ?? "");
-  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-  return s;
+function csvEscape(value: unknown) {
+  const text = String(value ?? "");
+  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function errorMessage(error: unknown) {
+  const candidate = error as { response?: { data?: { message?: string } }; message?: string };
+  return candidate.response?.data?.message || candidate.message || "Failed to load reports";
 }
 
 export function useLguReports() {
+  const { user } = useLguSession();
   const [emergencies, setEmergencies] = useState<EmergencyReport[]>([]);
   const [tasks, setTasks] = useState<DispatchTask[]>([]);
-  const [filters, setFilters] = useState<ReportsFilters>(defaultFilters);
-  const [loading, setLoading] = useState(false);
+  const [filters, setFilters] = useState<ReportsFilters>(DEFAULT_REPORTS_FILTERS);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const barangayName = String(user?.barangay || "Barangay").trim() || "Barangay";
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -64,8 +45,8 @@ export function useLguReports() {
       const data = await fetchReportsData();
       setEmergencies(data.emergencies ?? []);
       setTasks(data.tasks ?? []);
-    } catch (e: any) {
-      setError(e?.response?.data?.message || e?.message || "Failed to load reports");
+    } catch (requestError: unknown) {
+      setError(errorMessage(requestError));
     } finally {
       setLoading(false);
     }
@@ -75,66 +56,36 @@ export function useLguReports() {
     void refresh();
   }, [refresh]);
 
-  const emergencyTypeOptions = useMemo(() => {
-    const set = new Set<string>();
-    for (const e of emergencies) {
-      const v = String(e.emergencyType || "").trim();
-      if (v) set.add(v);
-    }
-    return ["ALL", ...Array.from(set).sort((a, b) => a.localeCompare(b))];
-  }, [emergencies]);
+  const emergencyTypeOptions = useMemo(
+    () => ["ALL", ...Array.from(new Set(emergencies.map((item) => item.emergencyType).filter(Boolean))).sort()],
+    [emergencies],
+  );
 
-  const filteredEmergencies = useMemo(() => {
-    const fromIso = filters.dateFrom ? toStartOfDayIso(filters.dateFrom) : "";
-    const toIso = filters.dateTo ? toEndOfDayIso(filters.dateTo) : "";
-    const type = String(filters.emergencyType || "ALL");
+  const statusOptions = useMemo(
+    () => ["ALL", ...Array.from(new Set(emergencies.map((item) => item.status).filter(Boolean))).sort()],
+    [emergencies],
+  );
 
-    return emergencies.filter((e) => {
-      const dt = emergencyDate(e);
-      if (fromIso && dt && dt < fromIso) return false;
-      if (toIso && dt && dt > toIso) return false;
-      if (type !== "ALL" && String(e.emergencyType || "") !== type) return false;
-      return true;
-    });
-  }, [emergencies, filters]);
+  const filteredEmergencies = useMemo(() => filterEmergencies(emergencies, filters), [emergencies, filters]);
+  const filteredTasks = useMemo(
+    () => filterTasks(tasks, emergencies, filteredEmergencies, filters),
+    [tasks, emergencies, filteredEmergencies, filters],
+  );
 
-  const filteredTasks = useMemo(() => {
-    const fromIso = filters.dateFrom ? toStartOfDayIso(filters.dateFrom) : "";
-    const toIso = filters.dateTo ? toEndOfDayIso(filters.dateTo) : "";
-    const type = String(filters.emergencyType || "ALL");
+  const dashboard = useMemo(
+    () =>
+      buildReportsDashboard({
+        allEmergencies: emergencies,
+        allTasks: tasks,
+        emergencies: filteredEmergencies,
+        tasks: filteredTasks,
+        filters,
+        barangayName,
+      }),
+    [emergencies, tasks, filteredEmergencies, filteredTasks, filters, barangayName],
+  );
 
-    return tasks.filter((t) => {
-      const dt = taskEmergencyReportedAt(t) || safeIso(t.createdAt) || safeIso(t.updatedAt) || "";
-      if (fromIso && dt && dt < fromIso) return false;
-      if (toIso && dt && dt > toIso) return false;
-      if (type !== "ALL" && String(t.emergency?.emergencyType || "") !== type) return false;
-      return true;
-    });
-  }, [tasks, filters]);
-
-  const summary: ReportsSummary = useMemo(() => {
-    const activeTasks = filteredTasks.filter((t) => String(t.status).toUpperCase() === "ACCEPTED").length;
-    const completedTasks = filteredTasks.filter((t) => String(t.status).toUpperCase() === "VERIFIED").length;
-
-    const responseMins: number[] = [];
-    for (const t of filteredTasks) {
-      const r = safeIso(t.respondedAt);
-      const rep = safeIso(t.emergency?.reportedAt);
-      if (!r || !rep) continue;
-      const ms = new Date(r).getTime() - new Date(rep).getTime();
-      if (Number.isFinite(ms) && ms >= 0) responseMins.push(ms / 60000);
-    }
-
-    const avg =
-      responseMins.length > 0 ? responseMins.reduce((a, b) => a + b, 0) / responseMins.length : null;
-
-    return {
-      totalEmergencies: filteredEmergencies.length,
-      activeTasks,
-      completedTasks,
-      avgResponseMinutes: avg ? Math.round(avg * 10) / 10 : null,
-    };
-  }, [filteredEmergencies.length, filteredTasks]);
+  const clearFilters = useCallback(() => setFilters(DEFAULT_REPORTS_FILTERS), []);
 
   const exportTasksCsv = useCallback(() => {
     const header = [
@@ -149,25 +100,19 @@ export function useLguReports() {
       "verifiedAt",
       "volunteer",
     ];
-
-    const rows = filteredTasks.map((t) => [
-      t.id,
-      t.status,
-      t.emergency?.id,
-      t.emergency?.emergencyType,
-      t.emergency?.barangayName || "",
-      t.emergency?.reportedAt || "",
-      t.respondedAt || "",
-      t.completedAt || "",
-      t.verifiedAt || "",
-      t.volunteer?.name || "",
+    const rows = filteredTasks.map((task) => [
+      task.id,
+      task.status,
+      task.emergency?.id,
+      task.emergency?.emergencyType,
+      task.emergency?.barangayName || "",
+      task.emergency?.reportedAt || "",
+      task.respondedAt || "",
+      task.completedAt || "",
+      task.verifiedAt || "",
+      task.volunteer?.name || "",
     ]);
-
-    const csv =
-      header.join(",") +
-      "\n" +
-      rows.map((r) => r.map(csvEscape).join(",")).join("\n");
-
+    const csv = [header, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
     const stamp = new Date().toISOString().slice(0, 10);
     downloadTextFile(`lgu-report-tasks-${stamp}.csv`, csv, "text/csv");
   }, [filteredTasks]);
@@ -175,15 +120,14 @@ export function useLguReports() {
   return {
     loading,
     error,
+    barangayName,
     filters,
     setFilters,
-    clearFilters: () => setFilters(defaultFilters),
-    refresh,
+    clearFilters,
     emergencyTypeOptions,
-    emergencies: filteredEmergencies,
-    tasks: filteredTasks,
-    summary,
+    statusOptions,
+    ...dashboard,
     exportTasksCsv,
+    refresh,
   };
 }
-
