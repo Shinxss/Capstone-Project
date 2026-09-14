@@ -12,6 +12,7 @@ const metricStyles = {
 export default function ReportMetricCard({ metric }: { metric: ReportMetric }) {
   const { Icon, icon } = metricStyles[metric.key];
   const trend = metric.trend;
+  const hasLongValue = metric.value.length > 10;
   const TrendIcon = trend?.direction === "up" ? TrendingUp : trend?.direction === "down" ? TrendingDown : Minus;
   const trendClass = trend?.isPositive === true
     ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
@@ -20,12 +21,17 @@ export default function ReportMetricCard({ metric }: { metric: ReportMetric }) {
       : "bg-slate-100 text-slate-600 dark:bg-slate-700/60 dark:text-slate-300";
 
   return (
-    <article className="min-h-[122px] rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_6px_20px_-18px_rgba(15,23,42,0.28)] dark:border-[#162544] dark:bg-[#0B1220]">
+    <article className="min-h-[122px] min-w-0 overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_6px_20px_-18px_rgba(15,23,42,0.28)] dark:border-[#162544] dark:bg-[#0B1220]">
       <div className="flex items-start gap-3">
         <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${icon}`}><Icon size={22} /></div>
         <div className="min-w-0 pt-0.5">
           <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{metric.label}</p>
-          <p className="mt-1 whitespace-nowrap text-[28px] font-black leading-none tracking-tight text-slate-950 dark:text-slate-100">{metric.value}</p>
+          <p
+            className={`mt-1 max-w-full whitespace-nowrap font-black leading-none tracking-tight text-slate-950 dark:text-slate-100 ${hasLongValue ? "text-[20px] 2xl:text-[22px]" : "text-[28px]"}`}
+            title={metric.value}
+          >
+            {metric.value}
+          </p>
           {trend ? (
             <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
               <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${trendClass}`}><TrendIcon size={11} />{trend.label}</span>
