@@ -22,6 +22,7 @@ import { useProfileNotificationPreferences } from "../hooks/useProfileNotificati
 import { useProfileAvatar } from "../hooks/useProfileAvatar";
 import { useProfileRequestShortcuts } from "../hooks/useProfileRequestShortcuts";
 import { useProfileSummary } from "../hooks/useProfileSummary";
+import { useResponderDutyStatus } from "../hooks/useResponderDutyStatus";
 import { useAchievements } from "../../achievements/hooks/useAchievements";
 import { usePullToRefresh } from "../../common/hooks/usePullToRefresh";
 import { RefreshableScrollScreen } from "../../common/components/RefreshableScrollScreen";
@@ -37,6 +38,7 @@ export default function MoreScreen() {
   const { openAuthRequired, closeAuthRequired, goToLogin, modalProps: authRequiredModalProps } = useAuthRequiredPrompt();
   const { displayName, isUser, session, updateUser } = useSession();
   const { mode, isDark, setMode } = useTheme();
+  const { isResponder, onDuty, updatingDuty, setOnDuty } = useResponderDutyStatus();
 
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [avatarSheetVisible, setAvatarSheetVisible] = useState(false);
@@ -407,12 +409,18 @@ export default function MoreScreen() {
         visible={drawerVisible}
         isUser={isUser}
         canShowVolunteerAssignmentsToggle={canShowVolunteerAssignmentsToggle}
+        showResponderDutyToggle={isResponder}
+        responderOnDuty={onDuty}
+        updatingDuty={updatingDuty}
         communityUpdatesEnabled={communityUpdatesEnabled}
         volunteerAssignmentsEnabled={volunteerAssignmentsEnabled}
         updatingPrefs={updating}
         isDarkModeEnabled={isDarkModeEnabled}
         onClose={() => setDrawerVisible(false)}
         onPressProfileSettings={onPressProfileSettings}
+        onToggleResponderDuty={(nextValue) => {
+          void setOnDuty(nextValue);
+        }}
         onToggleCommunityUpdates={onToggleCommunityUpdates}
         onToggleVolunteerAssignments={onToggleVolunteerAssignments}
         onToggleDarkMode={(nextValue) => setMode(nextValue ? "dark" : "light")}

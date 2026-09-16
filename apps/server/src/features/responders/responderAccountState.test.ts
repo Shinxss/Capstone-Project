@@ -37,6 +37,29 @@ test("an inactive responder creation request cannot create an on-duty responder"
   assert.deepEqual(state, { isActive: false, onDuty: false });
 });
 
+test("a newly created active responder starts off duty", () => {
+  const state = buildResponderAccountCreationState({ isActive: true, onDuty: true });
+
+  assert.deepEqual(state, { isActive: true, onDuty: false });
+});
+
+test("account edits cannot override responder-controlled duty status", () => {
+  assert.deepEqual(
+    buildResponderAccountUpdateState(
+      { isActive: true, onDuty: false },
+      { onDuty: true }
+    ),
+    { isActive: true, onDuty: false }
+  );
+  assert.deepEqual(
+    buildResponderAccountUpdateState(
+      { isActive: true, onDuty: true },
+      { onDuty: false }
+    ),
+    { isActive: true, onDuty: true }
+  );
+});
+
 test("dispatchable responder state still requires active and on-duty flags", () => {
   assert.deepEqual(DISPATCHABLE_RESPONDER_STATE, { isActive: true, onDuty: true });
   assert.equal(isResponderDispatchableState({ isActive: false, onDuty: false }), false);

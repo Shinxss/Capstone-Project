@@ -25,6 +25,7 @@ type AuthContextValue = {
   guestId: string | null;
   isGuest: boolean;
   setAuthed: (token: string, user: AuthUser) => Promise<void>;
+  updateUser: (partial: Partial<AuthUser>) => Promise<void>;
   signIn: (identifier: string, password: string) => Promise<void>;
   signInWithToken: (accessToken: string) => Promise<void>;
   continueAsGuest: () => Promise<void>;
@@ -111,6 +112,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       email: nextUser.email,
       role: nextUser.role,
       volunteerStatus: nextUser.volunteerStatus,
+      onDuty: nextUser.onDuty,
       contactNo: nextUser.contactNo,
       birthdate: nextUser.birthdate,
       gender: nextUser.gender,
@@ -133,6 +135,47 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setToken(nextToken);
     setGuestId(null);
   }, []);
+
+  const updateUser = useCallback(
+    async (partial: Partial<AuthUser>) => {
+      if (mode !== "authed" || !token || !user) {
+        throw new Error("No authenticated user session");
+      }
+
+      const nextUser: AuthUser = { ...user, ...partial };
+      await saveAuthState({
+        mode: "authed",
+        token,
+        user: nextUser,
+      });
+      await setUserSession({
+        id: nextUser.id,
+        lifelineId: nextUser.lifelineId,
+        firstName: nextUser.firstName ?? "",
+        lastName: nextUser.lastName,
+        email: nextUser.email,
+        role: nextUser.role,
+        volunteerStatus: nextUser.volunteerStatus,
+        onDuty: nextUser.onDuty,
+        contactNo: nextUser.contactNo,
+        birthdate: nextUser.birthdate,
+        gender: nextUser.gender,
+        skills: nextUser.skills,
+        barangay: nextUser.barangay,
+        municipality: nextUser.municipality,
+        avatarUrl: nextUser.avatarUrl,
+        authProvider: nextUser.authProvider,
+        emailVerified: nextUser.emailVerified,
+        passwordSet: nextUser.passwordSet,
+        googleLinked: nextUser.googleLinked,
+        profileCompletionRequired: nextUser.profileCompletionRequired,
+        missingProfileFields: nextUser.missingProfileFields,
+        accessToken: token,
+      });
+      setUser(nextUser);
+    },
+    [mode, token, user]
+  );
 
   const signIn = useCallback(async (identifier: string, password: string) => {
     const session = await signInSession(identifier, password);
@@ -181,6 +224,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       guestId,
       isGuest: mode === "guest",
       setAuthed,
+      updateUser,
       signIn,
       signInWithToken,
       continueAsGuest,
@@ -193,6 +237,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       token,
       guestId,
       setAuthed,
+      updateUser,
       signIn,
       signInWithToken,
       continueAsGuest,

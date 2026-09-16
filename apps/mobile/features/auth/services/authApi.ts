@@ -14,6 +14,7 @@ export type CommunityLoginUser = {
   lastName?: string;
   role?: string;
   volunteerStatus?: string;
+  onDuty?: boolean;
   birthdate?: string;
   contactNo?: string;
   barangay?: string;
@@ -65,6 +66,7 @@ function parseUserPayload(data: any): CommunityLoginUser {
     lastName: typeof data?.lastName === "string" ? data.lastName : undefined,
     role: typeof data?.role === "string" ? data.role : undefined,
     volunteerStatus: typeof data?.volunteerStatus === "string" ? data.volunteerStatus : undefined,
+    onDuty: typeof data?.onDuty === "boolean" ? data.onDuty : undefined,
     birthdate: typeof data?.birthdate === "string" ? data.birthdate : undefined,
     contactNo: typeof data?.contactNo === "string" ? data.contactNo : undefined,
     barangay: typeof data?.barangay === "string" ? data.barangay : undefined,

@@ -6,7 +6,6 @@ import type {
   UpdateResponderAccountPayload,
 } from "../models/responderAccount.types";
 import {
-  isResponderDutyControlDisabled,
   isResponderEffectivelyOnDuty,
   setResponderAccountActive,
 } from "../models/responderAccountState";
@@ -51,7 +50,7 @@ function blankForm(defaultBarangay: string): FormState {
     barangay: defaultBarangay,
     municipality: "Dagupan City",
     skills: "",
-    onDuty: true,
+    onDuty: false,
     isActive: true,
   };
 }
@@ -156,7 +155,6 @@ export default function ResponderAccountFormModal({
       barangay: sanitizeOptional(form.barangay),
       municipality: sanitizeOptional(form.municipality) ?? "Dagupan City",
       skills: sanitizeOptional(form.skills),
-      onDuty: isResponderEffectivelyOnDuty(form),
       isActive: form.isActive,
     };
 
@@ -311,27 +309,6 @@ export default function ResponderAccountFormModal({
               className="mt-1 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-gray-300 dark:border-[#162544] dark:bg-[#0E1626] dark:text-slate-100"
               placeholder="Medical, Search and Rescue, Logistics"
             />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <input
-              id="responder-on-duty"
-              type="checkbox"
-              checked={form.onDuty}
-              disabled={isResponderDutyControlDisabled(form)}
-              onChange={(event) => setForm((prev) => ({ ...prev, onDuty: event.target.checked }))}
-              className="h-4 w-4 accent-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
-            />
-            <label
-              htmlFor="responder-on-duty"
-              className={
-                form.isActive
-                  ? "text-sm text-gray-700 dark:text-slate-200"
-                  : "cursor-not-allowed text-sm text-gray-400 dark:text-slate-500"
-              }
-            >
-              On duty
-            </label>
           </div>
 
           <div className="flex items-center gap-2">

@@ -15,7 +15,7 @@ export const DISPATCHABLE_RESPONDER_STATE = Object.freeze({
 
 export function normalizeResponderAccountState(
   state: PartialResponderAccountState,
-  defaults: ResponderAccountState = { isActive: true, onDuty: true }
+  defaults: ResponderAccountState = { isActive: true, onDuty: false }
 ): ResponderAccountState {
   const isActive = Boolean(state.isActive ?? defaults.isActive);
   const onDuty = isActive && Boolean(state.onDuty ?? defaults.onDuty);
@@ -26,7 +26,10 @@ export function normalizeResponderAccountState(
 export function buildResponderAccountCreationState(
   payload: PartialResponderAccountState
 ): ResponderAccountState {
-  return normalizeResponderAccountState(payload);
+  return {
+    isActive: Boolean(payload.isActive ?? true),
+    onDuty: false,
+  };
 }
 
 export function buildResponderAccountUpdateState(
@@ -35,11 +38,12 @@ export function buildResponderAccountUpdateState(
 ): ResponderAccountState {
   const current = normalizeResponderAccountState(existing);
   const isReactivation = payload.isActive === true && !current.isActive;
+  const isActive = Boolean(payload.isActive ?? current.isActive);
 
-  return normalizeResponderAccountState({
-    isActive: payload.isActive ?? current.isActive,
-    onDuty: payload.onDuty ?? (isReactivation ? false : current.onDuty),
-  });
+  return {
+    isActive,
+    onDuty: isActive && !isReactivation ? current.onDuty : false,
+  };
 }
 
 export function buildResponderActivationState(isActive: boolean): ResponderAccountState {

@@ -99,12 +99,16 @@ type ProfileMoreDrawerProps = {
   visible: boolean;
   isUser: boolean;
   canShowVolunteerAssignmentsToggle: boolean;
+  showResponderDutyToggle: boolean;
+  responderOnDuty: boolean;
+  updatingDuty: boolean;
   communityUpdatesEnabled: boolean;
   volunteerAssignmentsEnabled: boolean;
   updatingPrefs: boolean;
   isDarkModeEnabled: boolean;
   onClose: () => void;
   onPressProfileSettings: () => void;
+  onToggleResponderDuty: (nextValue: boolean) => void;
   onToggleCommunityUpdates: (nextValue: boolean) => void;
   onToggleVolunteerAssignments: (nextValue: boolean) => void;
   onToggleDarkMode: (nextValue: boolean) => void;
@@ -118,12 +122,16 @@ export default function ProfileMoreDrawer({
   visible,
   isUser,
   canShowVolunteerAssignmentsToggle,
+  showResponderDutyToggle,
+  responderOnDuty,
+  updatingDuty,
   communityUpdatesEnabled,
   volunteerAssignmentsEnabled,
   updatingPrefs,
   isDarkModeEnabled,
   onClose,
   onPressProfileSettings,
+  onToggleResponderDuty,
   onToggleCommunityUpdates,
   onToggleVolunteerAssignments,
   onToggleDarkMode,
@@ -272,6 +280,27 @@ export default function ProfileMoreDrawer({
                 icon="person-outline"
                 onPress={() => closeThen(onPressProfileSettings)}
               />
+              {showResponderDutyToggle ? (
+                <DrawerRow
+                  title={responderOnDuty ? "On Duty" : "Off Duty"}
+                  subtitle={
+                    responderOnDuty
+                      ? "Available for emergency assignments"
+                      : "You won't receive new assignments"
+                  }
+                  icon={responderOnDuty ? "checkmark-circle-outline" : "pause-circle-outline"}
+                  right={
+                    <Switch
+                      value={responderOnDuty}
+                      onValueChange={onToggleResponderDuty}
+                      trackColor={{ false: isDark ? "#334155" : "#D1D5DB", true: "#16A34A" }}
+                      thumbColor="#FFFFFF"
+                      disabled={updatingDuty}
+                    />
+                  }
+                  disabled={updatingDuty}
+                />
+              ) : null}
               <DrawerRow
                 title="Request Updates"
                 subtitle="Status alerts for your emergency requests"

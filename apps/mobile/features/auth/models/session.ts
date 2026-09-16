@@ -6,6 +6,7 @@ export type AuthUser = {
   email?: string;
   role?: string;
   volunteerStatus?: string;
+  onDuty?: boolean;
   contactNo?: string;
   birthdate?: string;
   gender?: string;

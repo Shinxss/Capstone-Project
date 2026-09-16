@@ -8,6 +8,7 @@ import {
 } from "../../../realtime/socketAuth";
 import { getRealtimeIO, nowIso } from "../../../realtime/socketRuntime";
 import { emitRequestTrackingUpdate } from "../../emergency/realtime/requestTracking.gateway";
+import { evaluateVolunteerDutyEligibility } from "./volunteerDutyStatus";
 
 export type VolunteerPresenceStatus = "ONLINE" | "BUSY" | "IDLE" | "OFFLINE";
 
@@ -38,6 +39,12 @@ export type VolunteerSubscription = {
 };
 
 export type VolunteersSubscribeAck = (payload: { ok: boolean; message?: string }) => void;
+export type VolunteerHeartbeatAckPayload = {
+  ok: boolean;
+  onDuty?: boolean;
+  message?: string;
+};
+export type VolunteerHeartbeatAck = (payload: VolunteerHeartbeatAckPayload) => void;
 
 export const VOLUNTEERS_PUBLIC_ROOM = "volunteers:public";
 export const IDLE_AFTER_MS = 5 * 60_000;
@@ -53,6 +60,18 @@ const presenceByVolunteerId = new Map<string, VolunteerPresenceRecord>();
 const socketIdToVolunteerId = new Map<string, string>();
 const volunteerBusyById = new Map<string, boolean>();
 const volunteerSubscriptions = new Map<string, VolunteerSubscription>();
+
+function clearVolunteerPresence(volunteerId: string, reason: string) {
+  const existing = presenceByVolunteerId.get(volunteerId);
+  if (existing) {
+    existing.onDuty = false;
+    for (const socketId of existing.socketIds) {
+      socketIdToVolunteerId.delete(socketId);
+    }
+  }
+  presenceByVolunteerId.delete(volunteerId);
+  emitPresenceChanged(volunteerId, reason, existing);
+}
 
 function resolveConnectedPresenceStatus(volunteerId: string): VolunteerPresenceStatus {
   return volunteerBusyById.get(volunteerId) ? "BUSY" : "ONLINE";
@@ -428,40 +447,98 @@ export function registerVolunteerPresenceSocketHandlers(
     socket.leave(VOLUNTEERS_PUBLIC_ROOM);
   });
 
-  socket.on("volunteer:heartbeat", async (payload: { onDuty?: boolean } | undefined) => {
-    if (!canBroadcastVolunteerPresence(authedSocket)) return;
+  socket.on(
+    "volunteer:heartbeat",
+    async (
+      payload: { onDuty?: boolean } | undefined,
+      ack?: VolunteerHeartbeatAck
+    ) => {
+      const acknowledge = (result: VolunteerHeartbeatAckPayload) => {
+        if (typeof ack === "function") ack(result);
+      };
 
-    const onDutyInput =
-      typeof payload?.onDuty === "boolean"
-        ? payload.onDuty
-        : Boolean(authedSocket.data.onDuty ?? true);
-
-    authedSocket.data.onDuty = onDutyInput;
-    socketIdToVolunteerId.set(socket.id, userId);
-
-    await User.updateOne(
-      { _id: new Types.ObjectId(userId) },
-      { $set: { onDuty: onDutyInput } }
-    ).catch(() => undefined);
-
-    if (!onDutyInput) {
-      const existing = presenceByVolunteerId.get(userId);
-      if (existing) {
-        existing.onDuty = false;
+      if (!Types.ObjectId.isValid(userId)) {
+        acknowledge({ ok: false, onDuty: false, message: "Unable to verify this responder account." });
+        return;
       }
-      presenceByVolunteerId.delete(userId);
-      emitPresenceChanged(userId, "heartbeat_off_duty", existing);
-      return;
-    }
 
-    upsertPresence(userId, {
-      onDuty: true,
-      socketId: socket.id,
-      touchHeartbeat: true,
-      reason: "heartbeat",
-    });
-    await syncVolunteerBusyState(userId);
-  });
+      const onDutyInput =
+        typeof payload?.onDuty === "boolean"
+          ? payload.onDuty
+          : Boolean(authedSocket.data.onDuty ?? false);
+
+      try {
+        const account = await User.findById(userId)
+          .select("_id role volunteerStatus isActive onDuty")
+          .lean();
+        const eligibility = evaluateVolunteerDutyEligibility(account);
+
+        if (!eligibility.allowed) {
+          authedSocket.data.onDuty = false;
+          clearVolunteerPresence(userId, "heartbeat_account_ineligible");
+          if (account?.isActive === false) {
+            await User.updateOne(
+              { _id: new Types.ObjectId(userId) },
+              { $set: { onDuty: false } }
+            );
+          }
+          acknowledge({ ok: false, onDuty: false, message: eligibility.message });
+          return;
+        }
+
+        const updateResult = await User.updateOne(
+          {
+            _id: new Types.ObjectId(userId),
+            isActive: { $ne: false },
+            $or: [
+              { role: "RESPONDER" },
+              { role: "VOLUNTEER", volunteerStatus: "APPROVED" },
+            ],
+          },
+          { $set: { onDuty: onDutyInput } }
+        );
+
+        if (updateResult.matchedCount !== 1) {
+          authedSocket.data.onDuty = false;
+          clearVolunteerPresence(userId, "heartbeat_account_suspended");
+          await User.updateOne(
+            { _id: new Types.ObjectId(userId), isActive: false },
+            { $set: { onDuty: false } }
+          );
+          acknowledge({
+            ok: false,
+            onDuty: false,
+            message: "Your responder account is currently suspended.",
+          });
+          return;
+        }
+
+        authedSocket.data.onDuty = onDutyInput;
+
+        if (!onDutyInput) {
+          clearVolunteerPresence(userId, "heartbeat_off_duty");
+          acknowledge({ ok: true, onDuty: false });
+          return;
+        }
+
+        socketIdToVolunteerId.set(socket.id, userId);
+        upsertPresence(userId, {
+          onDuty: true,
+          socketId: socket.id,
+          touchHeartbeat: true,
+          reason: "heartbeat",
+        });
+        await syncVolunteerBusyState(userId);
+        acknowledge({ ok: true, onDuty: true });
+      } catch {
+        acknowledge({
+          ok: false,
+          onDuty: Boolean(authedSocket.data.onDuty),
+          message: "Unable to update availability. Please try again.",
+        });
+      }
+    }
+  );
 
   socket.on(
     "volunteer:location_update",

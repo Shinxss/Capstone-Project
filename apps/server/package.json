@@ -9,6 +9,7 @@
     "test:achievements": "tsx --test src/features/achievements/achievement.progression.test.ts src/features/achievements/achievement.service.test.ts",
     "test:responders": "tsx --test src/features/responders/responderAccountState.test.ts ../web/tests/responderAccountState.test.ts",
     "test:verified-volunteer-deployment": "tsx --test ../web/tests/verifiedVolunteerDeployment.test.ts",
+    "test:responder-duty": "tsx --test src/features/volunteers/realtime/volunteerDutyStatus.test.ts ../mobile/features/realtime/volunteerHeartbeat.test.ts",
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
     "seed:lgu": "tsx src/scripts/seedLgu.ts",

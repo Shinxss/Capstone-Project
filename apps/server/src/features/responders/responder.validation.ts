@@ -36,7 +36,7 @@ export const createResponderAccountSchema = z
     barangay: z.string().trim().min(1).max(200).optional(),
     municipality: z.string().trim().min(1).max(200).default("Dagupan City").optional(),
     skills: z.string().trim().max(300).optional(),
-    onDuty: z.boolean().default(true).optional(),
+    onDuty: z.boolean().default(false).optional(),
     isActive: z.boolean().default(true).optional(),
   })
   .strict();

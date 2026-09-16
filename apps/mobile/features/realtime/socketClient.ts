@@ -10,6 +10,12 @@ type ServerToClientEvents = {
   "notify:dispatch_offer": (payload: any) => void;
 };
 
+export type VolunteerHeartbeatAck = {
+  ok: boolean;
+  onDuty?: boolean;
+  message?: string;
+};
+
 type ClientToServerEvents = {
   "request:subscribe": (payload: { requestId: string }, ack?: (result: { ok: boolean; message?: string }) => void) => void;
   "request:unsubscribe": (payload: { requestId: string }) => void;
@@ -18,7 +24,10 @@ type ClientToServerEvents = {
     ack?: (result: { ok: boolean; message?: string }) => void
   ) => void;
   "volunteers:unsubscribe": () => void;
-  "volunteer:heartbeat": (payload: { onDuty?: boolean }) => void;
+  "volunteer:heartbeat": (
+    payload: { onDuty?: boolean },
+    ack?: (result: VolunteerHeartbeatAck) => void
+  ) => void;
   "volunteer:location_update": (payload: {
     lng: number;
     lat: number;
@@ -80,6 +89,32 @@ export function connectRealtime(token: string) {
 
 export function getRealtimeSocket() {
   return socket;
+}
+
+export function sendVolunteerHeartbeat(
+  activeSocket: LifelineSocket,
+  onDuty: boolean,
+  timeoutMs = 8_000
+): Promise<VolunteerHeartbeatAck> {
+  if (!activeSocket.connected) {
+    return Promise.reject(new Error("Realtime connection is unavailable"));
+  }
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(new Error("Availability update timed out"));
+    }, timeoutMs);
+
+    activeSocket.emit("volunteer:heartbeat", { onDuty }, (result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      resolve(result);
+    });
+  });
 }
 
 export function disconnectRealtime() {

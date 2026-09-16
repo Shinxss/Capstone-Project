@@ -9,6 +9,7 @@ import {
   disconnectRealtime,
   type LifelineSocket,
 } from "../socketClient";
+import { getVolunteerHeartbeatPlan } from "../volunteerHeartbeat";
 
 type RequestUpdatePayload = {
   requestId?: string;
@@ -115,7 +116,7 @@ function normalizeDispatchTarget(_payload: DispatchOfferPayload) {
 }
 
 export function useRealtimeBootstrap() {
-  const { hydrated, mode, token, user } = useAuth();
+  const { hydrated, mode, token, user, updateUser } = useAuth();
 
   useEffect(() => {
     if (!hydrated) return;
@@ -126,8 +127,7 @@ export function useRealtimeBootstrap() {
 
     const socket = connectRealtime(token);
     if (!socket) return;
-    const normalizedRole = String(user?.role ?? "").trim().toUpperCase();
-    const isDispatchAssignee = normalizedRole === "VOLUNTEER" || normalizedRole === "RESPONDER";
+    const heartbeatPlan = getVolunteerHeartbeatPlan(user?.role, user?.onDuty);
 
     const onRequestUpdate = (payload: RequestUpdatePayload) => {
       const copy = requestFeedCopy(payload);
@@ -200,12 +200,23 @@ export function useRealtimeBootstrap() {
     };
 
     let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
-    if (isDispatchAssignee) {
-      const sendHeartbeat = () => {
-        socket.emit("volunteer:heartbeat", { onDuty: true });
-      };
-      sendHeartbeat();
-      heartbeatTimer = setInterval(sendHeartbeat, 15_000);
+    const sendHeartbeat = () => {
+      if (!heartbeatPlan.enabled || !socket.connected) return;
+      socket.emit("volunteer:heartbeat", { onDuty: heartbeatPlan.onDuty }, (result) => {
+        if (result.ok) return;
+        if (typeof result.onDuty === "boolean" && result.onDuty !== Boolean(user?.onDuty)) {
+          void updateUser({ onDuty: result.onDuty });
+        }
+      });
+    };
+
+    if (heartbeatPlan.enabled) {
+      if (socket.connected) sendHeartbeat();
+      else socket.once("connect", sendHeartbeat);
+
+      if (heartbeatPlan.intervalMs) {
+        heartbeatTimer = setInterval(sendHeartbeat, heartbeatPlan.intervalMs);
+      }
     }
 
     socket.on("notify:request_update", onRequestUpdate as Parameters<LifelineSocket["on"]>[1]);
@@ -215,9 +226,10 @@ export function useRealtimeBootstrap() {
       if (heartbeatTimer) {
         clearInterval(heartbeatTimer);
       }
+      socket.off("connect", sendHeartbeat);
       socket.off("notify:request_update", onRequestUpdate as Parameters<LifelineSocket["on"]>[1]);
       socket.off("notify:dispatch_offer", onDispatchOffer as Parameters<LifelineSocket["on"]>[1]);
     };
-  }, [hydrated, mode, token, user?.role]);
+  }, [hydrated, mode, token, updateUser, user?.onDuty, user?.role]);
 }
 

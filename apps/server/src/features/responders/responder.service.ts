@@ -598,10 +598,6 @@ export async function updateResponderAccountForActor(params: {
     $set.skills = safeStr(payload.skills);
   }
 
-  if (payload.onDuty !== undefined) {
-    $set.onDuty = Boolean(payload.onDuty);
-  }
-
   if (payload.isActive !== undefined) {
     $set.isActive = Boolean(payload.isActive);
   }
