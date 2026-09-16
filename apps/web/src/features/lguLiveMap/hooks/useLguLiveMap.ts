@@ -43,8 +43,17 @@ import {
   createNotificationsSocket,
   type NotificationsRefreshPayload,
 } from "../../notifications/services/notifications.socket";
-import { activeAssignedResponderIds } from "../dispatch/utils/dispatchResponder.utils";
+import {
+  activeAssignedResponderIds,
+  nearestAvailableResponderIds,
+} from "../dispatch/utils/dispatchResponder.utils";
 import type { PresenceConnectionState } from "../dispatch/types/dispatchResponders.types";
+import {
+  DEPLOY_VOLUNTEER_QUERY_PARAM,
+  removeDeploymentIntentParam,
+  resolveDeploymentIntent,
+  resolveDeploymentModalAction,
+} from "../utils/deploymentIntent.utils";
 
 type LngLat = [number, number];
 
@@ -322,8 +331,13 @@ function ensureVolunteerPinStyles() {
 
 export function useLguLiveMap() {
   const confirm = useConfirm();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const focusEmergencyId = searchParams.get("emergencyId");
+  const deployVolunteerId = String(searchParams.get(DEPLOY_VOLUNTEER_QUERY_PARAM) ?? "").trim() || null;
+
+  const clearDeploymentIntentQuery = useCallback(() => {
+    setSearchParams((current) => removeDeploymentIntentParam(current), { replace: true });
+  }, [setSearchParams]);
 
   // Prevent re-opening details if the user already closed it manually.
   const autoFocusedIdRef = useRef<string | null>(null);
@@ -361,6 +375,7 @@ export function useLguLiveMap() {
   const [selectedEmergencyTasks, setSelectedEmergencyTasks] = useState<DispatchTask[]>([]);
   const [tasksLoading, setTasksLoading] = useState(false);
   const [tasksError, setTasksError] = useState<string | null>(null);
+  const [tasksLoadedEmergencyId, setTasksLoadedEmergencyId] = useState<string | null>(null);
 
   // hazard draw + save form
   const [isDrawingHazard, setIsDrawingHazard] = useState(false);
@@ -414,6 +429,7 @@ export function useLguLiveMap() {
   // Stored in state so we can update status when dispatching.
   const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
   const [volunteersLoading, setVolunteersLoading] = useState(false);
+  const [volunteersReady, setVolunteersReady] = useState(false);
   const [volunteersError, setVolunteersError] = useState<string | null>(null);
 
   const refetchVolunteers = useCallback(async () => {
@@ -426,6 +442,7 @@ export function useLguLiveMap() {
       setVolunteersError(err?.response?.data?.message ?? err?.message ?? "Failed to load volunteers");
     } finally {
       setVolunteersLoading(false);
+      setVolunteersReady(true);
     }
   }, []);
 
@@ -673,6 +690,44 @@ export function useLguLiveMap() {
   const [dispatchModalOpen, setDispatchModalOpen] = useState(false);
   const [dispatchSelection, setDispatchSelection] = useState<string[]>([]);
   const [trackOpen, setTrackOpen] = useState(false);
+  const autoOpenedDeploymentRef = useRef<string | null>(null);
+  const invalidDeploymentRef = useRef<string | null>(null);
+
+  const deploymentIntentResolution = useMemo(
+    () => resolveDeploymentIntent(volunteers, deployVolunteerId, volunteersReady),
+    [deployVolunteerId, volunteers, volunteersReady]
+  );
+  const deploymentIntent =
+    deploymentIntentResolution.kind === "ready" ? deploymentIntentResolution.intent : null;
+
+  useEffect(() => {
+    if (!deployVolunteerId) {
+      autoOpenedDeploymentRef.current = null;
+      invalidDeploymentRef.current = null;
+      return;
+    }
+
+    if (deploymentIntentResolution.kind === "waiting") return;
+    if (deploymentIntentResolution.kind === "ready") {
+      invalidDeploymentRef.current = null;
+      return;
+    }
+    if (deploymentIntentResolution.kind === "none") return;
+    if (invalidDeploymentRef.current === deployVolunteerId) return;
+
+    invalidDeploymentRef.current = deployVolunteerId;
+    setDispatchSelection((previous) => previous.filter((id) => id !== deployVolunteerId));
+    const volunteerName =
+      deploymentIntentResolution.kind === "unavailable"
+        ? String(deploymentIntentResolution.volunteer.name ?? "").trim()
+        : "";
+    toastWarning(
+      volunteerName
+        ? `${volunteerName} is no longer available for deployment.`
+        : "This volunteer is no longer available for deployment."
+    );
+    clearDeploymentIntentQuery();
+  }, [clearDeploymentIntentQuery, deployVolunteerId, deploymentIntentResolution]);
 
   const filteredVolunteers = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -765,6 +820,7 @@ export function useLguLiveMap() {
       setSelectedEmergencyTasks([]);
       setTasksLoading(false);
       setTasksError(null);
+      setTasksLoadedEmergencyId(null);
       return;
     }
 
@@ -772,6 +828,7 @@ export function useLguLiveMap() {
     setSelectedEmergencyTasks([]);
     setTasksLoading(true);
     setTasksError(null);
+    setTasksLoadedEmergencyId(null);
 
     fetchDispatchTasks({
       emergencyId: selectedEmergencyId,
@@ -788,6 +845,7 @@ export function useLguLiveMap() {
       .finally(() => {
         if (cancelled) return;
         setTasksLoading(false);
+        setTasksLoadedEmergencyId(selectedEmergencyId);
       });
 
     return () => {
@@ -814,6 +872,7 @@ export function useLguLiveMap() {
     setTrackOpen(false);
     setSelectedEmergencyTasks([]);
     setTasksError(null);
+    setTasksLoadedEmergencyId(null);
   }, [selectedEmergencyId]);
 
   const assignedResponderIds = useMemo(() => {
@@ -1482,35 +1541,114 @@ export function useLguLiveMap() {
     cleanupDetails();
   }, [isDrawingHazard, cleanupDetails]);
 
+  const openDispatchRespondersForVolunteer = useCallback(
+    (volunteerId: string) => {
+      const volunteer = volunteers.find((item) => item.id === volunteerId);
+      if (!volunteer || volunteer.status !== "available") {
+        toastWarning(
+          volunteer?.name
+            ? `${volunteer.name} is no longer available for deployment.`
+            : "This volunteer is no longer available for deployment."
+        );
+        return false;
+      }
+
+      const action = resolveDeploymentModalAction({
+        volunteerId,
+        selectedEmergencyId,
+        hasEmergencyDetails: Boolean(selectedEmergencyDetails),
+        tasksLoading,
+        tasksError,
+        tasksLoadedEmergencyId,
+        assignedIds: activeAssignedResponderIds(selectedEmergencyTasks),
+      });
+      if (action.kind === "wait") return false;
+      if (action.kind === "already-assigned") {
+        toastWarning("This volunteer is already assigned to this emergency.");
+        return false;
+      }
+
+      setDispatchSelection(action.selectedIds);
+      setDispatchModalOpen(true);
+      return true;
+    },
+    [
+      selectedEmergencyDetails,
+      selectedEmergencyId,
+      selectedEmergencyTasks,
+      tasksError,
+      tasksLoadedEmergencyId,
+      tasksLoading,
+      volunteers,
+    ]
+  );
+
   const openDispatchResponders = useCallback(() => {
     if (!selectedEmergencyDetails) return;
 
+    if (deploymentIntent) {
+      openDispatchRespondersForVolunteer(deploymentIntent.volunteerId);
+      return;
+    }
+
     const assignedIds = activeAssignedResponderIds(selectedEmergencyTasks);
-    const available = volunteers.filter((v) => v.status === "available" && !assignedIds.has(v.id));
 
     // Preselect nearest 2 available responders (only if nothing is selected yet)
     setDispatchSelection((prev) => {
       if (prev.length) return prev;
-      const withCoords = available.filter((v) => Number.isFinite(v.lng) && Number.isFinite(v.lat));
-      if (withCoords.length) {
-        const sorted = [...withCoords].sort((a, b) => {
-          const da = ((a.lng as number) - selectedEmergencyDetails.lng) ** 2 + ((a.lat as number) - selectedEmergencyDetails.lat) ** 2;
-          const db = ((b.lng as number) - selectedEmergencyDetails.lng) ** 2 + ((b.lat as number) - selectedEmergencyDetails.lat) ** 2;
-          return da - db;
-        });
-        return sorted.slice(0, 2).map((v) => v.id);
-      }
-      // fallback if no coordinates exist yet
-      return available.slice(0, 2).map((v) => v.id);
+      return nearestAvailableResponderIds(volunteers, selectedEmergencyDetails, assignedIds);
     });
 
     setDispatchModalOpen(true);
-  }, [selectedEmergencyDetails, selectedEmergencyTasks, volunteers]);
+  }, [deploymentIntent, openDispatchRespondersForVolunteer, selectedEmergencyDetails, selectedEmergencyTasks, volunteers]);
+
+  useEffect(() => {
+    if (!deploymentIntent || !selectedEmergencyId) return;
+
+    const action = resolveDeploymentModalAction({
+      volunteerId: deploymentIntent.volunteerId,
+      selectedEmergencyId,
+      hasEmergencyDetails: Boolean(selectedEmergencyDetails),
+      tasksLoading,
+      tasksError,
+      tasksLoadedEmergencyId,
+      assignedIds: activeAssignedResponderIds(selectedEmergencyTasks),
+    });
+    if (action.kind === "wait") return;
+
+    const attemptKey = `${selectedEmergencyId}:${deploymentIntent.volunteerId}`;
+    if (autoOpenedDeploymentRef.current === attemptKey) return;
+    autoOpenedDeploymentRef.current = attemptKey;
+
+    if (action.kind === "already-assigned") {
+      toastWarning("This volunteer is already assigned to this emergency.");
+      return;
+    }
+
+    setDispatchSelection(action.selectedIds);
+    setDispatchModalOpen(true);
+  }, [
+    deploymentIntent,
+    selectedEmergencyDetails,
+    selectedEmergencyId,
+    selectedEmergencyTasks,
+    tasksError,
+    tasksLoadedEmergencyId,
+    tasksLoading,
+  ]);
 
   const closeDispatchResponders = useCallback(() => {
     setDispatchModalOpen(false);
     setDispatchSelection([]);
   }, []);
+
+  const cancelDeploymentIntent = useCallback(() => {
+    setDispatchModalOpen(false);
+    setDispatchSelection([]);
+    autoOpenedDeploymentRef.current = null;
+    invalidDeploymentRef.current = null;
+    clearDeploymentIntentQuery();
+  }, [clearDeploymentIntentQuery]);
 
   const clearDispatchSelection = useCallback(() => {
     setDispatchSelection([]);
@@ -1528,14 +1666,17 @@ export function useLguLiveMap() {
     if (removedIds.length === 0) return;
     setDispatchSelection((previous) => previous.filter((id) => availableIds.has(id)));
     const removedNames = removedIds
+      .filter((id) => id !== deployVolunteerId)
       .map((id) => volunteers.find((volunteer) => volunteer.id === id)?.name)
       .filter((name): name is string => Boolean(name));
-    toastWarning(
-      removedNames.length === 1
-        ? `${removedNames[0]} is no longer available and was removed from the dispatch selection.`
-        : "One or more responders are no longer available and were removed from the dispatch selection."
-    );
-  }, [dispatchModalOpen, dispatchSelection, selectedEmergencyTasks, volunteers]);
+    if (removedNames.length > 0 || !deployVolunteerId) {
+      toastWarning(
+        removedNames.length === 1
+          ? `${removedNames[0]} is no longer available and was removed from the dispatch selection.`
+          : "One or more responders are no longer available and were removed from the dispatch selection."
+      );
+    }
+  }, [deployVolunteerId, dispatchModalOpen, dispatchSelection, selectedEmergencyTasks, volunteers]);
 
   const toggleDispatchResponder = useCallback(
     (volunteerId: string) => {
@@ -1608,10 +1749,11 @@ export function useLguLiveMap() {
 
     setDispatchModalOpen(false);
     setDispatchSelection([]);
+    clearDeploymentIntentQuery();
     setTrackOpen(true);
     toastSuccess("Responders dispatched.");
     return true;
-  }, [dispatchSelection, refetchVolunteers, selectedEmergencyId, selectedEmergencyTasks, volunteers]);
+  }, [clearDeploymentIntentQuery, dispatchSelection, refetchVolunteers, selectedEmergencyId, selectedEmergencyTasks, volunteers]);
 
   const toggleTrackPanel = useCallback(() => {
     setTrackOpen((v) => !v);
@@ -1747,6 +1889,8 @@ export function useLguLiveMap() {
     volunteersError,
     refetchVolunteers,
     presenceConnectionState,
+    deploymentIntent,
+    cancelDeploymentIntent,
     dispatchModalOpen,
     openDispatchResponders,
     closeDispatchResponders,

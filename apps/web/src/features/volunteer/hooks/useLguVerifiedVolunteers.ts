@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import type { VolunteerApplication } from "../models/volunteerApplication.types";
 import {
   getVolunteerApplicationById,
@@ -7,6 +8,12 @@ import {
 import { getLguUser } from "../../auth/services/authStorage";
 import { DAGUPAN_CENTER } from "../../lguLiveMap/constants/lguLiveMap.constants";
 import { createLivePresenceSocket } from "../../lguLiveMap/services/livePresence.socket";
+import {
+  buildVolunteerDeploymentPath,
+  resolveVerifiedVolunteerAction,
+  resolveVerifiedVolunteerUserId,
+  type VerifiedVolunteerAvailability,
+} from "../utils/verifiedVolunteerDeployment";
 
 export type VerifiedVolunteerPresenceStatus = "ONLINE" | "BUSY" | "IDLE" | "OFFLINE";
 export type VerifiedVolunteerPresence = {
@@ -35,6 +42,7 @@ function errorMessage(error: unknown, fallback: string) {
 }
 
 export function useLguVerifiedVolunteers() {
+  const navigate = useNavigate();
   // list state
   const [items, setItems] = useState<VolunteerApplication[]>([]);
   const [total, setTotal] = useState(0);
@@ -189,6 +197,27 @@ export function useLguVerifiedVolunteers() {
     setDetailsError(null);
   }, []);
 
+  const deployVolunteer = useCallback(
+    (volunteerId: string) => {
+      const normalizedId = String(volunteerId).trim();
+      if (!normalizedId) return;
+      navigate(buildVolunteerDeploymentPath(normalizedId));
+    },
+    [navigate]
+  );
+
+  const handleVolunteerAction = useCallback(
+    (volunteer: VolunteerApplication, availability: VerifiedVolunteerAvailability) => {
+      if (resolveVerifiedVolunteerAction(availability) === "deploy") {
+        deployVolunteer(resolveVerifiedVolunteerUserId(volunteer));
+        return;
+      }
+
+      void openDetails(volunteer._id);
+    },
+    [deployVolunteer, openDetails]
+  );
+
   const counts = useMemo(() => {
     // for now: just total verified
     return { verified: total };
@@ -215,5 +244,7 @@ export function useLguVerifiedVolunteers() {
     detailsError,
     openDetails,
     closeDetails,
+    deployVolunteer,
+    handleVolunteerAction,
   };
 }

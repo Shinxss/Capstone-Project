@@ -8,6 +8,7 @@ import type {
   ResponderAccountsListResponse,
   UpdateResponderAccountPayload,
 } from "../models/responderAccount.types";
+import { isResponderEffectivelyOnDuty } from "../models/responderAccountState";
 
 type ResponderTeamSummaryDto = {
   id: string;
@@ -69,6 +70,8 @@ function resolveAvatarUrl(value?: string) {
 }
 
 function mapResponderAccount(item: ResponderAccountDto): ResponderAccountListItem {
+  const isActive = Boolean(item.isActive);
+
   return {
     id: item.id,
     lifelineId: item.lifelineId,
@@ -81,8 +84,8 @@ function mapResponderAccount(item: ResponderAccountDto): ResponderAccountListIte
     barangay: item.barangay,
     municipality: item.municipality,
     skills: item.skills,
-    onDuty: item.onDuty,
-    isActive: item.isActive,
+    onDuty: isResponderEffectivelyOnDuty({ isActive, onDuty: Boolean(item.onDuty) }),
+    isActive,
     team: item.team ?? null,
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,

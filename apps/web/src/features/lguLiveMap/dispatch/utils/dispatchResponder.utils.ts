@@ -43,6 +43,35 @@ export function activeAssignedResponderIds(tasks: DispatchTask[]) {
   );
 }
 
+export function nearestAvailableResponderIds(
+  volunteers: Volunteer[],
+  emergency: Pick<LguEmergencyDetails, "lng" | "lat">,
+  assignedIds: ReadonlySet<string>,
+  limit = 2,
+) {
+  const available = volunteers.filter(
+    (volunteer) => volunteer.status === "available" && !assignedIds.has(volunteer.id),
+  );
+  const withCoords = available.filter(
+    (volunteer) => Number.isFinite(volunteer.lng) && Number.isFinite(volunteer.lat),
+  );
+
+  if (withCoords.length > 0) {
+    return [...withCoords]
+      .sort((a, b) => {
+        const distanceA =
+          (Number(a.lng) - emergency.lng) ** 2 + (Number(a.lat) - emergency.lat) ** 2;
+        const distanceB =
+          (Number(b.lng) - emergency.lng) ** 2 + (Number(b.lat) - emergency.lat) ** 2;
+        return distanceA - distanceB;
+      })
+      .slice(0, limit)
+      .map((volunteer) => volunteer.id);
+  }
+
+  return available.slice(0, limit).map((volunteer) => volunteer.id);
+}
+
 export function toDispatchEmergencyContext(emergency: LguEmergencyDetails): DispatchEmergencyContext {
   const status = String(emergency.status ?? "").toUpperCase();
   const dispatchable = !["RESOLVED", "CANCELLED", "COMPLETED", "DONE", "VERIFIED"].includes(status);

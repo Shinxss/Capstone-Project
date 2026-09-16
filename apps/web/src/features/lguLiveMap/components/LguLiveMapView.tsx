@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 
 import DispatchRespondersModal from "./DispatchRespondersModal";
+import DeploymentIntentBanner from "./DeploymentIntentBanner";
 import LguEmergencyDetailsPanel from "./LguEmergencyDetailsPanel";
 import MapLegend from "./MapLegend";
 
@@ -175,6 +176,8 @@ export default function LguLiveMapView(props: Props) {
     volunteersError,
     refetchVolunteers,
     presenceConnectionState,
+    deploymentIntent,
+    cancelDeploymentIntent,
     dispatchModalOpen,
     openDispatchResponders,
     closeDispatchResponders,
@@ -290,6 +293,10 @@ export default function LguLiveMapView(props: Props) {
           fitReports="always"
         />
       </div>
+
+      {deploymentIntent ? (
+        <DeploymentIntentBanner intent={deploymentIntent} onCancel={cancelDeploymentIntent} />
+      ) : null}
 
       {/* Search bar top-left */}
       <div className="absolute top-3 left-3 z-20 pointer-events-none">

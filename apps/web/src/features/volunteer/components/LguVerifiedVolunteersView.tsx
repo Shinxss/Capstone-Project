@@ -7,6 +7,7 @@ import {
   useLguVerifiedVolunteers,
   type VerifiedVolunteerPresence,
 } from "../hooks/useLguVerifiedVolunteers";
+import type { VerifiedVolunteerAvailability } from "../utils/verifiedVolunteerDeployment";
 
 type Props = ReturnType<typeof useLguVerifiedVolunteers> & {
   loading: boolean;
@@ -15,7 +16,7 @@ type Props = ReturnType<typeof useLguVerifiedVolunteers> & {
 };
 
 type SkillFilterKey = "all" | "medical" | "search_rescue" | "logistics" | "communication" | "driving";
-type AvailabilityStatus = "available" | "deployed" | "offline";
+type AvailabilityStatus = VerifiedVolunteerAvailability;
 
 type VolunteerExtras = VolunteerApplication & {
   skills?: string[] | string;
@@ -310,8 +311,8 @@ export default function LguVerifiedVolunteersView(props: Props) {
     selected,
     detailsLoading,
     detailsError,
-    openDetails,
     closeDetails,
+    handleVolunteerAction,
     presenceReady,
     presenceByVolunteerId,
   } = props;
@@ -580,7 +581,7 @@ export default function LguVerifiedVolunteersView(props: Props) {
 
                   <button
                     type="button"
-                    onClick={() => void openDetails(card.volunteer._id)}
+                    onClick={() => handleVolunteerAction(card.volunteer, card.availability)}
                     className={card.statusUI.actionClass}
                   >
                     {card.statusUI.actionLabel}

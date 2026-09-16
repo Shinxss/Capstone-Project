@@ -17,6 +17,14 @@ import {
   type ResponderAccountListItem,
   type ResponderTeamSummary,
 } from "./responder.types";
+import {
+  buildResponderAccountCreationState,
+  buildResponderAccountUpdateState,
+  buildResponderActivationState,
+  DISPATCHABLE_RESPONDER_STATE,
+  isImpossibleResponderAccountFilter,
+  normalizeResponderAccountState,
+} from "./responderAccountState";
 
 const DEFAULT_MUNICIPALITY = "Dagupan City";
 
@@ -103,6 +111,7 @@ function mapResponderRow(
   teamMap: Map<string, ResponderTeamSummary>
 ): ResponderAccountListItem {
   const id = String(row._id);
+  const accountState = normalizeResponderAccountState(row);
 
   return {
     id,
@@ -116,8 +125,8 @@ function mapResponderRow(
     barangay: safeStr(row.barangay),
     municipality: safeStr(row.municipality),
     skills: safeStr(row.skills) || undefined,
-    onDuty: Boolean(row.onDuty ?? true),
-    isActive: Boolean(row.isActive ?? true),
+    onDuty: accountState.onDuty,
+    isActive: accountState.isActive,
     team: teamMap.get(id) ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -314,8 +323,27 @@ export async function listResponderAccountsForActor(params: {
     match.isActive = params.query.isActive === "true";
   }
 
-  if (params.query.onDuty === "true" || params.query.onDuty === "false") {
-    match.onDuty = params.query.onDuty === "true";
+  if (isImpossibleResponderAccountFilter(params.query)) {
+    return {
+      items: [] as ResponderAccountListItem[],
+      pagination: {
+        page: params.query.page,
+        limit: params.query.limit,
+        total: 0,
+        totalPages: 1,
+      },
+    };
+  }
+
+  if (params.query.onDuty === "true") {
+    match.isActive = true;
+    match.onDuty = true;
+  } else if (params.query.onDuty === "false") {
+    match.$and = [
+      {
+        $or: [{ isActive: false }, { onDuty: false }],
+      },
+    ];
   }
 
   const teamMemberIds = await resolveResponderIdsFromTeamFilter(actor, params.query.teamId);
@@ -458,6 +486,7 @@ export async function createResponderAccountForActor(params: {
   await ensureUniqueResponderIdentity({ username, email });
 
   const passwordHash = await bcrypt.hash(password, 10);
+  const accountState = buildResponderAccountCreationState(params.payload);
 
   try {
     const created = await User.create({
@@ -475,8 +504,8 @@ export async function createResponderAccountForActor(params: {
       barangay,
       municipality,
       skills,
-      onDuty: params.payload.onDuty ?? true,
-      isActive: params.payload.isActive ?? true,
+      onDuty: accountState.onDuty,
+      isActive: accountState.isActive,
     });
 
     const activeTeamMap = await buildActiveTeamByMemberMap([String(created._id)]);
@@ -511,7 +540,7 @@ export async function updateResponderAccountForActor(params: {
     role: "RESPONDER",
     ...(actor.actorRole === "LGU" ? { barangay: actor.scopeBarangay } : {}),
   })
-    .select("_id username email barangay")
+    .select("_id username email barangay onDuty isActive")
     .lean();
 
   if (!existing) {
@@ -576,6 +605,10 @@ export async function updateResponderAccountForActor(params: {
   if (payload.isActive !== undefined) {
     $set.isActive = Boolean(payload.isActive);
   }
+
+  const accountState = buildResponderAccountUpdateState(existing, payload);
+  $set.isActive = accountState.isActive;
+  $set.onDuty = accountState.onDuty;
 
   if (payload.barangay !== undefined) {
     const requestedBarangay = safeStr(payload.barangay);
@@ -670,7 +703,7 @@ export async function setResponderAccountActivationForActor(params: {
       role: "RESPONDER",
       ...(actor.actorRole === "LGU" ? { barangay: actor.scopeBarangay } : {}),
     },
-    { $set: { isActive: params.isActive } },
+    { $set: buildResponderActivationState(params.isActive) },
     { new: true }
   )
     .select(
@@ -698,8 +731,7 @@ export async function listDispatchableRespondersForActor(params: {
 
   const match: Record<string, unknown> = {
     role: "RESPONDER",
-    isActive: true,
-    onDuty: true,
+    ...DISPATCHABLE_RESPONDER_STATE,
   };
 
   applyBarangayScope(match, actor, params.query.barangay);

@@ -5,6 +5,11 @@ import type {
   ResponderAccountDetails,
   UpdateResponderAccountPayload,
 } from "../models/responderAccount.types";
+import {
+  isResponderDutyControlDisabled,
+  isResponderEffectivelyOnDuty,
+  setResponderAccountActive,
+} from "../models/responderAccountState";
 
 type Props = {
   open: boolean;
@@ -94,7 +99,7 @@ export default function ResponderAccountFormModal({
         barangay: account.barangay || defaultBarangay,
         municipality: account.municipality || "Dagupan City",
         skills: account.skills ?? "",
-        onDuty: account.onDuty,
+        onDuty: isResponderEffectivelyOnDuty(account),
         isActive: account.isActive,
       });
       setErrors({});
@@ -151,7 +156,7 @@ export default function ResponderAccountFormModal({
       barangay: sanitizeOptional(form.barangay),
       municipality: sanitizeOptional(form.municipality) ?? "Dagupan City",
       skills: sanitizeOptional(form.skills),
-      onDuty: form.onDuty,
+      onDuty: isResponderEffectivelyOnDuty(form),
       isActive: form.isActive,
     };
 
@@ -313,10 +318,18 @@ export default function ResponderAccountFormModal({
               id="responder-on-duty"
               type="checkbox"
               checked={form.onDuty}
+              disabled={isResponderDutyControlDisabled(form)}
               onChange={(event) => setForm((prev) => ({ ...prev, onDuty: event.target.checked }))}
-              className="h-4 w-4 accent-blue-600"
+              className="h-4 w-4 accent-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
             />
-            <label htmlFor="responder-on-duty" className="text-sm text-gray-700 dark:text-slate-200">
+            <label
+              htmlFor="responder-on-duty"
+              className={
+                form.isActive
+                  ? "text-sm text-gray-700 dark:text-slate-200"
+                  : "cursor-not-allowed text-sm text-gray-400 dark:text-slate-500"
+              }
+            >
               On duty
             </label>
           </div>
@@ -326,7 +339,9 @@ export default function ResponderAccountFormModal({
               id="responder-active"
               type="checkbox"
               checked={form.isActive}
-              onChange={(event) => setForm((prev) => ({ ...prev, isActive: event.target.checked }))}
+              onChange={(event) =>
+                setForm((prev) => setResponderAccountActive(prev, event.target.checked))
+              }
               className="h-4 w-4 accent-blue-600"
             />
             <label htmlFor="responder-active" className="text-sm text-gray-700 dark:text-slate-200">

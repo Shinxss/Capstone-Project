@@ -1,6 +1,7 @@
 import { Search, ShieldCheck } from "lucide-react";
 import EmptyState from "@/components/ui/EmptyState";
 import { useResponderAccounts } from "../hooks/useResponderAccounts";
+import { isResponderEffectivelyOnDuty } from "../models/responderAccountState";
 import ResponderAccountFormModal from "./ResponderAccountFormModal";
 
 type Props = ReturnType<typeof useResponderAccounts>;
@@ -148,7 +149,8 @@ export default function LguResponderAccountsView({
               {accounts.map((account) => {
                 const skills = splitSkills(account.skills);
                 const activeLabel = account.isActive ? "Active" : "Suspended";
-                const dutyLabel = account.onDuty ? "On duty" : "Off duty";
+                const effectiveOnDuty = isResponderEffectivelyOnDuty(account);
+                const dutyLabel = effectiveOnDuty ? "On duty" : "Off duty";
                 const actionLabel = account.isActive ? "Suspend" : "Reactivate";
 
                 return (
@@ -198,7 +200,7 @@ export default function LguResponderAccountsView({
                     <div className="mt-3 flex flex-wrap gap-1">
                       <span
                         className={
-                          account.onDuty
+                          effectiveOnDuty
                             ? "inline-flex rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
                             : "inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-700 dark:bg-slate-500/20 dark:text-slate-300"
                         }
