@@ -1,14 +1,11 @@
 import { Types } from "mongoose";
-import fs from "fs";
-import path from "path";
 import crypto from "crypto";
 import { hashTaskPayload } from "@lifeline/blockchain";
-
-import { encryptBuffer } from "../../utils/aesGcm";
 
 import { EmergencyReport } from "../emergency/emergency.model";
 import { User } from "../users/user.model";
 import { DispatchOffer, DispatchStatus } from "./dispatch.model";
+import { removeDispatchProofAsset, storeDispatchProofAsset } from "./dispatchProofAsset.service";
 import { sendDispatchOfferPush } from "../notifications/pushNotification.service";
 import { getDispatchPendingResponseCutoffDate } from "./dispatch.constants";
 import {
@@ -367,13 +364,13 @@ export async function addProofToDispatch(params: {
     fileName: fileName ? String(fileName) : undefined,
   });
   const proofFileHash = hashProofFileBytes(parsedProof.buffer);
-  const dir = ensureUploadsDir();
   const filename = `${dispatchId}_${Date.now()}_${crypto.randomBytes(6).toString("hex")}.${parsedProof.ext}`;
-  const abs = path.join(dir, filename);
-
-  // Encrypt before writing to disk (encryption-at-rest)
-  const encrypted = encryptBuffer(parsedProof.buffer);
-  fs.writeFileSync(abs, encrypted);
+  await storeDispatchProofAsset({
+    filename,
+    dispatchId,
+    mimeType: parsedProof.mimeTypeDetected,
+    buffer: parsedProof.buffer,
+  });
 
   const url = `/uploads/dispatch-proofs/${filename}`;
   (offer.proofs as any) = Array.isArray(offer.proofs) ? offer.proofs : [];
@@ -385,7 +382,12 @@ export async function addProofToDispatch(params: {
     fileHash: proofFileHash,
   } as any);
   (offer as any).proofFileHashes = extractProofFileHashes(offer);
-  await offer.save();
+  try {
+    await offer.save();
+  } catch (error) {
+    await removeDispatchProofAsset(filename).catch(() => undefined);
+    throw error;
+  }
 
   return offer;
 }
@@ -848,12 +850,6 @@ export function toDispatchDTO(doc: any) {
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
   };
-}
-
-function ensureUploadsDir() {
-  const dir = path.join(process.cwd(), "uploads", "dispatch-proofs");
-  fs.mkdirSync(dir, { recursive: true });
-  return dir;
 }
 
 function normalizeProofFileName(fileName?: string) {

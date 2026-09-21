@@ -16,6 +16,7 @@ import { doubleCsrfProtection } from "./middlewares/csrf";
 import { AUDIT_EVENT } from "./features/audit/audit.constants";
 import { logSecurityEvent } from "./features/audit/audit.service";
 import { DispatchOffer } from "./features/dispatches/dispatch.model";
+import { readDispatchProofAsset } from "./features/dispatches/dispatchProofAsset.service";
 import { EmergencyReportModel } from "./features/emergency/models/EmergencyReport.model";
 import { readProfileAvatar } from "./features/users/userAvatar.service";
 
@@ -155,10 +156,8 @@ app.use(doubleCsrfProtection);
 
 const uploadsDir = path.join(process.cwd(), "uploads");
 fs.mkdirSync(uploadsDir, { recursive: true });
-const dispatchProofsDir = path.join(uploadsDir, "dispatch-proofs");
 const emergencyReportPhotosDir = path.join(uploadsDir, "emergency-report-photos");
 const profileAvatarsDir = path.join(uploadsDir, "profile-avatars");
-fs.mkdirSync(dispatchProofsDir, { recursive: true });
 fs.mkdirSync(emergencyReportPhotosDir, { recursive: true });
 fs.mkdirSync(profileAvatarsDir, { recursive: true });
 
@@ -179,24 +178,12 @@ app.get(
         return res.status(403).json({ message: "Forbidden" });
       }
 
-      const abs = path.join(dispatchProofsDir, filename);
-      if (!fs.existsSync(abs)) return res.status(404).end();
+      const proof = await readDispatchProofAsset(filename);
+      if (!proof) return res.status(404).end();
 
-      const raw = fs.readFileSync(abs);
-      let plain: Buffer;
-      try {
-        plain = decryptBuffer(raw);
-      } catch {
-        plain = raw;
-      }
-
-      const ext = path.extname(filename).toLowerCase();
-      if (ext === ".png") res.type("png");
-      else if (ext === ".jpg" || ext === ".jpeg") res.type("jpeg");
-      else if (ext === ".heic") res.type("heic");
-      else res.type("application/octet-stream");
-
-      return res.send(plain);
+      res.type(proof.mimeType);
+      res.setHeader("Cache-Control", "private, max-age=31536000, immutable");
+      return res.send(proof.buffer);
     } catch {
       return res.status(500).end();
     }
