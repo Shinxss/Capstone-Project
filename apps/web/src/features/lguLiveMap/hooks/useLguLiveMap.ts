@@ -44,9 +44,12 @@ import {
   type NotificationsRefreshPayload,
 } from "../../notifications/services/notifications.socket";
 import {
-  activeAssignedResponderIds,
   nearestAvailableResponderIds,
 } from "../dispatch/utils/dispatchResponder.utils";
+import {
+  blockingResponderIds,
+  responderDispatchStates,
+} from "../dispatch/utils/dispatchLifecycle.utils";
 import type { PresenceConnectionState } from "../dispatch/types/dispatchResponders.types";
 import {
   DEPLOY_VOLUNTEER_QUERY_PARAM,
@@ -657,14 +660,9 @@ export function useLguLiveMap() {
     const user = getLguUser();
     if (!user?.id) return;
 
-    let lastRefreshAt = 0;
     const socket = createNotificationsSocket();
 
     const onRefresh = (payload: NotificationsRefreshPayload) => {
-      const now = Date.now();
-      if (now - lastRefreshAt < 1000) return;
-      lastRefreshAt = now;
-
       const reason = String(payload?.reason ?? "").trim().toLowerCase();
       if (reason === "emergency_reported") {
         toastInfo("New emergency reported");
@@ -672,6 +670,15 @@ export function useLguLiveMap() {
 
       void refetchEmergencies();
       void refetchVolunteers();
+      if (selectedEmergencyId && reason.startsWith("dispatch_")) {
+        void fetchDispatchTasks({ emergencyId: selectedEmergencyId })
+          .then((tasks) => {
+            setSelectedEmergencyTasks(Array.isArray(tasks) ? tasks : []);
+            setTasksError(null);
+            setTasksLoadedEmergencyId(selectedEmergencyId);
+          })
+          .catch(() => undefined);
+      }
     };
 
     socket.on("notifications:refresh", onRefresh);
@@ -681,7 +688,7 @@ export function useLguLiveMap() {
       socket.off("notifications:refresh", onRefresh);
       socket.disconnect();
     };
-  }, [refetchEmergencies, refetchVolunteers]);
+  }, [refetchEmergencies, refetchVolunteers, selectedEmergencyId]);
 
   // Per-emergency responder assignment (volunteer ids)
   const [assignmentsByEmergency, setAssignmentsByEmergency] = useState<Record<string, string[]>>({});
@@ -1560,9 +1567,14 @@ export function useLguLiveMap() {
         tasksLoading,
         tasksError,
         tasksLoadedEmergencyId,
-        assignedIds: activeAssignedResponderIds(selectedEmergencyTasks),
+        dispatchState:
+          responderDispatchStates(selectedEmergencyTasks).get(volunteerId) ?? "available",
       });
       if (action.kind === "wait") return false;
+      if (action.kind === "awaiting-response") {
+        toastWarning("Waiting for this responder to accept or decline the dispatch request.");
+        return false;
+      }
       if (action.kind === "already-assigned") {
         toastWarning("This volunteer is already assigned to this emergency.");
         return false;
@@ -1591,7 +1603,7 @@ export function useLguLiveMap() {
       return;
     }
 
-    const assignedIds = activeAssignedResponderIds(selectedEmergencyTasks);
+    const assignedIds = blockingResponderIds(selectedEmergencyTasks);
 
     // Preselect nearest 2 available responders (only if nothing is selected yet)
     setDispatchSelection((prev) => {
@@ -1612,13 +1624,19 @@ export function useLguLiveMap() {
       tasksLoading,
       tasksError,
       tasksLoadedEmergencyId,
-      assignedIds: activeAssignedResponderIds(selectedEmergencyTasks),
+      dispatchState:
+        responderDispatchStates(selectedEmergencyTasks).get(deploymentIntent.volunteerId) ?? "available",
     });
     if (action.kind === "wait") return;
 
     const attemptKey = `${selectedEmergencyId}:${deploymentIntent.volunteerId}`;
     if (autoOpenedDeploymentRef.current === attemptKey) return;
     autoOpenedDeploymentRef.current = attemptKey;
+
+    if (action.kind === "awaiting-response") {
+      toastWarning("Waiting for this responder to accept or decline the dispatch request.");
+      return;
+    }
 
     if (action.kind === "already-assigned") {
       toastWarning("This volunteer is already assigned to this emergency.");
@@ -1656,7 +1674,7 @@ export function useLguLiveMap() {
 
   useEffect(() => {
     if (!dispatchModalOpen) return;
-    const assignedIds = activeAssignedResponderIds(selectedEmergencyTasks);
+    const assignedIds = blockingResponderIds(selectedEmergencyTasks);
     const availableIds = new Set(
       volunteers
         .filter((volunteer) => volunteer.status === "available" && !assignedIds.has(volunteer.id))
@@ -1681,7 +1699,7 @@ export function useLguLiveMap() {
   const toggleDispatchResponder = useCallback(
     (volunteerId: string) => {
       const v = volunteers.find((x) => x.id === volunteerId);
-      const assignedIds = activeAssignedResponderIds(selectedEmergencyTasks);
+      const assignedIds = blockingResponderIds(selectedEmergencyTasks);
       if (!v || v.status !== "available" || assignedIds.has(volunteerId)) return;
 
       setDispatchSelection((prev) =>
@@ -1696,7 +1714,7 @@ export function useLguLiveMap() {
   const confirmDispatchResponders = useCallback(async () => {
     if (!selectedEmergencyId) return false;
 
-    const assignedIds = activeAssignedResponderIds(selectedEmergencyTasks);
+    const assignedIds = blockingResponderIds(selectedEmergencyTasks);
     const availableSet = new Set(
       volunteers.filter((v) => v.status === "available" && !assignedIds.has(v.id)).map((v) => v.id)
     );
@@ -1711,7 +1729,20 @@ export function useLguLiveMap() {
     try {
       await createDispatchOffers({ emergencyId: selectedEmergencyId, volunteerIds: chosen });
     } catch (error: unknown) {
-      const parsed = error as { message?: string; response?: { data?: { message?: string } } };
+      const parsed = error as {
+        message?: string;
+        response?: { data?: { code?: string; message?: string } };
+      };
+      const backendCode = String(parsed.response?.data?.code ?? "").toUpperCase();
+      if (backendCode === "RESPONDER_ALREADY_DISPATCHED") {
+        const refreshedTasks = await fetchDispatchTasks({ emergencyId: selectedEmergencyId }).catch(() => null);
+        if (refreshedTasks) setSelectedEmergencyTasks(refreshedTasks);
+        toastError(
+          parsed.response?.data?.message ??
+            "This responder already has an active or pending dispatch for this emergency.",
+        );
+        return false;
+      }
       const backendMessage = String(parsed.response?.data?.message ?? parsed.message ?? "").toLowerCase();
       if (backendMessage.includes("available") || backendMessage.includes("busy") || backendMessage.includes("dispatch")) {
         await refetchVolunteers().catch(() => undefined);

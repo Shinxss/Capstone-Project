@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { DispatchTask } from "../../../tasks/models/tasks.types";
 import type { LguEmergencyDetails, Volunteer } from "../../models/lguLiveMap.types";
 import {
@@ -11,11 +11,14 @@ import type {
   DispatchResponderSort,
 } from "../types/dispatchResponders.types";
 import {
-  activeAssignedResponderIds,
   normalizeDispatchResponder,
   responderBestMatchValue,
   toDispatchEmergencyContext,
 } from "../utils/dispatchResponder.utils";
+import {
+  nextPendingOfferExpirationMs,
+  responderDispatchStates,
+} from "../utils/dispatchLifecycle.utils";
 
 type Params = {
   emergency: LguEmergencyDetails;
@@ -34,12 +37,27 @@ export function useDispatchResponderFilters({ emergency, volunteers, tasks, sele
   const [activeFilter, setActiveFilter] = useState<DispatchResponderFilter>("recommended");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<DispatchResponderSort>("bestMatch");
+  const [lifecycleNowMs, setLifecycleNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    const nextExpiration = nextPendingOfferExpirationMs(tasks, lifecycleNowMs);
+    if (nextExpiration === null) return;
+
+    const timeout = window.setTimeout(
+      () => setLifecycleNowMs(Date.now()),
+      Math.max(0, nextExpiration - Date.now() + 25),
+    );
+    return () => window.clearTimeout(timeout);
+  }, [lifecycleNowMs, tasks]);
 
   const emergencyContext = useMemo(() => toDispatchEmergencyContext(emergency), [emergency]);
-  const assignedIds = useMemo(() => activeAssignedResponderIds(tasks), [tasks]);
+  const dispatchStates = useMemo(
+    () => responderDispatchStates(tasks, lifecycleNowMs),
+    [lifecycleNowMs, tasks],
+  );
   const responders = useMemo(
-    () => volunteers.map((volunteer) => normalizeDispatchResponder(volunteer, emergencyContext, assignedIds)),
-    [assignedIds, emergencyContext, volunteers],
+    () => volunteers.map((volunteer) => normalizeDispatchResponder(volunteer, emergencyContext, dispatchStates)),
+    [dispatchStates, emergencyContext, volunteers],
   );
   const supportsRating = responders.some((responder) => responder.rating !== null);
   const supportsEta = responders.some((responder) => responder.etaMinutes !== null);

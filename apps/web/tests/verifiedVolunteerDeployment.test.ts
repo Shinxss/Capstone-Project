@@ -80,7 +80,7 @@ test("deployment modal waits for tasks from the selected emergency", () => {
       tasksLoading: false,
       tasksError: null,
       tasksLoadedEmergencyId: "emergency-old",
-      assignedIds: new Set(),
+      dispatchState: "available",
     }),
     { kind: "wait" }
   );
@@ -95,7 +95,7 @@ test("deployment modal preselects only the intended volunteer after tasks load",
       tasksLoading: false,
       tasksError: null,
       tasksLoadedEmergencyId: "emergency-a",
-      assignedIds: new Set(),
+      dispatchState: "available",
     }),
     { kind: "open", selectedIds: ["volunteer-a"] }
   );
@@ -110,9 +110,24 @@ test("already-assigned target cannot open a duplicate deployment", () => {
       tasksLoading: false,
       tasksError: null,
       tasksLoadedEmergencyId: "emergency-a",
-      assignedIds: new Set(["volunteer-a"]),
+      dispatchState: "assigned",
     }),
     { kind: "already-assigned" }
+  );
+});
+
+test("awaiting-response target reports pending state instead of assigned", () => {
+  assert.deepEqual(
+    resolveDeploymentModalAction({
+      volunteerId: "volunteer-a",
+      selectedEmergencyId: "emergency-a",
+      hasEmergencyDetails: true,
+      tasksLoading: false,
+      tasksError: null,
+      tasksLoadedEmergencyId: "emergency-a",
+      dispatchState: "awaiting_response",
+    }),
+    { kind: "awaiting-response" },
   );
 });
 

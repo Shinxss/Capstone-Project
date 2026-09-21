@@ -4,8 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "pnpm run test:dispatch-chain",
+    "test": "pnpm run test:dispatch-chain && pnpm run test:dispatch-lifecycle",
     "test:dispatch-chain": "tsx --test src/features/dispatches/dispatch.chain.test.ts src/features/dispatches/dispatchProofAsset.test.ts",
+    "test:dispatch-lifecycle": "tsx --test src/features/dispatches/dispatch.lifecycle.test.ts ../web/tests/dispatchLifecycle.test.ts ../web/tests/verifiedVolunteerDeployment.test.ts ../mobile/features/dispatch/utils/dispatchLifecycle.test.ts",
     "test:achievements": "tsx --test src/features/achievements/achievement.progression.test.ts src/features/achievements/achievement.service.test.ts",
     "test:responders": "tsx --test src/features/responders/responderAccountState.test.ts ../web/tests/responderAccountState.test.ts",
     "test:verified-volunteer-deployment": "tsx --test ../web/tests/verifiedVolunteerDeployment.test.ts",

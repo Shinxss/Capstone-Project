@@ -22,6 +22,19 @@ export type TaskVolunteer = {
   avatarUrl?: string | null;
 };
 
+export type DispatchTaskStatus =
+  | "PENDING"
+  | "ACCEPTED"
+  | "DECLINED"
+  | "CANCELLED"
+  | "DONE"
+  | "VERIFIED";
+
+export type DispatchCancellationReason =
+  | "RESPONSE_TIMEOUT"
+  | "SUPERSEDED"
+  | "REPORTER_CONFLICT";
+
 export type TaskEmergency = {
   id: string;
   referenceNumber?: string | null;
@@ -47,7 +60,9 @@ export type TaskLastKnownLocation = {
 
 export type DispatchTask = {
   id: string;
-  status: string;
+  status: DispatchTaskStatus;
+  expiresAt?: string | null;
+  cancellationReason?: DispatchCancellationReason | null;
   respondedAt?: string | null;
   completedAt?: string | null;
   verifiedAt?: string | null;

@@ -1,4 +1,5 @@
 import type { Volunteer } from "../models/lguLiveMap.types";
+import type { ResponderDispatchState } from "../dispatch/utils/dispatchLifecycle.utils";
 
 export const DEPLOY_VOLUNTEER_QUERY_PARAM = "deployVolunteerId";
 
@@ -44,6 +45,7 @@ export function removeDeploymentIntentParam(searchParams: URLSearchParams) {
 
 export type DeploymentModalAction =
   | { kind: "wait" }
+  | { kind: "awaiting-response" }
   | { kind: "already-assigned" }
   | { kind: "open"; selectedIds: string[] };
 
@@ -54,7 +56,7 @@ export function resolveDeploymentModalAction(params: {
   tasksLoading: boolean;
   tasksError: string | null;
   tasksLoadedEmergencyId: string | null;
-  assignedIds: ReadonlySet<string>;
+  dispatchState: ResponderDispatchState;
 }): DeploymentModalAction {
   if (
     !params.selectedEmergencyId ||
@@ -66,7 +68,11 @@ export function resolveDeploymentModalAction(params: {
     return { kind: "wait" };
   }
 
-  if (params.assignedIds.has(params.volunteerId)) {
+  if (params.dispatchState === "awaiting_response") {
+    return { kind: "awaiting-response" };
+  }
+
+  if (params.dispatchState === "assigned") {
     return { kind: "already-assigned" };
   }
 

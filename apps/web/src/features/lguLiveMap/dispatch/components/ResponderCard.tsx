@@ -26,9 +26,11 @@ export default function ResponderCard({
   onToggle: (id: string) => void;
 }) {
   const recommendation = recommendationLabelFor(responder, rankedIndex);
-  const disabledReason = responder.isAssigned
-    ? "Already assigned to this emergency"
-    : responder.availability !== "available"
+  const disabledReason = responder.isAwaitingResponse
+    ? "Waiting for this responder to answer the dispatch request"
+    : responder.isAssigned
+      ? "Already assigned to this emergency"
+      : responder.availability !== "available"
       ? `Responder is ${responder.availability}`
       : "Responder cannot be dispatched to this emergency";
   return (
@@ -66,6 +68,7 @@ export default function ResponderCard({
           </label>
         </div>
       </div>
+      {responder.isAwaitingResponse ? <p className="mt-3 flex items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-300"><Clock3 size={14} />Waiting for this responder to accept or decline the dispatch request.</p> : null}
       {responder.isAssigned ? <p className="mt-3 flex items-center gap-1.5 text-xs font-medium text-blue-700 dark:text-blue-300"><ShieldCheck size={14} />This responder already has an active assignment for this emergency.</p> : null}
     </article>
   );

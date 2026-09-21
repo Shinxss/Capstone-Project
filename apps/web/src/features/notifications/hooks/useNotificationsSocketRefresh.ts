@@ -13,6 +13,8 @@ export function notificationBodyFromReason(reason: string) {
   const normalized = String(reason || "").trim().toLowerCase();
   if (normalized === "emergency_reported") return "A new emergency report needs attention.";
   if (normalized === "dispatch_accepted") return "A dispatch has been accepted.";
+  if (normalized === "dispatch_declined") return "A dispatch has been declined.";
+  if (normalized === "dispatch_expired") return "A dispatch offer has expired.";
   if (normalized === "dispatch_completed") return "A dispatch has been completed and may need verification.";
   if (normalized === "dispatch_verified") return "A dispatch has been verified.";
   return "There is a new notification update.";

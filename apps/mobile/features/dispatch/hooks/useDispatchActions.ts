@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Alert } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import type { DispatchOffer } from "../models/dispatch";
@@ -28,12 +28,14 @@ function isStalePendingError(message: string) {
 
 export function useDispatchActions(params?: UseDispatchActionsParams) {
   const [busyAction, setBusyAction] = useState<DispatchActionKind | null>(null);
+  const decisionLockRef = useRef(false);
 
   const acceptDispatch = useCallback(
     async (dispatch: DispatchOffer | null | undefined) => {
-      if (!dispatch?.id || busyAction) return;
+      if (!dispatch?.id || busyAction || decisionLockRef.current) return;
 
       try {
+        decisionLockRef.current = true;
         setBusyAction("accept");
         const updated = await respondToDispatch(dispatch.id, "ACCEPT");
         await setStoredActiveDispatch(updated);
@@ -46,6 +48,7 @@ export function useDispatchActions(params?: UseDispatchActionsParams) {
         }
         Alert.alert("Failed", message);
       } finally {
+        decisionLockRef.current = false;
         setBusyAction(null);
       }
     },
@@ -54,9 +57,10 @@ export function useDispatchActions(params?: UseDispatchActionsParams) {
 
   const declineDispatch = useCallback(
     async (dispatch: DispatchOffer | null | undefined) => {
-      if (!dispatch?.id || busyAction) return;
+      if (!dispatch?.id || busyAction || decisionLockRef.current) return;
 
       try {
+        decisionLockRef.current = true;
         setBusyAction("decline");
         await respondToDispatch(dispatch.id, "DECLINE");
         await params?.onDeclined?.();
@@ -68,6 +72,7 @@ export function useDispatchActions(params?: UseDispatchActionsParams) {
         }
         Alert.alert("Failed", message);
       } finally {
+        decisionLockRef.current = false;
         setBusyAction(null);
       }
     },

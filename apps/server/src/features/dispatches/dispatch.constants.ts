@@ -1,4 +1,5 @@
 const DEFAULT_PENDING_RESPONSE_TIMEOUT_MS = 5 * 60_000;
+const DEFAULT_PENDING_EXPIRATION_SWEEP_MS = 30_000;
 
 function parsePositiveMs(raw: unknown, fallback: number) {
   const parsed = Number(raw);
@@ -12,6 +13,15 @@ export const DISPATCH_PENDING_RESPONSE_TIMEOUT_MS = parsePositiveMs(
   DEFAULT_PENDING_RESPONSE_TIMEOUT_MS
 );
 
+export const DISPATCH_PENDING_EXPIRATION_SWEEP_MS = parsePositiveMs(
+  process.env.DISPATCH_PENDING_EXPIRATION_SWEEP_MS,
+  DEFAULT_PENDING_EXPIRATION_SWEEP_MS,
+);
+
 export function getDispatchPendingResponseCutoffDate(nowMs = Date.now()) {
   return new Date(nowMs - DISPATCH_PENDING_RESPONSE_TIMEOUT_MS);
+}
+
+export function getDispatchPendingResponseExpiresAt(nowMs = Date.now()) {
+  return new Date(nowMs + DISPATCH_PENDING_RESPONSE_TIMEOUT_MS);
 }

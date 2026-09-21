@@ -18,6 +18,11 @@ export type DispatchStatus =
   | "DONE"
   | "VERIFIED";
 
+export type DispatchCancellationReason =
+  | "RESPONSE_TIMEOUT"
+  | "SUPERSEDED"
+  | "REPORTER_CONFLICT";
+
 export type DispatchProof = {
   url: string;
   uploadedAt: string;
@@ -67,6 +72,8 @@ export type DispatchBlockchainRecord = {
 export type DispatchOffer = {
   id: string;
   status: DispatchStatus;
+  expiresAt?: string | null;
+  cancellationReason?: DispatchCancellationReason | null;
   createdAt?: string;
   updatedAt?: string;
   respondedAt?: string | null;

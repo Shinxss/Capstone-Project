@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DispatchOffer } from "../models/dispatch";
 import { fetchMyPendingDispatch } from "../services/dispatchApi";
+import { pendingDispatchExpirationMs } from "../utils/dispatchLifecycle";
 
 export function usePendingDispatch(options?: { pollMs?: number; enabled?: boolean }) {
   const pollMs = options?.pollMs ?? 8000;
@@ -42,6 +43,24 @@ export function usePendingDispatch(options?: { pollMs?: number; enabled?: boolea
       timerRef.current = null;
     };
   }, [pollMs, refresh, enabled]);
+
+  useEffect(() => {
+    const expiresAt = pendingDispatchExpirationMs(pending);
+    if (expiresAt === null) return;
+
+    const expireLocally = () => {
+      setPending(null);
+      void refresh();
+    };
+    const remainingMs = expiresAt - Date.now();
+    if (remainingMs <= 0) {
+      expireLocally();
+      return;
+    }
+
+    const timeout = setTimeout(expireLocally, remainingMs + 25);
+    return () => clearTimeout(timeout);
+  }, [pending, refresh]);
 
   const clear = useCallback(() => setPending(null), []);
 

@@ -8,6 +8,11 @@ export type DispatchStatus =
   | "DONE"
   | "VERIFIED";
 
+export type DispatchCancellationReason =
+  | "RESPONSE_TIMEOUT"
+  | "SUPERSEDED"
+  | "REPORTER_CONFLICT";
+
 export type EmergencySnapshot = {
   id: string;
   emergencyType: string;
@@ -54,6 +59,8 @@ export type DispatchOfferDoc = {
 
   status: DispatchStatus;
   respondedAt?: Date;
+  expiresAt?: Date;
+  cancellationReason?: DispatchCancellationReason;
 
   // Volunteer completion
   completedAt?: Date;
@@ -108,6 +115,11 @@ const DispatchOfferSchema = new Schema<DispatchOfferDoc>(
     },
 
     respondedAt: { type: Date },
+    expiresAt: { type: Date, index: true },
+    cancellationReason: {
+      type: String,
+      enum: ["RESPONSE_TIMEOUT", "SUPERSEDED", "REPORTER_CONFLICT"],
+    },
 
     completedAt: { type: Date },
     proofs: {
@@ -235,6 +247,25 @@ DispatchOfferSchema.index({ volunteerId: 1, status: 1, updatedAt: -1 });
 DispatchOfferSchema.index({ emergencyId: 1, status: 1, updatedAt: -1 });
 DispatchOfferSchema.index({ "blockchain.taskIdHash": 1 });
 DispatchOfferSchema.index({ emergencyId: 1, status: 1, lastKnownLocationAt: -1 });
+DispatchOfferSchema.index(
+  { emergencyId: 1, volunteerId: 1 },
+  {
+    name: "one_blocking_dispatch_per_emergency_responder",
+    unique: true,
+    partialFilterExpression: { status: { $in: ["PENDING", "ACCEPTED", "DONE"] } },
+  },
+);
 
 export const DispatchOffer =
   models.DispatchOffer || model<DispatchOfferDoc>("DispatchOffer", DispatchOfferSchema);
+
+export async function ensureDispatchLifecycleIndexes() {
+  await DispatchOffer.collection.createIndex(
+    { emergencyId: 1, volunteerId: 1 },
+    {
+      name: "one_blocking_dispatch_per_emergency_responder",
+      unique: true,
+      partialFilterExpression: { status: { $in: ["PENDING", "ACCEPTED", "DONE"] } },
+    },
+  );
+}

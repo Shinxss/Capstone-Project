@@ -13,6 +13,7 @@ import { useDispatchActions } from "./useDispatchActions";
 import { getDefaultTasksTab, groupDispatchesForTasks, hasAnyDispatchTasks } from "../utils/dispatchTaskGroups";
 import { getDispatchStatusLabel } from "../utils/dispatchProgress";
 import { useTaskFocusStats } from "./useTaskFocusStats";
+import { pendingDispatchExpirationMs } from "../utils/dispatchLifecycle";
 
 type UseTasksScreenParams = {
   enabled: boolean;
@@ -132,6 +133,24 @@ export function useTasksScreen(params: UseTasksScreenParams) {
       socket.off("connect", syncDispatches);
     };
   }, [enabled, mode, refresh, token]);
+
+  useEffect(() => {
+    const expiresAt = pendingDispatchExpirationMs(pendingDispatch);
+    if (expiresAt === null) return;
+
+    const expireLocally = () => {
+      setPendingDispatch(null);
+      void refresh({ showLoading: false });
+    };
+    const remainingMs = expiresAt - Date.now();
+    if (remainingMs <= 0) {
+      expireLocally();
+      return;
+    }
+
+    const timeout = setTimeout(expireLocally, remainingMs + 25);
+    return () => clearTimeout(timeout);
+  }, [pendingDispatch, refresh]);
 
   const groups = useMemo(
     () =>

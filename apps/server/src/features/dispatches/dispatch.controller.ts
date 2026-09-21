@@ -20,6 +20,7 @@ import type { DispatchStatus } from "./dispatch.model";
 import { AUDIT_EVENT } from "../audit/audit.constants";
 import { logAudit } from "../audit/audit.service";
 import { emitNotificationsRefresh } from "../../realtime/notificationsSocket";
+import { isDispatchConflictError } from "./dispatch.errors";
 
 function getAuth(req: Request) {
   const role = (req as any).user?.role ?? (req as any).role;
@@ -29,6 +30,14 @@ function getAuth(req: Request) {
 
 function isDispatchAssigneeRole(role: string) {
   return role === "VOLUNTEER" || role === "RESPONDER";
+}
+
+function sendDispatchError(res: Response, error: unknown, fallback: string) {
+  if (isDispatchConflictError(error)) {
+    return res.status(error.statusCode).json({ code: error.code, message: error.message });
+  }
+  const message = error instanceof Error ? error.message : fallback;
+  return res.status(400).json({ message });
 }
 
 export async function postDispatchOffers(req: Request, res: Response) {
@@ -71,8 +80,8 @@ export async function postDispatchOffers(req: Request, res: Response) {
     emitNotificationsRefresh("dispatch_created", ["LGU", "ADMIN"]);
 
     return res.status(201).json({ message: "Dispatch offers created", count: created.length });
-  } catch (e: any) {
-    return res.status(400).json({ message: e?.message ?? "Failed to dispatch" });
+  } catch (error: unknown) {
+    return sendDispatchError(res, error, "Failed to dispatch");
   }
 }
 
@@ -137,8 +146,13 @@ export async function patchRespond(req: Request, res: Response) {
     const offer = await respondToDispatch({
       dispatchId: String(req.params.id),
       volunteerUserId: String(userId),
-      decision: decision as any,
+      decision,
     });
+
+    emitNotificationsRefresh(
+      decision === "ACCEPT" ? "dispatch_accepted" : "dispatch_declined",
+      ["LGU", "ADMIN"],
+    );
 
     await logAudit(req, {
       eventType: AUDIT_EVENT.DISPATCH_STATUS_CHANGE,
@@ -150,13 +164,9 @@ export async function patchRespond(req: Request, res: Response) {
       },
     });
 
-    if (decision === "ACCEPT") {
-      emitNotificationsRefresh("dispatch_accepted", ["LGU", "ADMIN"]);
-    }
-
     return res.json({ data: toDispatchDTO(offer) });
-  } catch (e: any) {
-    return res.status(400).json({ message: e?.message ?? "Failed" });
+  } catch (error: unknown) {
+    return sendDispatchError(res, error, "Failed");
   }
 }
 

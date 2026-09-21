@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Alert } from "react-native";
 import type { DispatchOffer } from "../models/dispatch";
 import type { DispatchModalData } from "../models/dispatchModal";
@@ -6,6 +6,7 @@ import { toDispatchModalData } from "../models/dispatchModal";
 import { respondToDispatch } from "../services/dispatchApi";
 import { setStoredActiveDispatch } from "../services/dispatchStorage";
 import { DEFAULT_ASSIGNED_BY_LABEL } from "../constants/dispatchModal.constants";
+import { isPendingDispatchActive } from "../utils/dispatchLifecycle";
 
 type UseDispatchModalParams = {
   pendingDispatch: DispatchOffer | null;
@@ -78,11 +79,12 @@ export function useDispatchModal(params: UseDispatchModalParams) {
   const [accepting, setAccepting] = useState(false);
   const [declining, setDeclining] = useState(false);
   const [dismissedAssignmentId, setDismissedAssignmentId] = useState<string | null>(null);
+  const decisionLockRef = useRef(false);
 
   const data = useMemo(() => toDispatchModalData(pendingDispatch), [pendingDispatch]);
   const visible = Boolean(
     data &&
-      pendingDispatch?.status === "PENDING" &&
+      isPendingDispatchActive(pendingDispatch) &&
       pendingDispatch?.id &&
       pendingDispatch.id !== dismissedAssignmentId
   );
@@ -104,9 +106,10 @@ export function useDispatchModal(params: UseDispatchModalParams) {
 
   const acceptDispatch = useCallback(async () => {
     if (!pendingDispatch) return;
-    if (busy) return;
+    if (busy || decisionLockRef.current) return;
 
     try {
+      decisionLockRef.current = true;
       setAccepting(true);
       const updated = await respondToDispatch(pendingDispatch.id, "ACCEPT");
       await setStoredActiveDispatch(updated);
@@ -117,7 +120,7 @@ export function useDispatchModal(params: UseDispatchModalParams) {
       const parsed = error as { response?: { data?: { message?: string } }; message?: string };
       const message = String(parsed?.response?.data?.message ?? parsed?.message ?? "").trim();
       const normalized = message.toLowerCase();
-      const staleState = normalized.includes("not pending");
+      const staleState = normalized.includes("not pending") || normalized.includes("timed out");
 
       if (staleState) {
         clearPending();
@@ -127,15 +130,17 @@ export function useDispatchModal(params: UseDispatchModalParams) {
 
       Alert.alert("Failed", message || "Unable to accept dispatch.");
     } finally {
+      decisionLockRef.current = false;
       setAccepting(false);
     }
   }, [pendingDispatch, busy, clearPending, refreshActive, onAcceptSuccess, refreshPending]);
 
   const declineDispatch = useCallback(async () => {
     if (!pendingDispatch) return;
-    if (busy) return;
+    if (busy || decisionLockRef.current) return;
 
     try {
+      decisionLockRef.current = true;
       setDeclining(true);
       await respondToDispatch(pendingDispatch.id, "DECLINE");
       clearPending();
@@ -145,7 +150,7 @@ export function useDispatchModal(params: UseDispatchModalParams) {
       const parsed = error as { response?: { data?: { message?: string } }; message?: string };
       const message = String(parsed?.response?.data?.message ?? parsed?.message ?? "").trim();
       const normalized = message.toLowerCase();
-      const staleState = normalized.includes("not pending");
+      const staleState = normalized.includes("not pending") || normalized.includes("timed out");
 
       if (staleState) {
         clearPending();
@@ -155,6 +160,7 @@ export function useDispatchModal(params: UseDispatchModalParams) {
 
       Alert.alert("Failed", message || "Unable to decline dispatch.");
     } finally {
+      decisionLockRef.current = false;
       setDeclining(false);
     }
   }, [pendingDispatch, busy, clearPending, refreshPending, onDeclineSuccess, refreshActive]);

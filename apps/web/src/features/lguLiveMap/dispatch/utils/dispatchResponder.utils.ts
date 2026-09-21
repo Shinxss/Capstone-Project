@@ -1,5 +1,4 @@
 import { emergencyTitleForType } from "../../../emergency/constants/emergency.constants";
-import type { DispatchTask } from "../../../tasks/models/tasks.types";
 import type { LguEmergencyDetails, Volunteer } from "../../models/lguLiveMap.types";
 import { EMERGENCY_TRAINING_CONFIG } from "../constants/dispatchResponders.constants";
 import type {
@@ -7,6 +6,7 @@ import type {
   DispatchEmergencyContext,
   RecommendationLabel,
 } from "../types/dispatchResponders.types";
+import type { ResponderDispatchState } from "./dispatchLifecycle.utils";
 
 export function splitResponderSkills(value?: string | null) {
   const skills = String(value ?? "")
@@ -32,15 +32,6 @@ export function distanceInKm(fromLat: number, fromLng: number, toLat?: number, t
     Math.sin(latitudeDelta / 2) ** 2 +
     Math.cos(radians(fromLat)) * Math.cos(radians(Number(toLat))) * Math.sin(longitudeDelta / 2) ** 2;
   return radiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-export function activeAssignedResponderIds(tasks: DispatchTask[]) {
-  return new Set(
-    tasks
-      .filter((task) => !["DECLINED", "CANCELLED", "VERIFIED"].includes(String(task.status ?? "").toUpperCase()))
-      .map((task) => String(task.volunteer?.id ?? "").trim())
-      .filter(Boolean),
-  );
 }
 
 export function nearestAvailableResponderIds(
@@ -91,7 +82,7 @@ export function toDispatchEmergencyContext(emergency: LguEmergencyDetails): Disp
 export function normalizeDispatchResponder(
   volunteer: Volunteer,
   emergency: DispatchEmergencyContext,
-  assignedIds: ReadonlySet<string>,
+  dispatchStates: ReadonlyMap<string, ResponderDispatchState>,
 ): DispatchableResponder {
   const skills = splitResponderSkills(volunteer.skill);
   const normalizedSkills = skills.map((skill) => skill.toLowerCase());
@@ -99,7 +90,9 @@ export function normalizeDispatchResponder(
   const matchesEmergencyTraining = trainingTerms.some((term) =>
     normalizedSkills.some((skill) => skill.includes(term) || term.includes(skill)),
   );
-  const isAssigned = assignedIds.has(volunteer.id);
+  const dispatchState = dispatchStates.get(volunteer.id) ?? "available";
+  const isAssigned = dispatchState === "assigned";
+  const isAwaitingResponse = dispatchState === "awaiting_response";
   const availability = volunteer.status;
   const rating = Number.isFinite(volunteer.rating) ? Number(volunteer.rating) : null;
   const reviewCount = Number.isFinite(volunteer.reviewCount) ? Math.max(0, Number(volunteer.reviewCount)) : null;
@@ -113,8 +106,13 @@ export function normalizeDispatchResponder(
     etaMinutes,
     rating,
     reviewCount,
+    dispatchState,
     isAssigned,
-    isDispatchable: emergency.dispatchable && availability === "available" && !isAssigned,
+    isAwaitingResponse,
+    isDispatchable:
+      emergency.dispatchable &&
+      availability === "available" &&
+      dispatchState === "available",
     matchesEmergencyTraining,
   };
 }

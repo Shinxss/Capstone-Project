@@ -1,5 +1,6 @@
 import type { EmergencyType } from "../../../emergency/constants/emergency.constants";
 import type { Volunteer, VolunteerStatus } from "../../models/lguLiveMap.types";
+import type { ResponderDispatchState } from "../utils/dispatchLifecycle.utils";
 
 export type DispatchResponderFilter =
   | "recommended"
@@ -26,7 +27,9 @@ export type DispatchableResponder = Omit<Volunteer, "rating" | "reviewCount" | "
   etaMinutes: number | null;
   rating: number | null;
   reviewCount: number | null;
+  dispatchState: ResponderDispatchState;
   isAssigned: boolean;
+  isAwaitingResponse: boolean;
   isDispatchable: boolean;
   matchesEmergencyTraining: boolean;
 };

@@ -5,14 +5,25 @@ import { hashTaskPayload } from "@lifeline/blockchain";
 import { EmergencyReport } from "../emergency/emergency.model";
 import { User } from "../users/user.model";
 import { DispatchOffer, DispatchStatus } from "./dispatch.model";
+import { DispatchConflictError } from "./dispatch.errors";
+import {
+  activePendingOfferFilter,
+  expiredPendingOfferFilter,
+  getDispatchOfferExpiresAt,
+  isPendingOfferActive,
+} from "./dispatch.lifecycle";
 import {
   dispatchProofAssetExists,
   removeDispatchProofAsset,
   storeDispatchProofAsset,
 } from "./dispatchProofAsset.service";
 import { sendDispatchOfferPush } from "../notifications/pushNotification.service";
-import { getDispatchPendingResponseCutoffDate } from "./dispatch.constants";
 import {
+  DISPATCH_PENDING_EXPIRATION_SWEEP_MS,
+  getDispatchPendingResponseExpiresAt,
+} from "./dispatch.constants";
+import {
+  emitNotificationsRefresh,
   emitRequestTrackingUpdate,
   emitUserNotification,
   getDispatchAssigneePresenceStatus,
@@ -48,6 +59,53 @@ export type CreateDispatchInput = {
   createdByUserId: string;
   createdByRole?: string;
 };
+
+type ExpirePendingScope = {
+  emergencyId?: Types.ObjectId;
+  volunteerId?: Types.ObjectId;
+  volunteerIds?: Types.ObjectId[];
+};
+
+let pendingExpirationSweepTimer: NodeJS.Timeout | null = null;
+
+export async function expirePendingDispatchOffers(
+  scope: ExpirePendingScope = {},
+  now = new Date(),
+) {
+  const query: Record<string, unknown> = {
+    status: "PENDING",
+    ...expiredPendingOfferFilter(now),
+  };
+  if (scope.emergencyId) query.emergencyId = scope.emergencyId;
+  if (scope.volunteerId) query.volunteerId = scope.volunteerId;
+  if (scope.volunteerIds?.length) query.volunteerId = { $in: scope.volunteerIds };
+
+  const result = await DispatchOffer.updateMany(query, {
+    $set: {
+      status: "CANCELLED",
+      cancellationReason: "RESPONSE_TIMEOUT",
+      respondedAt: now,
+    },
+  });
+
+  if (result.modifiedCount > 0) {
+    emitNotificationsRefresh("dispatch_expired", ["LGU", "ADMIN"]);
+  }
+
+  return result.modifiedCount;
+}
+
+export function startPendingDispatchExpirationSweep() {
+  if (pendingExpirationSweepTimer) return;
+
+  pendingExpirationSweepTimer = setInterval(() => {
+    void expirePendingDispatchOffers().catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error("[dispatch] pending expiration sweep failed", { message });
+    });
+  }, DISPATCH_PENDING_EXPIRATION_SWEEP_MS);
+  pendingExpirationSweepTimer.unref();
+}
 
 export async function createDispatchOffers(input: CreateDispatchInput) {
   const emergencyId = String(input.emergencyId);
@@ -96,6 +154,35 @@ export async function createDispatchOffers(input: CreateDispatchInput) {
     throw new Error("No valid approved volunteers or active responders found");
   }
 
+  if (Types.ObjectId.isValid(reporterUserId) && validVolunteerIds.includes(reporterUserId)) {
+    throw new Error("Reporter cannot be dispatched to their own emergency report.");
+  }
+
+  const now = new Date();
+  const emergencyObjectId = new Types.ObjectId(emergencyId);
+  const volunteerObjectIds = validVolunteerIds.map((id) => new Types.ObjectId(id));
+
+  await expirePendingDispatchOffers({
+    emergencyId: emergencyObjectId,
+    volunteerIds: volunteerObjectIds,
+  }, now);
+
+  const existingBlocking = await DispatchOffer.find({
+    emergencyId: emergencyObjectId,
+    volunteerId: { $in: volunteerObjectIds },
+    $or: [
+      { status: { $in: ["ACCEPTED", "DONE"] } },
+      { status: "PENDING", ...activePendingOfferFilter(now) },
+    ],
+  }).select("volunteerId status");
+
+  if (existingBlocking.length > 0) {
+    throw new DispatchConflictError(
+      "This responder already has an active or pending dispatch for this emergency.",
+      "RESPONDER_ALREADY_DISPATCHED",
+    );
+  }
+
   const unavailableVolunteerIds = validVolunteerIds.filter(
     (volunteerId) => getDispatchAssigneePresenceStatus(volunteerId) !== "ONLINE"
   );
@@ -103,25 +190,7 @@ export async function createDispatchOffers(input: CreateDispatchInput) {
     throw new Error("One or more selected responders are no longer available.");
   }
 
-  if (Types.ObjectId.isValid(reporterUserId) && validVolunteerIds.includes(reporterUserId)) {
-    throw new Error("Reporter cannot be dispatched to their own emergency report.");
-  }
-
-  // Avoid duplicate PENDING offers for the same emergency/volunteer pair.
-  const pendingCutoff = getDispatchPendingResponseCutoffDate();
-  const existingPending = await DispatchOffer.find({
-    emergencyId: new Types.ObjectId(emergencyId),
-    volunteerId: { $in: validVolunteerIds.map((id) => new Types.ObjectId(id)) },
-    status: "PENDING",
-    createdAt: { $gte: pendingCutoff },
-  }).select("volunteerId");
-
-  const existingPendingVolunteerIds = new Set(existingPending.map((d) => String(d.volunteerId)));
-  const dispatchableVolunteerIds = validVolunteerIds.filter((id) => !existingPendingVolunteerIds.has(id));
-
-  if (dispatchableVolunteerIds.length === 0) {
-    throw new Error("Selected volunteers are already dispatched for this emergency.");
-  }
+  const dispatchableVolunteerIds = validVolunteerIds;
 
   // Only acknowledge the incident after all dispatch eligibility checks pass.
   const snapshotStatus = emergency.status === "OPEN" ? "ACKNOWLEDGED" : emergency.status;
@@ -157,6 +226,7 @@ export async function createDispatchOffers(input: CreateDispatchInput) {
     volunteerId: new Types.ObjectId(volunteerId),
     createdBy,
     status: "PENDING" as DispatchStatus,
+    expiresAt: getDispatchPendingResponseExpiresAt(now.getTime()),
     emergencySnapshot: snapshot,
   }));
 
@@ -166,7 +236,10 @@ export async function createDispatchOffers(input: CreateDispatchInput) {
   } catch (error: any) {
     const isDuplicate = error?.code === 11000 || String(error?.message ?? "").includes("E11000");
     if (isDuplicate) {
-      throw new Error("Selected volunteers are already dispatched for this emergency.");
+      throw new DispatchConflictError(
+        "This responder already has an active or pending dispatch for this emergency.",
+        "RESPONDER_ALREADY_DISPATCHED",
+      );
     }
     throw error;
   }
@@ -228,11 +301,14 @@ export async function createDispatchOffers(input: CreateDispatchInput) {
 }
 
 export async function getMyPendingDispatch(volunteerUserId: string) {
-  const pendingCutoff = getDispatchPendingResponseCutoffDate();
+  const volunteerId = new Types.ObjectId(volunteerUserId);
+  const now = new Date();
+  await expirePendingDispatchOffers({ volunteerId }, now);
+
   return DispatchOffer.findOne({
-    volunteerId: new Types.ObjectId(volunteerUserId),
+    volunteerId,
     status: "PENDING",
-    createdAt: { $gte: pendingCutoff },
+    ...activePendingOfferFilter(now),
   }).sort({ createdAt: -1 });
 }
 
@@ -280,22 +356,25 @@ export async function respondToDispatch(params: {
     throw new Error("Not allowed");
   }
 
-  const pendingCutoff = getDispatchPendingResponseCutoffDate();
-  const offerCreatedAtMs = offer.createdAt ? new Date(offer.createdAt).getTime() : Number.NaN;
-  const isExpiredPending =
-    offer.status === "PENDING" &&
-    Number.isFinite(offerCreatedAtMs) &&
-    offerCreatedAtMs < pendingCutoff.getTime();
-  if (isExpiredPending) {
-    offer.status = "CANCELLED";
-    offer.respondedAt = new Date();
-    await offer.save();
+  const now = new Date();
+  if (offer.status === "PENDING" && !isPendingOfferActive(offer, now.getTime())) {
+    await DispatchOffer.findOneAndUpdate(
+      { _id: offer._id, status: "PENDING", ...expiredPendingOfferFilter(now) },
+      {
+        $set: {
+          status: "CANCELLED",
+          cancellationReason: "RESPONSE_TIMEOUT",
+          respondedAt: now,
+        },
+      },
+    );
+    emitNotificationsRefresh("dispatch_expired", ["LGU", "ADMIN"]);
     await syncVolunteerBusyState(String(offer.volunteerId)).catch(() => undefined);
-    throw new Error("Dispatch offer timed out");
+    throw new DispatchConflictError("Dispatch offer timed out", "DISPATCH_OFFER_EXPIRED");
   }
 
   if (offer.status !== "PENDING") {
-    throw new Error("Dispatch offer is not pending");
+    throw new DispatchConflictError("Dispatch offer is not pending", "DISPATCH_OFFER_NOT_PENDING");
   }
 
   if (decision === "ACCEPT") {
@@ -305,40 +384,71 @@ export async function respondToDispatch(params: {
       Types.ObjectId.isValid(reporterUserId) &&
       reporterUserId === String(volunteerUserId).trim()
     ) {
-      offer.status = "CANCELLED";
-      offer.respondedAt = new Date();
-      await offer.save();
+      await DispatchOffer.findOneAndUpdate(
+        { _id: offer._id, status: "PENDING" },
+        {
+          $set: {
+            status: "CANCELLED",
+            cancellationReason: "REPORTER_CONFLICT",
+            respondedAt: now,
+          },
+        },
+      );
       await syncVolunteerBusyState(String(offer.volunteerId)).catch(() => undefined);
       throw new Error("Reporter cannot accept dispatch for their own emergency report.");
     }
-
-    offer.status = "ACCEPTED";
-  } else {
-    offer.status = "DECLINED";
   }
 
-  offer.respondedAt = new Date();
-  await offer.save();
+  const nextStatus: DispatchStatus = decision === "ACCEPT" ? "ACCEPTED" : "DECLINED";
+  const updatedOffer = await DispatchOffer.findOneAndUpdate(
+    {
+      _id: offer._id,
+      volunteerId: offer.volunteerId,
+      status: "PENDING",
+      ...activePendingOfferFilter(now),
+    },
+    {
+      $set: {
+        status: nextStatus,
+        respondedAt: now,
+      },
+    },
+    { new: true },
+  );
+
+  if (!updatedOffer) {
+    await expirePendingDispatchOffers({ volunteerId: offer.volunteerId }, now);
+    throw new DispatchConflictError(
+      "Dispatch offer is no longer pending",
+      "DISPATCH_OFFER_NOT_PENDING",
+    );
+  }
 
   // If accepted, cancel any other pending offers for this volunteer
   if (decision === "ACCEPT") {
     await DispatchOffer.updateMany(
       {
-        _id: { $ne: offer._id },
-        volunteerId: offer.volunteerId,
+        _id: { $ne: updatedOffer._id },
+        volunteerId: updatedOffer.volunteerId,
         status: "PENDING",
       },
-      { $set: { status: "CANCELLED", respondedAt: new Date() } }
+      {
+        $set: {
+          status: "CANCELLED",
+          cancellationReason: "SUPERSEDED",
+          respondedAt: now,
+        },
+      }
     );
 
-    await notifyRequestTrackingUpdated(String(offer.emergencyId), "responder_en_route", {
+    await notifyRequestTrackingUpdated(String(updatedOffer.emergencyId), "responder_en_route", {
       stepOverride: "En Route",
     }).catch(() => undefined);
   }
 
-  await syncVolunteerBusyState(String(offer.volunteerId)).catch(() => undefined);
+  await syncVolunteerBusyState(String(updatedOffer.volunteerId)).catch(() => undefined);
 
-  return offer;
+  return updatedOffer;
 }
 
 export async function addProofToDispatch(params: {
@@ -792,6 +902,10 @@ export async function listDispatchTasksForLgu(params: { statuses: DispatchStatus
     query.emergencyId = new Types.ObjectId(params.emergencyId);
   }
 
+  await expirePendingDispatchOffers(
+    query.emergencyId ? { emergencyId: query.emergencyId } : {},
+  );
+
   return DispatchOffer.find(query)
     .populate({ path: "volunteerId", select: "firstName lastName email role lifelineId avatarUrl" })
     .sort({ updatedAt: -1 })
@@ -854,6 +968,8 @@ export function toDispatchDTO(doc: any) {
     id: String(doc._id),
     status: doc.status,
     respondedAt: doc.respondedAt ?? null,
+    expiresAt: getDispatchOfferExpiresAt(doc),
+    cancellationReason: doc.cancellationReason ?? null,
     completedAt: doc.completedAt ?? null,
     verifiedAt: doc.verifiedAt ?? null,
     chainRecord,
