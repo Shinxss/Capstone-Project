@@ -63,7 +63,14 @@ export function TasksScreen() {
       }
 
       if (tasks.activeTab === "awaiting_approval") {
-        return <AwaitingApprovalCard dispatch={dispatch} />;
+        return (
+          <AwaitingApprovalCard
+            dispatch={dispatch}
+            busy={tasks.actions.isBusy}
+            uploadingProof={tasks.actions.isUploadingProof}
+            onUploadProof={tasks.actions.uploadProof}
+          />
+        );
       }
 
       return <CompletedDispatchCard dispatch={dispatch} />;

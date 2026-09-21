@@ -563,7 +563,8 @@ export function useLguTasksForReview() {
     const hasVolunteer = Boolean(selectedTask.volunteer?.id || selectedTask.volunteer?.name);
     const hasCompletedAt = Boolean(selectedTask.completedAt);
     const hasLocation = Boolean(selectedTask.emergency?.barangayName) || hasCoordinates(selectedTask);
-    const hasProof = (selectedTask.proofs?.length ?? 0) > 0;
+    const proofCount = selectedTask.proofs?.length ?? 0;
+    const hasRequiredProofs = proofCount >= 3;
 
     return [
       {
@@ -594,9 +595,9 @@ export function useLguTasksForReview() {
       },
       {
         id: "proof",
-        label: "At least one proof uploaded",
-        status: toChecklistStatus(hasProof),
-        detail: hasProof ? `${selectedTask.proofs?.length ?? 0} proof file(s)` : "No proof uploaded",
+        label: "At least three proofs uploaded",
+        status: toChecklistStatus(hasRequiredProofs),
+        detail: proofCount > 0 ? `${proofCount} proof file(s)` : "No proof uploaded",
       },
     ];
   }, [selectedTask]);

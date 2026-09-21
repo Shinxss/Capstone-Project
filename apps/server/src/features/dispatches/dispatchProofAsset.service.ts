@@ -101,6 +101,21 @@ export async function readDispatchProofAsset(filename: string): Promise<{
   };
 }
 
+export async function dispatchProofAssetExists(proofUrl: string): Promise<boolean> {
+  const filename = filenameFromDispatchProofUrl(proofUrl);
+  if (!filename) return true;
+
+  const absolutePath = path.join(ensureDispatchProofsDir(), filename);
+  try {
+    await fs.promises.access(absolutePath, fs.constants.R_OK);
+    return true;
+  } catch (error: any) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+
+  return Boolean(await DispatchProofAsset.exists({ filename }));
+}
+
 function ensureDispatchProofsDir() {
   const dir = path.join(process.cwd(), "uploads", "dispatch-proofs");
   fs.mkdirSync(dir, { recursive: true });
@@ -111,6 +126,24 @@ function toSafeFilename(filename: string) {
   const requested = String(filename ?? "");
   const safeFilename = path.basename(requested);
   return safeFilename && safeFilename === requested ? safeFilename : null;
+}
+
+function filenameFromDispatchProofUrl(proofUrl: string) {
+  const raw = String(proofUrl ?? "").trim();
+  if (!raw) return null;
+
+  let pathname = raw;
+  if (/^https?:\/\//i.test(raw)) {
+    try {
+      pathname = new URL(raw).pathname;
+    } catch {
+      return null;
+    }
+  }
+
+  const prefix = "/uploads/dispatch-proofs/";
+  if (!pathname.startsWith(prefix)) return null;
+  return toSafeFilename(pathname.slice(prefix.length));
 }
 
 function dispatchIdFromProofFilename(filename: string) {

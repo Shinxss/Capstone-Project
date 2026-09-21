@@ -5,7 +5,11 @@ import { hashTaskPayload } from "@lifeline/blockchain";
 import { EmergencyReport } from "../emergency/emergency.model";
 import { User } from "../users/user.model";
 import { DispatchOffer, DispatchStatus } from "./dispatch.model";
-import { removeDispatchProofAsset, storeDispatchProofAsset } from "./dispatchProofAsset.service";
+import {
+  dispatchProofAssetExists,
+  removeDispatchProofAsset,
+  storeDispatchProofAsset,
+} from "./dispatchProofAsset.service";
 import { sendDispatchOfferPush } from "../notifications/pushNotification.service";
 import { getDispatchPendingResponseCutoffDate } from "./dispatch.constants";
 import {
@@ -365,6 +369,14 @@ export async function addProofToDispatch(params: {
   });
   const proofFileHash = hashProofFileBytes(parsedProof.buffer);
   const filename = `${dispatchId}_${Date.now()}_${crypto.randomBytes(6).toString("hex")}.${parsedProof.ext}`;
+
+  if (offer.status === "DONE" && Array.isArray(offer.proofs) && offer.proofs.length > 0) {
+    const availability = await Promise.all(
+      offer.proofs.map((proof: any) => dispatchProofAssetExists(String(proof?.url ?? "")))
+    );
+    (offer.proofs as any) = offer.proofs.filter((_proof: any, index: number) => availability[index]);
+  }
+
   await storeDispatchProofAsset({
     filename,
     dispatchId,
@@ -519,6 +531,20 @@ export async function verifyDispatch(
   if (offer.status !== "DONE") {
     // "DONE" is the current codebase equivalent of "FOR_REVIEW".
     throw new Error("Only DONE (FOR_REVIEW) tasks can be verified");
+  }
+
+  const proofs = Array.isArray(offer.proofs) ? offer.proofs : [];
+  const proofAvailability = await Promise.all(
+    proofs.map((proof: any) => dispatchProofAssetExists(String(proof?.url ?? "")))
+  );
+  const availableProofCount = proofAvailability.filter(Boolean).length;
+  if (
+    availableProofCount < MIN_PROOFS_REQUIRED_TO_COMPLETE ||
+    availableProofCount !== proofs.length
+  ) {
+    throw new Error(
+      `Task needs ${MIN_PROOFS_REQUIRED_TO_COMPLETE} available proof images before verification. Ask the volunteer to re-upload them.`
+    );
   }
 
   // Blockchain write (hash-only) BEFORE we mark VERIFIED in DB.

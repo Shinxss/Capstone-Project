@@ -4,6 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import { DispatchProofAsset } from "./dispatchProofAsset.model";
 import {
+  dispatchProofAssetExists,
   readDispatchProofAsset,
   removeDispatchProofAsset,
   storeDispatchProofAsset,
@@ -18,6 +19,7 @@ test("dispatch proofs remain readable when the local upload file is lost", async
   const originalFindOneAndUpdate = DispatchProofAsset.findOneAndUpdate;
   const originalFindOne = DispatchProofAsset.findOne;
   const originalDeleteOne = DispatchProofAsset.deleteOne;
+  const originalExists = DispatchProofAsset.exists;
 
   (DispatchProofAsset as any).findOneAndUpdate = async (_filter: unknown, update: any) => {
     durablePayload = Buffer.from(update.$set.payload);
@@ -28,6 +30,7 @@ test("dispatch proofs remain readable when the local upload file is lost", async
     }),
   });
   (DispatchProofAsset as any).deleteOne = async () => undefined;
+  (DispatchProofAsset as any).exists = async () => (durablePayload ? { _id: "stored" } : null);
 
   try {
     await storeDispatchProofAsset({
@@ -39,6 +42,10 @@ test("dispatch proofs remain readable when the local upload file is lost", async
     assert.ok(durablePayload);
 
     await fs.promises.unlink(localPath);
+    assert.equal(
+      await dispatchProofAssetExists(`/uploads/dispatch-proofs/${filename}`),
+      true,
+    );
     const recovered = await readDispatchProofAsset(filename);
 
     assert.equal(recovered?.mimeType, "image/png");
@@ -48,5 +55,6 @@ test("dispatch proofs remain readable when the local upload file is lost", async
     (DispatchProofAsset as any).findOneAndUpdate = originalFindOneAndUpdate;
     (DispatchProofAsset as any).findOne = originalFindOne;
     (DispatchProofAsset as any).deleteOne = originalDeleteOne;
+    (DispatchProofAsset as any).exists = originalExists;
   }
 });

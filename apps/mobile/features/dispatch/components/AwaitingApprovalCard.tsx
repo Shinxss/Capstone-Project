@@ -1,4 +1,4 @@
-import { Image, ScrollView, Text, View } from "react-native";
+import { Image, Pressable, ScrollView, Text, View } from "react-native";
 import { useAuth } from "../../auth/AuthProvider";
 import type { DispatchOffer } from "../models/dispatch";
 import { getDispatchStatusLabel } from "../utils/dispatchProgress";
@@ -8,6 +8,9 @@ import { TaskCardBase } from "./TaskCardBase";
 
 type AwaitingApprovalCardProps = {
   dispatch: DispatchOffer;
+  busy: boolean;
+  uploadingProof: boolean;
+  onUploadProof: (dispatch: DispatchOffer) => void;
 };
 
 function toAbsoluteAssetUrl(raw: string) {
@@ -19,7 +22,12 @@ function toAbsoluteAssetUrl(raw: string) {
   return `${apiBase.replace(/\/+$/, "")}/${value.replace(/^\/+/, "")}`;
 }
 
-export function AwaitingApprovalCard({ dispatch }: AwaitingApprovalCardProps) {
+export function AwaitingApprovalCard({
+  dispatch,
+  busy,
+  uploadingProof,
+  onUploadProof,
+}: AwaitingApprovalCardProps) {
   const { token } = useAuth();
   const submittedAt = formatDateTime(dispatch.completedAt ?? dispatch.updatedAt);
   const proofImages = (Array.isArray(dispatch.proofs) ? dispatch.proofs : [])
@@ -63,9 +71,19 @@ export function AwaitingApprovalCard({ dispatch }: AwaitingApprovalCardProps) {
 
       <DispatchProgressStepper dispatch={dispatch} />
 
-      <Text className="mt-4 text-xs font-semibold text-red-700">
-        Waiting for LGU verification. No further volunteer action is required.
-      </Text>
+      <Text className="mt-4 text-xs font-semibold text-red-700">Waiting for LGU verification.</Text>
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Upload replacement proof images"
+        onPress={() => onUploadProof(dispatch)}
+        disabled={busy}
+        className="mt-3 rounded-xl border border-red-300 bg-white px-4 py-3"
+      >
+        <Text className="text-center text-sm font-extrabold text-red-700">
+          {uploadingProof ? "Uploading..." : "Re-upload Proofs"}
+        </Text>
+      </Pressable>
     </TaskCardBase>
   );
 }

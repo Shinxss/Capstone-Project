@@ -38,7 +38,10 @@ export async function fetchTaskProofBlob(proofUrl: string) {
   }
 
   if (!res.ok) {
-    let msg = `Failed to load proof (${res.status})`;
+    let msg =
+      res.status === 404
+        ? "This proof file is no longer available. Ask the volunteer to re-upload it."
+        : `Failed to load proof (${res.status})`;
     try {
       const data = await res.json();
       if (data?.message) msg = data.message;
