@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -48,6 +50,10 @@ type SelectionSheetProps = {
   searchPlaceholder?: string;
 };
 
+function normalizeBarangaySearchValue(value: string): string {
+  return value.trim().toLowerCase();
+}
+
 function SelectionSheet({
   visible,
   title,
@@ -59,7 +65,10 @@ function SelectionSheet({
   searchPlaceholder = "Search",
 }: SelectionSheetProps) {
   const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
   const [query, setQuery] = useState("");
+
+  const sheetMaxHeight = Math.min(Math.round(height * 0.82), 620);
 
   useEffect(() => {
     if (!visible) {
@@ -69,69 +78,92 @@ function SelectionSheet({
 
   const filteredOptions = useMemo(() => {
     if (!searchable) return options;
-    const normalizedQuery = query.trim().toLowerCase();
+    const normalizedQuery = normalizeBarangaySearchValue(query);
     if (!normalizedQuery) return options;
 
-    return options.filter((option) => option.toLowerCase().includes(normalizedQuery));
+    return options.filter((option) =>
+      option.toLowerCase().includes(normalizedQuery)
+    );
   }, [options, query, searchable]);
 
   return (
     <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
-      <Pressable style={styles.sheetBackdrop} onPress={onClose}>
-        <Pressable
-          style={[styles.sheetSurface, { paddingBottom: Math.max(insets.bottom, 14) }]}
-          onPress={() => undefined}
-        >
-          <View style={styles.sheetHandle} />
-
-          <Text style={styles.sheetTitle}>{title}</Text>
-
-          {searchable ? (
-            <View style={styles.sheetSearchContainer}>
-              <Ionicons name="search-outline" size={18} color="#6B7280" />
-              <TextInput
-                value={query}
-                onChangeText={setQuery}
-                placeholder={searchPlaceholder}
-                placeholderTextColor="#9CA3AF"
-                style={styles.sheetSearchInput}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </View>
-          ) : null}
-
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={styles.sheetListContainer}
-            showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.sheetKeyboardContainer}
+      >
+        <Pressable style={styles.sheetBackdrop} onPress={onClose}>
+          <Pressable
+            style={[
+              styles.sheetSurface,
+              {
+                maxHeight: sheetMaxHeight,
+                paddingBottom: Math.max(insets.bottom, 14),
+              },
+            ]}
+            onPress={() => undefined}
           >
-            {filteredOptions.map((option) => {
-              const selected = selectedValue === option;
-              return (
-                <Pressable
-                  key={option}
-                  style={({ pressed }) => [styles.sheetItem, pressed ? styles.pressed : null]}
-                  onPress={() => onSelect(option)}
-                >
-                  <Text style={[styles.sheetItemLabel, selected ? styles.sheetItemLabelSelected : null]}>
-                    {option}
-                  </Text>
-                  {selected ? <Ionicons name="checkmark" size={18} color="#2563EB" /> : null}
-                </Pressable>
-              );
-            })}
+            <View style={styles.sheetHandle} />
 
-            {filteredOptions.length === 0 ? (
-              <Text style={styles.sheetEmptyText}>No matching barangays found.</Text>
+            <Text style={styles.sheetTitle}>{title}</Text>
+
+            {searchable ? (
+              <View style={styles.sheetSearchContainer}>
+                <Ionicons name="search-outline" size={18} color="#6B7280" />
+                <TextInput
+                  value={query}
+                  onChangeText={setQuery}
+                  placeholder={searchPlaceholder}
+                  placeholderTextColor="#9CA3AF"
+                  style={styles.sheetSearchInput}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
             ) : null}
-          </ScrollView>
 
-          <Pressable style={({ pressed }) => [styles.sheetCloseButton, pressed ? styles.pressed : null]} onPress={onClose}>
-            <Text style={styles.sheetCloseButtonText}>Close</Text>
+            <View style={styles.sheetListArea}>
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+                contentContainerStyle={styles.sheetListContainer}
+                showsVerticalScrollIndicator={true}
+              >
+                {filteredOptions.map((option) => {
+                  const selected = selectedValue === option;
+                  return (
+                    <Pressable
+                      key={option}
+                      style={({ pressed }) => [styles.sheetItem, pressed ? styles.pressed : null]}
+                      onPress={() => onSelect(option)}
+                    >
+                      <Text style={[styles.sheetItemLabel, selected ? styles.sheetItemLabelSelected : null]}>
+                        {option}
+                      </Text>
+                      {selected ? <Ionicons name="checkmark" size={18} color="#2563EB" /> : null}
+                    </Pressable>
+                  );
+                })}
+
+                {filteredOptions.length === 0 ? (
+                  <View style={styles.sheetEmptyState}>
+                    <Ionicons name="location-outline" size={32} color="#9CA3AF" />
+                    <Text style={styles.sheetEmptyTitle}>No matching barangays found.</Text>
+                    <Text style={styles.sheetEmptySubtitle}>Try another barangay name.</Text>
+                  </View>
+                ) : null}
+              </ScrollView>
+            </View>
+
+            <Pressable
+              style={({ pressed }) => [styles.sheetCloseButton, pressed ? styles.pressed : null]}
+              onPress={onClose}
+            >
+              <Text style={styles.sheetCloseButtonText}>Close</Text>
+            </Pressable>
           </Pressable>
         </Pressable>
-      </Pressable>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -454,13 +486,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
   },
+  sheetKeyboardContainer: {
+    flex: 1,
+  },
   sheetBackdrop: {
     flex: 1,
     justifyContent: "flex-end",
     backgroundColor: "rgba(15, 23, 42, 0.35)",
   },
   sheetSurface: {
-    maxHeight: "82%",
+    width: "100%",
+    flexShrink: 1,
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
     backgroundColor: "#FFFFFF",
@@ -474,6 +510,7 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 999,
     backgroundColor: "#D1D5DB",
+    flexShrink: 0,
   },
   sheetTitle: {
     marginTop: 12,
@@ -482,6 +519,7 @@ const styles = StyleSheet.create({
     color: "#111827",
     fontSize: 17,
     fontWeight: "800",
+    flexShrink: 0,
   },
   sheetSearchContainer: {
     marginHorizontal: 16,
@@ -495,6 +533,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     columnGap: 8,
+    flexShrink: 0,
   },
   sheetSearchInput: {
     flex: 1,
@@ -502,7 +541,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
   },
+  sheetListArea: {
+    flexShrink: 1,
+    minHeight: 80,
+  },
   sheetListContainer: {
+    flexGrow: 1,
     paddingBottom: 8,
   },
   sheetItem: {
@@ -522,12 +566,24 @@ const styles = StyleSheet.create({
   sheetItemLabelSelected: {
     fontWeight: "700",
   },
-  sheetEmptyText: {
-    color: "#6B7280",
-    fontSize: 14,
+  sheetEmptyState: {
+    paddingVertical: 24,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sheetEmptyTitle: {
+    color: "#374151",
+    fontSize: 15,
+    fontWeight: "700",
+    marginTop: 8,
     textAlign: "center",
-    marginTop: 16,
-    marginBottom: 8,
+  },
+  sheetEmptySubtitle: {
+    color: "#6B7280",
+    fontSize: 13,
+    marginTop: 4,
+    textAlign: "center",
   },
   sheetCloseButton: {
     marginHorizontal: 16,
@@ -539,6 +595,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#FFFFFF",
+    flexShrink: 0,
   },
   sheetCloseButtonText: {
     color: "#111827",

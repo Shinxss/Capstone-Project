@@ -154,15 +154,19 @@ export function HomeView({
   onPressApplyVolunteer,
   showVolunteerCta = true,
 }: Props) {
-  const { width, isNarrow, isCompactHeight, isLargePhone } = useResponsiveLayout();
+  const { width, height, isNarrow, isCompactHeight, isLargePhone } = useResponsiveLayout();
   const { screenContentBottomPadding } = useBottomNavMetrics();
   const { isDark } = useTheme();
-  const headingFontSize = isNarrow ? 34 : isCompactHeight ? 36 : isLargePhone ? 40 : 39;
+  const isCompactScreen = isCompactHeight || height <= 760;
+  const headingFontSize = isCompactScreen || isNarrow ? 28 : isLargePhone ? 33 : 31;
   const sosSize = Math.min(
-    isCompactHeight ? 204 : 224,
-    Math.max(isCompactHeight ? 184 : 190, width * 0.55)
+    isCompactScreen ? 160 : isLargePhone ? 184 : 176,
+    Math.max(
+      isCompactScreen ? 148 : 160,
+      Math.round(width * 0.44)
+    )
   );
-  const sosInnerSize = sosSize - (isNarrow ? 26 : 30);
+  const sosInnerSize = sosSize - (isNarrow || isCompactScreen ? 22 : 26);
   const weatherCardBackground = withOpacity(alertTheme.cardBackgroundColor, 0.1);
   const weatherBaseColor = alertTheme.headlineColor;
   const weatherTitleColor = isDark
@@ -192,7 +196,7 @@ export function HomeView({
       Animated.sequence([
         Animated.parallel([
           Animated.timing(pulseScale, {
-            toValue: 1.14,
+            toValue: 1.12,
             duration: 700,
             useNativeDriver: true,
           }),
@@ -204,7 +208,7 @@ export function HomeView({
         ]),
         Animated.parallel([
           Animated.timing(pulseScale, {
-            toValue: 1.05,
+            toValue: 1.04,
             duration: 700,
             useNativeDriver: true,
           }),
@@ -239,7 +243,7 @@ export function HomeView({
         contentContainerStyle={[
           styles.container,
           {
-            paddingTop: isCompactHeight ? 10 : 16,
+            paddingTop: isCompactScreen ? 8 : 12,
             paddingBottom: screenContentBottomPadding,
           },
         ]}
@@ -297,13 +301,13 @@ export function HomeView({
         </View>
 
         {/* Heading */}
-        <View style={[styles.headerBlock, { marginTop: isCompactHeight ? 24 : 40 }]}>
+        <View style={[styles.headerBlock, { marginTop: isCompactScreen ? 18 : isLargePhone ? 24 : 20 }]}>
           <Text
             numberOfLines={2}
             maxFontSizeMultiplier={1.15}
             style={[
               styles.h1,
-              { fontSize: headingFontSize, lineHeight: Math.round(headingFontSize * 0.98) },
+              { fontSize: headingFontSize, lineHeight: Math.round(headingFontSize * 1.02) },
               isDark ? styles.h1Dark : null,
             ]}
           >
@@ -313,7 +317,11 @@ export function HomeView({
             maxFontSizeMultiplier={1.25}
             style={[
               styles.h2,
-              { marginTop: isCompactHeight ? 16 : 24 },
+              {
+                marginTop: isCompactScreen ? 10 : 12,
+                fontSize: isCompactScreen ? 14 : 15,
+                lineHeight: isCompactScreen ? 18 : 20,
+              },
               isDark ? styles.h2Dark : null,
             ]}
           >
@@ -322,7 +330,7 @@ export function HomeView({
         </View>
 
         {/* SOS */}
-        <View style={[styles.sosBlock, { marginTop: isCompactHeight ? 14 : 20 }]}>
+        <View style={[styles.sosBlock, { marginTop: isCompactScreen ? 12 : 14 }]}>
           <View
             style={[
               styles.sosOuter,
@@ -366,12 +374,36 @@ export function HomeView({
                 holding && isDark ? styles.sosInnerHoldingDark : null,
               ]}
             >
-              <View style={styles.warnCircle}>
-                <Ionicons name="warning" size={18} color="#fff" />
+              <View
+                style={[
+                  styles.warnCircle,
+                  isCompactScreen ? styles.warnCircleCompact : null,
+                ]}
+              >
+                <Ionicons
+                  name="warning"
+                  size={isCompactScreen ? 15 : 17}
+                  color="#fff"
+                />
               </View>
 
-              <Text style={[styles.sosText, isCompactHeight ? styles.sosTextCompact : null]}>SOS</Text>
-              <Text style={styles.sosHint}>
+              <Text
+                style={[
+                  styles.sosText,
+                  {
+                    fontSize: isCompactScreen ? 36 : isLargePhone ? 42 : 39,
+                    lineHeight: isCompactScreen ? 38 : isLargePhone ? 44 : 41,
+                  },
+                ]}
+              >
+                SOS
+              </Text>
+              <Text
+                style={[
+                  styles.sosHint,
+                  { fontSize: isCompactScreen ? 12 : 13 },
+                ]}
+              >
                 {holding ? `Keep holding... ${remainingSeconds}s` : "Hold for 3s"}
               </Text>
             </Pressable>
@@ -381,7 +413,11 @@ export function HomeView({
             maxFontSizeMultiplier={1.25}
             style={[
               styles.locationNote,
-              { marginTop: isCompactHeight ? 18 : 24 },
+              {
+                marginTop: isCompactScreen ? 12 : 14,
+                fontSize: isCompactScreen ? 13 : 14,
+                lineHeight: isCompactScreen ? 18 : 20,
+              },
               isDark ? styles.locationNoteDark : null,
             ]}
           >
@@ -395,7 +431,7 @@ export function HomeView({
           disabled={!onPressAlert}
           style={({ pressed }) => [
             styles.card,
-            { marginTop: isCompactHeight ? 28 : 40 },
+            { marginTop: isCompactScreen ? 18 : 22 },
             {
               backgroundColor: weatherCardBackground,
               borderColor: alertTheme.cardBorderColor,
@@ -581,17 +617,27 @@ const styles = StyleSheet.create({
     borderColor: "#7F1D1D",
   },
   warnCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: "rgba(255,255,255,0.25)",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 6,
+    marginBottom: 4,
   },
-  sosText: { fontSize: 46, fontWeight: "600", color: "#fff" },
-  sosTextCompact: { fontSize: 42 },
-  sosHint: { fontSize: 13, color: "rgba(255,255,255,0.92)", marginTop: 2 },
+  warnCircleCompact: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    marginBottom: 3,
+  },
+  sosText: {
+    fontWeight: "700",
+    color: "#fff",
+    textAlign: "center",
+    letterSpacing: 0.5,
+  },
+  sosHint: { fontSize: 13, color: "rgba(255,255,255,0.92)", marginTop: 2, textAlign: "center" },
   locationNote: {
     maxWidth: 330,
     fontSize: 14,

@@ -27,6 +27,19 @@ export type Emergency = {
   updatedAt?: string;
 };
 
+export type EmergencyMapSource = "own_report" | "assigned";
+
+export type EmergencyMapEntry = {
+  emergency: Emergency;
+  source: EmergencyMapSource;
+};
+
+export type EmergencyMarkerPlacement = {
+  emergency: Emergency;
+  source: EmergencyMapSource;
+  coordinate: [number, number];
+};
+
 export type TravelMode = "drive" | "walk";
 
 export type RouteSummary = {

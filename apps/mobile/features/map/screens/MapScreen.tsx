@@ -32,7 +32,15 @@ import { updateDispatchLocation } from "../../dispatch/services/dispatchApi";
 import type { DispatchOffer } from "../../dispatch/models/dispatch";
 import { EmergencyBottomSheetContainer } from "../components/EmergencyBottomSheetContainer";
 import { useEmergencyBottomSheet } from "../hooks/useEmergencyBottomSheet";
-import type { Emergency, EmergencyType } from "../models/map.types";
+import type {
+  Emergency,
+  EmergencyMapEntry,
+  EmergencyMarkerPlacement,
+  EmergencyType,
+} from "../models/map.types";
+import { OwnReportPreviewCard } from "../components/OwnReportPreviewCard";
+import { useBottomNavMetrics } from "../../common/hooks/useBottomNavMetrics";
+import type { MapEmergencyReport } from "../../emergency/models/emergency.types";
 import { useDevWeatherOverride } from "../../weather/hooks/useDevWeatherOverride";
 import { DevWeatherOverrideOverlay } from "../../weather/components/DevWeatherOverrideOverlay";
 import { useDevLocationOverride } from "../../location/hooks/useDevLocationOverride";
@@ -182,6 +190,26 @@ function mapDispatchToEmergency(dispatch: DispatchOffer | null | undefined): Eme
   };
 }
 
+function mapReportToEmergency(item: MapEmergencyReport): Emergency {
+  const emergencyType = toMapEmergencyType(item.type);
+  return {
+    id: item.incidentId,
+    type: emergencyType,
+    title: mobileEmergencyTitle(emergencyType),
+    description: item.description,
+    images: [],
+    referenceNumber: item.referenceNumber,
+    reportedAt: item.createdAt,
+    status: normalizeEmergencyStatus(item.status),
+    location: {
+      lng: item.location.coords.longitude,
+      lat: item.location.coords.latitude,
+      label: item.location.label,
+    },
+    updatedAt: item.createdAt ? new Date(item.createdAt).toLocaleString() : "just now",
+  };
+}
+
 function hexToRgba(hex: string, alpha: number) {
   const h = hex.replace("#", "");
   const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
@@ -205,40 +233,36 @@ function readRouteNumber(value?: string | string[]) {
   return parsed;
 }
 
-type EmergencyMarkerPlacement = {
-  emergency: Emergency;
-  coordinate: [number, number];
-};
-
-function spreadOverlappingEmergencyMarkers(items: Emergency[]): EmergencyMarkerPlacement[] {
+function spreadOverlappingEmergencyMarkers(items: EmergencyMapEntry[]): EmergencyMarkerPlacement[] {
   if (items.length <= 1) {
-    return items.map((emergency) => ({
-      emergency,
-      coordinate: [emergency.location.lng, emergency.location.lat],
+    return items.map((entry) => ({
+      emergency: entry.emergency,
+      source: entry.source,
+      coordinate: [entry.emergency.location.lng, entry.emergency.location.lat],
     }));
   }
 
-  const grouped = new Map<string, Emergency[]>();
-  items.forEach((emergency) => {
-    const key = `${emergency.location.lng.toFixed(6)},${emergency.location.lat.toFixed(6)}`;
+  const grouped = new Map<string, EmergencyMapEntry[]>();
+  items.forEach((entry) => {
+    const key = `${entry.emergency.location.lng.toFixed(6)},${entry.emergency.location.lat.toFixed(6)}`;
     const group = grouped.get(key);
-    if (group) group.push(emergency);
-    else grouped.set(key, [emergency]);
+    if (group) group.push(entry);
+    else grouped.set(key, [entry]);
   });
 
-  return items.map((emergency) => {
-    const baseLng = emergency.location.lng;
-    const baseLat = emergency.location.lat;
+  return items.map((entry) => {
+    const baseLng = entry.emergency.location.lng;
+    const baseLat = entry.emergency.location.lat;
     const key = `${baseLng.toFixed(6)},${baseLat.toFixed(6)}`;
     const group = grouped.get(key);
     if (!group || group.length <= 1) {
-      return { emergency, coordinate: [baseLng, baseLat] };
+      return { emergency: entry.emergency, source: entry.source, coordinate: [baseLng, baseLat] };
     }
 
-    const sorted = [...group].sort((a, b) => a.id.localeCompare(b.id));
-    const index = sorted.findIndex((item) => item.id === emergency.id);
+    const sorted = [...group].sort((a, b) => a.emergency.id.localeCompare(b.emergency.id));
+    const index = sorted.findIndex((item) => item.emergency.id === entry.emergency.id);
     if (index <= 0) {
-      return { emergency, coordinate: [baseLng, baseLat] };
+      return { emergency: entry.emergency, source: entry.source, coordinate: [baseLng, baseLat] };
     }
 
     const orbitIndex = index - 1;
@@ -253,16 +277,23 @@ function spreadOverlappingEmergencyMarkers(items: Emergency[]): EmergencyMarkerP
     const [markerLng, markerLat] = [baseLng + lngOffset, baseLat + latOffset];
 
     return {
-      emergency,
+      emergency: entry.emergency,
+      source: entry.source,
       coordinate: [markerLng, markerLat],
     };
   });
 }
 
 /**
- * Big pulse wave (RN Animated version of your CSS)
+ * Big pulse wave with active selection highlight
  */
-function PulseMarker({ type }: { type: EmergencyType }) {
+function PulseMarker({
+  type,
+  selected = false,
+}: {
+  type: EmergencyType;
+  selected?: boolean;
+}) {
   const emergencyVisual = getMobileEmergencyVisual(type);
   const color = emergencyVisual.markerColor;
   const EmergencyTypeIcon = emergencyVisual.icon;
@@ -271,21 +302,32 @@ function PulseMarker({ type }: { type: EmergencyType }) {
   const scale2 = useRef(new Animated.Value(0.2)).current;
   const opacity1 = useRef(new Animated.Value(0)).current;
   const opacity2 = useRef(new Animated.Value(0)).current;
+  const pinScale = useRef(new Animated.Value(selected ? 1.15 : 1)).current;
 
   useEffect(() => {
+    Animated.spring(pinScale, {
+      toValue: selected ? 1.15 : 1,
+      useNativeDriver: true,
+      friction: 6,
+      tension: 110,
+    }).start();
+  }, [pinScale, selected]);
+
+  useEffect(() => {
+    const maxOpacity = selected ? 0.95 : 0.85;
     const makeLoop = (scale: Animated.Value, opacity: Animated.Value, delayMs: number) =>
       Animated.loop(
         Animated.sequence([
           Animated.delay(delayMs),
           Animated.parallel([
             Animated.timing(scale, {
-              toValue: 1,
+              toValue: selected ? 1.1 : 1,
               duration: 1800,
               easing: Easing.out(Easing.ease),
               useNativeDriver: true,
             }),
             Animated.sequence([
-              Animated.timing(opacity, { toValue: 0.85, duration: 180, useNativeDriver: true }),
+              Animated.timing(opacity, { toValue: maxOpacity, duration: 180, useNativeDriver: true }),
               Animated.timing(opacity, { toValue: 0, duration: 1620, useNativeDriver: true }),
             ]),
           ]),
@@ -304,7 +346,7 @@ function PulseMarker({ type }: { type: EmergencyType }) {
       loop1.stop();
       loop2.stop();
     };
-  }, [scale1, scale2, opacity1, opacity2]);
+  }, [scale1, scale2, opacity1, opacity2, selected]);
 
   return (
     <View style={styles.markerWrap} pointerEvents="none">
@@ -312,8 +354,8 @@ function PulseMarker({ type }: { type: EmergencyType }) {
         style={[
           styles.pulse,
           {
-            borderColor: hexToRgba(color, 0.35),
-            backgroundColor: hexToRgba(color, 0.18),
+            borderColor: hexToRgba(color, selected ? 0.5 : 0.35),
+            backgroundColor: hexToRgba(color, selected ? 0.24 : 0.18),
             opacity: opacity1,
             transform: [{ scale: scale1 }],
           },
@@ -323,18 +365,38 @@ function PulseMarker({ type }: { type: EmergencyType }) {
         style={[
           styles.pulse,
           {
-            borderColor: hexToRgba(color, 0.22),
-            backgroundColor: hexToRgba(color, 0.1),
+            borderColor: hexToRgba(color, selected ? 0.35 : 0.22),
+            backgroundColor: hexToRgba(color, selected ? 0.15 : 0.1),
             opacity: opacity2,
             transform: [{ scale: scale2 }],
           },
         ]}
       />
 
-      <View style={[styles.pin, { borderColor: hexToRgba(color, 0.95) }]}>
+      {selected ? (
+        <View
+          style={[
+            styles.selectedRing,
+            {
+              borderColor: color,
+            },
+          ]}
+        />
+      ) : null}
+
+      <Animated.View
+        style={[
+          styles.pin,
+          selected ? styles.pinSelected : null,
+          {
+            borderColor: selected ? "#FFFFFF" : hexToRgba(color, 0.95),
+            transform: [{ scale: pinScale }],
+          },
+        ]}
+      >
         <View style={styles.innerWave} />
-        <EmergencyTypeIcon size={16} color={color} strokeWidth={2.3} />
-      </View>
+        <EmergencyTypeIcon size={16} color={color} strokeWidth={selected ? 2.6 : 2.3} />
+      </Animated.View>
     </View>
   );
 }
@@ -342,6 +404,7 @@ function PulseMarker({ type }: { type: EmergencyType }) {
 export default function MapTab() {
   const insets = useSafeAreaInsets();
   const { isCompactHeight } = useResponsiveLayout();
+  const { totalHeight: bottomNavHeight } = useBottomNavMetrics();
   const { isDark } = useTheme();
   const isFocused = useIsFocused();
   const { mode, user, token } = useAuth();
@@ -391,9 +454,55 @@ export default function MapTab() {
   const [locationFixKind, setLocationFixKind] = useState<LocationFixKind | null>(null);
   const [locationAccessMessage, setLocationAccessMessage] = useState<string | null>(null);
   const [hazardZones, setHazardZones] = useState<HazardZone[]>([]);
-  const [reports, setReports] = useState<Emergency[]>([]);
-  const [selectedCommunityMarker, setSelectedCommunityMarker] =
+  const [ownReportEntries, setOwnReportEntries] = useState<EmergencyMapEntry[]>([]);
+  const [adminReportEntries, setAdminReportEntries] = useState<EmergencyMapEntry[]>([]);
+  const [selectedOwnReportMarker, setSelectedOwnReportMarker] =
     useState<EmergencyMarkerPlacement | null>(null);
+
+  const reports = useMemo<EmergencyMapEntry[]>(() => {
+    if (!canViewEmergencies) return [];
+
+    const merged = new Map<string, EmergencyMapEntry>();
+
+    // 1. Current user's own reports (for ALL authenticated roles: Community, Volunteer, Responder)
+    ownReportEntries.forEach((entry) => {
+      merged.set(entry.emergency.id, entry);
+    });
+
+    // 2. Operational dispatch assignments for Volunteer / Responder
+    if (isDispatchAssignee) {
+      const assigned = [pendingDispatch, activeDispatch]
+        .map(mapDispatchToEmergency)
+        .filter((item): item is Emergency => Boolean(item));
+
+      assigned.forEach((emergency) => {
+        // Overwrites own_report if same incidentId exists in both collections, preferring "assigned"
+        merged.set(emergency.id, {
+          emergency,
+          source: "assigned",
+        });
+      });
+    }
+
+    // 3. For LGU/Admin if viewing unapproved reports feed
+    if (canViewUnapprovedEmergencyReports) {
+      adminReportEntries.forEach((entry) => {
+        if (!merged.has(entry.emergency.id)) {
+          merged.set(entry.emergency.id, entry);
+        }
+      });
+    }
+
+    return [...merged.values()];
+  }, [
+    activeDispatch,
+    adminReportEntries,
+    canViewEmergencies,
+    canViewUnapprovedEmergencyReports,
+    isDispatchAssignee,
+    ownReportEntries,
+    pendingDispatch,
+  ]);
   const devLocationEnabled = __DEV__ && devLoc.enabled;
   const devWeatherEnabled = __DEV__ && devWx.enabled;
   const effectiveDevLocation = useMemo(
@@ -459,71 +568,47 @@ export default function MapTab() {
 
   const loadEmergencyReports = useCallback(async () => {
     if (!canViewEmergencies) {
-      setReports([]);
-      return;
-    }
-
-    if (isDispatchAssignee) {
-      const assigned = [pendingDispatch, activeDispatch]
-        .map(mapDispatchToEmergency)
-        .filter((item): item is Emergency => Boolean(item));
-      const deduped = new Map<string, Emergency>();
-
-      assigned.forEach((item) => {
-        deduped.set(item.id, item);
-      });
-
-      setReports([...deduped.values()]);
+      setOwnReportEntries([]);
+      setAdminReportEntries([]);
       return;
     }
 
     if (emergencyRefreshInFlightRef.current) return;
-
     emergencyRefreshInFlightRef.current = true;
-    try {
-      const items = isCommunityUser
-        ? await fetchMyEmergencyMapReports()
-        : await fetchEmergencyMapReportsWithOptions({
-            includeUnapproved: canViewUnapprovedEmergencyReports,
-            limit: 300,
-          });
 
-      setReports(
-        items
+    try {
+      // 1. Fetch current user's own reports (for ALL authenticated mobile user roles)
+      const myItems = await fetchMyEmergencyMapReports();
+      const mappedOwn = myItems
+        .filter((item) => !isClosedEmergencyStatus(item.status))
+        .map((item) => ({
+          emergency: mapReportToEmergency(item),
+          source: "own_report" as const,
+        }));
+      setOwnReportEntries(mappedOwn);
+
+      // 2. Fetch unapproved citywide reports only if authorized LGU/ADMIN
+      if (canViewUnapprovedEmergencyReports) {
+        const adminItems = await fetchEmergencyMapReportsWithOptions({
+          includeUnapproved: true,
+          limit: 300,
+        });
+        const mappedAdmin = adminItems
           .filter((item) => !isClosedEmergencyStatus(item.status))
-          .map((item) => {
-          const emergencyType = toMapEmergencyType(item.type);
-          return {
-            id: item.incidentId,
-            type: emergencyType,
-            title: mobileEmergencyTitle(emergencyType),
-            description: item.description,
-            images: [],
-            referenceNumber: item.referenceNumber,
-            reportedAt: item.createdAt,
-            status: normalizeEmergencyStatus(item.status),
-            location: {
-              lng: item.location.coords.longitude,
-              lat: item.location.coords.latitude,
-              label: item.location.label,
-            },
-            updatedAt: item.createdAt ? new Date(item.createdAt).toLocaleString() : "just now",
-          };
-          })
-      );
+          .map((item) => ({
+            emergency: mapReportToEmergency(item),
+            source: "assigned" as const,
+          }));
+        setAdminReportEntries(mappedAdmin);
+      } else {
+        setAdminReportEntries([]);
+      }
     } catch {
-      setReports([]);
+      // Retain existing entries on transient network failures
     } finally {
       emergencyRefreshInFlightRef.current = false;
     }
-  }, [
-    activeDispatch,
-    canViewEmergencies,
-    canViewUnapprovedEmergencyReports,
-    isCommunityUser,
-    isDispatchAssignee,
-    pendingDispatch,
-  ]);
+  }, [canViewEmergencies, canViewUnapprovedEmergencyReports]);
 
   useEffect(() => {
     void loadHazardZones();
@@ -531,7 +616,8 @@ export default function MapTab() {
 
   useEffect(() => {
     if (!canViewEmergencies) {
-      setReports([]);
+      setOwnReportEntries([]);
+      setAdminReportEntries([]);
       return;
     }
 
@@ -628,10 +714,12 @@ export default function MapTab() {
     const q = query.trim().toLowerCase();
     if (!q) return reports;
     return reports.filter(
-      (r) =>
-        r.title.toLowerCase().includes(q) ||
-        r.type.toLowerCase().includes(q) ||
-        (r.description ?? "").toLowerCase().includes(q)
+      (entry) =>
+        entry.emergency.title.toLowerCase().includes(q) ||
+        entry.emergency.type.toLowerCase().includes(q) ||
+        (entry.emergency.referenceNumber ?? "").toLowerCase().includes(q) ||
+        (entry.emergency.description ?? "").toLowerCase().includes(q) ||
+        (entry.emergency.location.label ?? "").toLowerCase().includes(q)
     );
   }, [reports, query]);
 
@@ -1055,11 +1143,14 @@ export default function MapTab() {
       animationDuration: 900,
     });
 
-    if (isCommunityUser && matchedMarker) {
-      setSelectedCommunityMarker(matchedMarker);
+    if (matchedMarker?.source === "own_report") {
+      setSelectedOwnReportMarker(matchedMarker);
       return;
     }
-    setSelectedCommunityMarker(null);
+    setSelectedOwnReportMarker(null);
+    if (matchedMarker?.source === "assigned") {
+      openSheet(matchedMarker.emergency);
+    }
   }, [
     canViewEmergencies,
     emergencySheet,
@@ -1068,7 +1159,6 @@ export default function MapTab() {
     emergencySheet.sheetMode,
     focusIncidentId,
     focusReportCoordinate,
-    isCommunityUser,
     isFocused,
     isMapReady,
     mapFocusSequence,
@@ -1085,7 +1175,7 @@ export default function MapTab() {
 
   useEffect(() => {
     if (canViewEmergencies) return;
-    setSelectedCommunityMarker(null);
+    setSelectedOwnReportMarker(null);
     closeEmergencySheet();
   }, [canViewEmergencies, closeEmergencySheet]);
 
@@ -1099,49 +1189,52 @@ export default function MapTab() {
 
   const openSheet = (emergency: Emergency) => {
     if (!canViewEmergencies) return;
-    setSelectedCommunityMarker(null);
+    setSelectedOwnReportMarker(null);
     layersSheetRef.current?.close();
     emergencySheet.openEmergency(emergency);
   };
 
-  const onPressCommunityMarker = useCallback(
+  const onPressOwnReportMarker = useCallback(
     (entry: EmergencyMarkerPlacement) => {
       layersSheetRef.current?.close();
       closeEmergencySheet();
-      setSelectedCommunityMarker(entry);
+      setSelectedOwnReportMarker(entry);
+
+      cameraRef.current?.setCamera({
+        centerCoordinate: [entry.coordinate[0], entry.coordinate[1] - 0.0022],
+        animationDuration: 400,
+      });
     },
     [closeEmergencySheet]
   );
 
-  const onPressCommunityViewDetails = useCallback(() => {
-    const emergencyId = String(selectedCommunityMarker?.emergency?.id ?? "").trim();
-    if (!emergencyId) return;
-    setSelectedCommunityMarker(null);
+  const onPressOwnReportViewDetails = useCallback((emergencyId: string) => {
+    setSelectedOwnReportMarker(null);
     router.push({
       pathname: "/my-request-tracking",
       params: { id: emergencyId },
     });
-  }, [selectedCommunityMarker?.emergency?.id]);
+  }, []);
 
   useEffect(() => {
-    if (!selectedCommunityMarker) return;
+    if (!selectedOwnReportMarker) return;
     const matched = visibleEmergencyMarkers.find(
-      (entry) => entry.emergency.id === selectedCommunityMarker.emergency.id
+      (entry) => entry.emergency.id === selectedOwnReportMarker.emergency.id
     );
     if (!matched) {
-      setSelectedCommunityMarker(null);
+      setSelectedOwnReportMarker(null);
       return;
     }
 
-    const [currentLng, currentLat] = selectedCommunityMarker.coordinate;
+    const [currentLng, currentLat] = selectedOwnReportMarker.coordinate;
     const [nextLng, nextLat] = matched.coordinate;
     if (currentLng !== nextLng || currentLat !== nextLat) {
-      setSelectedCommunityMarker(matched);
+      setSelectedOwnReportMarker(matched);
     }
-  }, [selectedCommunityMarker, visibleEmergencyMarkers]);
+  }, [selectedOwnReportMarker, visibleEmergencyMarkers]);
 
   const openLayersSheet = () => {
-    setSelectedCommunityMarker(null);
+    setSelectedOwnReportMarker(null);
     if (emergencySheet.selectedEmergency) {
       emergencySheet.minimizeSheet();
     }
@@ -1174,7 +1267,7 @@ export default function MapTab() {
           compassEnabled={false}
           scaleBarEnabled={false}
           onPress={() => {
-            setSelectedCommunityMarker(null);
+            setSelectedOwnReportMarker(null);
             if (emergencySheet.selectedEmergency) {
               emergencySheet.minimizeSheet();
             }
@@ -1339,94 +1432,33 @@ export default function MapTab() {
           ))}
 
           {canViewEmergencies
-            ? visibleEmergencyMarkers.map((entry) => (
-                <MapboxGL.MarkerView
-                  key={entry.emergency.id}
-                  coordinate={entry.coordinate}
-                  anchor={{ x: 0.5, y: 0.5 }}
-                >
-                  <Pressable
-                    onPress={() => {
-                      if (isCommunityUser) {
-                        onPressCommunityMarker(entry);
-                        return;
-                      }
-                      openSheet(entry.emergency);
-                    }}
-                    style={{ padding: 2 }}
+            ? visibleEmergencyMarkers.map((entry) => {
+                const isSelected = selectedOwnReportMarker?.emergency.id === entry.emergency.id;
+                return (
+                  <MapboxGL.MarkerView
+                    key={entry.emergency.id}
+                    coordinate={entry.coordinate}
+                    anchor={{ x: 0.5, y: 0.5 }}
                   >
-                    <PulseMarker type={entry.emergency.type} />
-                  </Pressable>
-                </MapboxGL.MarkerView>
-              ))
+                    <Pressable
+                      onPress={() => {
+                        if (entry.source === "own_report") {
+                          onPressOwnReportMarker(entry);
+                          return;
+                        }
+                        openSheet(entry.emergency);
+                      }}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      style={styles.markerHitArea}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${entry.emergency.title}, ${entry.source === "own_report" ? "Your report" : "Assigned emergency"}`}
+                    >
+                      <PulseMarker type={entry.emergency.type} selected={isSelected} />
+                    </Pressable>
+                  </MapboxGL.MarkerView>
+                );
+              })
             : null}
-
-          {isCommunityUser && selectedCommunityMarker ? (
-            <MapboxGL.MarkerView
-              key={`community-card-${selectedCommunityMarker.emergency.id}`}
-              coordinate={selectedCommunityMarker.coordinate}
-              anchor={{ x: 0.5, y: 1.12 }}
-            >
-              <View style={styles.communityEmergencyCardWrap} pointerEvents="box-none">
-                <View style={[styles.communityEmergencyCard, isDark ? styles.communityEmergencyCardDark : null]}>
-                  <View style={styles.communityEmergencyCardHeader}>
-                    <Text
-                      style={[styles.communityEmergencyCardTitle, isDark ? styles.communityEmergencyCardTitleDark : null]}
-                      numberOfLines={1}
-                    >
-                      {selectedCommunityMarker.emergency.title}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.communityEmergencyCardStatus,
-                        isDark ? styles.communityEmergencyCardStatusDark : null,
-                      ]}
-                    >
-                      {formatEmergencyStatusLabel(selectedCommunityMarker.emergency.status)}
-                    </Text>
-                  </View>
-
-                  {selectedCommunityMarker.emergency.referenceNumber ? (
-                    <Text
-                      style={[
-                        styles.communityEmergencyCardRef,
-                        isDark ? styles.communityEmergencyCardRefDark : null,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {selectedCommunityMarker.emergency.referenceNumber}
-                    </Text>
-                  ) : null}
-
-                  <Text
-                    style={[styles.communityEmergencyCardLocation, isDark ? styles.communityEmergencyCardLocationDark : null]}
-                    numberOfLines={1}
-                  >
-                    {selectedCommunityMarker.emergency.location.label ||
-                      `${selectedCommunityMarker.emergency.location.lat.toFixed(5)}, ${selectedCommunityMarker.emergency.location.lng.toFixed(5)}`}
-                  </Text>
-
-                  <Pressable
-                    onPress={onPressCommunityViewDetails}
-                    style={[
-                      styles.communityEmergencyCardButton,
-                      isDark ? styles.communityEmergencyCardButtonDark : null,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.communityEmergencyCardButtonText,
-                        isDark ? styles.communityEmergencyCardButtonTextDark : null,
-                      ]}
-                    >
-                      View details
-                    </Text>
-                  </Pressable>
-                </View>
-                <View style={[styles.communityEmergencyCardPointer, isDark ? styles.communityEmergencyCardPointerDark : null]} />
-              </View>
-            </MapboxGL.MarkerView>
-          ) : null}
         </MapboxGL.MapView>
 
         {!isMapReady ? (
@@ -1505,6 +1537,15 @@ export default function MapTab() {
           onClear={clearDevLoc}
           top={locationOverrideTop}
         />
+
+        {selectedOwnReportMarker ? (
+          <OwnReportPreviewCard
+            marker={selectedOwnReportMarker}
+            onViewDetails={onPressOwnReportViewDetails}
+            onClose={() => setSelectedOwnReportMarker(null)}
+            bottomOffset={bottomNavHeight + 12}
+          />
+        ) : null}
 
         <EmergencyBottomSheetContainer controller={emergencySheet} authToken={token} />
 
@@ -1891,12 +1932,25 @@ const styles = StyleSheet.create({
   },
 
   // marker
+  markerHitArea: {
+    minWidth: 48,
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   markerWrap: {
     width: PIN_SIZE,
     height: PIN_SIZE,
     alignItems: "center",
     justifyContent: "center",
     overflow: "visible",
+  },
+  selectedRing: {
+    position: "absolute",
+    width: PIN_SIZE + 10,
+    height: PIN_SIZE + 10,
+    borderRadius: 9999,
+    borderWidth: 2,
   },
   pulse: {
     position: "absolute",
@@ -1914,6 +1968,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     elevation: 10,
+  },
+  pinSelected: {
+    borderWidth: 3.5,
+    borderColor: "#FFFFFF",
+    elevation: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
   },
   innerWave: {
     position: "absolute",
@@ -1976,127 +2039,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "700",
   },
-  communityEmergencyCardWrap: {
-    alignItems: "center",
-  },
-  communityEmergencyCard: {
-    width: 230,
-    borderRadius: 14,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "rgba(15,23,42,0.08)",
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 10,
-    shadowColor: "#000",
-    shadowOpacity: 0.16,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
-  },
-  communityEmergencyCardDark: {
-    backgroundColor: "#0E1626",
-    borderColor: "#1F2A44",
-  },
-  communityEmergencyCardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  communityEmergencyCardTitle: {
-    flex: 1,
-    color: "#0F172A",
-    fontSize: 13,
-    fontWeight: "800",
-  },
-  communityEmergencyCardTitleDark: {
-    color: "#E2E8F0",
-  },
-  communityEmergencyCardStatus: {
-    color: "#1D4ED8",
-    fontSize: 11,
-    fontWeight: "800",
-  },
-  communityEmergencyCardStatusDark: {
-    color: "#93C5FD",
-  },
-  communityEmergencyCardRef: {
-    marginTop: 4,
-    color: "#334155",
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  communityEmergencyCardRefDark: {
-    color: "#94A3B8",
-  },
-  communityEmergencyCardLocation: {
-    marginTop: 4,
-    color: "#475569",
-    fontSize: 11,
-    fontWeight: "600",
-  },
-  communityEmergencyCardLocationDark: {
-    color: "#CBD5E1",
-  },
-  communityEmergencyCardButton: {
-    marginTop: 9,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: "#0F172A",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  communityEmergencyCardButtonDark: {
-    backgroundColor: "#E2E8F0",
-  },
-  communityEmergencyCardButtonText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "800",
-  },
-  communityEmergencyCardButtonTextDark: {
-    color: "#0F172A",
-  },
-  communityEmergencyCardPointer: {
-    marginTop: -1,
-    width: 14,
-    height: 14,
-    backgroundColor: "#FFFFFF",
-    borderLeftWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: "rgba(15,23,42,0.08)",
-    transform: [{ rotate: "-45deg" }],
-  },
-  communityEmergencyCardPointerDark: {
-    backgroundColor: "#0E1626",
-    borderColor: "#1F2A44",
-  },
-
   actionsRow: { marginTop: 12, flexDirection: "row", alignItems: "center", gap: 10 },
-  modeToggle: {
-    height: 44,
-    borderRadius: 999,
-    backgroundColor: "rgba(0,0,0,0.06)",
-    padding: 2,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-  },
-  modePill: {
-    height: 40,
-    paddingHorizontal: 10,
-    borderRadius: 999,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-  },
-  modePillActive: {
-    backgroundColor: "#FFFFFF",
-  },
-  modePillText: { fontSize: 12, fontWeight: "800", color: "#444" },
-  modePillTextActive: { color: "#111" },
   actionBtn: {
     flex: 1,
     height: 44,
