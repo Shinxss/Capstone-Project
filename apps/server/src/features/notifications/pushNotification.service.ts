@@ -7,7 +7,7 @@ const expo = new Expo({
   accessToken: process.env.EXPO_ACCESS_TOKEN,
 });
 
-const DISPATCH_CHANNEL_ID = "lifeline_dispatch_v7";
+const DISPATCH_CHANNEL_ID = "lifeline_dispatch_v8";
 const ALERTS_CHANNEL_ID = "lifeline_alerts_v2";
 
 function resolveExpoPushToken(row: { expoPushToken?: unknown; token?: unknown }) {

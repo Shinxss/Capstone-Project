@@ -62,7 +62,7 @@ export default function LguShell({ title, subtitle, hideHeaderContext = false, c
         />
 
         {/* ✅ only page content scrolls */}
-        <div className="flex-1 overflow-y-auto bg-transparent dark:bg-[#060C18]">{children}</div>
+        <div className="min-w-0 flex-1 overflow-y-auto bg-transparent dark:bg-[#060C18]">{children}</div>
       </div>
     </div>
   );

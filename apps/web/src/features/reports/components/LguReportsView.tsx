@@ -17,7 +17,7 @@ export default function LguReportsView(props: Props) {
   if (props.error) return <ReportsErrorState error={props.error} onRetry={props.refresh} />;
 
   return (
-    <div className="px-4 py-4 sm:px-5 lg:px-6">
+    <div className="w-full min-w-0 max-w-full px-4 py-4 sm:px-5 lg:px-6">
       <ReportsPageHeader
         barangayName={props.barangayName}
         filters={props.filters}

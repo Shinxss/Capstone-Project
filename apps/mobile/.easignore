@@ -55,3 +55,6 @@ coverage/
 *.tsbuildinfo
 .DS_Store
 Thumbs.db
+
+# Temp browser directories
+.tmp-report-responsive-chrome/

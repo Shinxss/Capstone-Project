@@ -25,7 +25,7 @@ Notifications.setNotificationHandler({
   }),
 });
 
-export const DISPATCH_CHANNEL_ID = "lifeline_dispatch_v7";
+export const DISPATCH_CHANNEL_ID = "lifeline_dispatch_v8";
 export const ALERTS_CHANNEL_ID = "lifeline_alerts_v2";
 
 function normalizeStep(raw: unknown) {
@@ -70,24 +70,17 @@ export async function ensureNotificationChannels() {
   if (Platform.OS !== "android") return;
 
   try {
-    // Delete legacy channel so Android picks up fresh sound & vibration settings
+    // Delete legacy channels so Android picks up fresh sound & vibration settings
     await Notifications.deleteNotificationChannelAsync("lifeline_dispatch_v6").catch(() => undefined);
+    await Notifications.deleteNotificationChannelAsync("lifeline_dispatch_v7").catch(() => undefined);
   } catch {}
 
   try {
     await Notifications.setNotificationChannelAsync(DISPATCH_CHANNEL_ID, {
       name: "Emergency Dispatch Alerts",
-      description: "Critical alarms when deployed to an emergency response",
+      description: "Critical alerts for emergency deployment",
       importance: Notifications.AndroidImportance.MAX,
       sound: "alarm.wav",
-      audioAttributes: {
-        usage: Notifications.AndroidAudioUsage.NOTIFICATION_EVENT,
-        contentType: Notifications.AndroidAudioContentType.SONIFICATION,
-        flags: {
-          enforceAudibility: true,
-          requestHardwareAudioVideoSynchronization: false,
-        },
-      },
       enableVibrate: true,
       vibrationPattern: [0, 500, 250, 500],
       enableLights: true,
@@ -96,6 +89,15 @@ export async function ensureNotificationChannels() {
       bypassDnd: true,
       showBadge: true,
     });
+
+    if (__DEV__) {
+      const channel = await Notifications.getNotificationChannelAsync(DISPATCH_CHANNEL_ID);
+      console.log("[push] dispatch channel", {
+        id: channel?.id,
+        sound: channel?.sound,
+        importance: channel?.importance,
+      });
+    }
   } catch (error) {
     console.warn("[push] dispatch channel setup failed", error);
   }

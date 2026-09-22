@@ -41,7 +41,7 @@ export default function ReportsFilters({ filters, setFilters, clearFilters, emer
   const fieldClass = "h-[42px] rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none transition hover:border-slate-300 focus:border-red-400 focus:ring-2 focus:ring-red-100 dark:border-[#162544] dark:bg-[#0B1220] dark:text-slate-200 dark:focus:ring-red-500/15";
 
   return (
-    <div className="flex w-full flex-wrap items-center gap-2 2xl:w-auto 2xl:flex-nowrap">
+    <div className="flex w-full min-w-0 max-w-full flex-wrap items-center gap-2 2xl:w-auto 2xl:shrink-0 2xl:flex-nowrap">
       <div ref={dateRef} className="relative min-w-0 flex-1 sm:min-w-[230px] 2xl:flex-none">
         <button
           type="button"
