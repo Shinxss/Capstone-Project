@@ -22,6 +22,7 @@ import { useProfileNotificationPreferences } from "../hooks/useProfileNotificati
 import { useProfileAvatar } from "../hooks/useProfileAvatar";
 import { useProfileRequestShortcuts } from "../hooks/useProfileRequestShortcuts";
 import { useProfileSummary } from "../hooks/useProfileSummary";
+import { ProfileRemoteSectionsSkeleton } from "../components/ProfileSkeletons";
 import { useResponderDutyStatus } from "../hooks/useResponderDutyStatus";
 import { useAchievements } from "../../achievements/hooks/useAchievements";
 import { usePullToRefresh } from "../../common/hooks/usePullToRefresh";
@@ -64,7 +65,7 @@ export default function MoreScreen() {
   const achievementRole = isUser ? String(user?.role ?? "").toUpperCase() : "";
   const isAchievementAccount = achievementRole === "VOLUNTEER" || achievementRole === "COMMUNITY";
 
-  const { summary, refresh: refreshProfileSummary } = useProfileSummary({
+  const { summary, loading: summaryLoading, hasRemoteData, refresh: refreshProfileSummary } = useProfileSummary({
     enabled: isUser,
     user,
   });
@@ -380,7 +381,7 @@ export default function MoreScreen() {
           showDotFor={showDotFor}
         />
 
-        <ProfileActivitiesGrid summary={summary} onPressApplyVolunteer={onPressApplyVolunteer} />
+        {summaryLoading && !hasRemoteData ? <ProfileRemoteSectionsSkeleton /> : <ProfileActivitiesGrid summary={summary} onPressApplyVolunteer={onPressApplyVolunteer} />}
         {isUser ? (
           <>
             {isAchievementAccount ? (
@@ -396,11 +397,7 @@ export default function MoreScreen() {
                 onViewAll={() => router.push("/achievements" as never)}
               />
             ) : null}
-            <ProfilePersonalInfoCard
-              summary={summary}
-              onPressHeader={onPressEditProfile}
-              onPressRow={onPressPersonalInfoRow}
-            />
+            {!summaryLoading || hasRemoteData ? <ProfilePersonalInfoCard summary={summary} onPressHeader={onPressEditProfile} onPressRow={onPressPersonalInfoRow} /> : null}
           </>
         ) : null}
       </RefreshableScrollScreen>

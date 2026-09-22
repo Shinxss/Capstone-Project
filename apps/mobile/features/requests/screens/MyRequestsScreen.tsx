@@ -1,6 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSession } from "../../auth/hooks/useSession";
 import type { MyRequestScope, MyRequestSummary } from "../models/myRequests";
 import { useMyRequests } from "../hooks/useMyRequests";
+import { RequestsListSkeleton } from "../components/RequestsSkeletons";
 
 function formatRequestType(raw: string) {
   const normalized = String(raw ?? "").trim().toLowerCase();
@@ -111,11 +111,8 @@ export function MyRequestsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        {loading ? (
-          <View style={styles.loadingWrap}>
-            <ActivityIndicator size="small" color="#DC2626" />
-            <Text style={styles.loadingText}>Loading requests...</Text>
-          </View>
+        {loading && items.length === 0 ? (
+          <RequestsListSkeleton />
         ) : items.length === 0 ? (
           <View style={styles.emptyWrap}>
             <Text style={styles.emptyText}>{emptyText}</Text>
@@ -240,16 +237,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800",
     color: "#1D4ED8",
-  },
-  loadingWrap: {
-    marginTop: 24,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-  },
-  loadingText: {
-    fontSize: 14,
-    color: "#6B7280",
   },
   emptyWrap: {
     marginTop: 20,

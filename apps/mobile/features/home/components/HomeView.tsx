@@ -15,6 +15,8 @@ import { resolveAvatarUri } from "../../profile/utils/avatarUrl";
 import { RefreshableScrollScreen } from "../../common/components/RefreshableScrollScreen";
 import { useBottomNavMetrics } from "../../common/hooks/useBottomNavMetrics";
 import { useResponsiveLayout } from "../../common/hooks/useResponsiveLayout";
+import { Skeleton, SkeletonRegion } from "../../../components/ui/Skeleton";
+import { ActiveRequestCardSkeleton } from "../../requests/components/RequestsSkeletons";
 import type {
   MyRequestSummary,
   MyRequestTrackingDTO,
@@ -110,8 +112,10 @@ type Props = {
   alertIconName: AlertIconName;
   alertTheme: AlertTheme;
   alertRetryEnabled?: boolean;
+  alertLoading?: boolean;
   refreshing?: boolean;
   activeRequest?: MyRequestSummary;
+  activeRequestLoading?: boolean;
   activeRequestTracking?: MyRequestTrackingDTO | null;
   onStartHold: () => void;
   onCancelHold: () => void;
@@ -119,7 +123,6 @@ type Props = {
   onPressAlert?: () => void;
   onPressTracking?: () => void;
   onPressNotifications?: () => void;
-  onPressViewAll?: () => void;
   onPressApplyVolunteer?: () => void;
   showVolunteerCta?: boolean;
 };
@@ -137,8 +140,10 @@ export function HomeView({
   alertIconName,
   alertTheme,
   alertRetryEnabled,
+  alertLoading = false,
   refreshing,
   activeRequest,
+  activeRequestLoading = false,
   activeRequestTracking,
   onStartHold,
   onCancelHold,
@@ -146,7 +151,6 @@ export function HomeView({
   onPressAlert,
   onPressTracking,
   onPressNotifications,
-  onPressViewAll,
   onPressApplyVolunteer,
   showVolunteerCta = true,
 }: Props) {
@@ -399,23 +403,28 @@ export function HomeView({
             pressed && onPressAlert ? styles.cardPressed : null,
           ]}
         >
-          <View style={[styles.cardIcon, { backgroundColor: alertTheme.iconBackgroundColor }]}>
-            <Ionicons
-              name={alertIconName}
-              size={24}
-              color={alertTheme.iconColor}
-            />
-          </View>
-          <View style={styles.cardContent}>
-            <Text style={[styles.cardHeadline, { color: weatherTitleColor }]}>
-              {alertTitle}
-            </Text>
-            <Text style={[styles.cardSub, { color: weatherTextColor }]}>{alertMessage}</Text>
-            {alertRetryEnabled ? <Text style={[styles.cardRetry, { color: weatherRetryColor }]}>Tap to retry</Text> : null}
-          </View>
+          {alertLoading ? (
+            <SkeletonRegion label="Loading local weather alerts" style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 12 }}>
+              <Skeleton width={48} height={48} radius={14} />
+              <View style={styles.cardContent}><Skeleton width="46%" height={16} /><View style={{ marginTop: 9 }}><Skeleton width="90%" height={12} /></View><View style={{ marginTop: 7 }}><Skeleton width="68%" height={12} /></View></View>
+            </SkeletonRegion>
+          ) : (
+            <>
+              <View style={[styles.cardIcon, { backgroundColor: alertTheme.iconBackgroundColor }]}>
+                <Ionicons name={alertIconName} size={24} color={alertTheme.iconColor} />
+              </View>
+              <View style={styles.cardContent}>
+                <Text style={[styles.cardHeadline, { color: weatherTitleColor }]}>{alertTitle}</Text>
+                <Text style={[styles.cardSub, { color: weatherTextColor }]}>{alertMessage}</Text>
+                {alertRetryEnabled ? <Text style={[styles.cardRetry, { color: weatherRetryColor }]}>Tap to retry</Text> : null}
+              </View>
+            </>
+          )}
         </Pressable>
 
-        {activeRequest ? (
+        {activeRequestLoading && !activeRequest ? (
+          <ActiveRequestCardSkeleton />
+        ) : activeRequest ? (
           <ActiveEmergencyRequestCard
             request={activeRequest}
             tracking={activeRequestTracking}

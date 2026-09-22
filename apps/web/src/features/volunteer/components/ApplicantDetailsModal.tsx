@@ -1,4 +1,5 @@
 import type { VolunteerApplication } from "../models/volunteerApplication.types";
+import { VolunteerDetailsSkeleton } from "./VolunteerSkeletons";
 
 function Row({ label, value }: { label: string; value?: string }) {
   return (
@@ -49,7 +50,7 @@ export default function ApplicantDetailsModal(props: {
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
-          {loading && <div className="text-sm text-gray-600 dark:text-slate-400">Loading application...</div>}
+          {loading && !app ? <VolunteerDetailsSkeleton label="Loading volunteer application" /> : null}
           {!!error && <div className="text-sm text-red-600">{error}</div>}
 
           {!loading && !error && app && (

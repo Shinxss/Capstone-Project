@@ -18,6 +18,7 @@ import type { DashboardEmergencyItem, DashboardStatCardItem } from "../models/lg
 
 import EmergencyQuickView from "./EmergencyQuickView";
 import DashboardStatCard from "./DashboardStatCard";
+import LguDashboardSkeleton from "./LguDashboardSkeleton";
 import MapLegend from "../../lguLiveMap/components/MapLegend";
 
 import type { HazardZone } from "../../hazardZones/models/hazardZones.types";
@@ -280,12 +281,8 @@ export default function LguDashboardView({
     };
   });
 
-  if (loading) {
-    return (
-      <div className="rounded-lg border border-gray-200 bg-white p-4 text-gray-600 dark:bg-[#0B1220] dark:border-[#162544] dark:text-slate-300">
-        Loading...
-      </div>
-    );
+  if (loading && safeRecent.length === 0 && effectiveHazardZones.length === 0) {
+    return <LguDashboardSkeleton />;
   }
 
   if (error) {

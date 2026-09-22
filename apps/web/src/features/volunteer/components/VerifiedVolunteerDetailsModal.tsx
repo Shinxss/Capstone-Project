@@ -1,4 +1,5 @@
 import type { VolunteerApplication } from "../models/volunteerApplication.types";
+import { VolunteerDetailsSkeleton } from "./VolunteerSkeletons";
 
 function Row({ label, value }: { label: string; value?: string }) {
   return (
@@ -38,7 +39,7 @@ export default function VerifiedVolunteerDetailsModal(props: {
         </div>
 
         <div className="p-5">
-          {loading && <div className="text-sm text-gray-600 dark:text-slate-400">Loading...</div>}
+          {loading && !data ? <VolunteerDetailsSkeleton /> : null}
           {!!error && <div className="text-sm text-red-600">{error}</div>}
 
           {!loading && !error && data && (

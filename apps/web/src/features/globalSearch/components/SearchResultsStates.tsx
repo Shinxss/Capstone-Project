@@ -1,31 +1,31 @@
 import { Search } from "lucide-react";
+import { Skeleton, SkeletonCard, SkeletonRegion } from "@/components/ui/Skeleton";
 
 export function SearchResultsSkeleton() {
   return (
-    <div className="space-y-4" aria-busy="true" aria-label="Loading search results">
+    <SkeletonRegion label="Loading search results" className="space-y-4">
       {[0, 1].map((section) => (
         <div key={section} className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/60 dark:border-[#213451] dark:bg-[#0A1220]">
           <div className="flex h-13 items-center gap-3 border-b border-slate-200 px-4 dark:border-[#213451]">
-            <div className="h-5 w-5 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
-            <div className="h-5 w-35 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+            <Skeleton className="h-5 w-5" />
+            <Skeleton className="h-5 w-35" />
           </div>
           <div className="p-2.5">
             {[0, 1].map((row) => (
-              <div key={row} className="mb-2 flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 last:mb-0 dark:border-[#213451] dark:bg-[#0E1626]">
-                <div className="h-14 w-14 shrink-0 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-700" />
+              <SkeletonCard key={row} className="mb-2 flex items-center gap-4 rounded-xl p-4 last:mb-0">
+                <Skeleton className="h-14 w-14 shrink-0 rounded-xl" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 w-1/3 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
-                  <div className="h-3 w-2/3 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
-                  <div className="h-3 w-1/2 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
+                  <Skeleton className="h-4 w-1/3" />
+                  <Skeleton className="h-3 w-2/3" />
+                  <Skeleton className="h-3 w-1/2" />
                 </div>
-                <div className="hidden h-10 w-32 animate-pulse rounded-lg bg-red-100 sm:block dark:bg-red-500/15" />
-              </div>
+                <Skeleton className="hidden h-10 w-32 rounded-lg sm:block" />
+              </SkeletonCard>
             ))}
           </div>
         </div>
       ))}
-      <span className="sr-only">Loading results</span>
-    </div>
+    </SkeletonRegion>
   );
 }
 

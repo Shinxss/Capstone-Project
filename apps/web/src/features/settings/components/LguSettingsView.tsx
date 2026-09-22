@@ -1,6 +1,7 @@
 import { useLguSettings } from "../hooks/useLguSettings";
 import { useConfirm } from "@/features/feedback/hooks/useConfirm";
 import type { NotificationChannelPrefs, NotificationPrefs } from "../models/settings.types";
+import { SettingsPageSkeleton } from "@/components/ui/PageSkeletons";
 
 type Props = ReturnType<typeof useLguSettings> & {
   loading: boolean;
@@ -95,14 +96,6 @@ const notificationRows: ReadonlyArray<{
   },
 ];
 
-function LoadingPanel() {
-  return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 text-gray-600 dark:bg-[#0B1220] dark:border-[#162544] dark:text-slate-300">
-      Loading...
-    </div>
-  );
-}
-
 function ErrorPanel({ error, onRetry }: { error: string; onRetry: () => void }) {
   return (
     <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-500/10 dark:border-red-500/25 dark:text-red-200">
@@ -151,7 +144,7 @@ export default function LguSettingsView(props: Props) {
     reset();
   };
 
-  if (loading) return <LoadingPanel />;
+  if (loading) return <SettingsPageSkeleton />;
   if (error) return <ErrorPanel error={error} onRetry={onRefresh} />;
 
   return (

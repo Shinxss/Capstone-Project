@@ -227,7 +227,7 @@ export default function HomeScreen() {
   } = useGuestSosLimit({ enabled: isGuest });
   const guestEmergencyContact = useGuestEmergencyContact({ enabled: isGuest });
   const isDispatchAssignee = useMemo(() => session?.mode === "user" && ["VOLUNTEER", "RESPONDER"].includes(String(session.user.role ?? "").toUpperCase()), [session]);
-  const { activeRequest: myActiveRequest, refresh: refreshMyActiveRequest } = useMyActiveRequest({
+  const { activeRequest: myActiveRequest, loading: activeRequestLoading, refresh: refreshMyActiveRequest } = useMyActiveRequest({
     pollMs: 8000,
     enabled: isUser,
   });
@@ -507,8 +507,10 @@ export default function HomeScreen() {
         alertIconName={weatherCard.iconName}
         alertTheme={weatherCard.theme}
         alertRetryEnabled={weatherCard.retryEnabled}
+        alertLoading={weatherLoading && !weatherSummary && !weatherErrorMessage && !locationMessage}
         refreshing={refreshingHome}
         activeRequest={myActiveRequest ?? undefined}
+        activeRequestLoading={activeRequestLoading}
         activeRequestTracking={activeRequestTracking}
         onRefresh={triggerRefreshHome}
         onPressAlert={weatherCard.retryEnabled ? onPressWeatherCard : undefined}
@@ -518,7 +520,6 @@ export default function HomeScreen() {
         onPressNotifications={() => {
           router.push("/notifications");
         }}
-        onPressViewAll={() => {}}
         showVolunteerCta={!isDispatchAssignee}
         onPressApplyVolunteer={onPressApplyVolunteer}
       />

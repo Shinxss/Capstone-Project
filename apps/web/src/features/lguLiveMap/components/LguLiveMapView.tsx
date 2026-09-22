@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import EmergencyMap from "../../emergency/components/EmergencyMap";
+import { Skeleton, SkeletonCard, SkeletonRegion } from "@/components/ui/Skeleton";
 import type { MapEmergencyPin } from "../../emergency/components/EmergencyMap";
 import {
   colorForEmergency,
@@ -100,14 +101,6 @@ function Pill({
       {icon}
       {value} {label}
     </span>
-  );
-}
-
-function LoadingPanel() {
-  return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 text-gray-600 dark:bg-[#0B1220] dark:border-[#162544] dark:text-slate-300">
-      Loading...
-    </div>
   );
 }
 
@@ -269,7 +262,6 @@ export default function LguLiveMapView(props: Props) {
     setLegendMinimized(true);
   }, [detailsOpen]);
 
-  if (loading) return <LoadingPanel />;
   if (error) return <ErrorPanel error={error} onRetry={onRefresh} />;
 
   return (
@@ -293,6 +285,23 @@ export default function LguLiveMapView(props: Props) {
           fitReports="always"
         />
       </div>
+
+      {loading && mapPins.length === 0 ? (
+        <SkeletonRegion
+          label="Loading emergency markers"
+          className="pointer-events-none absolute left-3 top-16 z-20 w-[320px] max-w-[70vw]"
+        >
+          <SkeletonCard className="space-y-3 shadow-sm">
+            <Skeleton className="h-4 w-36" />
+            {Array.from({ length: 3 }, (_, index) => (
+              <div key={index} className="flex items-center gap-3">
+                <Skeleton className="size-9 shrink-0 rounded-full" />
+                <div className="flex-1 space-y-2"><Skeleton className="h-3 w-4/5" /><Skeleton className="h-3 w-2/5" /></div>
+              </div>
+            ))}
+          </SkeletonCard>
+        </SkeletonRegion>
+      ) : null}
 
       {deploymentIntent ? (
         <DeploymentIntentBanner intent={deploymentIntent} onCancel={cancelDeploymentIntent} />

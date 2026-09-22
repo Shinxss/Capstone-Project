@@ -1,26 +1,23 @@
 import { View } from "react-native";
+import { Skeleton, SkeletonCard, SkeletonRegion, SkeletonText } from "../../../components/ui/Skeleton";
 
-function SkeletonCard() {
+function DispatchCardSkeleton() {
   return (
-    <View className="rounded-3xl border border-slate-200 bg-white p-4">
-      <View className="h-3 w-24 rounded-full bg-slate-200" />
-      <View className="mt-3 h-6 w-3/5 rounded-lg bg-slate-200" />
-      <View className="mt-2 h-4 w-2/5 rounded-lg bg-slate-200" />
-      <View className="mt-4 h-4 w-full rounded-lg bg-slate-100" />
-      <View className="mt-2 h-4 w-4/5 rounded-lg bg-slate-100" />
-      <View className="mt-4 flex-row gap-3">
-        <View className="h-11 flex-1 rounded-xl bg-slate-200" />
-        <View className="h-11 flex-1 rounded-xl bg-slate-200" />
-      </View>
-    </View>
+    <SkeletonCard style={{ gap: 11 }}>
+      <Skeleton width={96} height={12} />
+      <Skeleton width="60%" height={22} />
+      <Skeleton width="42%" height={14} />
+      <SkeletonText widths={["100%", "82%"]} />
+      <View style={{ flexDirection: "row", gap: 12 }}><Skeleton width="48%" height={44} radius={12} /><Skeleton width="48%" height={44} radius={12} /></View>
+    </SkeletonCard>
   );
 }
 
 export function DispatchSkeleton() {
   return (
-    <View className="gap-3">
-      <SkeletonCard />
-      <SkeletonCard />
-    </View>
+    <SkeletonRegion label="Loading dispatch tasks" style={{ gap: 12 }}>
+      <DispatchCardSkeleton />
+      <DispatchCardSkeleton />
+    </SkeletonRegion>
   );
 }

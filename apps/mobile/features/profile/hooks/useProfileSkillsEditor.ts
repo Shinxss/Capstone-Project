@@ -24,6 +24,7 @@ export function useProfileSkillsEditor() {
   const sessionUser = session?.mode === "user" ? session.user : null;
 
   const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [skillOptions, setSkillOptions] = useState<string[]>([]);
@@ -44,6 +45,7 @@ export function useProfileSkillsEditor() {
     if (!isUser) {
       setError("Sign in required.");
       setLoading(false);
+      setInitialized(true);
       return;
     }
 
@@ -73,6 +75,7 @@ export function useProfileSkillsEditor() {
       setError(String(err?.response?.data?.message ?? err?.message ?? "Failed to load skills."));
     } finally {
       setLoading(false);
+      setInitialized(true);
     }
   }, [isUser, sessionUser?.firstName, sessionUser?.lastName]);
 
@@ -168,6 +171,7 @@ export function useProfileSkillsEditor() {
 
   return {
     loading,
+    initialized,
     saving,
     error,
     canEdit,

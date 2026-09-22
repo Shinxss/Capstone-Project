@@ -5,6 +5,7 @@ import InlineAlert from "../../../components/ui/InlineAlert";
 import EmptyState from "../../../components/ui/EmptyState";
 import type { ProfileUpdateInput } from "../models/profile.types";
 import { useLguProfile } from "../hooks/useLguProfile";
+import { ProfilePageSkeleton } from "@/components/ui/PageSkeletons";
 
 type Props = ReturnType<typeof useLguProfile> & {
   loading: boolean;
@@ -40,14 +41,6 @@ function CardHeader({ title, onEdit }: { title: string; onEdit: () => void }) {
           Edit
         </button>
       </div>
-    </div>
-  );
-}
-
-function LoadingPanel() {
-  return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 text-gray-600 dark:bg-[#0B1220] dark:border-[#162544] dark:text-slate-300">
-      Loading...
     </div>
   );
 }
@@ -145,7 +138,7 @@ export default function LguProfileView(props: Props) {
     setEditSection(null);
   };
 
-  if (loading) return <LoadingPanel />;
+  if (loading && !profile) return <ProfilePageSkeleton />;
   if (error) return <ErrorPanel error={error} onRetry={onRefresh} />;
 
   return (

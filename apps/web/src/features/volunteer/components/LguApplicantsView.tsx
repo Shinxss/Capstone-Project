@@ -3,6 +3,7 @@ import ApplicantDetailsModal from "./ApplicantDetailsModal";
 import EmptyState from "../../../components/ui/EmptyState";
 import type { VolunteerApplicationStatus } from "../models/volunteerApplication.types";
 import { useLguApplicants } from "../hooks/useLguApplicants";
+import { ApplicantsSkeleton } from "./VolunteerSkeletons";
 
 type Props = ReturnType<typeof useLguApplicants> & {
   loading: boolean;
@@ -19,14 +20,6 @@ function StatusPill({ status }: { status: VolunteerApplicationStatus }) {
   };
 
   return <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${map[status]}`}>{status.replace("_", " ")}</span>;
-}
-
-function LoadingPanel() {
-  return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 text-gray-600 dark:bg-[#0B1220] dark:border-[#162544] dark:text-slate-300">
-      Loading...
-    </div>
-  );
 }
 
 function ErrorPanel({ error, onRetry }: { error: string; onRetry: () => void }) {
@@ -71,7 +64,7 @@ export default function LguApplicantsView(props: Props) {
     review,
   } = props;
 
-  if (loading) return <LoadingPanel />;
+  if (loading && items.length === 0) return <ApplicantsSkeleton />;
   if (error) return <ErrorPanel error={error} onRetry={onRefresh} />;
 
   return (

@@ -7,6 +7,7 @@ import {
 } from "react-native-gesture-handler";
 import type { Emergency } from "../models/map.types";
 import type { EmergencyReportDetail } from "../../emergency/models/emergency.types";
+import { Skeleton, SkeletonImage, SkeletonRegion, SkeletonText } from "../../../components/ui/Skeleton";
 
 type EtaSummary = {
   durationMin: number;
@@ -111,9 +112,7 @@ export function EmergencyOverviewSheet({
   const reportedTime = formatReportedAt(
     emergency.reportedAt ?? emergencyDetail?.reportedAt ?? emergencyDetail?.createdAt
   );
-  const etaText = loadingEta
-    ? "Loading..."
-    : etaSummary
+  const etaText = etaSummary
       ? `${etaSummary.durationMin} min | ${etaSummary.distanceKm.toFixed(1)} km`
       : "-";
 
@@ -203,7 +202,7 @@ export function EmergencyOverviewSheet({
           </View>
         </View>
 
-        <Text className="text-[12px] font-semibold text-slate-700">Drive ETA: {etaText}</Text>
+        {loadingEta ? <Skeleton width={112} height={13} /> : <Text className="text-[12px] font-semibold text-slate-700">Drive ETA: {etaText}</Text>}
       </View>
 
       <View className="mt-3 flex-row items-center justify-between">
@@ -223,7 +222,12 @@ export function EmergencyOverviewSheet({
         <Text className="text-[12px] font-semibold uppercase tracking-wide text-slate-500">
           Images
         </Text>
-        {photos.length ? (
+        {loadingDetail && !emergencyDetail ? (
+          <SkeletonRegion label="Loading emergency images" style={{ paddingTop: 10, flexDirection: "row", gap: 10 }}>
+            <Skeleton width={imageTileWidth} height={imageTileHeight} radius={16} />
+            <Skeleton width={imageTileWidth} height={imageTileHeight} radius={16} />
+          </SkeletonRegion>
+        ) : photos.length ? (
           <NativeViewGestureHandler
             disallowInterruption
             shouldActivateOnStart
@@ -244,9 +248,9 @@ export function EmergencyOverviewSheet({
                 if (!uri) return null;
                 return (
                   <View key={`${emergency.id}-thumb-${index}`} className="relative">
-                    <Image
+                    <SkeletonImage
                       source={imageHeaders ? { uri, headers: imageHeaders } : { uri }}
-                      style={{ width: imageTileWidth, height: imageTileHeight, borderRadius: 16 }}
+                      containerStyle={{ width: imageTileWidth, height: imageTileHeight }}
                       resizeMode="cover"
                     />
                   </View>
@@ -263,15 +267,19 @@ export function EmergencyOverviewSheet({
         <Text className="text-[12px] font-semibold uppercase tracking-wide text-slate-500">
           Location
         </Text>
-        <Text className="mt-1 text-[14px] font-semibold text-slate-900">{barangayLabel}</Text>
-        <Text className="mt-1 text-[12px] text-slate-500">{locationLabel || "-"}</Text>
+        {loadingDetail && !emergencyDetail ? <View style={{ marginTop: 8 }}><SkeletonText widths={["42%", "78%"]} /></View> : <><Text className="mt-1 text-[14px] font-semibold text-slate-900">{barangayLabel}</Text><Text className="mt-1 text-[12px] text-slate-500">{locationLabel || "-"}</Text></>}
       </View>
 
       <View className="mt-3 border-t border-slate-200 pt-3">
         <Text className="text-[12px] font-semibold uppercase tracking-wide text-slate-500">
           Reporter
         </Text>
-        <View className="mt-2 flex-row items-center gap-3">
+        {loadingDetail && !emergencyDetail ? (
+          <SkeletonRegion label="Loading reporter information" style={{ marginTop: 8, flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <Skeleton width={48} height={48} radius={24} />
+            <View style={{ minWidth: 0, flex: 1 }}><SkeletonText widths={["56%", "38%"]} /></View>
+          </SkeletonRegion>
+        ) : <View className="mt-2 flex-row items-center gap-3">
           <View className="h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100">
             {reporterAvatarUri ? (
               <Image
@@ -286,19 +294,16 @@ export function EmergencyOverviewSheet({
 
           <View className="flex-1">
             <Text className="text-[14px] font-semibold text-slate-900" numberOfLines={1}>
-              {loadingDetail ? "Loading..." : reporterName}
+              {reporterName}
             </Text>
             <Text className="mt-1 text-[12px] text-slate-500" numberOfLines={1}>
-              {loadingDetail
-                ? "Loading..."
-                : reporter?.isGuest
+              {reporter?.isGuest
                   ? "Guest Reporter"
                   : `Lifeline ID: ${reporterLifelineId}`}
             </Text>
           </View>
-        </View>
-        <Text className="mt-2 text-[12px] text-slate-600">Contact: {reporterContact}</Text>
-        <Text className="mt-1 text-[12px] text-slate-500">Address: {reporterAddress}</Text>
+        </View>}
+        {!loadingDetail || emergencyDetail ? <><Text className="mt-2 text-[12px] text-slate-600">Contact: {reporterContact}</Text><Text className="mt-1 text-[12px] text-slate-500">Address: {reporterAddress}</Text></> : null}
       </View>
     </View>
   );

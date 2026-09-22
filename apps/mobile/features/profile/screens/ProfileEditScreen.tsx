@@ -12,6 +12,7 @@ import ProfileEditForm from "../components/ProfileEditForm";
 import ProfileEditHeader from "../components/ProfileEditHeader";
 import { useEditProfile } from "../hooks/useEditProfile";
 import { formatSkillsDisplayText } from "../utils/skills";
+import { ProfileEditSkeleton } from "../components/ProfileSkeletons";
 
 export default function EditProfileScreen() {
   const router = useRouter();
@@ -111,6 +112,14 @@ export default function EditProfileScreen() {
             <Text style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 14 }}>Sign In</Text>
           </Pressable>
         </View>
+      </GradientScreen>
+    );
+  }
+
+  if (editProfile.loading && !editProfile.initialized) {
+    return (
+      <GradientScreen gradientHeight={230}>
+        <ProfileEditSkeleton />
       </GradientScreen>
     );
   }

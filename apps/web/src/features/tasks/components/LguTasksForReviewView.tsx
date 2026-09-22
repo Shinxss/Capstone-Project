@@ -2,20 +2,13 @@ import { ClipboardCheck } from "lucide-react";
 import { useLguTasksForReview } from "../hooks/useLguTasksForReview";
 import ForReviewDetailsPanel from "./ForReviewDetailsPanel";
 import ForReviewQueueRail from "./ForReviewQueueRail";
+import { TasksForReviewSkeleton } from "./TasksSkeletons";
 
 type Props = ReturnType<typeof useLguTasksForReview> & {
   loading: boolean;
   error: string | null;
   onRefresh: () => void;
 };
-
-function LoadingPanel() {
-  return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 text-gray-600 dark:border-[#162544] dark:bg-[#0B1220] dark:text-slate-300">
-      Loading...
-    </div>
-  );
-}
 
 function ErrorPanel({ error, onRetry }: { error: string; onRetry: () => void }) {
   return (
@@ -53,10 +46,10 @@ function EmptyDetailsPanel() {
 export default function LguTasksForReviewView(props: Props) {
   const { loading, error, onRefresh } = props;
 
-  if (loading) {
+  if (loading && props.rows.length === 0) {
     return (
       <div className="pl-4 pr-0 sm:pl-6 sm:pr-0">
-        <LoadingPanel />
+        <TasksForReviewSkeleton />
       </div>
     );
   }

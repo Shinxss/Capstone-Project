@@ -24,7 +24,7 @@ export default function SearchResultsView({ portalPathPrefix = "/lgu" }: SearchR
         </div>
       ) : null}
 
-      {search.loading ? (
+      {search.loading && search.visibleGroups.length === 0 ? (
         <SearchResultsSkeleton />
       ) : search.visibleGroups.length === 0 ? (
         <EmptySearchState query={search.query} onClear={search.clearSearch} />

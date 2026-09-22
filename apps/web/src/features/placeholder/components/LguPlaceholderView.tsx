@@ -7,9 +7,9 @@ type Props = {
 
 function LoadingPanel() {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 text-gray-600 dark:bg-[#0B1220] dark:border-[#162544] dark:text-slate-300">
-      Loading...
-    </div>
+    <SkeletonRegion label="Loading page">
+      <SkeletonCard className="space-y-3 rounded-lg p-5"><Skeleton className="h-5 w-36" /><Skeleton className="h-3 w-72 max-w-full" /></SkeletonCard>
+    </SkeletonRegion>
   );
 }
 
@@ -40,3 +40,4 @@ export default function LguPlaceholderView({ loading, error, onRefresh, title }:
     </div>
   );
 }
+import { Skeleton, SkeletonCard, SkeletonRegion } from "../../../components/ui/Skeleton";

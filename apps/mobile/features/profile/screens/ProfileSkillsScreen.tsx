@@ -9,6 +9,7 @@ import { useAuth } from "../../auth/AuthProvider";
 import { RefreshableScrollScreen } from "../../common/components/RefreshableScrollScreen";
 import ProfileSkillsCard from "../components/ProfileSkillsCard";
 import { useProfileSkillsEditor } from "../hooks/useProfileSkillsEditor";
+import { ProfileSkillsSkeleton } from "../components/ProfileSkeletons";
 
 export default function ProfileSkillsScreen() {
   const router = useRouter();
@@ -65,6 +66,14 @@ export default function ProfileSkillsScreen() {
             <Text style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 14 }}>Sign In</Text>
           </Pressable>
         </View>
+      </GradientScreen>
+    );
+  }
+
+  if (skillsEditor.loading && !skillsEditor.initialized) {
+    return (
+      <GradientScreen gradientHeight={210}>
+        <ProfileSkillsSkeleton />
       </GradientScreen>
     );
   }

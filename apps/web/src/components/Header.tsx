@@ -6,6 +6,7 @@ import { clearLguSession } from "../features/auth/services/authStorage";
 import { logout } from "../features/auth/services/lguAuth.service";
 import { appendActivityLog } from "../features/activityLog/services/activityLog.service";
 import type { LguNotification } from "../features/notifications/models/notifications.types";
+import { Skeleton, SkeletonRegion } from "./ui/Skeleton";
 import {
   fetchLguNotifications,
   markNotificationRead,
@@ -419,9 +420,15 @@ export default function Header({
 
             <div className="max-h-[calc(100vh-214px)] overflow-y-auto p-3">
               {notificationsLoading ? (
-                <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600 dark:border-[#162544] dark:bg-[#0B1220] dark:text-slate-300">
-                  Loading notifications...
-                </div>
+                <SkeletonRegion label="Loading notifications" className="space-y-2">
+                  {Array.from({ length: 3 }, (_, index) => (
+                    <div key={index} className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 dark:border-[#162544] dark:bg-[#0B1220]">
+                      <Skeleton className="h-3.5 w-2/3" />
+                      <Skeleton className="mt-2 h-3 w-full" />
+                      <Skeleton className="mt-2 h-3 w-20" />
+                    </div>
+                  ))}
+                </SkeletonRegion>
               ) : null}
 
               {notificationsError ? (

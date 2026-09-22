@@ -8,6 +8,7 @@ import {
   type VerifiedVolunteerPresence,
 } from "../hooks/useLguVerifiedVolunteers";
 import type { VerifiedVolunteerAvailability } from "../utils/verifiedVolunteerDeployment";
+import { VerifiedVolunteersSkeleton } from "./VolunteerSkeletons";
 
 type Props = ReturnType<typeof useLguVerifiedVolunteers> & {
   loading: boolean;
@@ -273,14 +274,6 @@ function SummaryCard({
   );
 }
 
-function LoadingPanel() {
-  return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 text-gray-600 dark:bg-[#0B1220] dark:border-[#162544] dark:text-slate-300">
-      Loading...
-    </div>
-  );
-}
-
 function ErrorPanel({ error, onRetry }: { error: string; onRetry: () => void }) {
   return (
     <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-500/10 dark:border-red-500/25 dark:text-red-200">
@@ -371,7 +364,7 @@ export default function LguVerifiedVolunteersView(props: Props) {
     };
   }, [cards, filteredCards, skillFilter, total]);
 
-  if (loading) return <LoadingPanel />;
+  if (loading && items.length === 0) return <VerifiedVolunteersSkeleton />;
   if (error) return <ErrorPanel error={error} onRetry={onRefresh} />;
 
   const visibleSkillFilters = skillFilters.slice(0, 4);

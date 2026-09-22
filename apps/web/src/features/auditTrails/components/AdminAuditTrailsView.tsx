@@ -1,5 +1,6 @@
 import type { useAdminAuditTrails } from "../hooks/useAdminAuditTrails";
 import type { AuditLogItem } from "../models/auditTrails.types";
+import { TableContentSkeleton } from "@/components/ui/PageSkeletons";
 
 type Props = ReturnType<typeof useAdminAuditTrails>;
 
@@ -98,11 +99,7 @@ export default function AdminAuditTrailsView({
         ) : null}
       </div>
 
-      {loading ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-600 dark:border-[#162544] dark:bg-[#0B1220] dark:text-slate-300">
-          Loading audit logs...
-        </div>
-      ) : null}
+      {loading && items.length === 0 ? <TableContentSkeleton label="Loading audit logs" rows={7} columns={["w-32", "w-36", "w-28", "w-24", "w-28"]} /> : null}
 
       {error ? (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
@@ -110,7 +107,7 @@ export default function AdminAuditTrailsView({
         </div>
       ) : null}
 
-      {!loading && !error ? (
+      {!error && !(loading && items.length === 0) ? (
         <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-[#162544] dark:bg-[#0B1220]">
           <table className="w-full text-left text-xs">
             <thead className="bg-gray-50 text-[11px] font-semibold uppercase text-gray-500 dark:bg-[#0E1626] dark:text-slate-400">

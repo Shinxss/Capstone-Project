@@ -193,7 +193,7 @@ export default function NotificationsScreen() {
         </View>
       ) : null}
 
-      {vm.loading ? (
+      {vm.loading && vm.items.length === 0 ? (
         <NotificationsListSkeleton />
       ) : vm.sections.length === 0 ? (
         <NotificationsEmptyState

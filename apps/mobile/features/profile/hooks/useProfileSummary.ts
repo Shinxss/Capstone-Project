@@ -49,6 +49,7 @@ export function useProfileSummary(options?: UseProfileSummaryOptions) {
 
   return {
     summary: data ?? fallbackSummary,
+    hasRemoteData: data !== null,
     loading,
     error,
     refresh,

@@ -1,5 +1,6 @@
 import { Search, ShieldCheck } from "lucide-react";
 import EmptyState from "@/components/ui/EmptyState";
+import { TableContentSkeleton } from "@/components/ui/PageSkeletons";
 import { useResponderAccounts } from "../hooks/useResponderAccounts";
 import { isResponderEffectivelyOnDuty } from "../models/responderAccountState";
 import ResponderAccountFormModal from "./ResponderAccountFormModal";
@@ -112,11 +113,7 @@ export default function LguResponderAccountsView({
           </button>
         </div>
 
-        {loading ? (
-          <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-600 dark:border-[#162544] dark:bg-[#0B1220] dark:text-slate-300">
-            Loading responder accounts...
-          </div>
-        ) : null}
+        {loading && accounts.length === 0 ? <TableContentSkeleton label="Loading responder accounts" columns={["w-36", "w-24", "w-24", "w-20", "w-24"]} /> : null}
 
         {error ? (
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
@@ -135,7 +132,7 @@ export default function LguResponderAccountsView({
           </div>
         ) : null}
 
-        {!loading && !error ? (
+        {!error && !(loading && accounts.length === 0) ? (
           accounts.length === 0 ? (
             <div className="rounded-lg border border-gray-200 bg-white p-2 dark:border-[#162544] dark:bg-[#0B1220]">
               <EmptyState

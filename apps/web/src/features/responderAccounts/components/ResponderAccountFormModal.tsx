@@ -9,6 +9,7 @@ import {
   isResponderEffectivelyOnDuty,
   setResponderAccountActive,
 } from "../models/responderAccountState";
+import { Skeleton, SkeletonRegion } from "../../../components/ui/Skeleton";
 
 type Props = {
   open: boolean;
@@ -204,9 +205,11 @@ export default function ResponderAccountFormModal({
       }
     >
       {loading ? (
-        <div className="rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 dark:border-[#162544] dark:bg-[#0E1626] dark:text-slate-300">
-          Loading responder details...
-        </div>
+        <SkeletonRegion label="Loading responder details" className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {Array.from({ length: 8 }, (_, index) => (
+            <div key={index} className="space-y-2"><Skeleton className="h-3 w-28" /><Skeleton className="h-10 w-full" /></div>
+          ))}
+        </SkeletonRegion>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>

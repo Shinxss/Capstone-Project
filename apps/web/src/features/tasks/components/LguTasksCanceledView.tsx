@@ -5,6 +5,8 @@ import EmptyState from "../../../components/ui/EmptyState";
 import InlineAlert from "../../../components/ui/InlineAlert";
 import type { DispatchTask } from "../models/tasks.types";
 import { useLguTasksCanceled } from "../hooks/useLguTasksCanceled";
+import { CanceledTasksSkeleton } from "./TasksSkeletons";
+import { Skeleton, SkeletonRegion } from "../../../components/ui/Skeleton";
 
 type Props = ReturnType<typeof useLguTasksCanceled> & {
   loading: boolean;
@@ -26,14 +28,6 @@ function Row({ label, value }: { label: string; value?: string }) {
     <div className="grid grid-cols-[160px_1fr] gap-3 py-1">
       <div className="text-xs font-semibold text-gray-500 dark:text-slate-400">{label}</div>
       <div className="text-sm break-words text-gray-900 dark:text-slate-100">{value || "-"}</div>
-    </div>
-  );
-}
-
-function LoadingPanel() {
-  return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 text-gray-600 dark:bg-[#0B1220] dark:border-[#162544] dark:text-slate-300">
-      Loading...
     </div>
   );
 }
@@ -62,7 +56,7 @@ export default function LguTasksCanceledView(props: Props) {
   const [selected, setSelected] = useState<DispatchTask | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
-  if (loading) return <LoadingPanel />;
+  if (loading && rows.length === 0) return <CanceledTasksSkeleton />;
   if (error) return <ErrorPanel error={error} onRetry={onRefresh} />;
 
   return (
@@ -300,7 +294,15 @@ export default function LguTasksCanceledView(props: Props) {
 
         <div className="mt-2 max-h-80 overflow-y-auto rounded-xl border border-gray-200 dark:border-[#162544]">
           {reassign.loadingVolunteers ? (
-            <div className="px-4 py-3 text-sm text-gray-600 dark:text-slate-300">Loading volunteers...</div>
+            <SkeletonRegion label="Loading volunteers" className="space-y-1 p-2">
+              {Array.from({ length: 4 }, (_, index) => (
+                <div key={index} className="flex items-center gap-3 px-2 py-2">
+                  <Skeleton className="size-9 shrink-0 rounded-full" />
+                  <div className="min-w-0 flex-1 space-y-2"><Skeleton className="h-3.5 w-36 max-w-full" /><Skeleton className="h-3 w-24" /></div>
+                  <Skeleton className="size-4 rounded" />
+                </div>
+              ))}
+            </SkeletonRegion>
           ) : reassign.volunteers.length === 0 ? (
             <div className="px-4 py-3 text-sm text-gray-600 dark:text-slate-300">No volunteers found.</div>
           ) : (

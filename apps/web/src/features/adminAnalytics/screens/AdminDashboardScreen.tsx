@@ -7,6 +7,7 @@ import { normalizeEmergencyType } from "@/features/emergency/constants/emergency
 import type { EmergencyReport } from "@/features/emergency/models/emergency.types";
 import { fetchEmergencyReports } from "@/features/emergency/services/emergency.service";
 import { DAGUPAN_CENTER } from "@/features/lguLiveMap/constants/lguLiveMap.constants";
+import { Skeleton, SkeletonMap, SkeletonRegion, SkeletonStatCard } from "@/components/ui/Skeleton";
 
 
 function toActiveIncidentPin(report: EmergencyReport): MapEmergencyPin | null {
@@ -64,10 +65,12 @@ export default function AdminDashboard() {
           <div className="text-sm text-gray-600 dark:text-slate-400">{data?.scopeLabel ?? "City-wide overview"}</div>
         </div>
 
-        {loading ? (
-          <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-600 dark:border-[#162544] dark:bg-[#0B1220] dark:text-slate-300">
-            Loading dashboard...
-          </div>
+        {loading && !data ? (
+          <SkeletonRegion label="Loading admin dashboard" className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-3">{Array.from({ length: 3 }, (_, index) => <SkeletonStatCard key={index} compact />)}</div>
+            <SkeletonMap className="min-h-90" />
+            <div className="flex gap-2"><Skeleton className="h-9 w-28" /><Skeleton className="h-9 w-28" /><Skeleton className="h-9 w-24" /></div>
+          </SkeletonRegion>
         ) : null}
 
         {error ? (
@@ -102,7 +105,7 @@ export default function AdminDashboard() {
               <div className="text-sm font-semibold text-gray-700 dark:text-slate-200">Live Incident Map</div>
               <div className="text-xs text-gray-600 dark:text-slate-400">
                 {mapLoading && mapPins.length === 0
-                  ? "Loading incidents..."
+                  ? <Skeleton className="mt-1 h-3 w-28" />
                   : `${mapPins.length} active incident${mapPins.length === 1 ? "" : "s"} shown`}
               </div>
             </div>

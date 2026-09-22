@@ -11,10 +11,12 @@ import { useLguTasksInProgress } from "../hooks/useLguTasksInProgress";
 type Props = ReturnType<typeof useLguTasksInProgress>;
 
 export default function LguTasksInProgressView(props: Props) {
+  const initialLoading = props.loading && props.groups.length === 0;
+
   return (
     <div className="mx-auto w-full max-w-[1680px] space-y-5 px-4 py-5 sm:px-6 sm:py-6">
 
-      {props.loading ? <InProgressTasksSkeleton /> : (
+      {initialLoading ? <InProgressTasksSkeleton /> : (
         <>
           <InProgressTaskStats stats={props.stats} />
           <InProgressTaskFilters filters={props.filters} options={props.filterOptions} sort={props.sort} filtersActive={props.filtersActive} onFilterChange={props.updateFilter} onSortChange={props.changeSort} onClear={props.clearFilters} />

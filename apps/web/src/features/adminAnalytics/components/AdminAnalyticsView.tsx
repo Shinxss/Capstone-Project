@@ -1,4 +1,5 @@
 import type { useAdminAnalytics } from "../hooks/useAdminAnalytics";
+import { AnalyticsPageSkeleton } from "@/components/ui/PageSkeletons";
 
 type Props = ReturnType<typeof useAdminAnalytics>;
 
@@ -30,11 +31,7 @@ export default function AdminAnalyticsView({ range, setRange, data, loading, err
         </div>
       </div>
 
-      {loading ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-600 dark:border-[#162544] dark:bg-[#0B1220] dark:text-slate-300">
-          Loading analytics...
-        </div>
-      ) : null}
+      {loading && !data ? <AnalyticsPageSkeleton /> : null}
 
       {error ? (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
@@ -42,7 +39,7 @@ export default function AdminAnalyticsView({ range, setRange, data, loading, err
         </div>
       ) : null}
 
-      {data && !loading && !error ? (
+      {data && !error ? (
         <>
           <div className="grid gap-3 md:grid-cols-3">
             {metricCard("Emergencies Open", data.counts.emergencies.OPEN, "text-red-600 dark:text-red-300")}

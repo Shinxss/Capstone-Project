@@ -1,5 +1,6 @@
-import { Download, ImageOff, Loader2 } from "lucide-react";
+import { Download, ImageOff } from "lucide-react";
 import type { TaskProof } from "../models/tasks.types";
+import { Skeleton } from "../../../components/ui/Skeleton";
 
 type Props = {
   proofs: TaskProof[];
@@ -81,10 +82,7 @@ export default function ForReviewProofGallery({
                         className="h-full w-full object-cover transition duration-200 group-hover:scale-[1.01]"
                       />
                     ) : index === activeProofIndex && proofLoading ? (
-                      <div className="flex h-full items-center justify-center gap-2 text-xs text-gray-600 dark:text-slate-300">
-                        <Loader2 size={14} className="animate-spin" />
-                        Loading...
-                      </div>
+                      <Skeleton className="h-full w-full rounded-none" />
                     ) : (
                       <div className="flex h-full items-center justify-center text-xs font-medium text-gray-500 dark:text-slate-400">
                         Tap to load proof

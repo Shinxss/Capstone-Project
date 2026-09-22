@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { useAdminRolesPermissions } from "../hooks/useAdminRolesPermissions";
 import type { RoleKey } from "../models/rbac.types";
+import { Skeleton, SkeletonCard, SkeletonRegion } from "@/components/ui/Skeleton";
 
 type Props = ReturnType<typeof useAdminRolesPermissions>;
 
@@ -51,10 +52,11 @@ export default function AdminRolesPermissionsView({ roles, catalog, loading, err
         ))}
       </div>
 
-      {loading ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-600 dark:border-[#162544] dark:bg-[#0B1220] dark:text-slate-300">
-          Loading roles...
-        </div>
+      {loading && roles.length === 0 ? (
+        <SkeletonRegion label="Loading roles and permissions" className="grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
+          <SkeletonCard className="space-y-3">{Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="h-10 w-full" />)}</SkeletonCard>
+          <SkeletonCard className="space-y-4"><Skeleton className="h-6 w-40" />{Array.from({ length: 5 }, (_, index) => <Skeleton key={index} className="h-12 w-full" />)}</SkeletonCard>
+        </SkeletonRegion>
       ) : null}
 
       {error ? (
@@ -63,7 +65,7 @@ export default function AdminRolesPermissionsView({ roles, catalog, loading, err
         </div>
       ) : null}
 
-      {!loading && !error && currentRole ? (
+      {!error && currentRole ? (
         <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-[#162544] dark:bg-[#0B1220]">
           <div className="mb-3 text-sm font-semibold text-gray-700 dark:text-slate-200">
             Editing: {currentRole.label} ({currentRole.key})

@@ -15,8 +15,25 @@ import { emergencyTitleForType, normalizeEmergencyType } from "../../emergency/c
 import type { DispatchTask, TaskProof } from "../../tasks/models/tasks.types";
 import { fetchTaskProofBlob } from "../../tasks/services/tasksApi";
 import type { LguEmergencyDetails, Volunteer } from "../models/lguLiveMap.types";
+import { Skeleton, SkeletonRegion } from "@/components/ui/Skeleton";
 
 type DrawerTab = "overview" | "dispatch" | "timeline" | "aar" | "blockchain";
+
+function DispatchTasksSkeleton() {
+  return (
+    <SkeletonRegion label="Loading dispatch tasks" className="mt-3 space-y-2">
+      {Array.from({ length: 2 }, (_, index) => (
+        <div key={index} className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-[#162544] dark:bg-[#0B1220]">
+          <div className="flex items-center justify-between gap-3">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-5 w-16 rounded-full" />
+          </div>
+          <Skeleton className="mt-2 h-3 w-48 max-w-full" />
+        </div>
+      ))}
+    </SkeletonRegion>
+  );
+}
 
 type Props = {
   open: boolean;
@@ -444,9 +461,7 @@ export default function EmergencyDetailsDrawer({
                   </div>
 
                   {tasksLoading ? (
-                    <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-xs text-gray-600 dark:border-[#162544] dark:bg-[#0B1220] dark:text-slate-300">
-                      Loading dispatch tasks...
-                    </div>
+                    <DispatchTasksSkeleton />
                   ) : null}
 
                   {tasksError ? (
@@ -731,9 +746,9 @@ export default function EmergencyDetailsDrawer({
 
             <div className="p-4">
               {previewLoading ? (
-                <div className="h-[280px] rounded-lg border border-gray-200 bg-gray-50 grid place-items-center text-sm text-gray-600 dark:border-[#162544] dark:bg-[#0E1626] dark:text-slate-300">
-                  Loading proof...
-                </div>
+                <SkeletonRegion label="Loading proof">
+                  <Skeleton className="h-[280px] w-full rounded-lg" />
+                </SkeletonRegion>
               ) : null}
 
               {previewError ? (

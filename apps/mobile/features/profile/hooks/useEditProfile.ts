@@ -102,6 +102,7 @@ export function useEditProfile() {
   const [initialFields, setInitialFields] = useState<EditableProfileFields>(fieldsFromProfile(sessionProfile));
   const [errors, setErrors] = useState<EditProfileFieldErrors>({});
   const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -118,6 +119,7 @@ export function useEditProfile() {
       setLoadError("Sign in required.");
       setSaveError(null);
       setLoading(false);
+      setInitialized(true);
       return;
     }
 
@@ -150,6 +152,7 @@ export function useEditProfile() {
       setLoadError(String(error?.response?.data?.message ?? error?.message ?? "Failed to load profile."));
     } finally {
       setLoading(false);
+      setInitialized(true);
     }
   }, [isUser, sessionProfile]);
 
@@ -231,6 +234,7 @@ export function useEditProfile() {
 
   return {
     loading,
+    initialized,
     saving,
     loadError,
     saveError,

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import Modal from "@/components/ui/Modal";
+import { TableContentSkeleton } from "@/components/ui/PageSkeletons";
 import { useConfirm } from "@/features/feedback/hooks/useConfirm";
 import type { AdminAnnouncement, AdminAnnouncementAudience, AdminAnnouncementDraftInput } from "../models/adminAnnouncements.types";
 import { useAdminAnnouncements } from "../hooks/useAdminAnnouncements";
@@ -144,11 +145,7 @@ export default function AdminAnnouncementsView({
           </div>
         </div>
 
-        {loading ? (
-          <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-600 dark:border-[#162544] dark:bg-[#0B1220] dark:text-slate-300">
-            Loading announcements...
-          </div>
-        ) : null}
+        {loading && filteredItems.length === 0 ? <TableContentSkeleton label="Loading announcements" columns={["w-40", "w-24", "w-20", "w-28", "w-24"]} /> : null}
 
         {error ? (
           <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
@@ -156,7 +153,7 @@ export default function AdminAnnouncementsView({
           </div>
         ) : null}
 
-        {!loading && !error ? (
+        {!error && !(loading && filteredItems.length === 0) ? (
           filteredItems.length > 0 ? (
             <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-[#162544] dark:bg-[#0B1220]">
               <table className="w-full text-left text-sm">

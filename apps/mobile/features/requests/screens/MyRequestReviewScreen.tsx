@@ -8,6 +8,7 @@ import { useSession } from "../../auth/hooks/useSession";
 import { VolunteerReviewForm } from "../components/VolunteerReviewForm";
 import { VolunteerReviewSummaryCard } from "../components/VolunteerReviewSummaryCard";
 import { useMyRequestReview } from "../hooks/useMyRequestReview";
+import { RequestReviewSkeleton } from "../components/RequestsSkeletons";
 
 function toMessage(error: unknown, fallback: string) {
   if (error instanceof Error && error.message.trim()) return error.message.trim();
@@ -145,10 +146,11 @@ export function MyRequestReviewScreen() {
   if (loading && !data) {
     return (
       <SafeAreaView style={styles.safe}>
-        <View style={styles.centerState}>
-          <ActivityIndicator size="small" color="#DC2626" />
-          <Text style={styles.stateSub}>Loading review details...</Text>
+        <View style={styles.headerRow}>
+          <View style={styles.backButton} />
+          <Text style={styles.headerTitle}>Volunteer Review</Text>
         </View>
+        <View style={styles.content}><RequestReviewSkeleton /></View>
       </SafeAreaView>
     );
   }

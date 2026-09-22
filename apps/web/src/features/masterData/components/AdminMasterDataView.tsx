@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import Modal from "@/components/ui/Modal";
+import { TableContentSkeleton } from "@/components/ui/PageSkeletons";
 import type { useAdminMasterData } from "../hooks/useAdminMasterData";
 import type { MasterDataRecord, MasterDataTab } from "../models/masterData.types";
 
@@ -171,11 +172,7 @@ export default function AdminMasterDataView({ tab, setTab, items, loading, error
           </button>
         </div>
 
-        {loading ? (
-          <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-600 dark:border-[#162544] dark:bg-[#0B1220] dark:text-slate-300">
-            Loading {title.toLowerCase()}...
-          </div>
-        ) : null}
+        {loading && items.length === 0 ? <TableContentSkeleton label={`Loading ${title.toLowerCase()}`} columns={["w-36", "w-28", "w-24", "w-20"]} /> : null}
 
         {error ? (
           <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
@@ -183,7 +180,7 @@ export default function AdminMasterDataView({ tab, setTab, items, loading, error
           </div>
         ) : null}
 
-        {!loading && !error ? (
+        {!error && !(loading && items.length === 0) ? (
           <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-[#162544] dark:bg-[#0B1220]">
             <table className="w-full text-left text-sm">
               <thead className="bg-gray-50 text-xs font-semibold uppercase text-gray-500 dark:bg-[#0E1626] dark:text-slate-400">

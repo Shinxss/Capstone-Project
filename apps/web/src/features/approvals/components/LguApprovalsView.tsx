@@ -7,6 +7,7 @@ import ApprovalFilters from "./ApprovalFilters";
 import ApprovalRejectModal from "./ApprovalRejectModal";
 import ApprovalReportCard from "./ApprovalReportCard";
 import ApprovalStats from "./ApprovalStats";
+import { Skeleton, SkeletonCard, SkeletonRegion, SkeletonStatCard } from "@/components/ui/Skeleton";
 
 type Props = ReturnType<typeof useLguApprovals> & {
   loading: boolean;
@@ -16,20 +17,20 @@ type Props = ReturnType<typeof useLguApprovals> & {
 
 function ApprovalListSkeleton() {
   return (
-    <div className="space-y-2" aria-label="Loading emergency reports">
+    <SkeletonRegion label="Loading emergency reports" className="space-y-2">
       {Array.from({ length: 5 }, (_, index) => (
-        <div key={index} className="h-[108px] animate-pulse rounded-xl border border-slate-200 bg-white p-3 dark:border-[#1C2940] dark:bg-[#0B1220]">
+        <SkeletonCard key={index} className="h-[108px] rounded-xl p-3">
           <div className="flex h-full gap-4">
-            <div className="w-36 rounded-lg bg-slate-100 dark:bg-[#18243A]" />
+            <Skeleton className="w-36 shrink-0 rounded-lg" />
             <div className="flex-1 space-y-3 py-2">
-              <div className="h-3 w-1/3 rounded bg-slate-100 dark:bg-[#18243A]" />
-              <div className="h-2.5 w-1/2 rounded bg-slate-100 dark:bg-[#18243A]" />
-              <div className="h-2.5 w-3/4 rounded bg-slate-100 dark:bg-[#18243A]" />
+              <Skeleton className="h-3 w-1/3" />
+              <Skeleton className="h-2.5 w-1/2" />
+              <Skeleton className="h-2.5 w-3/4" />
             </div>
           </div>
-        </div>
+        </SkeletonCard>
       ))}
-    </div>
+    </SkeletonRegion>
   );
 }
 
@@ -53,25 +54,30 @@ export default function LguApprovalsView(props: Props) {
     rejectingId,
   } = props;
   const [rejectTarget, setRejectTarget] = useState<EmergencyApprovalItem | null>(null);
+  const initialLoading = loading && filtered.length === 0;
 
   return (
     <div className="min-h-full bg-slate-50 px-5 py-4 text-slate-900 dark:bg-[#060C18] dark:text-slate-100 lg:px-6">
       <div className="mx-auto max-w-[1500px] space-y-4">
-        <ApprovalStats {...stats} />
+        {initialLoading ? (
+          <SkeletonRegion label="Loading approval statistics" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {Array.from({ length: 4 }, (_, index) => <SkeletonStatCard key={index} />)}
+          </SkeletonRegion>
+        ) : <ApprovalStats {...stats} />}
 
-        <ApprovalFilters
+        {initialLoading ? <SkeletonCard className="h-24"><Skeleton className="h-10 w-full" /></SkeletonCard> : <ApprovalFilters
           filters={filters}
           emergencyTypeOptions={emergencyTypeOptions}
           barangayOptions={barangayOptions}
           onChange={setFilters}
           onClear={clearFilters}
-        />
+        />}
 
         <section>
           <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-lg font-extrabold text-slate-950 dark:text-white">Reported Emergencies</h2>
             <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
-              <span>Showing {filtered.length === 0 ? 0 : `1–${filtered.length}`} of {filtered.length} reports</span>
+              {initialLoading ? <Skeleton className="h-3 w-36" /> : <span>Showing {filtered.length === 0 ? 0 : `1–${filtered.length}`} of {filtered.length} reports</span>}
               <span className="hidden h-4 w-px bg-slate-200 dark:bg-[#293852] sm:block" />
               <label className="flex items-center gap-2">
                 <span>Sort by</span>
@@ -100,7 +106,7 @@ export default function LguApprovalsView(props: Props) {
                 </button>
               </div>
             </div>
-          ) : loading ? (
+          ) : initialLoading ? (
             <ApprovalListSkeleton />
           ) : filtered.length === 0 ? (
             <div className="grid min-h-52 place-items-center rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center dark:border-[#2A3954] dark:bg-[#0B1220]">

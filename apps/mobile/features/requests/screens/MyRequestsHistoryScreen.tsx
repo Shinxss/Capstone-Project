@@ -8,6 +8,7 @@ import { useSession } from "../../auth/hooks/useSession";
 import { usePullToRefresh } from "../../common/hooks/usePullToRefresh";
 import { MyRequestsHeader, type MyRequestsHeaderTabOption } from "../components/MyRequestsHeader";
 import { RequestHistoryCard } from "../components/RequestHistoryCard";
+import { RequestsListSkeleton } from "../components/RequestsSkeletons";
 import { useMyRequestsHistory } from "../hooks/useMyRequestsHistory";
 import { cancelMyRequest } from "../services/myRequestsApi";
 import {
@@ -253,10 +254,7 @@ export function MyRequestsHistoryScreen() {
         )}
         ListEmptyComponent={
           loading ? (
-            <View className="mt-8 items-center justify-center">
-              <ActivityIndicator size="small" color="#DC2626" />
-              <Text className="mt-2 text-sm text-zinc-500">Loading requests...</Text>
-            </View>
+            <RequestsListSkeleton label="Loading request history" />
           ) : searchValue.trim() ? (
             <View className="mt-6 rounded-2xl bg-white p-6">
               <Text className="text-center text-sm text-zinc-600">No requests match your search</Text>

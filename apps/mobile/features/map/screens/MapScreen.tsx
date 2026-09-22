@@ -42,6 +42,7 @@ import { useVolunteerMapFeed } from "../../realtime/hooks/useVolunteerMapFeed";
 import { connectRealtime } from "../../realtime/socketClient";
 import { useTheme } from "../../theme/useTheme";
 import { useResponsiveLayout } from "../../common/hooks/useResponsiveLayout";
+import { Skeleton, SkeletonRegion } from "../../../components/ui/Skeleton";
 import {
   getMobileEmergencyVisual,
   mobileEmergencyTitle,
@@ -1427,6 +1428,15 @@ export default function MapTab() {
             </MapboxGL.MarkerView>
           ) : null}
         </MapboxGL.MapView>
+
+        {!isMapReady ? (
+          <SkeletonRegion
+            label="Loading map"
+            style={[StyleSheet.absoluteFillObject, { zIndex: 4 }]}
+          >
+            <Skeleton width="100%" height="100%" radius={0} />
+          </SkeletonRegion>
+        ) : null}
 
         {/* Google-Maps-like top UI */}
         <View pointerEvents="box-none" style={styles.overlay}>

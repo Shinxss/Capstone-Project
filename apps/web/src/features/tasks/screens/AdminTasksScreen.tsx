@@ -3,6 +3,7 @@ import AdminShell from "@/components/admin/AdminShell";
 import { useLguTasks } from "@/features/tasks/hooks/useLguTasks";
 import { verifyTask } from "@/features/tasks/services/tasksApi";
 import { toastError, toastSuccess } from "@/services/feedback/toast.service";
+import { TableContentSkeleton } from "@/components/ui/PageSkeletons";
 
 type TasksTab = "IN_PROGRESS" | "FOR_REVIEW" | "COMPLETED" | "CANCELED";
 
@@ -65,11 +66,7 @@ export default function AdminTasks() {
           ))}
         </div>
 
-        {activeState.loading ? (
-          <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-600 dark:border-[#162544] dark:bg-[#0B1220] dark:text-slate-300">
-            Loading tasks...
-          </div>
-        ) : null}
+        {activeState.loading && tasks.length === 0 ? <TableContentSkeleton label="Loading tasks" columns={["w-36", "w-28", "w-24", "w-20", "w-24"]} /> : null}
 
         {activeState.error ? (
           <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
@@ -77,7 +74,7 @@ export default function AdminTasks() {
           </div>
         ) : null}
 
-        {!activeState.loading && !activeState.error ? (
+        {!activeState.error && !(activeState.loading && tasks.length === 0) ? (
           tasks.length > 0 ? (
             <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-[#162544] dark:bg-[#0B1220]">
               <table className="w-full text-left text-sm">

@@ -6,6 +6,7 @@ import type { EmergencyReport } from "../../emergency/models/emergency.types";
 import { emergencyTitleForType } from "../../emergency/constants/emergency.constants";
 import type { DispatchTask } from "../../tasks/models/tasks.types";
 import type { LguEmergencyDetails, Volunteer } from "../models/lguLiveMap.types";
+import { Skeleton, SkeletonRegion } from "@/components/ui/Skeleton";
 
 type DetailsTab = "overview" | "dispatch" | "timeline";
 
@@ -26,6 +27,19 @@ type TimelineEvent = {
   at: number;
   label: string;
 };
+
+function AssignedVolunteersSkeleton() {
+  return (
+    <SkeletonRegion label="Loading assigned volunteers" className="mt-3 space-y-2">
+      {Array.from({ length: 2 }, (_, index) => (
+        <div key={index} className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 dark:border-[#22365D] dark:bg-[#0B1220]">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-5 w-16 rounded-full" />
+        </div>
+      ))}
+    </SkeletonRegion>
+  );
+}
 
 type ResolvedPhoto = {
   key: string;
@@ -323,10 +337,11 @@ export default function LguEmergencyDetailsPanel({
         <section className="relative">
           {coverPhoto ? (
             <img src={coverPhoto.src} alt="Emergency proof" className="h-64 w-full object-cover" />
+          ) : photosLoading ? (
+            <Skeleton className="h-64 w-full rounded-none" />
           ) : (
             <div className="h-64 w-full bg-gradient-to-b from-slate-300 to-slate-200 dark:from-[#1A2740] dark:to-[#0E1626] flex items-center justify-center">
-              {!photosLoading ? (
-                isSosEmergency ? (
+              {isSosEmergency ? (
                   <div className="flex flex-col items-center gap-2 px-4 text-center">
                     <div className="grid h-20 w-20 place-items-center rounded-xl bg-red-600 shadow-md shadow-red-500/25">
                       <span className="text-2xl font-black tracking-wide text-white">SOS</span>
@@ -338,13 +353,12 @@ export default function LguEmergencyDetailsPanel({
                       Urgent SOS report
                     </span>
                   </div>
-                ) : (
+              ) : (
                   <div className="flex flex-col items-center gap-2 text-slate-600 dark:text-slate-300">
                     <ImageOff size={36} />
                     <span className="text-xs font-semibold uppercase tracking-wide">No image</span>
                   </div>
-                )
-              ) : null}
+              )}
             </div>
           )}
 
@@ -357,12 +371,6 @@ export default function LguEmergencyDetailsPanel({
           >
             <X size={16} />
           </button>
-
-          {photosLoading ? (
-            <div className="absolute bottom-3 left-3 rounded-lg bg-black/55 px-3 py-2 text-xs text-white">
-              Loading images...
-            </div>
-          ) : null}
 
           {!photosLoading && coverPhoto ? (
             <button
@@ -462,7 +470,7 @@ export default function LguEmergencyDetailsPanel({
                 <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-500">Assigned Volunteers</div>
 
                 {tasksLoading ? (
-                  <div className="mt-3 text-sm text-gray-600 dark:text-slate-300">Loading assigned volunteers...</div>
+                  <AssignedVolunteersSkeleton />
                 ) : null}
 
                 {tasksError ? (
@@ -540,7 +548,7 @@ export default function LguEmergencyDetailsPanel({
                 <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-500">Assigned Volunteers</div>
 
                 {tasksLoading ? (
-                  <div className="mt-3 text-sm text-gray-600 dark:text-slate-300">Loading assigned volunteers...</div>
+                  <AssignedVolunteersSkeleton />
                 ) : null}
 
                 {tasksError ? (

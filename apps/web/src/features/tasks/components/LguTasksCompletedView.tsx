@@ -39,11 +39,11 @@ export default function LguTasksCompletedView({
   return (
     <main className="mx-auto w-full max-w-[1680px] space-y-5 px-4 py-5 sm:px-6 sm:py-6">
 
-      {loading ? <CompletedTasksSkeleton /> : null}
+      {loading && filtered.length === 0 ? <CompletedTasksSkeleton /> : null}
 
-      {!loading && error ? <CompletedTasksErrorState onRetry={refresh} /> : null}
+      {error ? <CompletedTasksErrorState onRetry={refresh} /> : null}
 
-      {!loading && !error ? (
+      {!error && !(loading && filtered.length === 0) ? (
         <>
           <CompletedTaskStats statistics={statistics} />
           <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-[#1C2940] dark:bg-[#0B1220]">

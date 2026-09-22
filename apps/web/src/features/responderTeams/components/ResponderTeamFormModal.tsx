@@ -6,6 +6,7 @@ import type {
   ResponderTeamDetails,
   UpdateResponderTeamPayload,
 } from "../models/responderTeam.types";
+import { Skeleton, SkeletonRegion } from "../../../components/ui/Skeleton";
 
 type Props = {
   open: boolean;
@@ -264,9 +265,14 @@ export default function ResponderTeamFormModal({
       }
     >
       {loading ? (
-        <div className="rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 dark:border-[#162544] dark:bg-[#0E1626] dark:text-slate-300">
-          Loading team details...
-        </div>
+        <SkeletonRegion label="Loading team details" className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+          <div className="space-y-4">
+            {Array.from({ length: 5 }, (_, index) => (
+              <div key={index} className="space-y-2"><Skeleton className="h-3 w-28" /><Skeleton className="h-10 w-full" /></div>
+            ))}
+          </div>
+          <div className="space-y-3"><Skeleton className="h-4 w-32" /><Skeleton className="h-10 w-full" />{Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="h-12 w-full" />)}</div>
+        </SkeletonRegion>
       ) : (
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
           <div className="space-y-4">
@@ -375,7 +381,7 @@ export default function ResponderTeamFormModal({
                 Team Members ({form.memberIds.length})
               </label>
               {responderOptionsLoading ? (
-                <span className="text-xs text-gray-500 dark:text-slate-500">Loading responders...</span>
+                <Skeleton className="h-3 w-24" />
               ) : null}
             </div>
 
