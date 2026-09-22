@@ -8,6 +8,9 @@
     "icon": "./assets/lifeline-logo.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "ios": {
       "supportsTablet": true
     },
@@ -69,6 +72,9 @@
       ],
       "expo-secure-store"
     ],
+    "updates": {
+      "url": "https://u.expo.dev/c0c4b1ea-4aad-425d-9e1d-1a0bb16c5d5a"
+    },
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
