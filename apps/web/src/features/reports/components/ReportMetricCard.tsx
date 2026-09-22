@@ -12,7 +12,7 @@ const metricStyles = {
 export default function ReportMetricCard({ metric }: { metric: ReportMetric }) {
   const { Icon, icon } = metricStyles[metric.key];
   const trend = metric.trend;
-  const hasLongValue = metric.value.length > 10;
+  const valLength = metric.value.length;
   const TrendIcon = trend?.direction === "up" ? TrendingUp : trend?.direction === "down" ? TrendingDown : Minus;
   const trendClass = trend?.isPositive === true
     ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
@@ -24,11 +24,19 @@ export default function ReportMetricCard({ metric }: { metric: ReportMetric }) {
     <article className="min-h-[122px] min-w-0 overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_6px_20px_-18px_rgba(15,23,42,0.28)] dark:border-[#162544] dark:bg-[#0B1220]">
       <div className="flex items-start gap-3">
         <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${icon}`}><Icon size={22} /></div>
-        <div className="min-w-0 pt-0.5">
-          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{metric.label}</p>
+        <div className="min-w-0 flex-1 pt-0.5">
+          <p className="truncate text-xs font-medium text-slate-500 dark:text-slate-400" title={metric.label}>
+            {metric.label}
+          </p>
           <p
-            className={`mt-1 max-w-full whitespace-nowrap font-black leading-none tracking-tight text-slate-950 dark:text-slate-100 ${hasLongValue ? "text-[20px] 2xl:text-[22px]" : "text-[28px]"}`}
-            title={metric.value}
+            className={`mt-1 truncate font-black leading-tight tracking-tight text-slate-950 dark:text-slate-100 ${
+              valLength > 10
+                ? "text-[18px] 2xl:text-[20px]"
+                : valLength > 6
+                  ? "text-[20px] 2xl:text-[22px]"
+                  : "text-[24px] xl:text-[26px] 2xl:text-[28px]"
+            }`}
+            title={metric.tooltip ?? metric.value}
           >
             {metric.value}
           </p>

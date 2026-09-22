@@ -45,9 +45,28 @@ export function formatResponseDuration(minutes: number | null) {
   if (minutes === null || !Number.isFinite(minutes)) return "N/A";
   const rounded = Math.max(0, Math.round(minutes));
   if (rounded < 60) return `${rounded} min`;
-  const hours = Math.floor(rounded / 60);
-  const remaining = rounded % 60;
-  return `${hours} ${hours === 1 ? "hr" : "hrs"}${remaining ? ` ${remaining} min` : ""}`;
+  const totalHours = Math.floor(rounded / 60);
+  const remainingMinutes = rounded % 60;
+  if (totalHours >= 24) {
+    const days = Math.floor(totalHours / 24);
+    const remHours = totalHours % 24;
+    return remHours > 0 ? `${days}d ${remHours}h` : `${days}d`;
+  }
+  return `${totalHours}h${remainingMinutes ? ` ${remainingMinutes}m` : ""}`;
+}
+
+export function formatDetailedResponseDuration(minutes: number | null): string | undefined {
+  if (minutes === null || !Number.isFinite(minutes)) return undefined;
+  const rounded = Math.max(0, Math.round(minutes));
+  if (rounded < 60) return `${rounded} minute${rounded === 1 ? "" : "s"}`;
+  const totalHours = Math.floor(rounded / 60);
+  const remainingMinutes = rounded % 60;
+  if (totalHours >= 24) {
+    const days = Math.floor(totalHours / 24);
+    const remHours = totalHours % 24;
+    return `${days} day${days === 1 ? "" : "s"} ${remHours} hr${remHours === 1 ? "" : "s"}${remainingMinutes ? ` ${remainingMinutes} min` : ""} (${totalHours} hrs ${remainingMinutes} min)`;
+  }
+  return `${totalHours} hr${totalHours === 1 ? "" : "s"}${remainingMinutes ? ` ${remainingMinutes} min` : ""}`;
 }
 
 export function extractAreaLabel(locationLabel?: string) {
@@ -342,7 +361,13 @@ export function buildReportsDashboard(args: {
     { key: "total", label: "Total Incidents", value: formatNumber(emergencies.length), trend: trend(currentPeriod.emergencies.length, previousPeriod.emergencies.length) },
     { key: "responded", label: "Responded Incidents", value: formatNumber(performance.responded), trend: trend(currentPerformance.responded, previousPerformance.responded) },
     { key: "unresolved", label: "Unresolved Incidents", value: formatNumber(performance.unresolved), trend: { ...trend(currentPerformance.unresolved, previousPerformance.unresolved, true), isPositive: currentPerformance.unresolved === previousPerformance.unresolved ? undefined : currentPerformance.unresolved < previousPerformance.unresolved } },
-    { key: "responseTime", label: "Avg Response Time", value: formatResponseDuration(performance.averageResponseMinutes), trend: trend(currentPerformance.averageResponseMinutes, previousPerformance.averageResponseMinutes, true) },
+    {
+      key: "responseTime",
+      label: "Avg Response Time",
+      value: formatResponseDuration(performance.averageResponseMinutes),
+      trend: trend(currentPerformance.averageResponseMinutes, previousPerformance.averageResponseMinutes, true),
+      tooltip: formatDetailedResponseDuration(performance.averageResponseMinutes),
+    },
     { key: "volunteerHours", label: "Volunteer Hours", value: formatNumber(volunteerHours), trend: trend(estimateVolunteerHours(currentPeriod.tasks), estimateVolunteerHours(previousPeriod.tasks)) },
   ];
   const breakdown = buildEmergencyBreakdown(emergencies);

@@ -20,6 +20,7 @@ export type ReportMetric = {
   label: string;
   value: string;
   trend?: ReportTrend;
+  tooltip?: string;
 };
 
 export type IncidentTrendPoint = {
