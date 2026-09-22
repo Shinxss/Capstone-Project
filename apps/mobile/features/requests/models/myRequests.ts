@@ -1,3 +1,8 @@
+import type { MobileEmergencyVisualType } from "../../emergency/constants/emergencyVisuals";
+
+export type RequestSortOrder = "newest" | "oldest";
+export type RequestTypeFilter = "all" | MobileEmergencyVisualType;
+
 export type MyRequestStatusTab =
   | "all"
   | "submitted"

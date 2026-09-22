@@ -7,15 +7,19 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSession } from "../../auth/hooks/useSession";
 import { usePullToRefresh } from "../../common/hooks/usePullToRefresh";
 import { MyRequestsHeader, type MyRequestsHeaderTabOption } from "../components/MyRequestsHeader";
+import { MyRequestsFilterSheet } from "../components/MyRequestsFilterSheet";
 import { RequestHistoryCard } from "../components/RequestHistoryCard";
 import { RequestsListSkeleton } from "../components/RequestsSkeletons";
 import { useMyRequestsHistory } from "../hooks/useMyRequestsHistory";
 import { cancelMyRequest } from "../services/myRequestsApi";
+import { filterAndSortMyRequests } from "../utils/requestsFilter";
 import {
   MY_REQUEST_TAB_LABELS,
   normalizeMyRequestStatusTab,
   type MyRequestStatusTab,
   type MyRequestSummary,
+  type RequestSortOrder,
+  type RequestTypeFilter,
 } from "../models/myRequests";
 
 const STATUS_TAB_ORDER: MyRequestStatusTab[] = [
@@ -66,7 +70,13 @@ export function MyRequestsHistoryScreen() {
   );
   const [activeTab, setActiveTab] = useState<MyRequestStatusTab>(initialTab);
   const [searchValue, setSearchValue] = useState("");
+  const [sortOrder, setSortOrder] = useState<RequestSortOrder>("newest");
+  const [typeFilter, setTypeFilter] = useState<RequestTypeFilter>("all");
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [cancellingRequestId, setCancellingRequestId] = useState<string | null>(null);
+
+  const hasActiveFilters = sortOrder !== "newest" || typeFilter !== "all";
+
   const { items, loading, error, refresh } = useMyRequestsHistory(activeTab, { enabled: isUser });
   const refreshHistory = useCallback(async () => {
     await refresh();
@@ -170,26 +180,28 @@ export function MyRequestsHistoryScreen() {
   );
 
   const filteredItems = useMemo(() => {
-    const needle = searchValue.trim().toLowerCase();
-    if (!needle) return items;
-
-    return items.filter((item) => {
-      const haystack = [
-        item.referenceNumber,
-        item.locationText,
-        item.type,
-        item.trackingLabel,
-      ]
-        .join(" ")
-        .toLowerCase();
-
-      return haystack.includes(needle);
+    return filterAndSortMyRequests(items, {
+      searchValue,
+      typeFilter,
+      sortOrder,
     });
-  }, [items, searchValue]);
+  }, [items, searchValue, typeFilter, sortOrder]);
 
   const onPressHeaderMenu = useCallback(() => {
-    setSearchValue("");
-    setActiveTab("all");
+    setIsFilterSheetOpen(true);
+  }, []);
+
+  const onApplyFilters = useCallback(
+    (filters: { sortOrder: RequestSortOrder; typeFilter: RequestTypeFilter }) => {
+      setSortOrder(filters.sortOrder);
+      setTypeFilter(filters.typeFilter);
+    },
+    []
+  );
+
+  const onResetFilters = useCallback(() => {
+    setSortOrder("newest");
+    setTypeFilter("all");
   }, []);
 
   const emptyTabMessage = useMemo(() => emptyMessageForTab(activeTab), [activeTab]);
@@ -216,6 +228,7 @@ export function MyRequestsHistoryScreen() {
         searchPlaceholder="Search your requests"
         onBackPress={() => router.back()}
         onMenuPress={onPressHeaderMenu}
+        hasActiveFilters={hasActiveFilters}
       />
 
       <FlatList
@@ -255,9 +268,15 @@ export function MyRequestsHistoryScreen() {
         ListEmptyComponent={
           loading ? (
             <RequestsListSkeleton label="Loading request history" />
-          ) : searchValue.trim() ? (
+          ) : items.length > 0 ? (
             <View className="mt-6 rounded-2xl bg-white p-6">
-              <Text className="text-center text-sm text-zinc-600">No requests match your search</Text>
+              <Text className="text-center text-sm text-zinc-600">
+                {searchValue.trim() && typeFilter !== "all"
+                  ? "No requests match your search and filters."
+                  : searchValue.trim()
+                  ? "No requests match your search"
+                  : "No requests match your filters."}
+              </Text>
             </View>
           ) : (
             <View style={{ flex: 1, justifyContent: "center" }}>
@@ -287,6 +306,15 @@ export function MyRequestsHistoryScreen() {
             </View>
           ) : null
         }
+      />
+
+      <MyRequestsFilterSheet
+        visible={isFilterSheetOpen}
+        sortOrder={sortOrder}
+        typeFilter={typeFilter}
+        onApply={onApplyFilters}
+        onReset={onResetFilters}
+        onClose={() => setIsFilterSheetOpen(false)}
       />
     </SafeAreaView>
   );

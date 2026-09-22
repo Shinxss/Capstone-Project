@@ -73,7 +73,24 @@ function formatTimeAgo(iso?: string) {
   return `${days} day${days > 1 ? "s" : ""} ago`;
 }
 
+function getReporterPhone(report: EmergencyReport): string | undefined {
+  const reportedBy = report.reportedBy;
+
+  if (reportedBy && typeof reportedBy !== "string") {
+    const contactNo = String((reportedBy as Reporter).contactNo ?? "").trim();
+    if (contactNo) {
+      return contactNo;
+    }
+  }
+
+  const guestPhone = String(report.guestReporter?.phoneNumber ?? "").trim();
+  return guestPhone || undefined;
+}
+
 function reporterNameFrom(report: EmergencyReport) {
+  const guestName = String(report.guestReporter?.fullName ?? "").trim();
+  if (guestName) return guestName;
+
   const reportedBy = report.reportedBy;
   if (!reportedBy || typeof reportedBy === "string") return "Unknown Reporter";
 
@@ -213,7 +230,7 @@ function toEmergencyItem(report: EmergencyReport, volunteerCounts?: DispatchVolu
     reporterLabel: isSOS ? "SOS Reported by" : "Reported by",
     reporterName: reporterNameFrom(report),
     reporterVerified: false,
-    phone: undefined,
+    phone: getReporterPhone(report),
     description: report.notes || `Reported via ${report.source}`,
     needs: [],
     volunteersAssigned,

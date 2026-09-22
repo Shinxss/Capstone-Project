@@ -21,6 +21,7 @@ import {
   iconForEmergency,
   type EmergencyType,
 } from "../constants/emergency.constants";
+import { normalizePhoneForTel } from "../utils/phone.utils";
 import EmergenciesSkeleton from "./EmergenciesSkeleton";
 
 type Props = ReturnType<typeof useLguEmergencies> & {
@@ -117,6 +118,8 @@ function EmergencyCard({
 }) {
   const typeAccent = colorForEmergency(item.type);
   const isSOS = !!item.isSOS;
+  const normalizedTel = normalizePhoneForTel(item.phone);
+  const hasValidPhone = Boolean(normalizedTel);
 
   const cardBorderClass = isSOS ? "border-2 border-red-500" : "border border-gray-200 dark:border-[#162544]";
   const cardBorderStyle = isSOS ? undefined : { borderLeftWidth: 4, borderLeftColor: typeAccent };
@@ -136,7 +139,7 @@ function EmergencyCard({
           </div>
           <div className="flex items-center gap-2 text-sm font-semibold">
             <Phone size={16} />
-            {item.phone ?? "+63 9XX XXX XXXX"}
+            {item.phone || "No contact number"}
           </div>
         </div>
       ) : null}
@@ -183,6 +186,9 @@ function EmergencyCard({
               <div className="leading-tight">
                 <div className="text-xs text-gray-600 dark:text-slate-400">{item.reporterLabel}</div>
                 <div className="text-sm font-bold text-gray-900 dark:text-slate-100">{item.reporterName}</div>
+                <div className="text-xs font-medium text-gray-600 dark:text-slate-400">
+                  {item.phone || "No contact number"}
+                </div>
               </div>
 
               {item.reporterVerified ? (
@@ -193,13 +199,26 @@ function EmergencyCard({
               ) : null}
 
               {item.isSOS ? (
-                <button
-                  type="button"
-                  className="ml-4 inline-flex items-center gap-2 rounded-full bg-red-600 px-5 py-2 text-sm font-semibold text-white hover:bg-red-700"
-                >
-                  <Phone size={16} />
-                  Call
-                </button>
+                hasValidPhone ? (
+                  <a
+                    href={`tel:${normalizedTel}`}
+                    aria-label={`Call ${item.reporterName}`}
+                    className="ml-4 inline-flex items-center gap-2 rounded-full bg-red-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                  >
+                    <Phone size={16} />
+                    Call
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    disabled
+                    aria-label={`Call unavailable for ${item.reporterName}`}
+                    className="ml-4 inline-flex cursor-not-allowed items-center gap-2 rounded-full bg-gray-200 px-5 py-2 text-sm font-semibold text-gray-500 opacity-60 dark:bg-slate-800 dark:text-slate-400"
+                  >
+                    <Phone size={16} />
+                    Call unavailable
+                  </button>
+                )
               ) : null}
             </div>
 

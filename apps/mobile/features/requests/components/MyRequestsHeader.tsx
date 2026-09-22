@@ -16,6 +16,7 @@ type MyRequestsHeaderProps<T extends string> = {
   searchPlaceholder?: string;
   onBackPress: () => void;
   onMenuPress?: () => void;
+  hasActiveFilters?: boolean;
 };
 
 export function MyRequestsHeader<T extends string>({
@@ -27,6 +28,7 @@ export function MyRequestsHeader<T extends string>({
   searchPlaceholder = "Search requests",
   onBackPress,
   onMenuPress,
+  hasActiveFilters = false,
 }: MyRequestsHeaderProps<T>) {
   return (
     <View style={styles.container}>
@@ -54,8 +56,14 @@ export function MyRequestsHeader<T extends string>({
           hitSlop={8}
           style={styles.iconButton}
           disabled={!onMenuPress}
+          accessibilityRole="button"
+          accessibilityLabel="Filter and sort requests"
+          accessibilityState={{ selected: hasActiveFilters }}
         >
-          <Ionicons name="menu-outline" size={25} color="#111827" />
+          <View style={styles.menuIconWrap}>
+            <Ionicons name="options-outline" size={23} color="#111827" />
+            {hasActiveFilters ? <View style={styles.activeDot} /> : null}
+          </View>
         </Pressable>
       </View>
 
@@ -155,6 +163,20 @@ const styles = StyleSheet.create({
   tabIndicator: {
     height: 2,
     width: "100%",
+    backgroundColor: "#DC2626",
+  },
+  menuIconWrap: {
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  activeDot: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     backgroundColor: "#DC2626",
   },
 });
