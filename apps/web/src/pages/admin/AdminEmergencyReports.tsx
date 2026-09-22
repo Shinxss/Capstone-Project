@@ -7,7 +7,13 @@ export default function AdminEmergencyReports() {
 
   return (
     <AdminShell title="Emergency Reports" subtitle="Monitor and triage active emergency reports">
-      <LguEmergenciesView {...vm} loading={vm.loading} error={vm.error} onRefresh={vm.refetch} />
+      <LguEmergenciesView
+        {...vm}
+        loading={vm.loading}
+        error={vm.error}
+        onRefresh={vm.refetch}
+        onReviewSosAlerts={vm.reviewSosAlerts}
+      />
     </AdminShell>
   );
 }

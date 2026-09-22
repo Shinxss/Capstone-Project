@@ -324,6 +324,11 @@ export function useLguEmergencies() {
     [items, sosCount]
   );
 
+  const reviewSosAlerts = useCallback(() => {
+    setTypeFilter("SOS");
+    setQuery("");
+  }, []);
+
   return {
     reports,
     loading,
@@ -338,5 +343,7 @@ export function useLguEmergencies() {
     sosCount,
     stats,
     completedEmergencyIds,
+    reviewSosAlerts,
   };
 }
+

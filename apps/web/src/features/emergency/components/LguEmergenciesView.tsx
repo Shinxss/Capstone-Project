@@ -1,3 +1,4 @@
+import { createElement, useRef } from "react";
 import {
   Search,
   Siren,
@@ -26,6 +27,7 @@ type Props = ReturnType<typeof useLguEmergencies> & {
   loading: boolean;
   error: string | null;
   onRefresh: () => void;
+  onReviewSosAlerts?: () => void;
 };
 
 const TYPE_CHIP_ORDER: EmergencyType[] = [
@@ -113,7 +115,6 @@ function EmergencyCard({
   item: LguEmergencyItem;
   onActionClick: (item: LguEmergencyItem) => void;
 }) {
-  const Icon = iconForEmergency(item.type);
   const typeAccent = colorForEmergency(item.type);
   const isSOS = !!item.isSOS;
 
@@ -149,7 +150,10 @@ function EmergencyCard({
               borderColor: hexToRgba(typeAccent, 0.26),
             }}
           >
-            <Icon size={22} style={{ color: typeAccent }} />
+            {createElement(iconForEmergency(item.type), {
+              size: 22,
+              style: { color: typeAccent },
+            })}
           </div>
 
           <div className="flex-1">
@@ -259,6 +263,7 @@ function ErrorPanel({ error, onRetry }: { error: string; onRetry: () => void }) 
 
 export default function LguEmergenciesView(props: Props) {
   const navigate = useNavigate();
+  const emergencyListRef = useRef<HTMLDivElement | null>(null);
   const { loading, error, onRefresh, query, setQuery, typeFilter, setTypeFilter, items, stats, filtered } = props;
 
   const isOperational = (status: LguEmergencyItem["status"]) =>
@@ -267,6 +272,23 @@ export default function LguEmergenciesView(props: Props) {
   const activeSosItems = activeItems.filter((item) => item.isSOS);
   const activeSosCount = activeSosItems.length;
   const visibleItems = filtered.filter((item) => isOperational(item.status));
+
+  const isSosActive = typeFilter === "SOS";
+
+  const onReviewSosAlerts = () => {
+    if (props.onReviewSosAlerts) {
+      props.onReviewSosAlerts();
+    } else {
+      props.reviewSosAlerts();
+    }
+
+    requestAnimationFrame(() => {
+      emergencyListRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  };
 
   const handleEmergencyAction = (item: LguEmergencyItem) => {
     const emergencyId = String(item.id || "").trim();
@@ -295,10 +317,18 @@ export default function LguEmergenciesView(props: Props) {
           </div>
 
           <button
-            onClick={() => setTypeFilter("SOS")}
-            className="rounded-xl bg-red-300/70 px-5 py-3 text-sm font-bold text-white hover:bg-red-300"
+            type="button"
+            onClick={onReviewSosAlerts}
+            disabled={isSosActive}
+            aria-pressed={isSosActive}
+            className={[
+              "rounded-xl px-5 py-3 text-sm font-bold transition-all focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-[#060C18]",
+              isSosActive
+                ? "border border-red-300 bg-red-100 text-red-800 cursor-default dark:border-red-500/40 dark:bg-red-950/60 dark:text-red-200 opacity-90"
+                : "bg-red-600 text-white hover:bg-red-700 shadow-sm active:scale-[0.99] cursor-pointer",
+            ].join(" ")}
           >
-            View SOS Reports
+            {isSosActive ? "Viewing SOS Alerts" : "Review SOS Alerts"}
           </button>
         </div>
       ) : null}
@@ -347,9 +377,13 @@ export default function LguEmergenciesView(props: Props) {
         <StatCard value={stats.deployed} label="Deployed" tone="green" icon={<Users className="text-green-700" />} />
       </div>
 
-      <div className="space-y-5">
+      <div ref={emergencyListRef} className="space-y-5 scroll-mt-6">
         {visibleItems.length === 0 ? (
-          <EmptyState icon={AlertTriangle} title="No emergency reports found." />
+          <EmptyState
+            icon={AlertTriangle}
+            title={typeFilter === "SOS" ? "No active SOS alerts match the current filters." : "No emergency reports found."}
+            description={query ? "Try clearing your search query to see all SOS alerts." : undefined}
+          />
         ) : (
           visibleItems.map((item) =>
             item.isSOS ? (

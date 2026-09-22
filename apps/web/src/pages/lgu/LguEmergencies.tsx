@@ -7,7 +7,13 @@ export default function LguEmergencies() {
 
   return (
     <LguShell title="Emergencies" subtitle="Monitor and manage active emergency situations">
-      <LguEmergenciesView {...vm} loading={vm.loading} error={vm.error} onRefresh={vm.refetch} />
+      <LguEmergenciesView
+        {...vm}
+        loading={vm.loading}
+        error={vm.error}
+        onRefresh={vm.refetch}
+        onReviewSosAlerts={vm.reviewSosAlerts}
+      />
     </LguShell>
   );
 }
