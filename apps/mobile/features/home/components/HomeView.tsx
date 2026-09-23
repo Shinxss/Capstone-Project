@@ -5,6 +5,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -154,19 +155,26 @@ export function HomeView({
   onPressApplyVolunteer,
   showVolunteerCta = true,
 }: Props) {
-  const { width, height, isNarrow, isCompactHeight, isLargePhone } = useResponsiveLayout();
+  const { width, height } = useWindowDimensions();
+  const { isNarrow, isCompactHeight, isLargePhone } = useResponsiveLayout();
   const { screenContentBottomPadding } = useBottomNavMetrics();
   const { isDark } = useTheme();
-  const isCompactScreen = isCompactHeight || height <= 760;
-  const headingFontSize = isCompactScreen || isNarrow ? 28 : isLargePhone ? 33 : 31;
-  const sosSize = Math.min(
-    isCompactScreen ? 160 : isLargePhone ? 184 : 176,
-    Math.max(
-      isCompactScreen ? 148 : 160,
-      Math.round(width * 0.44)
-    )
-  );
-  const sosInnerSize = sosSize - (isNarrow || isCompactScreen ? 22 : 26);
+
+  const isShortScreen = height <= 740;
+  const isCompactScreen = isShortScreen || isCompactHeight || height <= 780 || width < 375;
+  const isLargeDevice = isLargePhone || (height >= 880 && width >= 410);
+
+  const headingFontSize = isShortScreen ? 24 : isCompactScreen || isNarrow ? 27 : isLargeDevice ? 32 : 30;
+  const sosSize = useMemo(() => {
+    if (isShortScreen) {
+      return Math.min(154, Math.max(148, Math.round(width * 0.42)));
+    }
+    if (isLargeDevice) {
+      return Math.min(178, Math.max(170, Math.round(width * 0.41)));
+    }
+    return Math.min(168, Math.max(160, Math.round(width * 0.425)));
+  }, [isLargeDevice, isShortScreen, width]);
+  const sosInnerSize = sosSize - (isShortScreen ? 22 : isCompactScreen ? 24 : 26);
   const weatherCardBackground = withOpacity(alertTheme.cardBackgroundColor, 0.1);
   const weatherBaseColor = alertTheme.headlineColor;
   const weatherTitleColor = isDark
@@ -243,7 +251,7 @@ export function HomeView({
         contentContainerStyle={[
           styles.container,
           {
-            paddingTop: isCompactScreen ? 8 : 12,
+            paddingTop: isShortScreen ? 6 : isCompactScreen ? 8 : 12,
             paddingBottom: screenContentBottomPadding,
           },
         ]}
@@ -257,6 +265,7 @@ export function HomeView({
               hitSlop={8}
               style={({ pressed }) => [
                 styles.avatar,
+                isShortScreen ? styles.avatarShort : null,
                 {
                   borderColor: isDark ? "#2563EB" : "#EF4444",
                   backgroundColor: isDark ? "#0E1626" : "#FFFFFF",
@@ -274,40 +283,43 @@ export function HomeView({
                   resizeMode="cover"
                 />
               ) : (
-                <Ionicons name="person" size={16} color={isDark ? "#E2E8F0" : "#111827"} />
+                <Ionicons name="person" size={isShortScreen ? 15 : 16} color={isDark ? "#E2E8F0" : "#111827"} />
               )}
             </Pressable>
             <View style={styles.profileText}>
               <Text
                 numberOfLines={1}
                 maxFontSizeMultiplier={1.2}
-                style={[styles.hello, isDark ? styles.helloDark : null]}
+                style={[styles.hello, isShortScreen ? styles.helloShort : null, isDark ? styles.helloDark : null]}
               >
                 Hello, {safeDisplayName}!
               </Text>
               <Text
                 numberOfLines={1}
                 maxFontSizeMultiplier={1.2}
-                style={[styles.sub, isDark ? styles.subDark : null]}
+                style={[styles.sub, isShortScreen ? styles.subShort : null, isDark ? styles.subDark : null]}
               >
                 How are you doing today?
               </Text>
             </View>
           </View>
 
-          <Pressable style={[styles.bellBtn, isDark ? styles.bellBtnDark : null]} onPress={onPressNotifications}>
-            <Ionicons name="notifications-outline" size={25} color={isDark ? "#E2E8F0" : "#111827"} />
+          <Pressable
+            style={[styles.bellBtn, isShortScreen ? styles.bellBtnShort : null, isDark ? styles.bellBtnDark : null]}
+            onPress={onPressNotifications}
+          >
+            <Ionicons name="notifications-outline" size={isShortScreen ? 22 : 25} color={isDark ? "#E2E8F0" : "#111827"} />
           </Pressable>
         </View>
 
         {/* Heading */}
-        <View style={[styles.headerBlock, { marginTop: isCompactScreen ? 18 : isLargePhone ? 24 : 20 }]}>
+        <View style={[styles.headerBlock, { marginTop: isShortScreen ? 10 : isCompactScreen ? 14 : isLargeDevice ? 22 : 18 }]}>
           <Text
             numberOfLines={2}
             maxFontSizeMultiplier={1.15}
             style={[
               styles.h1,
-              { fontSize: headingFontSize, lineHeight: Math.round(headingFontSize * 1.02) },
+              { fontSize: headingFontSize, lineHeight: Math.round(headingFontSize * 1.05) },
               isDark ? styles.h1Dark : null,
             ]}
           >
@@ -318,9 +330,9 @@ export function HomeView({
             style={[
               styles.h2,
               {
-                marginTop: isCompactScreen ? 10 : 12,
-                fontSize: isCompactScreen ? 14 : 15,
-                lineHeight: isCompactScreen ? 18 : 20,
+                marginTop: isShortScreen ? 6 : isCompactScreen ? 8 : 11,
+                fontSize: isShortScreen ? 13 : isCompactScreen ? 14 : 15,
+                lineHeight: isShortScreen ? 17 : isCompactScreen ? 18 : 20,
               },
               isDark ? styles.h2Dark : null,
             ]}
@@ -330,7 +342,7 @@ export function HomeView({
         </View>
 
         {/* SOS */}
-        <View style={[styles.sosBlock, { marginTop: isCompactScreen ? 12 : 14 }]}>
+        <View style={[styles.sosBlock, { marginTop: isShortScreen ? 8 : isCompactScreen ? 10 : 13 }]}>
           <View
             style={[
               styles.sosOuter,
@@ -377,12 +389,12 @@ export function HomeView({
               <View
                 style={[
                   styles.warnCircle,
-                  isCompactScreen ? styles.warnCircleCompact : null,
+                  isShortScreen ? styles.warnCircleShort : isCompactScreen ? styles.warnCircleCompact : null,
                 ]}
               >
                 <Ionicons
                   name="warning"
-                  size={isCompactScreen ? 15 : 17}
+                  size={isShortScreen ? 14 : isCompactScreen ? 15 : 17}
                   color="#fff"
                 />
               </View>
@@ -391,8 +403,8 @@ export function HomeView({
                 style={[
                   styles.sosText,
                   {
-                    fontSize: isCompactScreen ? 36 : isLargePhone ? 42 : 39,
-                    lineHeight: isCompactScreen ? 38 : isLargePhone ? 44 : 41,
+                    fontSize: isShortScreen ? 34 : isCompactScreen ? 36 : isLargeDevice ? 41 : 38,
+                    lineHeight: isShortScreen ? 36 : isCompactScreen ? 38 : isLargeDevice ? 43 : 40,
                   },
                 ]}
               >
@@ -401,7 +413,7 @@ export function HomeView({
               <Text
                 style={[
                   styles.sosHint,
-                  { fontSize: isCompactScreen ? 12 : 13 },
+                  { fontSize: isShortScreen ? 12 : 13 },
                 ]}
               >
                 {holding ? `Keep holding... ${remainingSeconds}s` : "Hold for 3s"}
@@ -414,9 +426,9 @@ export function HomeView({
             style={[
               styles.locationNote,
               {
-                marginTop: isCompactScreen ? 12 : 14,
-                fontSize: isCompactScreen ? 13 : 14,
-                lineHeight: isCompactScreen ? 18 : 20,
+                marginTop: isShortScreen ? 8 : isCompactScreen ? 10 : 13,
+                fontSize: isShortScreen ? 12.5 : isCompactScreen ? 13 : 14,
+                lineHeight: isShortScreen ? 16 : isCompactScreen ? 18 : 20,
               },
               isDark ? styles.locationNoteDark : null,
             ]}
@@ -431,7 +443,8 @@ export function HomeView({
           disabled={!onPressAlert}
           style={({ pressed }) => [
             styles.card,
-            { marginTop: isCompactScreen ? 18 : 22 },
+            isShortScreen ? styles.cardShort : null,
+            { marginTop: isShortScreen ? 10 : isCompactScreen ? 14 : 18 },
             {
               backgroundColor: weatherCardBackground,
               borderColor: alertTheme.cardBorderColor,
@@ -441,17 +454,17 @@ export function HomeView({
         >
           {alertLoading ? (
             <SkeletonRegion label="Loading local weather alerts" style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 12 }}>
-              <Skeleton width={48} height={48} radius={14} />
+              <Skeleton width={isShortScreen ? 44 : 48} height={isShortScreen ? 44 : 48} radius={14} />
               <View style={styles.cardContent}><Skeleton width="46%" height={16} /><View style={{ marginTop: 9 }}><Skeleton width="90%" height={12} /></View><View style={{ marginTop: 7 }}><Skeleton width="68%" height={12} /></View></View>
             </SkeletonRegion>
           ) : (
             <>
-              <View style={[styles.cardIcon, { backgroundColor: alertTheme.iconBackgroundColor }]}>
-                <Ionicons name={alertIconName} size={24} color={alertTheme.iconColor} />
+              <View style={[styles.cardIcon, isShortScreen ? styles.cardIconShort : null, { backgroundColor: alertTheme.iconBackgroundColor }]}>
+                <Ionicons name={alertIconName} size={isShortScreen ? 22 : 24} color={alertTheme.iconColor} />
               </View>
               <View style={styles.cardContent}>
-                <Text style={[styles.cardHeadline, { color: weatherTitleColor }]}>{alertTitle}</Text>
-                <Text style={[styles.cardSub, { color: weatherTextColor }]}>{alertMessage}</Text>
+                <Text style={[styles.cardHeadline, isShortScreen ? styles.cardHeadlineShort : null, { color: weatherTitleColor }]}>{alertTitle}</Text>
+                <Text style={[styles.cardSub, isShortScreen ? styles.cardSubShort : null, { color: weatherTextColor }]}>{alertMessage}</Text>
                 {alertRetryEnabled ? <Text style={[styles.cardRetry, { color: weatherRetryColor }]}>Tap to retry</Text> : null}
               </View>
             </>
@@ -469,7 +482,7 @@ export function HomeView({
         ) : null}
 
         {showVolunteerCta ? (
-          <View style={styles.volunteer}>
+          <View style={[styles.volunteer, { marginTop: isShortScreen ? 14 : isCompactScreen ? 18 : 22 }]}>
             <View style={styles.volCircle1} />
             <View style={styles.volCircle2} />
 
@@ -522,14 +535,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#EF4444",
   },
+  avatarShort: {
+    width: 44,
+    height: 44,
+  },
   avatarImage: {
     width: "100%",
     height: "100%",
     borderRadius: 100,
   },
   hello: { fontSize: 18, color: "#111827", fontWeight: "700" },
+  helloShort: { fontSize: 17 },
   helloDark: { color: "#F1F5F9" },
   sub: { fontSize: 13, color: "#6B7280", marginTop: 1 },
+  subShort: { fontSize: 12 },
   subDark: { color: "#94A3B8" },
   bellBtn: {
     width: 40,
@@ -542,6 +561,11 @@ const styles = StyleSheet.create({
     marginRight: 6,
     borderColor: "#E5E7EB",
     flexShrink: 0,
+  },
+  bellBtnShort: {
+    width: 36,
+    height: 36,
+    borderRadius: 9,
   },
   bellBtnDark: {
     backgroundColor: "#0E1626",
@@ -631,6 +655,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 3,
   },
+  warnCircleShort: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    marginBottom: 2,
+  },
   sosText: {
     fontWeight: "700",
     color: "#fff",
@@ -658,6 +688,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E5E7EB",
   },
+  cardShort: {
+    padding: 10,
+    borderRadius: 12,
+    gap: 10,
+  },
   cardPressed: {
     opacity: 0.92,
   },
@@ -668,9 +703,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  cardIconShort: {
+    width: 48,
+    height: 48,
+    borderRadius: 9,
+  },
   cardContent: { flex: 1, minWidth: 0 },
   cardHeadline: { fontSize: 16, fontWeight: "900", marginTop: 2 },
+  cardHeadlineShort: { fontSize: 15 },
   cardSub: { fontSize: 12, color: "#6B7280", marginTop: 2, lineHeight: 15 },
+  cardSubShort: { fontSize: 11.5, lineHeight: 14 },
   cardRetry: { fontSize: 11, marginTop: 4, fontWeight: "700" },
 
   volunteer: {

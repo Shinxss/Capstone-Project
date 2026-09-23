@@ -497,7 +497,7 @@ export function VolunteerApplicationView({
           disabled={submitDisabled}
         >
           <Text style={styles.submitText}>
-            {submitting ? "Submitting..." : "Submit Application"}
+            {submitting ? "Submitting application..." : "Submit Application"}
           </Text>
         </Pressable>
       </ScrollView>

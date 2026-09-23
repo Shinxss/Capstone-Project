@@ -25,6 +25,7 @@ import { useProfileSummary } from "../hooks/useProfileSummary";
 import { ProfileRemoteSectionsSkeleton } from "../components/ProfileSkeletons";
 import { useResponderDutyStatus } from "../hooks/useResponderDutyStatus";
 import { useAchievements } from "../../achievements/hooks/useAchievements";
+import { useMyVolunteerApplication } from "../../volunteer/hooks/useMyVolunteerApplication";
 import { usePullToRefresh } from "../../common/hooks/usePullToRefresh";
 import { RefreshableScrollScreen } from "../../common/components/RefreshableScrollScreen";
 import {
@@ -69,6 +70,10 @@ export default function MoreScreen() {
     enabled: isUser,
     user,
   });
+  const {
+    application: volunteerApplication,
+    refresh: refreshVolunteerApplication,
+  } = useMyVolunteerApplication({ enabled: isUser });
   const {
     summary: achievementSummary,
     progression: achievementProgression,
@@ -326,8 +331,16 @@ export default function MoreScreen() {
       refreshProfileSummary(),
       refreshNotificationPreferences(),
       refreshAchievements(),
+      refreshVolunteerApplication(),
     ]);
-  }, [isUser, refreshAchievements, refreshNotificationPreferences, refreshProfileSummary, refreshRequestCounts]);
+  }, [
+    isUser,
+    refreshAchievements,
+    refreshNotificationPreferences,
+    refreshProfileSummary,
+    refreshRequestCounts,
+    refreshVolunteerApplication,
+  ]);
   const { refreshing: refreshingProfilePage, triggerRefresh: triggerRefreshProfilePage } =
     usePullToRefresh(refreshProfilePage);
 
@@ -381,7 +394,15 @@ export default function MoreScreen() {
           showDotFor={showDotFor}
         />
 
-        {summaryLoading && !hasRemoteData ? <ProfileRemoteSectionsSkeleton /> : <ProfileActivitiesGrid summary={summary} onPressApplyVolunteer={onPressApplyVolunteer} />}
+        {summaryLoading && !hasRemoteData ? (
+          <ProfileRemoteSectionsSkeleton />
+        ) : (
+          <ProfileActivitiesGrid
+            summary={summary}
+            application={volunteerApplication}
+            onPressApplyVolunteer={onPressApplyVolunteer}
+          />
+        )}
         {isUser ? (
           <>
             {isAchievementAccount ? (

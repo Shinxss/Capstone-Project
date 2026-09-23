@@ -46,4 +46,6 @@ export type VolunteerApplicationRecord = VolunteerApplicationInput & {
   status: VolunteerApplicationStatus;
   createdAt: string;
   updatedAt: string;
+  reviewNotes?: string;
+  reviewedAt?: string;
 };

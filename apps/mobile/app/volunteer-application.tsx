@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useState } from "react";
 import { Alert } from "react-native";
 import { router } from "expo-router";
 
 import { useVolunteerApplicationForm } from "../features/volunteer/hooks/useVolunteerApplicationForm";
 import { VolunteerApplicationView } from "../features/volunteer/components/VolunteerApplicationView";
+import { VolunteerApplicationSuccessModal } from "../features/volunteer/components/VolunteerApplicationSuccessModal";
 
 export default function VolunteerApplicationScreen() {
   const {
@@ -17,6 +18,8 @@ export default function VolunteerApplicationScreen() {
     submit,
   } = useVolunteerApplicationForm();
 
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
+
   const onBack = () => router.back();
 
   const onSubmit = async () => {
@@ -27,30 +30,50 @@ export default function VolunteerApplicationScreen() {
         Alert.alert("Check required fields", "Please fix the highlighted fields.");
         return;
       }
+      if (result.reason === "busy") {
+        return;
+      }
 
-      Alert.alert("Submit failed", result.message ?? "Please try again.");
+      Alert.alert(
+        "Submission failed",
+        result.message || "Application could not be submitted. Please try again."
+      );
       return;
     }
 
-    Alert.alert(
-      "Submitted",
-      "Application submitted! Status: Pending LGU Verification."
-    );
-    router.back();
+    setSuccessModalVisible(true);
+  };
+
+  const onViewStatus = () => {
+    setSuccessModalVisible(false);
+    router.replace("/(tabs)/more");
+  };
+
+  const onBackToProfile = () => {
+    setSuccessModalVisible(false);
+    router.replace("/(tabs)/more");
   };
 
   return (
-    <VolunteerApplicationView
-      form={form}
-      setForm={setForm}
-      skillOptions={skillOptions}
-      submitting={submitting}
-      error={error}
-      errors={errors}
-      showErrors={submitAttempted}
-      submitDisabled={submitting}
-      onBack={onBack}
-      onSubmit={onSubmit}
-    />
+    <>
+      <VolunteerApplicationView
+        form={form}
+        setForm={setForm}
+        skillOptions={skillOptions}
+        submitting={submitting}
+        error={error}
+        errors={errors}
+        showErrors={submitAttempted}
+        submitDisabled={submitting}
+        onBack={onBack}
+        onSubmit={onSubmit}
+      />
+
+      <VolunteerApplicationSuccessModal
+        visible={successModalVisible}
+        onViewStatus={onViewStatus}
+        onBackToProfile={onBackToProfile}
+      />
+    </>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_CITY, DEFAULT_PROVINCE } from "../constants/volunteer.constants";
 import { VolunteerApplicationInput } from "../models/volunteerApplication.model";
 import { volunteerApplicationService } from "../services/volunteerApplication.service";
@@ -95,6 +95,7 @@ export function useVolunteerApplicationForm() {
     buildPrefilledForm(sessionUser)
   );
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [skillOptions, setSkillOptions] = useState<string[]>([]);
@@ -148,6 +149,10 @@ export function useVolunteerApplicationForm() {
   const isValid = validation.isValid;
 
   async function submit() {
+    if (submittingRef.current) {
+      return { ok: false as const, reason: "busy" as const };
+    }
+
     setError(null);
 
     // ✅ FIX: should be !isValid
@@ -157,6 +162,7 @@ export function useVolunteerApplicationForm() {
     }
 
     try {
+      submittingRef.current = true;
       setSubmitting(true);
 
       const payload = buildVolunteerSubmitPayload(form);
@@ -169,6 +175,7 @@ export function useVolunteerApplicationForm() {
       setError(message);
       return { ok: false as const, reason: "api_error" as const, message };
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   }

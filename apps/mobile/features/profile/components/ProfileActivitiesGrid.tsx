@@ -1,11 +1,14 @@
-﻿import React, { useMemo } from "react";
+import React, { useMemo } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../theme/useTheme";
 import type { ProfileSummary } from "../models/profile";
+import type { VolunteerApplicationRecord } from "../../volunteer/models/volunteerApplication.model";
+import { VolunteerApplicationStatusCard } from "../../volunteer/components/VolunteerApplicationStatusCard";
 
 type ProfileActivitiesGridProps = {
   summary: ProfileSummary;
+  application?: VolunteerApplicationRecord | null;
   onPressApplyVolunteer: () => void;
 };
 
@@ -22,6 +25,7 @@ function formatMetricValue(value: number) {
 
 export default function ProfileActivitiesGrid({
   summary,
+  application,
   onPressApplyVolunteer,
 }: ProfileActivitiesGridProps) {
   const { isDark } = useTheme();
@@ -100,41 +104,11 @@ export default function ProfileActivitiesGrid({
         }}
       >
         {isCommunityUser ? (
-          <View
-            style={{
-              borderRadius: 12,
-              borderWidth: 1,
-              paddingHorizontal: 14,
-              paddingVertical: 14,
-              backgroundColor: isDark ? "#0E1626" : "#FFFFFF",
-              borderColor: isDark ? "#162544" : "#E5E7EB",
-            }}
-          >
-            <Text className="mb-3 text-[16px] font-extrabold text-slate-900 dark:text-slate-100">
-              Volunteer Activities
-            </Text>
-            <Text className="text-[13px] leading-5 text-slate-600 dark:text-slate-300">
-              This section is available for verified volunteers.
-            </Text>
-            <Pressable
-              onPress={onPressApplyVolunteer}
-              style={({ pressed }) => ({
-                marginTop: 12,
-                width: "100%",
-                minHeight: 40,
-                borderRadius: 10,
-                borderWidth: 1,
-                paddingHorizontal: 14,
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: isDark ? "#1E3A8A" : "#DC2626",
-                borderColor: isDark ? "#3B82F6" : "#DC2626",
-                opacity: pressed ? 0.9 : 1,
-              })}
-            >
-              <Text className="text-sm font-semibold text-white">Apply as Volunteer</Text>
-            </Pressable>
-          </View>
+          <VolunteerApplicationStatusCard
+            application={application}
+            volunteerStatus={summary.volunteerStatus}
+            onPressApplyVolunteer={onPressApplyVolunteer}
+          />
         ) : (
           <>
             <Text className="text-[17px] font-extrabold text-slate-900 dark:text-slate-100">My Activities</Text>

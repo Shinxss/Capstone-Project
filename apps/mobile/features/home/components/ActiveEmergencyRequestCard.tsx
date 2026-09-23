@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useMemo } from "react";
-import { Alert, Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Linking, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import {
   isActiveRequestTrackingLabel,
   type MyRequestSummary,
@@ -28,6 +28,8 @@ export function ActiveEmergencyRequestCard({
   tracking,
   onPressTracking,
 }: Props) {
+  const { height } = useWindowDimensions();
+  const isShortScreen = height <= 740;
   const currentTracking = tracking?.request.id === request.id ? tracking : null;
   const trackingLabel = useMemo(
     () => normalizeTrackingLabel(currentTracking?.tracking.label ?? request.trackingStatus),
@@ -76,23 +78,23 @@ export function ActiveEmergencyRequestCard({
   }
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, isShortScreen ? styles.cardShort : null]}>
       <View style={styles.header}>
-        <View style={styles.headerIcon}>
-          <Ionicons name="alert-circle-outline" size={21} color="#DC2626" />
+        <View style={[styles.headerIcon, isShortScreen ? styles.headerIconShort : null]}>
+          <Ionicons name="alert-circle-outline" size={isShortScreen ? 19 : 21} color="#DC2626" />
         </View>
-        <Text style={styles.title} maxFontSizeMultiplier={1.15}>
+        <Text style={[styles.title, isShortScreen ? styles.titleShort : null]} maxFontSizeMultiplier={1.15}>
           Active Emergency Request
         </Text>
       </View>
 
-      <View style={styles.statusBar}>
-        <Text numberOfLines={1} style={styles.statusText} maxFontSizeMultiplier={1.15}>
+      <View style={[styles.statusBar, isShortScreen ? styles.statusBarShort : null]}>
+        <Text numberOfLines={1} style={[styles.statusText, isShortScreen ? styles.statusTextShort : null]} maxFontSizeMultiplier={1.15}>
           {statusLabel}
         </Text>
       </View>
 
-      <View style={styles.mapWrap}>
+      <View style={[styles.mapWrap, isShortScreen ? styles.mapWrapShort : null]}>
         {emergencyCoordinate ? (
           <TrackingMapCard
             emergencyCoordinate={emergencyCoordinate}
@@ -118,9 +120,13 @@ export function ActiveEmergencyRequestCard({
             onPress={callResponder}
             accessibilityRole="button"
             accessibilityLabel="Call assigned responder"
-            style={({ pressed }) => [styles.actionButton, pressed && styles.buttonPressed]}
+            style={({ pressed }) => [
+              styles.actionButton,
+              isShortScreen ? styles.actionButtonShort : null,
+              pressed && styles.buttonPressed,
+            ]}
           >
-            <Ionicons name="call" size={19} color="#475569" />
+            <Ionicons name="call" size={isShortScreen ? 18 : 19} color="#475569" />
             <Text numberOfLines={1} style={styles.actionText} maxFontSizeMultiplier={1.1}>
               Call Responder
             </Text>
@@ -134,10 +140,11 @@ export function ActiveEmergencyRequestCard({
           accessibilityLabel={`View emergency location: ${locationLabel}`}
           style={({ pressed }) => [
             styles.actionButton,
+            isShortScreen ? styles.actionButtonShort : null,
             pressed && onPressTracking ? styles.buttonPressed : null,
           ]}
         >
-          <Ionicons name="location" size={20} color="#475569" />
+          <Ionicons name="location" size={isShortScreen ? 19 : 20} color="#475569" />
           <Text numberOfLines={1} style={styles.locationText} maxFontSizeMultiplier={1.1}>
             {locationLabel}
           </Text>
@@ -150,6 +157,7 @@ export function ActiveEmergencyRequestCard({
         accessibilityRole="button"
         style={({ pressed }) => [
           styles.trackingButton,
+          isShortScreen ? styles.trackingButtonShort : null,
           pressed && onPressTracking ? styles.buttonPressed : null,
         ]}
       >
@@ -181,6 +189,11 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 5 },
     elevation: 3,
   },
+  cardShort: {
+    marginTop: 10,
+    padding: 11,
+    borderRadius: 16,
+  },
   header: {
     minWidth: 0,
     flexDirection: "row",
@@ -196,12 +209,20 @@ const styles = StyleSheet.create({
     backgroundColor: "#FEE2E2",
     flexShrink: 0,
   },
+  headerIconShort: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+  },
   title: {
     flex: 1,
     minWidth: 0,
     color: "#111827",
     fontSize: 18,
     fontWeight: "800",
+  },
+  titleShort: {
+    fontSize: 16,
   },
   statusBar: {
     minHeight: 42,
@@ -211,10 +232,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "#E3262E",
   },
+  statusBarShort: {
+    minHeight: 36,
+    marginTop: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
   statusText: {
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "800",
+  },
+  statusTextShort: {
+    fontSize: 14.5,
   },
   mapWrap: {
     height: 158,
@@ -222,6 +252,11 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderRadius: 13,
     backgroundColor: "#E2E8F0",
+  },
+  mapWrapShort: {
+    height: 140,
+    marginTop: 8,
+    borderRadius: 11,
   },
   mapFallback: {
     flex: 1,
@@ -260,6 +295,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
   },
+  actionButtonShort: {
+    height: 44,
+  },
   actionText: {
     flexShrink: 1,
     color: "#1E293B",
@@ -284,6 +322,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+  },
+  trackingButtonShort: {
+    height: 44,
+    marginTop: 8,
   },
   trackingButtonText: {
     color: "#075DAA",

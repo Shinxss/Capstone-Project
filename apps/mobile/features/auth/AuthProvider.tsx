@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Alert } from "react-native";
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import type { AuthUser } from "./auth.types";
@@ -82,8 +82,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     void hydrate();
   }, [hydrate]);
 
+  const isSigningOutRef = useRef(false);
+
   useEffect(() => {
     const unsubscribe = subscribeUnauthorized(async () => {
+      if (isSigningOutRef.current) {
+        return;
+      }
+
       Alert.alert("Session expired", "Your session has expired. Please log in again.");
       applyAnonymous();
       try {
@@ -206,12 +212,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const signOut = useCallback(async () => {
+    isSigningOutRef.current = true;
     applyAnonymous();
     try {
       await signOutSession();
     } finally {
-      await GoogleSignin.revokeAccess().catch(() => undefined);
-      await GoogleSignin.signOut().catch(() => undefined);
+      try {
+        await GoogleSignin.revokeAccess().catch(() => undefined);
+        await GoogleSignin.signOut().catch(() => undefined);
+      } finally {
+        isSigningOutRef.current = false;
+      }
     }
   }, [applyAnonymous]);
 

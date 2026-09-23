@@ -17,6 +17,7 @@ import {
   DAGUPAN_BARANGAY_OPTIONS,
   PROFILE_GENDER_OPTIONS,
 } from "../../profile/constants/profileEdit.constants";
+import { useResponsiveLayout } from "../../common/hooks/useResponsiveLayout";
 import type {
   ProfileCompletionField,
   ProfileCompletionFieldErrors,
@@ -48,6 +49,8 @@ type SelectionSheetProps = {
   onSelect: (value: string) => void;
   searchable?: boolean;
   searchPlaceholder?: string;
+  variant?: "compact" | "searchable";
+  stableHeight?: boolean;
 };
 
 function normalizeBarangaySearchValue(value: string): string {
@@ -63,11 +66,20 @@ function SelectionSheet({
   onSelect,
   searchable = false,
   searchPlaceholder = "Search",
+  variant,
+  stableHeight,
 }: SelectionSheetProps) {
   const insets = useSafeAreaInsets();
-  const { height } = useWindowDimensions();
+  const { height, isCompactHeight, isLargePhone } = useResponsiveLayout();
   const [query, setQuery] = useState("");
 
+  const isStableHeight = stableHeight ?? (variant === "searchable" || searchable);
+  const isCompact = isCompactHeight || height <= 760;
+  const targetPercent = isCompact ? 0.66 : isLargePhone ? 0.72 : 0.70;
+  const sheetHeight = Math.min(
+    Math.round(height * targetPercent),
+    isLargePhone ? 660 : 620
+  );
   const sheetMaxHeight = Math.min(Math.round(height * 0.82), 620);
 
   useEffect(() => {
@@ -96,10 +108,15 @@ function SelectionSheet({
           <Pressable
             style={[
               styles.sheetSurface,
-              {
-                maxHeight: sheetMaxHeight,
-                paddingBottom: Math.max(insets.bottom, 14),
-              },
+              isStableHeight
+                ? {
+                    height: sheetHeight,
+                    maxHeight: "100%",
+                  }
+                : {
+                    maxHeight: sheetMaxHeight,
+                  },
+              { paddingBottom: Math.max(insets.bottom, 14) },
             ]}
             onPress={() => undefined}
           >
@@ -122,37 +139,38 @@ function SelectionSheet({
               </View>
             ) : null}
 
-            <View style={styles.sheetListArea}>
-              <ScrollView
-                keyboardShouldPersistTaps="handled"
-                keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
-                contentContainerStyle={styles.sheetListContainer}
-                showsVerticalScrollIndicator={true}
-              >
-                {filteredOptions.map((option) => {
-                  const selected = selectedValue === option;
-                  return (
-                    <Pressable
-                      key={option}
-                      style={({ pressed }) => [styles.sheetItem, pressed ? styles.pressed : null]}
-                      onPress={() => onSelect(option)}
-                    >
-                      <Text style={[styles.sheetItemLabel, selected ? styles.sheetItemLabelSelected : null]}>
-                        {option}
-                      </Text>
-                      {selected ? <Ionicons name="checkmark" size={18} color="#2563EB" /> : null}
-                    </Pressable>
-                  );
-                })}
-
-                {filteredOptions.length === 0 ? (
-                  <View style={styles.sheetEmptyState}>
-                    <Ionicons name="location-outline" size={32} color="#9CA3AF" />
-                    <Text style={styles.sheetEmptyTitle}>No matching barangays found.</Text>
-                    <Text style={styles.sheetEmptySubtitle}>Try another barangay name.</Text>
-                  </View>
-                ) : null}
-              </ScrollView>
+            <View style={isStableHeight ? styles.resultsContainer : styles.resultsContainerCompact}>
+              {filteredOptions.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Ionicons name="search-outline" size={28} color="#9CA3AF" />
+                  <Text style={styles.emptyStateTitle}>No matching barangays found.</Text>
+                  <Text style={styles.emptyStateSubtitle}>Try another barangay name.</Text>
+                </View>
+              ) : (
+                <ScrollView
+                  keyboardShouldPersistTaps="handled"
+                  keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+                  contentContainerStyle={styles.sheetListContainer}
+                  showsVerticalScrollIndicator={true}
+                  style={styles.sheetScrollView}
+                >
+                  {filteredOptions.map((option) => {
+                    const selected = selectedValue === option;
+                    return (
+                      <Pressable
+                        key={option}
+                        style={({ pressed }) => [styles.sheetItem, pressed ? styles.pressed : null]}
+                        onPress={() => onSelect(option)}
+                      >
+                        <Text style={[styles.sheetItemLabel, selected ? styles.sheetItemLabelSelected : null]}>
+                          {option}
+                        </Text>
+                        {selected ? <Ionicons name="checkmark" size={18} color="#2563EB" /> : null}
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              )}
             </View>
 
             <Pressable
@@ -366,6 +384,8 @@ export default function ProfileCompletionForm({
         title="Select Gender"
         options={PROFILE_GENDER_OPTIONS}
         selectedValue={values.gender}
+        variant="compact"
+        stableHeight={false}
         onClose={() => setPickerKind(null)}
         onSelect={(value) => {
           onChangeField("gender", value);
@@ -380,6 +400,8 @@ export default function ProfileCompletionForm({
         selectedValue={values.barangay}
         searchable
         searchPlaceholder="Search barangay"
+        variant="searchable"
+        stableHeight={true}
         onClose={() => setPickerKind(null)}
         onSelect={(value) => {
           onChangeField("barangay", value);
@@ -541,12 +563,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
   },
-  sheetListArea: {
+  resultsContainer: {
+    flex: 1,
+    minHeight: 120,
+  },
+  resultsContainerCompact: {
     flexShrink: 1,
-    minHeight: 80,
+  },
+  sheetScrollView: {
+    flex: 1,
   },
   sheetListContainer: {
-    flexGrow: 1,
     paddingBottom: 8,
   },
   sheetItem: {
@@ -566,20 +593,21 @@ const styles = StyleSheet.create({
   sheetItemLabelSelected: {
     fontWeight: "700",
   },
-  sheetEmptyState: {
-    paddingVertical: 24,
-    paddingHorizontal: 16,
+  emptyState: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: 24,
+    paddingVertical: 16,
   },
-  sheetEmptyTitle: {
+  emptyStateTitle: {
     color: "#374151",
     fontSize: 15,
     fontWeight: "700",
-    marginTop: 8,
+    marginTop: 10,
     textAlign: "center",
   },
-  sheetEmptySubtitle: {
+  emptyStateSubtitle: {
     color: "#6B7280",
     fontSize: 13,
     marginTop: 4,
