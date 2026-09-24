@@ -348,6 +348,10 @@ export default function HomeScreen() {
     });
   }, [myActiveRequest?.id]);
 
+  const onPressViewMyRequests = useCallback(() => {
+    router.push("/my-requests/history");
+  }, []);
+
   const openGuestSosLimitPrompt = useCallback(() => {
     authRequired.openAuthRequired({
       title: GUEST_SOS_LIMIT_TITLE,
@@ -438,6 +442,8 @@ export default function HomeScreen() {
         params: {
           incidentId: result.incidentId,
           referenceNumber: result.referenceNumber,
+          clientRequestId: result.clientRequestId,
+          deliveryMode: result.deliveryMode,
           isSos: "1",
           reportLng: String(result.lng),
           reportLat: String(result.lat),
@@ -522,6 +528,7 @@ export default function HomeScreen() {
         }}
         showVolunteerCta={!isDispatchAssignee}
         onPressApplyVolunteer={onPressApplyVolunteer}
+        onPressViewMyRequests={onPressViewMyRequests}
       />
 
       <SosConfirmationModal

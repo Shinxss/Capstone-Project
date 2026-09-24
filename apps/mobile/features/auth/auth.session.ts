@@ -191,9 +191,22 @@ export async function bootstrapSession(): Promise<BootstrapSessionResult> {
 
     await persistAuthedState(token, user);
     return { mode: "authed", user, token };
-  } catch {
-    await cleanupToAnonymous();
-    return toAnonymousResult();
+  } catch (error: any) {
+    const status = error?.response?.status;
+    // Only confirmed authentication failures (401/403) clear the session
+    if (status === 401 || status === 403) {
+      await cleanupToAnonymous();
+      return toAnonymousResult();
+    }
+
+    // Network error, timeout, server unreachable, or 5xx: preserve cached authenticated session
+    try {
+      await persistUserSession(stored.user, token);
+    } catch {
+      // Ignore background storage sync error
+    }
+
+    return { mode: "authed", user: stored.user, token };
   }
 }
 

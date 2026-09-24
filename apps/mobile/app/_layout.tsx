@@ -3,6 +3,7 @@ import { Redirect, Stack, usePathname, type Href } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as WebBrowser from "expo-web-browser";
 import { StatusBar } from "expo-status-bar";
+import { SQLiteProvider } from "expo-sqlite";
 import { AuthProvider, useAuth } from "../features/auth/AuthProvider";
 import { ThemeProvider } from "../features/theme/ThemeProvider";
 import { useTheme } from "../features/theme/useTheme";
@@ -10,6 +11,10 @@ import { InAppNotificationHost } from "../features/notifications/components/InAp
 import { usePushNotificationsBootstrap } from "../features/notifications/hooks/usePushNotificationsBootstrap";
 import { useNotificationsBootstrap } from "../features/notifications/hooks/useNotificationsBootstrap";
 import { useRealtimeBootstrap } from "../features/realtime/hooks/useRealtimeBootstrap";
+import { ConnectivityProvider } from "../features/connectivity/ConnectivityProvider";
+import { OfflineBanner } from "../features/offline/components/OfflineBanner";
+import { OFFLINE_DATABASE_NAME, initOfflineDatabase } from "../features/offline/database/offlineDatabase";
+import { useOfflineEmergencySync } from "../features/offline/hooks/useOfflineEmergencySync";
 import SplashScreen from "../screens/SplashScreen";
 import {
   OnboardingProvider,
@@ -31,6 +36,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   usePushNotificationsBootstrap();
   useNotificationsBootstrap();
   useRealtimeBootstrap();
+  useOfflineEmergencySync();
 
   const currentPath = String(pathname ?? "");
   const inAuthFlow =
@@ -71,9 +77,6 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     return <Redirect href="/(auth)/login" />;
   }
 
-
-
-
   if (mode === "authed") {
     if (profileCompletionRequired && !inProfileCompletionFlow && !inSetPasswordFlow) {
       return <Redirect href="/profile-completion" />;
@@ -98,6 +101,7 @@ function RootLayoutInner() {
     <AuthProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <StatusBar style={isDark ? "light" : "dark"} />
+        <OfflineBanner />
         <AuthGate>
           <>
             <Stack
@@ -149,9 +153,13 @@ function RootLayoutInner() {
 export default function RootLayout() {
   return (
     <ThemeProvider>
-      <OnboardingProvider>
-        <RootLayoutInner />
-      </OnboardingProvider>
+      <ConnectivityProvider>
+        <SQLiteProvider databaseName={OFFLINE_DATABASE_NAME} onInit={initOfflineDatabase}>
+          <OnboardingProvider>
+            <RootLayoutInner />
+          </OnboardingProvider>
+        </SQLiteProvider>
+      </ConnectivityProvider>
     </ThemeProvider>
   );
 }

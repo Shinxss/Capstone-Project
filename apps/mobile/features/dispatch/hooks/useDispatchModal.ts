@@ -7,6 +7,7 @@ import { respondToDispatch } from "../services/dispatchApi";
 import { setStoredActiveDispatch } from "../services/dispatchStorage";
 import { DEFAULT_ASSIGNED_BY_LABEL } from "../constants/dispatchModal.constants";
 import { isPendingDispatchActive } from "../utils/dispatchLifecycle";
+import { emitDispatchEvent } from "../events/dispatchEvents";
 
 type UseDispatchModalParams = {
   pendingDispatch: DispatchOffer | null;
@@ -115,6 +116,7 @@ export function useDispatchModal(params: UseDispatchModalParams) {
       await setStoredActiveDispatch(updated);
       clearPending();
       await refreshActive();
+      void emitDispatchEvent();
       onAcceptSuccess?.();
     } catch (error: unknown) {
       const parsed = error as { response?: { data?: { message?: string } }; message?: string };
@@ -125,6 +127,7 @@ export function useDispatchModal(params: UseDispatchModalParams) {
       if (staleState) {
         clearPending();
         await Promise.allSettled([refreshPending(), refreshActive()]);
+        void emitDispatchEvent();
         return;
       }
 
@@ -145,6 +148,7 @@ export function useDispatchModal(params: UseDispatchModalParams) {
       await respondToDispatch(pendingDispatch.id, "DECLINE");
       clearPending();
       await refreshPending();
+      void emitDispatchEvent();
       onDeclineSuccess?.();
     } catch (error: unknown) {
       const parsed = error as { response?: { data?: { message?: string } }; message?: string };
@@ -155,6 +159,7 @@ export function useDispatchModal(params: UseDispatchModalParams) {
       if (staleState) {
         clearPending();
         await Promise.allSettled([refreshPending(), refreshActive()]);
+        void emitDispatchEvent();
         return;
       }
 

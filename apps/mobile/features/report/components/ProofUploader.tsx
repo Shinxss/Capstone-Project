@@ -14,7 +14,7 @@ type Props = {
 
 export function ProofUploader({ photos, hasError, onAddPhoto, onRemovePhoto }: Props) {
   const photo = photos[0];
-  const proofAdded = Boolean(photo?.url) && !photo.uploading && !photo.error;
+  const proofAdded = Boolean(photo?.localUri) && !photo.uploading && !photo.error;
 
   return (
     <View className="mt-8">

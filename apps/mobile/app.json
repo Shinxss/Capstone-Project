@@ -70,7 +70,8 @@
           ]
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-sqlite"
     ],
     "updates": {
       "url": "https://u.expo.dev/c0c4b1ea-4aad-425d-9e1d-1a0bb16c5d5a"

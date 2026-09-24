@@ -13,12 +13,18 @@
       "channel": "preview",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_OFFLINE_SOS_NUMBER": "+639171234567"
       }
     },
     "production": {
       "channel": "production",
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_OFFLINE_SOS_NUMBER": "+639171234567"
       }
     }
   }

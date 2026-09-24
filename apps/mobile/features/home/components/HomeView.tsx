@@ -5,7 +5,6 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,14 +14,17 @@ import { useTheme } from "../../theme/useTheme";
 import { resolveAvatarUri } from "../../profile/utils/avatarUrl";
 import { RefreshableScrollScreen } from "../../common/components/RefreshableScrollScreen";
 import { useBottomNavMetrics } from "../../common/hooks/useBottomNavMetrics";
-import { useResponsiveLayout } from "../../common/hooks/useResponsiveLayout";
 import { Skeleton, SkeletonRegion } from "../../../components/ui/Skeleton";
 import { ActiveRequestCardSkeleton } from "../../requests/components/RequestsSkeletons";
-import type {
-  MyRequestSummary,
-  MyRequestTrackingDTO,
+import {
+  isActiveRequestTrackingLabel,
+  type MyRequestSummary,
+  type MyRequestTrackingDTO,
 } from "../../requests/models/myRequests";
+import { normalizeTrackingLabel } from "../../requests/tracking/utils/tracking.utils";
 import { ActiveEmergencyRequestCard } from "./ActiveEmergencyRequestCard";
+import { NoActiveEmergencyCard } from "./NoActiveEmergencyCard";
+import { ScaledHomeContent } from "./ScaledHomeContent";
 
 type AlertIconName = React.ComponentProps<typeof Ionicons>["name"];
 type AlertTheme = {
@@ -126,6 +128,7 @@ type Props = {
   onPressNotifications?: () => void;
   onPressApplyVolunteer?: () => void;
   showVolunteerCta?: boolean;
+  onPressViewMyRequests?: () => void;
 };
 
 export function HomeView({
@@ -154,27 +157,11 @@ export function HomeView({
   onPressNotifications,
   onPressApplyVolunteer,
   showVolunteerCta = true,
+  onPressViewMyRequests,
 }: Props) {
-  const { width, height } = useWindowDimensions();
-  const { isNarrow, isCompactHeight, isLargePhone } = useResponsiveLayout();
   const { screenContentBottomPadding } = useBottomNavMetrics();
   const { isDark } = useTheme();
 
-  const isShortScreen = height <= 740;
-  const isCompactScreen = isShortScreen || isCompactHeight || height <= 780 || width < 375;
-  const isLargeDevice = isLargePhone || (height >= 880 && width >= 410);
-
-  const headingFontSize = isShortScreen ? 24 : isCompactScreen || isNarrow ? 27 : isLargeDevice ? 32 : 30;
-  const sosSize = useMemo(() => {
-    if (isShortScreen) {
-      return Math.min(154, Math.max(148, Math.round(width * 0.42)));
-    }
-    if (isLargeDevice) {
-      return Math.min(178, Math.max(170, Math.round(width * 0.41)));
-    }
-    return Math.min(168, Math.max(160, Math.round(width * 0.425)));
-  }, [isLargeDevice, isShortScreen, width]);
-  const sosInnerSize = sosSize - (isShortScreen ? 22 : isCompactScreen ? 24 : 26);
   const weatherCardBackground = withOpacity(alertTheme.cardBackgroundColor, 0.1);
   const weatherBaseColor = alertTheme.headlineColor;
   const weatherTitleColor = isDark
@@ -190,6 +177,16 @@ export function HomeView({
   const pulseOpacity = useRef(new Animated.Value(0)).current;
   const resolvedAvatarUri = useMemo(() => resolveAvatarUri(avatarUrl), [avatarUrl]);
   const safeDisplayName = String(displayName ?? "").trim() || "Guest";
+
+  const hasActiveRequest = useMemo(() => {
+    if (!activeRequest) return false;
+    const currentTracking =
+      activeRequestTracking?.request.id === activeRequest.id ? activeRequestTracking : null;
+    const trackingLabel = normalizeTrackingLabel(
+      currentTracking?.tracking.label ?? activeRequest.trackingStatus
+    );
+    return isActiveRequestTrackingLabel(trackingLabel);
+  }, [activeRequest, activeRequestTracking]);
 
   useEffect(() => {
     if (!holding) {
@@ -251,12 +248,11 @@ export function HomeView({
         contentContainerStyle={[
           styles.container,
           {
-            paddingTop: isShortScreen ? 6 : isCompactScreen ? 8 : 12,
             paddingBottom: screenContentBottomPadding,
           },
         ]}
       >
-        {/* Top bar */}
+        {/* Top bar (native / unscaled) */}
         <View style={styles.topRow}>
           <View style={styles.profile}>
             <Pressable
@@ -265,7 +261,6 @@ export function HomeView({
               hitSlop={8}
               style={({ pressed }) => [
                 styles.avatar,
-                isShortScreen ? styles.avatarShort : null,
                 {
                   borderColor: isDark ? "#2563EB" : "#EF4444",
                   backgroundColor: isDark ? "#0E1626" : "#FFFFFF",
@@ -283,21 +278,21 @@ export function HomeView({
                   resizeMode="cover"
                 />
               ) : (
-                <Ionicons name="person" size={isShortScreen ? 15 : 16} color={isDark ? "#E2E8F0" : "#111827"} />
+                <Ionicons name="person" size={16} color={isDark ? "#E2E8F0" : "#111827"} />
               )}
             </Pressable>
             <View style={styles.profileText}>
               <Text
                 numberOfLines={1}
                 maxFontSizeMultiplier={1.2}
-                style={[styles.hello, isShortScreen ? styles.helloShort : null, isDark ? styles.helloDark : null]}
+                style={[styles.hello, isDark ? styles.helloDark : null]}
               >
                 Hello, {safeDisplayName}!
               </Text>
               <Text
                 numberOfLines={1}
                 maxFontSizeMultiplier={1.2}
-                style={[styles.sub, isShortScreen ? styles.subShort : null, isDark ? styles.subDark : null]}
+                style={[styles.sub, isDark ? styles.subDark : null]}
               >
                 How are you doing today?
               </Text>
@@ -305,203 +300,157 @@ export function HomeView({
           </View>
 
           <Pressable
-            style={[styles.bellBtn, isShortScreen ? styles.bellBtnShort : null, isDark ? styles.bellBtnDark : null]}
+            style={[styles.bellBtn, isDark ? styles.bellBtnDark : null]}
             onPress={onPressNotifications}
           >
-            <Ionicons name="notifications-outline" size={isShortScreen ? 22 : 25} color={isDark ? "#E2E8F0" : "#111827"} />
+            <Ionicons name="notifications-outline" size={24} color={isDark ? "#E2E8F0" : "#111827"} />
           </Pressable>
         </View>
 
-        {/* Heading */}
-        <View style={[styles.headerBlock, { marginTop: isShortScreen ? 10 : isCompactScreen ? 14 : isLargeDevice ? 22 : 18 }]}>
-          <Text
-            numberOfLines={2}
-            maxFontSizeMultiplier={1.15}
-            style={[
-              styles.h1,
-              { fontSize: headingFontSize, lineHeight: Math.round(headingFontSize * 1.05) },
-              isDark ? styles.h1Dark : null,
-            ]}
-          >
-            Emergency help{"\n"}needed?
-          </Text>
-          <Text
-            maxFontSizeMultiplier={1.25}
-            style={[
-              styles.h2,
-              {
-                marginTop: isShortScreen ? 6 : isCompactScreen ? 8 : 11,
-                fontSize: isShortScreen ? 13 : isCompactScreen ? 14 : 15,
-                lineHeight: isShortScreen ? 17 : isCompactScreen ? 18 : 20,
-              },
-              isDark ? styles.h2Dark : null,
-            ]}
-          >
-            Press the button below and help reach you shortly.
-          </Text>
-        </View>
+        {/* Scaled Home Composition */}
+        <ScaledHomeContent>
+          {/* Heading */}
+          <View style={styles.headerBlock}>
+            <Text
+              numberOfLines={2}
+              maxFontSizeMultiplier={1.15}
+              style={[styles.h1, isDark ? styles.h1Dark : null]}
+            >
+              Emergency help{"\n"}needed?
+            </Text>
+            <Text
+              maxFontSizeMultiplier={1.25}
+              style={[styles.h2, isDark ? styles.h2Dark : null]}
+            >
+              Press the button below and help reach you shortly.
+            </Text>
+          </View>
 
-        {/* SOS */}
-        <View style={[styles.sosBlock, { marginTop: isShortScreen ? 8 : isCompactScreen ? 10 : 13 }]}>
-          <View
-            style={[
-              styles.sosOuter,
-              {
-                width: sosSize,
-                height: sosSize,
-                borderRadius: sosSize / 2,
-              },
-              isDark ? styles.sosOuterDark : null,
-              holding && styles.sosOuterHolding,
-              holding && isDark ? styles.sosOuterHoldingDark : null,
-            ]}
-          >
-            <Animated.View
-              pointerEvents="none"
+          {/* SOS */}
+          <View style={styles.sosBlock}>
+            <View
               style={[
-                styles.sosPulse,
-                {
-                  width: sosSize,
-                  height: sosSize,
-                  borderRadius: sosSize / 2,
-                  opacity: pulseOpacity,
-                  transform: [{ scale: pulseScale }],
-                },
-              ]}
-            />
-
-            <Pressable
-              onPressIn={onStartHold}
-              onPressOut={onCancelHold}
-              style={[
-                styles.sosInner,
-                {
-                  width: sosInnerSize,
-                  height: sosInnerSize,
-                  borderRadius: sosInnerSize / 2,
-                },
-                isDark ? styles.sosInnerShadow : null,
-                isDark ? styles.sosInnerDark : null,
-                holding && styles.sosInnerHolding,
-                holding && isDark ? styles.sosInnerHoldingDark : null,
+                styles.sosOuter,
+                isDark ? styles.sosOuterDark : null,
+                holding && styles.sosOuterHolding,
+                holding && isDark ? styles.sosOuterHoldingDark : null,
               ]}
             >
-              <View
+              <Animated.View
+                pointerEvents="none"
                 style={[
-                  styles.warnCircle,
-                  isShortScreen ? styles.warnCircleShort : isCompactScreen ? styles.warnCircleCompact : null,
-                ]}
-              >
-                <Ionicons
-                  name="warning"
-                  size={isShortScreen ? 14 : isCompactScreen ? 15 : 17}
-                  color="#fff"
-                />
-              </View>
-
-              <Text
-                style={[
-                  styles.sosText,
+                  styles.sosPulse,
                   {
-                    fontSize: isShortScreen ? 34 : isCompactScreen ? 36 : isLargeDevice ? 41 : 38,
-                    lineHeight: isShortScreen ? 36 : isCompactScreen ? 38 : isLargeDevice ? 43 : 40,
+                    opacity: pulseOpacity,
+                    transform: [{ scale: pulseScale }],
                   },
                 ]}
-              >
-                SOS
-              </Text>
-              <Text
+              />
+
+              <Pressable
+                onPressIn={onStartHold}
+                onPressOut={onCancelHold}
                 style={[
-                  styles.sosHint,
-                  { fontSize: isShortScreen ? 12 : 13 },
+                  styles.sosInner,
+                  isDark ? styles.sosInnerShadow : null,
+                  isDark ? styles.sosInnerDark : null,
+                  holding && styles.sosInnerHolding,
+                  holding && isDark ? styles.sosInnerHoldingDark : null,
                 ]}
               >
-                {holding ? `Keep holding... ${remainingSeconds}s` : "Hold for 3s"}
-              </Text>
-            </Pressable>
-          </View>
+                <View style={styles.warnCircle}>
+                  <Ionicons name="warning" size={16} color="#fff" />
+                </View>
 
-          <Text
-            maxFontSizeMultiplier={1.25}
-            style={[
-              styles.locationNote,
-              {
-                marginTop: isShortScreen ? 8 : isCompactScreen ? 10 : 13,
-                fontSize: isShortScreen ? 12.5 : isCompactScreen ? 13 : 14,
-                lineHeight: isShortScreen ? 16 : isCompactScreen ? 18 : 20,
-              },
-              isDark ? styles.locationNoteDark : null,
-            ]}
-          >
-            Your location will be shared with emergency responders
-          </Text>
-        </View>
-
-        {/* Alert card */}
-        <Pressable
-          onPress={onPressAlert}
-          disabled={!onPressAlert}
-          style={({ pressed }) => [
-            styles.card,
-            isShortScreen ? styles.cardShort : null,
-            { marginTop: isShortScreen ? 10 : isCompactScreen ? 14 : 18 },
-            {
-              backgroundColor: weatherCardBackground,
-              borderColor: alertTheme.cardBorderColor,
-            },
-            pressed && onPressAlert ? styles.cardPressed : null,
-          ]}
-        >
-          {alertLoading ? (
-            <SkeletonRegion label="Loading local weather alerts" style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 12 }}>
-              <Skeleton width={isShortScreen ? 44 : 48} height={isShortScreen ? 44 : 48} radius={14} />
-              <View style={styles.cardContent}><Skeleton width="46%" height={16} /><View style={{ marginTop: 9 }}><Skeleton width="90%" height={12} /></View><View style={{ marginTop: 7 }}><Skeleton width="68%" height={12} /></View></View>
-            </SkeletonRegion>
-          ) : (
-            <>
-              <View style={[styles.cardIcon, isShortScreen ? styles.cardIconShort : null, { backgroundColor: alertTheme.iconBackgroundColor }]}>
-                <Ionicons name={alertIconName} size={isShortScreen ? 22 : 24} color={alertTheme.iconColor} />
-              </View>
-              <View style={styles.cardContent}>
-                <Text style={[styles.cardHeadline, isShortScreen ? styles.cardHeadlineShort : null, { color: weatherTitleColor }]}>{alertTitle}</Text>
-                <Text style={[styles.cardSub, isShortScreen ? styles.cardSubShort : null, { color: weatherTextColor }]}>{alertMessage}</Text>
-                {alertRetryEnabled ? <Text style={[styles.cardRetry, { color: weatherRetryColor }]}>Tap to retry</Text> : null}
-              </View>
-            </>
-          )}
-        </Pressable>
-
-        {activeRequestLoading && !activeRequest ? (
-          <ActiveRequestCardSkeleton />
-        ) : activeRequest ? (
-          <ActiveEmergencyRequestCard
-            request={activeRequest}
-            tracking={activeRequestTracking}
-            onPressTracking={onPressTracking}
-          />
-        ) : null}
-
-        {showVolunteerCta ? (
-          <View style={[styles.volunteer, { marginTop: isShortScreen ? 14 : isCompactScreen ? 18 : 22 }]}>
-            <View style={styles.volCircle1} />
-            <View style={styles.volCircle2} />
-
-            <View style={styles.volRow}>
-              <View style={styles.volBadge}>
-                <Ionicons name="shield-outline" size={30} color="#fff" />
-              </View>
-              <Text style={styles.volTitle}>Become a Volunteer</Text>
+                <Text style={styles.sosText}>SOS</Text>
+                <Text style={styles.sosHint}>
+                  {holding ? `Keep holding... ${remainingSeconds}s` : "Hold for 3s"}
+                </Text>
+              </Pressable>
             </View>
 
-            <Text style={styles.volSub}>
-              Join our community responders and help save lives in your barangays
+            <Text
+              maxFontSizeMultiplier={1.25}
+              style={[styles.locationNote, isDark ? styles.locationNoteDark : null]}
+            >
+              Your location will be shared with emergency responders
             </Text>
-
-            <Pressable style={styles.applyBtn} onPress={onPressApplyVolunteer}>
-              <Text style={styles.applyText}>Apply Now</Text>
-            </Pressable>
           </View>
-        ) : null}
+
+          {/* Alert card */}
+          <Pressable
+            onPress={onPressAlert}
+            disabled={!onPressAlert}
+            style={({ pressed }) => [
+              styles.card,
+              {
+                backgroundColor: weatherCardBackground,
+                borderColor: alertTheme.cardBorderColor,
+              },
+              pressed && onPressAlert ? styles.cardPressed : null,
+            ]}
+          >
+            {alertLoading ? (
+              <SkeletonRegion label="Loading local weather alerts" style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <Skeleton width={52} height={52} radius={12} />
+                <View style={styles.cardContent}>
+                  <Skeleton width="46%" height={16} />
+                  <View style={{ marginTop: 9 }}><Skeleton width="90%" height={12} /></View>
+                  <View style={{ marginTop: 7 }}><Skeleton width="68%" height={12} /></View>
+                </View>
+              </SkeletonRegion>
+            ) : (
+              <>
+                <View style={[styles.cardIcon, { backgroundColor: alertTheme.iconBackgroundColor }]}>
+                  <Ionicons name={alertIconName} size={24} color={alertTheme.iconColor} />
+                </View>
+                <View style={styles.cardContent}>
+                  <Text style={[styles.cardHeadline, { color: weatherTitleColor }]}>{alertTitle}</Text>
+                  <Text style={[styles.cardSub, { color: weatherTextColor }]}>{alertMessage}</Text>
+                  {alertRetryEnabled ? <Text style={[styles.cardRetry, { color: weatherRetryColor }]}>Tap to retry</Text> : null}
+                </View>
+              </>
+            )}
+          </Pressable>
+
+          {/* Active Request / No Active Request */}
+          {activeRequestLoading && !activeRequest ? (
+            <ActiveRequestCardSkeleton />
+          ) : hasActiveRequest && activeRequest ? (
+            <ActiveEmergencyRequestCard
+              request={activeRequest}
+              tracking={activeRequestTracking}
+              onPressTracking={onPressTracking}
+            />
+          ) : (
+            <NoActiveEmergencyCard
+              onPressViewMyRequests={onPressViewMyRequests}
+            />
+          )}
+
+          {/* Volunteer CTA */}
+          {showVolunteerCta ? (
+            <View style={styles.volunteer}>
+              <View style={styles.volCircle1} />
+              <View style={styles.volCircle2} />
+
+              <View style={styles.volRow}>
+                <View style={styles.volBadge}>
+                  <Ionicons name="shield-outline" size={30} color="#fff" />
+                </View>
+                <Text style={styles.volTitle}>Become a Volunteer</Text>
+              </View>
+
+              <Text style={styles.volSub}>
+                Join our community responders and help save lives in your barangays
+              </Text>
+
+              <Pressable style={styles.applyBtn} onPress={onPressApplyVolunteer}>
+                <Text style={styles.applyText}>Apply Now</Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </ScaledHomeContent>
       </RefreshableScrollScreen>
     </SafeAreaView>
   );
@@ -515,40 +464,35 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 520,
     alignSelf: "center",
-    paddingHorizontal: 16,
+    paddingTop: 8,
   },
 
   topRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    paddingHorizontal: 16,
   },
   profile: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 10 },
   profileText: { flex: 1, minWidth: 0 },
   avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 100,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: "#fff",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
     borderColor: "#EF4444",
   },
-  avatarShort: {
-    width: 44,
-    height: 44,
-  },
   avatarImage: {
     width: "100%",
     height: "100%",
-    borderRadius: 100,
+    borderRadius: 24,
   },
   hello: { fontSize: 18, color: "#111827", fontWeight: "700" },
-  helloShort: { fontSize: 17 },
   helloDark: { color: "#F1F5F9" },
   sub: { fontSize: 13, color: "#6B7280", marginTop: 1 },
-  subShort: { fontSize: 12 },
   subDark: { color: "#94A3B8" },
   bellBtn: {
     width: 40,
@@ -558,45 +502,44 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    marginRight: 6,
     borderColor: "#E5E7EB",
     flexShrink: 0,
-  },
-  bellBtnShort: {
-    width: 36,
-    height: 36,
-    borderRadius: 9,
   },
   bellBtnDark: {
     backgroundColor: "#0E1626",
     borderColor: "#162544",
   },
 
-  headerBlock: { alignItems: "center", paddingHorizontal: 8 },
+  headerBlock: { alignItems: "center", paddingHorizontal: 8, marginTop: 18 },
   h1: {
     width: "100%",
     maxWidth: 430,
     fontWeight: "900",
     color: "#6B7280",
     textAlign: "center",
-    lineHeight: 38,
+    fontSize: 28,
+    lineHeight: 33,
   },
   h1Dark: {
     color: "#E2E8F0",
   },
   h2: {
     maxWidth: 320,
-    fontSize: 15,
+    fontSize: 14,
     color: "#9CA3AF",
     textAlign: "center",
-    lineHeight: 20,
+    lineHeight: 19,
+    marginTop: 8,
   },
   h2Dark: {
     color: "#94A3B8",
   },
 
-  sosBlock: { alignItems: "center" },
+  sosBlock: { alignItems: "center", marginTop: 14 },
   sosOuter: {
+    width: 168,
+    height: 168,
+    borderRadius: 84,
     backgroundColor: "#FEE2E2",
     alignItems: "center",
     justifyContent: "center",
@@ -614,9 +557,15 @@ const styles = StyleSheet.create({
   },
   sosPulse: {
     position: "absolute",
+    width: 168,
+    height: 168,
+    borderRadius: 84,
     backgroundColor: "#EF4444",
   },
   sosInner: {
+    width: 142,
+    height: 142,
+    borderRadius: 71,
     backgroundColor: "#EF4444",
     alignItems: "center",
     justifyContent: "center",
@@ -641,39 +590,30 @@ const styles = StyleSheet.create({
     borderColor: "#7F1D1D",
   },
   warnCircle: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: "rgba(255,255,255,0.25)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 4,
-  },
-  warnCircleCompact: {
     width: 24,
     height: 24,
     borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.25)",
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: 3,
-  },
-  warnCircleShort: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    marginBottom: 2,
   },
   sosText: {
     fontWeight: "700",
     color: "#fff",
     textAlign: "center",
     letterSpacing: 0.5,
+    fontSize: 38,
+    lineHeight: 40,
   },
   sosHint: { fontSize: 13, color: "rgba(255,255,255,0.92)", marginTop: 2, textAlign: "center" },
   locationNote: {
     maxWidth: 330,
-    fontSize: 14,
+    fontSize: 13.5,
     color: "#9CA3AF",
     textAlign: "center",
-    lineHeight: 20,
+    lineHeight: 18,
+    marginTop: 12,
   },
   locationNoteDark: {
     color: "#94A3B8",
@@ -687,36 +627,25 @@ const styles = StyleSheet.create({
     gap: 12,
     borderWidth: 1,
     borderColor: "#E5E7EB",
-  },
-  cardShort: {
-    padding: 10,
-    borderRadius: 12,
-    gap: 10,
+    marginTop: 16,
   },
   cardPressed: {
     opacity: 0.92,
   },
   cardIcon: {
-    width: 58,
-    height: 58,
-    borderRadius: 10,
+    width: 54,
+    height: 54,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
-  cardIconShort: {
-    width: 48,
-    height: 48,
-    borderRadius: 9,
-  },
   cardContent: { flex: 1, minWidth: 0 },
   cardHeadline: { fontSize: 16, fontWeight: "900", marginTop: 2 },
-  cardHeadlineShort: { fontSize: 15 },
   cardSub: { fontSize: 12, color: "#6B7280", marginTop: 2, lineHeight: 15 },
-  cardSubShort: { fontSize: 11.5, lineHeight: 14 },
   cardRetry: { fontSize: 11, marginTop: 4, fontWeight: "700" },
 
   volunteer: {
-    marginTop: 25,
+    marginTop: 18,
     backgroundColor: "#B91C1C",
     borderRadius: 16,
     padding: 16,

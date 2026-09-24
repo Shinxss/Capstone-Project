@@ -5,6 +5,7 @@ import { getDeviceLocation } from "../../emergency/services/locationService";
 import { getWeatherSummary, type WeatherSummary } from "../../weather/services/weatherApi";
 import { showInAppNotification } from "../components/InAppNotificationHost";
 import { addMobileNotifications, addMobileNotification, getMobileNotificationsMeta, updateMobileNotificationsMeta } from "../services/mobileNotificationsStore";
+import { useConnectivity } from "../../connectivity/hooks/useConnectivity";
 
 type HazardZoneRecord = {
   _id?: string;
@@ -257,15 +258,16 @@ function isPointInOrNearGeometry(
 
 export function useNotificationsBootstrap() {
   const { hydrated, mode, user } = useAuth();
+  const { isOnline } = useConnectivity();
   const pollingInFlightRef = useRef(false);
 
   useEffect(() => {
-    if (!hydrated || mode === "anonymous") return;
+    if (!hydrated || mode === "anonymous" || !isOnline) return;
 
     let cancelled = false;
 
     const runPoll = async () => {
-      if (cancelled || pollingInFlightRef.current) return;
+      if (cancelled || pollingInFlightRef.current || !isOnline) return;
       pollingInFlightRef.current = true;
 
       try {

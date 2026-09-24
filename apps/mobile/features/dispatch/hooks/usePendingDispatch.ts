@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { DispatchOffer } from "../models/dispatch";
 import { fetchMyPendingDispatch } from "../services/dispatchApi";
 import { pendingDispatchExpirationMs } from "../utils/dispatchLifecycle";
+import { subscribeDispatchEvents } from "../events/dispatchEvents";
 
 export function usePendingDispatch(options?: { pollMs?: number; enabled?: boolean }) {
   const pollMs = options?.pollMs ?? 8000;
@@ -31,6 +32,14 @@ export function usePendingDispatch(options?: { pollMs?: number; enabled?: boolea
       alive = false;
     };
   }, [refresh]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const unsubscribe = subscribeDispatchEvents(() => {
+      void refresh();
+    });
+    return unsubscribe;
+  }, [enabled, refresh]);
 
   useEffect(() => {
     if (!enabled) return;

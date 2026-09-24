@@ -14,6 +14,7 @@ import {
 } from "../services/pushRegistrationApi";
 import { playDispatchAlert } from "../services/dispatchAlertService";
 import { getRequestUpdateNotificationId } from "../utils/notificationIds";
+import { useConnectivity } from "../../connectivity/hooks/useConnectivity";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -161,6 +162,7 @@ async function getExpoPushToken(): Promise<string | null> {
 export function usePushNotificationsBootstrap() {
   const router = useRouter();
   const { hydrated, mode, user } = useAuth();
+  const { isOnline } = useConnectivity();
   const registeredUserIdRef = useRef<string | null>(null);
   const registeredTokenRef = useRef<string | null>(null);
 
@@ -303,7 +305,7 @@ export function usePushNotificationsBootstrap() {
     let timer: ReturnType<typeof setInterval> | null = null;
 
     const runRegistration = async () => {
-      if (registeredUserIdRef.current === user.id) return;
+      if (registeredUserIdRef.current === user.id || !isOnline) return;
 
       try {
         const expoPushToken = await getExpoPushToken();

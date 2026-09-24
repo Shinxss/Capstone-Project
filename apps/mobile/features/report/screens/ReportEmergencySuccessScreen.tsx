@@ -8,18 +8,33 @@ import { useReportDraft } from "../hooks/useReportDraft";
 type SearchParams = {
   incidentId?: string;
   referenceNumber?: string;
+  clientRequestId?: string;
+  deliveryMode?: string;
   isSos?: string;
   reportLng?: string;
   reportLat?: string;
 };
 
 export function ReportEmergencySuccessScreen() {
-  const { incidentId, referenceNumber, isSos, reportLng, reportLat } = useLocalSearchParams<SearchParams>();
+  const {
+    incidentId,
+    referenceNumber,
+    clientRequestId,
+    deliveryMode,
+    isSos,
+    reportLng,
+    reportLat,
+  } = useLocalSearchParams<SearchParams>();
   const { reset } = useReportDraft();
-  const sosMode = String(isSos ?? "") === "1";
-  const viewOnMapParams: Record<string, string> = {};
 
-  if (incidentId) viewOnMapParams.incidentId = String(incidentId);
+  const sosMode = String(isSos ?? "") === "1";
+  const mode = (deliveryMode as "online" | "offline_sms" | "offline_queued") || "online";
+  const isOfflineSms = mode === "offline_sms";
+  const isOfflineQueued = mode === "offline_queued";
+  const isOfflineMode = isOfflineSms || isOfflineQueued;
+
+  const viewOnMapParams: Record<string, string> = {};
+  if (incidentId && !isOfflineMode) viewOnMapParams.incidentId = String(incidentId);
   if (reportLng) viewOnMapParams.reportLng = String(reportLng);
   if (reportLat) viewOnMapParams.reportLat = String(reportLat);
 
@@ -28,6 +43,28 @@ export function ReportEmergencySuccessScreen() {
     router.replace("/(tabs)");
   };
 
+  // Determine title based on delivery mode
+  let title = sosMode ? "SOS Sent!" : "Report Submitted!";
+  if (isOfflineSms) {
+    title = sosMode ? "SOS Saved & Prepared" : "Report Saved & Prepared";
+  } else if (isOfflineQueued) {
+    title = sosMode ? "SOS Saved Offline" : "Report Saved Offline";
+  }
+
+  // Determine message based on delivery mode
+  let message = sosMode
+    ? "Your SOS has been received. Responders in your area have been alerted."
+    : "Your emergency report has been received. Responders in your area have been alerted.";
+  if (isOfflineSms) {
+    message =
+      "Your emergency has been saved on this device. Lifeline opened your SMS app with the emergency details. Delivery cannot be confirmed from the app. The report will also sync to Lifeline when internet returns.";
+  } else if (isOfflineQueued) {
+    message =
+      "Your emergency has been saved on this device and is waiting to sync. Try SMS again if available, or reconnect to the internet.";
+  }
+
+  const displayedReference = clientRequestId || referenceNumber || "N/A";
+
   return (
     <SafeAreaView edges={["bottom"]} style={styles.screen}>
       <ScrollView
@@ -35,56 +72,78 @@ export function ReportEmergencySuccessScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
       >
-      <View style={styles.iconWrap}>
-        <View style={styles.iconCircle}>
-          <Ionicons name="checkmark-circle-outline" size={44} color="#16a34a" />
+        <View style={styles.iconWrap}>
+          <View
+            style={[
+              styles.iconCircle,
+              isOfflineSms && styles.iconCircleSms,
+              isOfflineQueued && styles.iconCircleQueued,
+            ]}
+          >
+            {isOfflineQueued ? (
+              <Ionicons name="cloud-offline-outline" size={44} color="#b45309" />
+            ) : isOfflineSms ? (
+              <Ionicons name="chatbox-ellipses-outline" size={44} color="#0284c7" />
+            ) : (
+              <Ionicons name="checkmark-circle-outline" size={44} color="#16a34a" />
+            )}
+          </View>
         </View>
-      </View>
 
-      <Text maxFontSizeMultiplier={1.3} style={styles.title}>
-        {sosMode ? "SOS Sent!" : "Report Submitted!"}
-      </Text>
-
-      <Text maxFontSizeMultiplier={1.3} style={styles.message}>
-        {sosMode
-          ? "Your SOS has been received. Responders in your area have been alerted."
-          : "Your emergency report has been received. Responders in your area have been alerted."}
-      </Text>
-
-      <View style={styles.referenceCard}>
-        <Text maxFontSizeMultiplier={1.3} style={styles.referenceLabel}>
-          Reference Number:
+        <Text maxFontSizeMultiplier={1.3} style={styles.title}>
+          {title}
         </Text>
-        <Text maxFontSizeMultiplier={1.2} numberOfLines={2} style={styles.referenceValue}>
-          {referenceNumber || "N/A"}
+
+        <Text maxFontSizeMultiplier={1.3} style={styles.message}>
+          {message}
         </Text>
-      </View>
 
-      <Text maxFontSizeMultiplier={1.3} style={styles.helperText}>
-        Keep this reference number for tracking. You will receive updates about your report.
-      </Text>
-
-      <View style={styles.actions}>
-        <Pressable
-          onPress={() =>
-            router.push({
-              pathname: "/(tabs)/map",
-              params: Object.keys(viewOnMapParams).length ? viewOnMapParams : undefined,
-            })
-          }
-          style={styles.primaryBtn}
-        >
-          <Text maxFontSizeMultiplier={1.2} style={styles.primaryBtnText}>
-            View on Map
+        <View style={styles.referenceCard}>
+          <Text maxFontSizeMultiplier={1.3} style={styles.referenceLabel}>
+            {isOfflineMode ? "Local Reference ID:" : "Reference Number:"}
           </Text>
-        </Pressable>
-
-        <Pressable onPress={onBackHome} style={styles.secondaryBtn}>
-          <Text maxFontSizeMultiplier={1.2} style={styles.secondaryBtnText}>
-            Back to Home
+          <Text maxFontSizeMultiplier={1.2} numberOfLines={2} style={styles.referenceValue}>
+            {displayedReference}
           </Text>
-        </Pressable>
-      </View>
+        </View>
+
+        <Text maxFontSizeMultiplier={1.3} style={styles.helperText}>
+          {isOfflineMode
+            ? "Keep this reference ID. Your emergency is queued on this device and will automatically sync when connectivity is restored."
+            : "Keep this reference number for tracking. You will receive updates about your report."}
+        </Text>
+
+        <View style={styles.actions}>
+          {!isOfflineMode ? (
+            <>
+              <Pressable
+                onPress={() =>
+                  router.push({
+                    pathname: "/(tabs)/map",
+                    params: Object.keys(viewOnMapParams).length ? viewOnMapParams : undefined,
+                  })
+                }
+                style={styles.primaryBtn}
+              >
+                <Text maxFontSizeMultiplier={1.2} style={styles.primaryBtnText}>
+                  View on Map
+                </Text>
+              </Pressable>
+
+              <Pressable onPress={onBackHome} style={styles.secondaryBtn}>
+                <Text maxFontSizeMultiplier={1.2} style={styles.secondaryBtnText}>
+                  Back to Home
+                </Text>
+              </Pressable>
+            </>
+          ) : (
+            <Pressable onPress={onBackHome} style={styles.primaryBtn}>
+              <Text maxFontSizeMultiplier={1.2} style={styles.primaryBtnText}>
+                Back to Home
+              </Text>
+            </Pressable>
+          )}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -112,47 +171,53 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "#d1fae5",
   },
+  iconCircleSms: {
+    backgroundColor: "#e0f2fe",
+  },
+  iconCircleQueued: {
+    backgroundColor: "#fef3c7",
+  },
   title: {
     marginTop: 24,
     textAlign: "center",
-    fontSize: 42 / 2,
+    fontSize: 21,
     fontWeight: "600",
     color: "#18181b",
   },
   message: {
     marginTop: 10,
     textAlign: "center",
-    fontSize: 17,
-    lineHeight: 25,
+    fontSize: 16,
+    lineHeight: 24,
     color: "#52525b",
-    paddingHorizontal: 30,
+    paddingHorizontal: 16,
   },
   referenceCard: {
     marginTop: 28,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: "#d4d4d8",
-    backgroundColor: "#f4f4f5",
+    backgroundColor: "#ffffff",
     paddingHorizontal: 18,
     paddingVertical: 18,
   },
   referenceLabel: {
-    fontSize: 17,
+    fontSize: 15,
     color: "#52525b",
   },
   referenceValue: {
-    marginTop: 12,
-    fontSize: 38 / 2,
+    marginTop: 8,
+    fontSize: 19,
     fontWeight: "700",
     color: "#18181b",
   },
   helperText: {
-    marginTop: 26,
+    marginTop: 20,
     textAlign: "center",
-    fontSize: 17,
-    lineHeight: 25,
+    fontSize: 15,
+    lineHeight: 22,
     color: "#52525b",
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
   },
   actions: {
     marginTop: 28,
@@ -185,4 +250,3 @@ const styles = StyleSheet.create({
     color: "#18181b",
   },
 });
-

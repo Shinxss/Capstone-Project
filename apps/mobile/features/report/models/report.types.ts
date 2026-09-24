@@ -20,6 +20,7 @@ export type ReportLocation = {
 export type ReportPhoto = {
   localUri: string;
   url?: string;
+  base64?: string;
   uploading?: boolean;
   error?: string;
   mimeType?: string;
@@ -42,6 +43,8 @@ export interface EmergencyTypeOption {
   iconColor: string;
 }
 
+export type ReportDeliveryMode = "online" | "offline_sms" | "offline_queued";
+
 export type ReportSubmitResult = {
   incidentId: string;
   referenceNumber: string;
@@ -50,4 +53,7 @@ export type ReportSubmitResult = {
   isVisibleOnMap: boolean;
   createdAt: string;
   location: ReportLocation;
+  deliveryMode?: ReportDeliveryMode;
+  clientRequestId?: string;
+  smsStatus?: string;
 };

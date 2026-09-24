@@ -14,6 +14,7 @@ import { getDefaultTasksTab, groupDispatchesForTasks, hasAnyDispatchTasks } from
 import { getDispatchStatusLabel } from "../utils/dispatchProgress";
 import { useTaskFocusStats } from "./useTaskFocusStats";
 import { pendingDispatchExpirationMs } from "../utils/dispatchLifecycle";
+import { subscribeDispatchEvents } from "../events/dispatchEvents";
 
 type UseTasksScreenParams = {
   enabled: boolean;
@@ -85,9 +86,7 @@ export function useTasksScreen(params: UseTasksScreenParams) {
       } catch {
         // Keep existing state on network failures.
       } finally {
-        if (showLoading) {
-          setLoading(false);
-        }
+        setLoading(false);
       }
     },
     [enabled, refreshFocusStats]
@@ -112,6 +111,14 @@ export function useTasksScreen(params: UseTasksScreenParams) {
     }
 
     void refresh();
+  }, [enabled, refresh]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const unsubscribe = subscribeDispatchEvents(() => {
+      void refresh({ showLoading: false });
+    });
+    return unsubscribe;
   }, [enabled, refresh]);
 
   useEffect(() => {
@@ -185,16 +192,22 @@ export function useTasksScreen(params: UseTasksScreenParams) {
 
   useEffect(() => {
     if (loading) return;
-    if (autoSelectedInitialTabRef.current) return;
+    if (!autoSelectedInitialTabRef.current) {
+      setActiveTab(getDefaultTasksTab(groups));
+      autoSelectedInitialTabRef.current = true;
+      return;
+    }
 
-    setActiveTab(getDefaultTasksTab(groups));
-    autoSelectedInitialTabRef.current = true;
-  }, [groups, loading]);
+    if (activeTab === "new_dispatch" && groups.new_dispatch.length === 0 && groups.active.length > 0) {
+      setActiveTab("active");
+    }
+  }, [activeTab, groups, loading]);
 
   const actions = useDispatchActions({
     onAccepted: async (updated) => {
       setPendingDispatch(null);
       setCurrentDispatch(updated);
+      setActiveTab("active");
       await refresh({ showLoading: false });
     },
     onDeclined: async () => {
@@ -214,6 +227,7 @@ export function useTasksScreen(params: UseTasksScreenParams) {
     loading,
     refreshing,
     triggerRefresh,
+    refresh,
     focusStats,
     focusStatsLoading,
     tabs,

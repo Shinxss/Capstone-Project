@@ -5,6 +5,7 @@ import type { DispatchOffer } from "../models/dispatch";
 import { MIN_DISPATCH_PROOFS_REQUIRED } from "../constants/dispatchUi.constants";
 import { completeDispatch, respondToDispatch, uploadDispatchProof } from "../services/dispatchApi";
 import { setStoredActiveDispatch } from "../services/dispatchStorage";
+import { emitDispatchEvent } from "../events/dispatchEvents";
 
 type DispatchActionKind = "accept" | "decline" | "upload_proof" | "mark_done";
 
@@ -40,10 +41,12 @@ export function useDispatchActions(params?: UseDispatchActionsParams) {
         const updated = await respondToDispatch(dispatch.id, "ACCEPT");
         await setStoredActiveDispatch(updated);
         await params?.onAccepted?.(updated);
+        void emitDispatchEvent();
       } catch (error) {
         const message = readErrorMessage(error, "Unable to accept dispatch.");
         if (isStalePendingError(message)) {
           await params?.onPendingExpired?.();
+          void emitDispatchEvent();
           return;
         }
         Alert.alert("Failed", message);
@@ -64,10 +67,12 @@ export function useDispatchActions(params?: UseDispatchActionsParams) {
         setBusyAction("decline");
         await respondToDispatch(dispatch.id, "DECLINE");
         await params?.onDeclined?.();
+        void emitDispatchEvent();
       } catch (error) {
         const message = readErrorMessage(error, "Unable to decline dispatch.");
         if (isStalePendingError(message)) {
           await params?.onPendingExpired?.();
+          void emitDispatchEvent();
           return;
         }
         Alert.alert("Failed", message);
@@ -173,6 +178,7 @@ export function useDispatchActions(params?: UseDispatchActionsParams) {
         setBusyAction("mark_done");
         const updated = await completeDispatch(dispatch.id);
         await params?.onCurrentUpdated?.(updated);
+        void emitDispatchEvent();
         Alert.alert("Submitted", "Task marked as done. Waiting for LGU verification.");
       } catch (error) {
         Alert.alert("Failed", readErrorMessage(error, "Something went wrong"));

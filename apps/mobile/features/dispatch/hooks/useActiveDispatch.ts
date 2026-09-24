@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { DispatchOffer } from "../models/dispatch";
 import { fetchMyActiveDispatch } from "../services/dispatchApi";
 import { getStoredActiveDispatch, setStoredActiveDispatch } from "../services/dispatchStorage";
+import { subscribeDispatchEvents } from "../events/dispatchEvents";
 
 export function useActiveDispatch(options?: { pollMs?: number; enabled?: boolean }) {
   const pollMs = options?.pollMs ?? 8000;
@@ -52,6 +53,14 @@ export function useActiveDispatch(options?: { pollMs?: number; enabled?: boolean
     return () => {
       alive = false;
     };
+  }, [enabled, refresh]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const unsubscribe = subscribeDispatchEvents(() => {
+      void refresh();
+    });
+    return unsubscribe;
   }, [enabled, refresh]);
 
   useEffect(() => {

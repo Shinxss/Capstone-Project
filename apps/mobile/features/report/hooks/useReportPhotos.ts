@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Alert } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { uploadEmergencyReportPhoto } from "../../emergency/services/emergencyApi";
 import type { ReportPhoto } from "../models/report.types";
 import { MAX_PROOF_IMAGES } from "../constants/report.constants";
 import { useReportDraft } from "./useReportDraft";
@@ -26,7 +25,7 @@ function getExtensionFromMime(mimeType?: string) {
 }
 
 export function useReportPhotos() {
-  const { draft, addPhotoLocal, updatePhoto, removePhoto: removePhotoFromDraft } = useReportDraft();
+  const { draft, addPhotoLocal, removePhoto: removePhotoFromDraft } = useReportDraft();
   const photos = draft.photos ?? [];
   const photosRef = useRef(photos);
 
@@ -44,19 +43,9 @@ export function useReportPhotos() {
     return false;
   }, [remainingSlots]);
 
-  const patchPhotoByLocalUri = useCallback(
-    (localUri: string, patch: Partial<ReportPhoto>) => {
-      const index = photosRef.current.findIndex((photo) => photo.localUri === localUri);
-      if (index >= 0) {
-        updatePhoto(index, patch);
-      }
-    },
-    [updatePhoto]
-  );
-
-  const uploadAsset = useCallback(
-    async (asset: ImagePicker.ImagePickerAsset) => {
-      if (!asset.uri || !asset.base64) {
+  const addLocalAsset = useCallback(
+    (asset: ImagePicker.ImagePickerAsset) => {
+      if (!asset.uri) {
         Alert.alert("Photo unavailable", "Unable to read the selected image.");
         return;
       }
@@ -69,32 +58,12 @@ export function useReportPhotos() {
         localUri: asset.uri,
         mimeType,
         fileName,
-        uploading: true,
+        base64: asset.base64 ?? undefined,
+        uploading: false,
+        error: undefined,
       });
-
-      try {
-        const response = await uploadEmergencyReportPhoto({
-          base64: asset.base64,
-          mimeType,
-          fileName,
-        });
-
-        patchPhotoByLocalUri(asset.uri, {
-          url: response.url,
-          uploading: false,
-          error: undefined,
-        });
-      } catch (error: any) {
-        const message = String(
-          error?.response?.data?.message ?? error?.message ?? "Unable to upload photo."
-        );
-        patchPhotoByLocalUri(asset.uri, {
-          uploading: false,
-          error: message,
-        });
-      }
     },
-    [addPhotoLocal, patchPhotoByLocalUri]
+    [addPhotoLocal]
   );
 
   const pickFromLibrary = useCallback(async () => {
@@ -119,9 +88,9 @@ export function useReportPhotos() {
     if (selectedAssets.length === 0) return;
 
     for (const asset of selectedAssets) {
-      await uploadAsset(asset);
+      addLocalAsset(asset);
     }
-  }, [ensureSlotAvailable, remainingSlots, uploadAsset]);
+  }, [ensureSlotAvailable, addLocalAsset]);
 
   const takePhoto = useCallback(async () => {
     if (!ensureSlotAvailable()) return;
@@ -142,8 +111,8 @@ export function useReportPhotos() {
     const asset = result.assets?.[0];
     if (!asset) return;
 
-    await uploadAsset(asset);
-  }, [ensureSlotAvailable, uploadAsset]);
+    addLocalAsset(asset);
+  }, [ensureSlotAvailable, addLocalAsset]);
 
   const removePhoto = useCallback(
     (index: number) => {

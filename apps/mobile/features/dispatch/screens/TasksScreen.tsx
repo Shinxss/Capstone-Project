@@ -2,7 +2,7 @@ import { useCallback, useEffect } from "react";
 import { useRouter } from "expo-router";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useIsFocused } from "@react-navigation/native";
+import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import { useAuth } from "../../auth/AuthProvider";
 import { useTasksAccess } from "../../auth/hooks/useTasksAccess";
 import { RefreshableScrollScreen } from "../../common/components/RefreshableScrollScreen";
@@ -35,6 +35,13 @@ export function TasksScreen() {
     mode,
     token,
   });
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!hydrated || !canAccessTasks) return;
+      void tasks.refresh({ showLoading: false });
+    }, [canAccessTasks, hydrated, tasks.refresh])
+  );
 
   const renderDispatchCard = useCallback(
     (dispatch: DispatchOffer) => {

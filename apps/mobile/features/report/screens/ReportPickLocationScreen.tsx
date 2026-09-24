@@ -5,6 +5,7 @@ import MapboxGL from "@rnmapbox/maps";
 import { router } from "expo-router";
 import { useReportDraft } from "../hooks/useReportDraft";
 import { getCurrentCoords, reverseGeocodeCoords } from "../../../shared/services/locationService";
+import { useConnectivity } from "../../connectivity/hooks/useConnectivity";
 
 const FALLBACK_CENTER: [number, number] = [120.9842, 14.5995];
 const TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? "";
@@ -19,6 +20,7 @@ function toLabel(latitude: number, longitude: number) {
 }
 
 export function ReportPickLocationScreen() {
+  const { isOffline } = useConnectivity();
   const { draft, setLocation, setLocationText } = useReportDraft();
   const [center, setCenter] = useState<[number, number]>(
     draft.location
@@ -75,7 +77,7 @@ export function ReportPickLocationScreen() {
 
     const resolve = async () => {
       setResolvingAddress(true);
-      const address = await reverseGeocodeCoords({ latitude, longitude });
+      const address = await reverseGeocodeCoords({ latitude, longitude }).catch(() => null);
       if (!active) return;
 
       setPickedAddress(address || toLabel(latitude, longitude));
@@ -114,6 +116,14 @@ export function ReportPickLocationScreen() {
       <View className="flex-row items-center justify-between px-4 pb-2 pt-1">
         <Text className="text-lg font-bold text-white">Pick Location</Text>
       </View>
+
+      {isOffline ? (
+        <View className="bg-amber-600 px-4 py-2">
+          <Text className="text-center text-xs font-semibold text-white">
+            Map preview is unavailable offline. Use your current GPS location.
+          </Text>
+        </View>
+      ) : null}
 
       <View className="flex-1 overflow-hidden">
         <MapboxGL.MapView

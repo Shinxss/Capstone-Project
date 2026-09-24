@@ -10,6 +10,7 @@ import {
   type LifelineSocket,
 } from "../socketClient";
 import { getVolunteerHeartbeatPlan } from "../volunteerHeartbeat";
+import { useConnectivity } from "../../connectivity/hooks/useConnectivity";
 
 type RequestUpdatePayload = {
   requestId?: string;
@@ -117,10 +118,11 @@ function normalizeDispatchTarget(_payload: DispatchOfferPayload) {
 
 export function useRealtimeBootstrap() {
   const { hydrated, mode, token, user, updateUser } = useAuth();
+  const { isOnline } = useConnectivity();
 
   useEffect(() => {
     if (!hydrated) return;
-    if (mode !== "authed" || !token) {
+    if (mode !== "authed" || !token || !isOnline) {
       disconnectRealtime();
       return;
     }
@@ -230,6 +232,5 @@ export function useRealtimeBootstrap() {
       socket.off("notify:request_update", onRequestUpdate as Parameters<LifelineSocket["on"]>[1]);
       socket.off("notify:dispatch_offer", onDispatchOffer as Parameters<LifelineSocket["on"]>[1]);
     };
-  }, [hydrated, mode, token, updateUser, user?.onDuty, user?.role]);
+  }, [hydrated, isOnline, mode, token, updateUser, user?.onDuty, user?.role]);
 }
-

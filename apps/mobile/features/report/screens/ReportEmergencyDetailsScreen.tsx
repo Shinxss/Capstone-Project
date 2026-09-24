@@ -26,6 +26,8 @@ import {
   REQUIRED_PROOF_IMAGES,
 } from "../constants/report.constants";
 
+import { useConnectivity } from "../../connectivity/hooks/useConnectivity";
+
 const DAGUPAN_CENTER: [number, number] = [120.34, 16.043];
 const FALLBACK_CENTER: [number, number] = DAGUPAN_CENTER;
 const TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? "";
@@ -41,9 +43,10 @@ function toLabel(latitude: number, longitude: number) {
 
 export function ReportEmergencyDetailsScreen() {
   const insets = useSafeAreaInsets();
+  const { isOffline } = useConnectivity();
   const { draft, setDescription, setLocation, setLocationText } = useReportDraft();
   const { loading, submit } = useSubmitReport();
-  const { photos, pickFromLibrary, takePhoto, removePhoto, hasUploading, hasError } = useReportPhotos();
+  const { photos, pickFromLibrary, takePhoto, removePhoto, hasError } = useReportPhotos();
   const [proofSheetVisible, setProofSheetVisible] = useState(false);
   const [showMapPicker, setShowMapPicker] = useState(false);
   const [mapCenter, setMapCenter] = useState<[number, number]>(
@@ -62,16 +65,15 @@ export function ReportEmergencyDetailsScreen() {
   );
 
   const hasCoords = Boolean(draft.location?.coords);
-  const uploadedProofCount = photos.filter((photo) => Boolean(photo.url)).length;
-  const hasMissingPhotoUrl = photos.some((photo) => !photo.url);
+  const validLocalPhotosCount = photos.filter(
+    (photo) => Boolean(photo.localUri) && !photo.error
+  ).length;
   const canSubmit =
     Boolean(draft.type && hasCoords) &&
-    uploadedProofCount === REQUIRED_PROOF_IMAGES &&
+    validLocalPhotosCount === REQUIRED_PROOF_IMAGES &&
     photos.length === MAX_PROOF_IMAGES &&
     !loading &&
-    !hasUploading &&
-    !hasError &&
-    !hasMissingPhotoUrl;
+    !hasError;
   const locationValue = draft.locationText ?? draft.location?.label ?? "";
   const markerCoordinate = useMemo(() => mapPicked, [mapPicked]);
 
@@ -131,7 +133,7 @@ export function ReportEmergencyDetailsScreen() {
     try {
       const coords = await getCurrentCoords();
       const [longitude, latitude] = [coords.longitude, coords.latitude];
-      const address = await reverseGeocodeCoords({ latitude, longitude });
+      const address = await reverseGeocodeCoords({ latitude, longitude }).catch(() => null);
       const label = address ?? toLabel(latitude, longitude);
       setLocationText(label);
       setLocation({ latitude, longitude }, label);
@@ -181,6 +183,8 @@ export function ReportEmergencyDetailsScreen() {
         params: {
           incidentId: response.incidentId,
           referenceNumber: response.referenceNumber,
+          clientRequestId: response.clientRequestId,
+          deliveryMode: response.deliveryMode ?? "online",
           isSos: "0",
           reportLng: String(reportLng),
           reportLat: String(reportLat),
@@ -212,7 +216,16 @@ export function ReportEmergencyDetailsScreen() {
           <Text className="text-xl font-semibold text-zinc-900">Location *</Text>
           <View className="mt-3 flex-row items-center gap-2">
             <Pressable
-              onPress={() => setShowMapPicker((current) => !current)}
+              onPress={() => {
+                if (isOffline) {
+                  Alert.alert(
+                    "Map Unavailable Offline",
+                    "Map preview is unavailable offline. Use your current GPS location."
+                  );
+                  return;
+                }
+                setShowMapPicker((current) => !current);
+              }}
               className="h-12 flex-1 items-start justify-center rounded-2xl border border-zinc-300 px-4"
             >
               <Text
@@ -287,6 +300,13 @@ export function ReportEmergencyDetailsScreen() {
 
                   <Pressable
                     onPress={() => {
+                      if (isOffline) {
+                        Alert.alert(
+                          "Map Unavailable Offline",
+                          "Map preview is unavailable offline. Use your current GPS location."
+                        );
+                        return;
+                      }
                       setShowMapPicker(false);
                       router.push("/report/pick-location");
                     }}
